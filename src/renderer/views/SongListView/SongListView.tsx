@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Spin } from 'antd';
 import { Outlet, useNavigate, useOutlet } from 'react-router-dom';
+import { Song } from '../../../types';
 import { SongFilter } from '../../components/SongFilter';
 import { SongList } from '../../components/SongList';
 import { SettingsButton } from '../../components/SettingsButton';
 import { SortButton } from '../../components/SortButton';
 import { SplittingQueue } from '../../components/SplittingQueue';
 import { EmptySongState } from '../../components/EmptySongState';
+import { SongImport } from '../../components/SongImport';
 import { useApp } from '../../context/AppContext';
 import { useInput } from '../../context/InputContext';
 import { StemToolsProvider } from '../../context/StemToolsContext';
@@ -53,6 +55,7 @@ export function SongListView() {
     setSort,
     filteredSongList,
     onlineResults,
+    onlineHasExactMatch,
     onlineTotal,
     onlineLoading,
     loadMore,
@@ -72,6 +75,13 @@ export function SongListView() {
   const [prevSort, setPrevSort] = useState(sort);
   const [prevSortAvailable, setPrevSortAvailable] = useState(sortAvailable);
   const gameModeSelector = useGameModeSelector();
+  const handleSongImported = useCallback(
+    (song: Song) => {
+      addSong(song);
+      setLibraryMode('local');
+    },
+    [addSong, setLibraryMode],
+  );
 
   if (
     nameFilter !== prevNameFilter ||
@@ -194,6 +204,10 @@ export function SongListView() {
               libraryMode={libraryMode}
               onChangeLibraryMode={setLibraryMode}
             />
+            <SongImport
+              disabled={currentPath === null}
+              onImported={handleSongImported}
+            />
             <SortButton
               sort={sort}
               disabled={!sortAvailable}
@@ -215,29 +229,44 @@ export function SongListView() {
           <div className="relative w-full max-w-250 grow overflow-hidden mx-auto bg-bg flex flex-col">
             {filteredSongList.length > 0 ||
             (libraryMode === 'online' && onlineLoading) ? (
-              <SongList
-                songList={filteredSongList}
-                scrollKey={nameFilter}
-                downloadingIds={downloadingIds}
-                downloadingDisabled={currentPath === null}
-                difficulty={difficulty}
-                onClickSong={(id) => {
-                  if (libraryMode === 'local') {
-                    play(id);
+              <>
+                {libraryMode === 'online' &&
+                  nameFilter.trim() &&
+                  !onlineLoading &&
+                  !onlineHasExactMatch && (
+                    <div
+                      className="mx-2 mt-2 rounded-lg border border-border-soft bg-surface px-3 py-2 text-sm text-text-muted"
+                      role="status"
+                    >
+                      No exact matches for “{nameFilter.trim()}”. Showing fuzzy
+                      results.
+                    </div>
+                  )}
+                <SongList
+                  className="grow min-h-0"
+                  songList={filteredSongList}
+                  scrollKey={nameFilter}
+                  downloadingIds={downloadingIds}
+                  downloadingDisabled={currentPath === null}
+                  difficulty={difficulty}
+                  onClickSong={(id) => {
+                    if (libraryMode === 'local') {
+                      play(id);
+                    }
+                  }}
+                  downloadedIds={
+                    libraryMode === 'online'
+                      ? new Set(songList.map((s) => s.id))
+                      : undefined
                   }
-                }}
-                downloadedIds={
-                  libraryMode === 'online'
-                    ? new Set(songList.map((s) => s.id))
-                    : undefined
-                }
-                splittingIds={splittingIds}
-                onSplit={handleSplit}
-                onDownload={handleDownload}
-                onLikeChange={handleLikeChange}
-                onLoadMore={libraryMode === 'online' ? loadMore : undefined}
-                focusedIndex={!isSortOpen ? focusedSongIndex : undefined}
-              />
+                  splittingIds={splittingIds}
+                  onSplit={handleSplit}
+                  onDownload={handleDownload}
+                  onLikeChange={handleLikeChange}
+                  onLoadMore={libraryMode === 'online' ? loadMore : undefined}
+                  focusedIndex={!isSortOpen ? focusedSongIndex : undefined}
+                />
+              </>
             ) : (
               <EmptySongState
                 libraryMode={libraryMode}

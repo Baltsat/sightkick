@@ -1,4 +1,5 @@
 import path from 'path';
+import { existsSync } from 'fs';
 import { test, expect, Page } from '@playwright/test';
 import { launchApp, Harness } from './support';
 import { toAssetUrl } from '../src/main/util';
@@ -29,6 +30,55 @@ test.describe('first run', () => {
 });
 
 test.describe('seeded library', () => {
+  test('previews and imports a prepared local auto-chart', async () => {
+    harness = await launchApp({ seedLibrary: true });
+    await harness.app.evaluate(({ dialog }, importDir) => {
+      dialog.showOpenDialog = async () => ({
+        canceled: false,
+        filePaths: [importDir],
+      });
+    }, harness.importDir);
+    page = await harness.app.firstWindow();
+
+    await page.getByRole('button', { name: 'Import song' }).click();
+    await expect(page.getByText('Review song import')).toBeVisible();
+    await expect(page.getByText('Auto-charted with STRUM')).toBeVisible();
+    await expect(
+      page.getByText('Existing album artwork will be preserved.'),
+    ).toBeVisible();
+
+    if (process.env.SIGHTKICK_IMPORT_PREVIEW_PROOF) {
+      await page.screenshot({
+        path: process.env.SIGHTKICK_IMPORT_PREVIEW_PROOF,
+      });
+    }
+
+    await page.getByRole('button', { name: 'Add to library' }).click();
+
+    const row = page.getByTestId(/song-item-/).filter({ hasText: 'Raging' });
+
+    await expect(row).toBeVisible();
+    await expect(row.getByText('Auto-charted with STRUM')).toBeVisible();
+    await expect(row.getByText('play once to earn stars')).toBeVisible();
+
+    await page.getByTestId('song-search').fill('STRUM');
+    await expect(row).toBeVisible();
+
+    const importedDir = path.join(
+      harness.libraryDir,
+      'Kygo feat. Kodaline - Raging',
+    );
+
+    expect(existsSync(path.join(importedDir, 'album.png'))).toBe(true);
+    expect(existsSync(path.join(importedDir, '.sightkick'))).toBe(true);
+
+    if (process.env.SIGHTKICK_IMPORT_AFTER_PROOF) {
+      await page.screenshot({
+        path: process.env.SIGHTKICK_IMPORT_AFTER_PROOF,
+      });
+    }
+  });
+
   test('scans the folder, lists the song, and renders real sheet music', async () => {
     harness = await launchApp({ seedLibrary: true });
     page = await harness.app.firstWindow();

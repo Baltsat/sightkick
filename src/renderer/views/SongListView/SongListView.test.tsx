@@ -86,6 +86,70 @@ describe('SongListView — loading the library', () => {
     expect(screen.queryByText('Name a')).not.toBeInTheDocument();
     expect(screen.getByText('Name c')).toBeInTheDocument();
   });
+
+  it('validates, previews and imports a prepared local chart folder', async () => {
+    const view = setupSongListView();
+
+    view.loadSongs([], '/music');
+    fireEvent.click(screen.getByTestId('import-song-trigger'));
+
+    expect(view.sentChannels()).toContain('select-import-song');
+
+    view.emit('select-import-song', {
+      preview: {
+        sourceDir: '/incoming/Raging',
+        name: 'Raging',
+        artist: 'Kygo feat. Kodaline',
+        album: 'Cloud Nine',
+        charter: '',
+        autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
+        chartFormat: 'mid',
+        audioCount: 7,
+        drumDifficulties: ['easy', 'medium', 'hard', 'expert'],
+        albumCoverDataUrl: 'data:image/jpeg;base64,cHJldmlldw==',
+        coverSource: 'embedded',
+      },
+    });
+
+    expect(screen.getByText('Review song import')).toBeInTheDocument();
+    expect(screen.getByText('Raging')).toBeInTheDocument();
+    expect(screen.getByText('Auto-charted with STRUM')).toBeInTheDocument();
+    expect(screen.getByText(/Embedded artwork found/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('import-artwork-url'), {
+      target: { value: 'https://example.com/permitted-cover.jpg' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add to library' }));
+
+    expect(view.ipc.sent).toContainEqual({
+      channel: 'import-song',
+      args: [
+        {
+          sourceDir: '/incoming/Raging',
+          artworkUrl: 'https://example.com/permitted-cover.jpg',
+        },
+      ],
+    });
+
+    view.emit('import-song', {
+      success: true,
+      song: makeListSong('raging', {
+        name: 'Raging',
+        charter: '',
+        autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
+      }),
+    });
+
+    expect(screen.getByTestId('song-item-raging')).toBeInTheDocument();
+  });
+
+  it('disables local import until a library folder is selected', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([], null);
+
+    expect(screen.getByTestId('import-song-trigger')).toBeDisabled();
+  });
 });
 
 describe('SongListView — filtering and sorting', () => {
@@ -113,6 +177,28 @@ describe('SongListView — filtering and sorting', () => {
 
     expect(screen.getByText('One')).toBeInTheDocument();
     expect(screen.queryByText('Two')).not.toBeInTheDocument();
+  });
+
+  it('searches local album, charter provenance and folded diacritics', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('raging', {
+        name: 'Raging',
+        artist: 'Kygo feat. Kodaliné',
+        album: 'Cloud Nine',
+        charter: '',
+        autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
+      }),
+      makeListSong('other', { name: 'Other' }),
+    ]);
+
+    for (const query of ['kodaline', 'cloud nine', 'strum']) {
+      view.search(query);
+
+      expect(screen.getByText('Raging')).toBeInTheDocument();
+      expect(screen.queryByText('Other')).not.toBeInTheDocument();
+    }
   });
 
   it('reorders the list when a sort option is chosen', () => {
@@ -167,6 +253,40 @@ describe('SongListView — difficulty', () => {
     view.selectDifficulty('hard');
 
     expect(view.filledStars('a')).toBe(2);
+  });
+
+  it('explains unplayed and scored star states accessibly', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('unplayed'),
+      makeListSong('played', {
+        scoreData: {
+          expert: { hitNotes: 92, totalNotes: 100, falseHits: 0 },
+        },
+      }),
+    ]);
+
+    expect(
+      view.row('unplayed').getByLabelText(/play once to earn stars/i),
+    ).toBeInTheDocument();
+    expect(
+      view.row('played').getByLabelText(/best score: 92% accuracy/i),
+    ).toBeInTheDocument();
+  });
+
+  it('labels the auto-chart tool separately from a human charter', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('raging', {
+        charter: '',
+        autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
+      }),
+    ]);
+
+    expect(screen.getByText('Auto-charted with STRUM')).toBeInTheDocument();
+    expect(screen.queryByText('charter')).not.toBeInTheDocument();
   });
 });
 
@@ -281,6 +401,52 @@ describe('SongListView — online mode', () => {
 
     expect(await screen.findByText('Name x')).toBeInTheDocument();
     expect(screen.getByText('Name y')).toBeInTheDocument();
+  });
+
+  it('ranks exact normalized metadata matches before fuzzy results', async () => {
+    const view = setupSongListView({
+      online: [
+        makeEnchorChart('fuzzy', {
+          name: 'Kyoukai',
+          artist: 'Ho-kago Tea Time',
+        }),
+        makeEnchorChart('exact', {
+          name: 'Stop and Stare',
+          artist: 'OneRépublic',
+        }),
+      ],
+    });
+
+    view.loadSongs([]);
+    view.selectMode('online');
+    view.search('ONEREPUBLIC');
+
+    await screen.findByText('Stop and Stare');
+
+    const names = screen
+      .getAllByText(/Stop and Stare|Kyoukai/)
+      .map((element) => element.textContent);
+
+    expect(names).toEqual(['Stop and Stare', 'Kyoukai']);
+    expect(screen.queryByText(/No exact matches/)).not.toBeInTheDocument();
+  });
+
+  it('says when online results are fuzzy-only', async () => {
+    const view = setupSongListView({
+      online: [
+        makeEnchorChart('fuzzy', {
+          name: 'Kyoukai',
+          artist: 'Ho-kago Tea Time',
+        }),
+      ],
+    });
+
+    view.loadSongs([]);
+    view.selectMode('online');
+    view.search('Kygo');
+
+    expect(await screen.findByText('Kyoukai')).toBeInTheDocument();
+    expect(screen.getByText(/No exact matches for “Kygo”/)).toBeInTheDocument();
   });
 
   it('downloads an online song and marks it downloaded', async () => {

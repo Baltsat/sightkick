@@ -9,7 +9,7 @@ import { faHeart } from '@fortawesome/free-regular-svg-icons';
 import appIcon from '../../../../assets/icon.png';
 import { Song } from '../../../types';
 import { cn } from '../../cn';
-import { Button, Tooltip } from 'antd';
+import { Button, Tag, Tooltip } from 'antd';
 import { useMemo } from 'react';
 import { SongMenu } from '../SongMenu';
 import { Stars } from '../Stars';
@@ -48,6 +48,9 @@ export function SongListItem({
 }: SongListItemProps) {
   const local = 'source' in songData ? undefined : songData;
   const { albumCover, id, name, artist, charter, drumDifficulty } = songData;
+  const autoChartTool =
+    'autoChartTool' in songData ? songData.autoChartTool : undefined;
+  const autoChartToolName = autoChartTool?.split('(')[0].trim();
   const score = useMemo(() => {
     const result = local?.scoreData?.[difficulty];
 
@@ -152,6 +155,7 @@ export function SongListItem({
         <div className="flex items-center">
           <img
             src={albumCover ?? appIcon}
+            alt={albumCover ? `${name} album cover` : ''}
             onError={(e) => {
               e.currentTarget.src = appIcon;
             }}
@@ -176,16 +180,48 @@ export function SongListItem({
             </div>
           )}
 
+          {autoChartToolName && (
+            <Tag color="purple">Auto-charted with {autoChartToolName}</Tag>
+          )}
+
           {local && (
             <div className="flex flex-col gap-1 items-center">
               <div className="text-xs text-text-dim">{difficulty}</div>
 
-              <Stars
-                rating={score ? score.starRating : 0}
-                perfect={Boolean(score && score.accuracy === 1)}
-                size="xs"
-                className="gap-1"
-              />
+              <Tooltip
+                title={
+                  score
+                    ? `Best score: ${Math.round(
+                        score.accuracy * 100,
+                      )}% accuracy`
+                    : 'Play once to earn stars'
+                }
+              >
+                <div
+                  className="text-xs text-text-faint text-center"
+                  tabIndex={0}
+                  aria-label={
+                    score
+                      ? `Best score: ${Math.round(
+                          score.accuracy * 100,
+                        )}% accuracy`
+                      : 'No best score yet. Play once to earn stars'
+                  }
+                >
+                  {score ? (
+                    <div aria-hidden="true">
+                      <Stars
+                        rating={score.starRating}
+                        perfect={score.accuracy === 1}
+                        size="xs"
+                        className="gap-1"
+                      />
+                    </div>
+                  ) : (
+                    'play once to earn stars'
+                  )}
+                </div>
+              </Tooltip>
             </div>
           )}
 

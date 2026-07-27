@@ -140,6 +140,10 @@ export function StemTools({
             onClick={onDeleteStemTools}
           ></IconButton>
         </div>
+        <div className="text-xs text-text-faint">
+          Open ⋮ on a local song with one mixed audio file, then choose Split
+          stems.
+        </div>
         {updateAvailable && (
           <div className="flex gap-2 items-center">
             <Button

@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import Fuse from 'fuse.js';
 import { Difficulty } from 'scan-chart';
 import { Song } from '../../types';
 import { type SortState } from '../components/SortButton';
 import { useOnlineSearch } from './useOnlineSearch';
 import { usePersisted } from './usePersisted';
 import { LibraryMode } from '../types';
+import { rankOnlineSongs, searchLocalSongs } from '../songSearch';
 
 export function useSongFilter(songList: Song[], difficulty: Difficulty) {
   const [nameFilter, setNameFilter] = useState('');
@@ -20,9 +20,13 @@ export function useSongFilter(songList: Song[], difficulty: Difficulty) {
     loading: onlineLoading,
     loadMore,
   } = useOnlineSearch(libraryMode === 'online', nameFilter, difficulty);
+  const rankedOnline = useMemo(
+    () => rankOnlineSongs(onlineResults, nameFilter),
+    [onlineResults, nameFilter],
+  );
   const filteredSongList = useMemo(() => {
     if (libraryMode === 'online') {
-      return onlineResults;
+      return rankedOnline.songs;
     }
 
     const byDifficulty = songList.filter(
@@ -30,11 +34,7 @@ export function useSongFilter(songList: Song[], difficulty: Difficulty) {
     );
 
     if (nameFilter) {
-      const fuse = new Fuse(byDifficulty, {
-        keys: ['name', 'artist', 'charter'],
-      });
-
-      return fuse.search(nameFilter).map((result) => result.item);
+      return searchLocalSongs(byDifficulty, nameFilter);
     }
 
     return [...byDifficulty].sort((a, b) => {
@@ -66,7 +66,7 @@ export function useSongFilter(songList: Song[], difficulty: Difficulty) {
           return a.name.localeCompare(b.name);
       }
     });
-  }, [songList, nameFilter, libraryMode, onlineResults, sort, difficulty]);
+  }, [songList, nameFilter, libraryMode, rankedOnline.songs, sort, difficulty]);
 
   return {
     nameFilter,
@@ -76,7 +76,8 @@ export function useSongFilter(songList: Song[], difficulty: Difficulty) {
     sort,
     setSort,
     filteredSongList,
-    onlineResults,
+    onlineResults: rankedOnline.songs,
+    onlineHasExactMatch: rankedOnline.hasExactMatch,
     onlineTotal,
     onlineLoading,
     loadMore,

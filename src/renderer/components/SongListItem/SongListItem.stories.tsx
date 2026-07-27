@@ -56,6 +56,20 @@ export const Liked: Story = {
   args: { songData: { ...songData, liked: true } },
 };
 
+export const Unplayed: Story = {
+  args: { songData: { ...songData, scoreData: undefined } },
+};
+
+export const AutoCharted: Story = {
+  args: {
+    songData: {
+      ...songData,
+      charter: '',
+      autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
+    },
+  },
+};
+
 export const Focused: Story = { args: { focused: true } };
 
 export const Online: Story = { args: { songData: onlineSongData } };
