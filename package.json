@@ -73,6 +73,7 @@
     "es-toolkit": "^1.47.1",
     "fuse.js": "^7.0.0",
     "ini": "^4.1.1",
+    "music-metadata": "^11.14.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.18.1",

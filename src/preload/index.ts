@@ -9,6 +9,8 @@ export type Channels =
   | 'resume-sleep'
   | 'check-dev'
   | 'download-song'
+  | 'select-import-song'
+  | 'import-song'
   | 'check-stem-tools'
   | 'check-stem-tools-update'
   | 'download-stem-tools'
