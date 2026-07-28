@@ -1,0 +1,57 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "7ff89f71a3de",
+  "session_id": "2e1173c6-bd46-49fd-9962-65875a3772ee",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-28T11:16:35.830744Z",
+  "branch": "codex/whestbench-campaign",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "artifacts/e140_equivariant_rolled_forward_residual_capacity_kill.json",
+    "research/e140_equivariant_rolled_forward_residual_capacity/RESULTS.md",
+    "research/e140_equivariant_rolled_forward_residual_capacity/screen.py",
+    "research/e140_equivariant_rolled_forward_residual_capacity/sensitivity.py",
+    "research/e140_equivariant_rolled_forward_residual_capacity/verify.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "7b2986405d28",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-28T11:16:35.665463Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 1861,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1861,
+    "total_lines_changed": 1861,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 265,
+      "user_lines_removed": 126,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.json": 84,
+        ".codex/config.toml": 3,
+        ".codex/hooks.json": 52,
+        "CAMPAIGN.md": 126
+      },
+      "user_removed_per_file": {
+        "CAMPAIGN.md": 126
+      }
+    }
+  ]
+}

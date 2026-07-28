@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "7ff89f71a3de",
+  "strategy": "manual-commit",
+  "branch": "codex/whestbench-campaign",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "artifacts/e140_equivariant_rolled_forward_residual_capacity_kill.json",
+    "research/e140_equivariant_rolled_forward_residual_capacity/RESULTS.md",
+    "research/e140_equivariant_rolled_forward_residual_capacity/screen.py",
+    "research/e140_equivariant_rolled_forward_residual_capacity/sensitivity.py",
+    "research/e140_equivariant_rolled_forward_residual_capacity/verify.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/7f/f89f71a3de/0/metadata.json",
+      "transcript": "/7f/f89f71a3de/0/full.jsonl",
+      "compact_transcript": "/7f/f89f71a3de/0/transcript.jsonl",
+      "content_hash": "/7f/f89f71a3de/0/content_hash.txt",
+      "prompt": "/7f/f89f71a3de/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
