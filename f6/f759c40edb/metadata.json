@@ -3,7 +3,7 @@
   "checkpoint_id": "f6f759c40edb",
   "strategy": "manual-commit",
   "branch": "codex/whestbench-campaign",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "artifacts/e146_coordinate_sign_oracle_result.json",
     "research/e146_coordinate_sign_oracle/RESULTS.md",
@@ -16,13 +16,20 @@
       "compact_transcript": "/f6/f759c40edb/0/transcript.jsonl",
       "content_hash": "/f6/f759c40edb/0/content_hash.txt",
       "prompt": "/f6/f759c40edb/0/prompt.txt"
+    },
+    {
+      "metadata": "/f6/f759c40edb/1/metadata.json",
+      "transcript": "/f6/f759c40edb/1/full.jsonl",
+      "compact_transcript": "/f6/f759c40edb/1/transcript.jsonl",
+      "content_hash": "/f6/f759c40edb/1/content_hash.txt",
+      "prompt": "/f6/f759c40edb/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 2,
-    "cache_creation_tokens": 77445,
+    "input_tokens": 4,
+    "cache_creation_tokens": 133543,
     "cache_read_tokens": 5943,
-    "output_tokens": 2323,
-    "api_call_count": 1
+    "output_tokens": 3341,
+    "api_call_count": 2
   }
 }
