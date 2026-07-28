@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "20dadcf40936",
+  "strategy": "manual-commit",
+  "branch": "codex/whestbench-campaign",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "artifacts/e149_balanced_row_subset_result.json",
+    "research/e149_balanced_row_subset/RESULTS.md",
+    "research/e149_balanced_row_subset/verify.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/20/dadcf40936/0/metadata.json",
+      "transcript": "/20/dadcf40936/0/full.jsonl",
+      "compact_transcript": "/20/dadcf40936/0/transcript.jsonl",
+      "content_hash": "/20/dadcf40936/0/content_hash.txt",
+      "prompt": "/20/dadcf40936/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 4,
+    "cache_creation_tokens": 124138,
+    "cache_read_tokens": 0,
+    "output_tokens": 55406,
+    "api_call_count": 2
+  }
+}
