@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "92c327202d1a",
+  "strategy": "manual-commit",
+  "branch": "codex/whestbench-campaign",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "artifacts/e158_e141_local_nonlinear_head_preregistration.json",
+    "research/e158_e141_local_nonlinear_head/capacity_screen.py",
+    "research/e158_e141_local_nonlinear_head/test_oracle.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/92/c327202d1a/0/metadata.json",
+      "transcript": "/92/c327202d1a/0/full.jsonl",
+      "compact_transcript": "/92/c327202d1a/0/transcript.jsonl",
+      "content_hash": "/92/c327202d1a/0/content_hash.txt",
+      "prompt": "/92/c327202d1a/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 12,
+    "cache_creation_tokens": 272897,
+    "cache_read_tokens": 522903,
+    "output_tokens": 90460,
+    "api_call_count": 6
+  }
+}
