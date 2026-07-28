@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "20f5228eac34",
+  "strategy": "manual-commit",
+  "branch": "codex/whestbench-campaign",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "research/e147_coordinate_sign_proxy/gate.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/20/f5228eac34/0/metadata.json",
+      "transcript": "/20/f5228eac34/0/full.jsonl",
+      "compact_transcript": "/20/f5228eac34/0/transcript.jsonl",
+      "content_hash": "/20/f5228eac34/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 4,
+    "cache_creation_tokens": 110771,
+    "cache_read_tokens": 144274,
+    "output_tokens": 49876,
+    "api_call_count": 2
+  }
+}
