@@ -24,6 +24,7 @@ import { listenMidi, loadMidiDeviceList, stopListenMidi } from './ipc/midi';
 import { updateSong } from './ipc/updateSong';
 import { rescanSongs } from './ipc/rescanSongs';
 import { exportPdf } from './ipc/exportPdf';
+import { importSong, selectImportSong } from './ipc/importSong';
 
 class AppState {
   private static instance: AppState;
@@ -100,6 +101,8 @@ class AppState {
     ipcMain.on('load-song-list', loadSongList);
     ipcMain.on('rescan-songs', rescanSongs);
     ipcMain.on('download-song', downloadSong);
+    ipcMain.on('select-import-song', selectImportSong);
+    ipcMain.on('import-song', importSong);
 
     ipcMain.on('check-stem-tools', checkStemTools);
     ipcMain.on('check-stem-tools-update', checkStemToolsUpdate);

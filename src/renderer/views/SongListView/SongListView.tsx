@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Spin } from 'antd';
 import { Outlet, useNavigate, useOutlet } from 'react-router-dom';
+import { Song } from '../../../types';
 import { SongFilter } from '../../components/SongFilter';
 import { SongList } from '../../components/SongList';
 import { SettingsButton } from '../../components/SettingsButton';
 import { SortButton } from '../../components/SortButton';
 import { SplittingQueue } from '../../components/SplittingQueue';
 import { EmptySongState } from '../../components/EmptySongState';
+import { SongImport } from '../../components/SongImport';
 import { useApp } from '../../context/AppContext';
 import { useInput } from '../../context/InputContext';
 import { StemToolsProvider } from '../../context/StemToolsContext';
@@ -72,6 +74,13 @@ export function SongListView() {
   const [prevSort, setPrevSort] = useState(sort);
   const [prevSortAvailable, setPrevSortAvailable] = useState(sortAvailable);
   const gameModeSelector = useGameModeSelector();
+  const handleSongImported = useCallback(
+    (song: Song) => {
+      addSong(song);
+      setLibraryMode('local');
+    },
+    [addSong, setLibraryMode],
+  );
 
   if (
     nameFilter !== prevNameFilter ||
@@ -193,6 +202,10 @@ export function SongListView() {
               }
               libraryMode={libraryMode}
               onChangeLibraryMode={setLibraryMode}
+            />
+            <SongImport
+              disabled={currentPath === null}
+              onImported={handleSongImported}
             />
             <SortButton
               sort={sort}

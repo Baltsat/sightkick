@@ -26,6 +26,8 @@ function readSongIdFile(dir: string): string | undefined {
 
 export function toSong(stored: SongData): Song {
   const rating = parseInt(stored.diff_drums ?? '', 10);
+  const autoChartTool = stored.auto_chart_tool?.trim();
+  const charter = stored.charter?.trim() ?? '';
 
   return {
     id: stored.id,
@@ -34,7 +36,8 @@ export function toSong(stored: SongData): Song {
     name: stored.name ?? '',
     artist: stored.artist ?? '',
     album: stored.album ?? '',
-    charter: stored.charter ?? '',
+    charter: hasDuplicatedAutoCharter(stored) ? '' : charter,
+    autoChartTool: autoChartTool || undefined,
     genre: stored.genre ?? '',
     year: stored.year ?? '',
     fiveLaneDrums: stored.five_lane_drums === 'True',
@@ -48,6 +51,21 @@ export function toSong(stored: SongData): Song {
     updatedAt: stored.updatedAt,
     scoreData: stored.scoreData,
   };
+}
+
+export function hasDuplicatedAutoCharter(
+  stored: Pick<SongData, 'auto_chart' | 'auto_chart_tool' | 'charter'>,
+): boolean {
+  const autoChartToolName = stored.auto_chart_tool?.split('(')[0].trim() ?? '';
+  const charterName = stored.charter?.split('(')[0].trim() ?? '';
+
+  return (
+    Boolean(autoChartToolName) &&
+    stored.auto_chart?.toLowerCase() === 'true' &&
+    charterName.localeCompare(autoChartToolName, undefined, {
+      sensitivity: 'accent',
+    }) === 0
+  );
 }
 
 function readDrumDifficulties(

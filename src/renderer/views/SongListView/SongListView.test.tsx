@@ -86,6 +86,66 @@ describe('SongListView — loading the library', () => {
     expect(screen.queryByText('Name a')).not.toBeInTheDocument();
     expect(screen.getByText('Name c')).toBeInTheDocument();
   });
+
+  it('validates, previews and imports a prepared local chart folder', async () => {
+    const view = setupSongListView();
+
+    view.loadSongs([], '/music');
+    fireEvent.click(screen.getByTestId('import-song-trigger'));
+
+    expect(view.sentChannels()).toContain('select-import-song');
+
+    view.emit('select-import-song', {
+      preview: {
+        sourceDir: '/incoming/Raging',
+        name: 'Raging',
+        artist: 'Kygo feat. Kodaline',
+        album: 'Cloud Nine',
+        charter: '',
+        autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
+        chartFormat: 'mid',
+        audioCount: 7,
+        drumDifficulties: ['easy', 'medium', 'hard', 'expert'],
+        albumCoverDataUrl: 'data:image/jpeg;base64,cHJldmlldw==',
+        coverSource: 'embedded',
+      },
+    });
+
+    expect(screen.getByText('Review song import')).toBeInTheDocument();
+    expect(screen.getByText('Raging')).toBeInTheDocument();
+    expect(screen.getByText('Auto-charted with STRUM')).toBeInTheDocument();
+    expect(screen.getByText(/Embedded artwork found/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add to library' }));
+
+    expect(view.ipc.sent).toContainEqual({
+      channel: 'import-song',
+      args: [
+        {
+          sourceDir: '/incoming/Raging',
+        },
+      ],
+    });
+
+    view.emit('import-song', {
+      success: true,
+      song: makeListSong('raging', {
+        name: 'Raging',
+        charter: '',
+        autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
+      }),
+    });
+
+    expect(screen.getByTestId('song-item-raging')).toBeInTheDocument();
+  });
+
+  it('disables local import until a library folder is selected', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([], null);
+
+    expect(screen.getByTestId('import-song-trigger')).toBeDisabled();
+  });
 });
 
 describe('SongListView — filtering and sorting', () => {

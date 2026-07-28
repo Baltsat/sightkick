@@ -277,6 +277,45 @@ describe('toSong', () => {
     expect(song.drumDifficulties).toEqual(['hard', 'expert']);
     expect(song.scoreData).toEqual(scoreData);
   });
+
+  it('keeps auto-chart provenance separate from a human charter', () => {
+    const song = toSong(
+      stored({
+        auto_chart: 'True',
+        auto_chart_tool: 'STRUM (OCTAVE AI auto-charter)',
+        charter: 'Jane Doe',
+      }),
+    );
+
+    expect(song.charter).toBe('Jane Doe');
+    expect(song.autoChartTool).toBe('STRUM (OCTAVE AI auto-charter)');
+  });
+
+  it('hides a duplicated AI engine from the human charter field', () => {
+    const song = toSong(
+      stored({
+        auto_chart: 'True',
+        auto_chart_tool: 'STRUM (OCTAVE AI auto-charter)',
+        charter: 'STRUM',
+      }),
+    );
+
+    expect(song.charter).toBe('');
+    expect(song.autoChartTool).toBe('STRUM (OCTAVE AI auto-charter)');
+  });
+
+  it('hides a parenthetical AI label from the human charter field', () => {
+    const song = toSong(
+      stored({
+        auto_chart: 'True',
+        auto_chart_tool: 'STRUM (OCTAVE AI auto-charter)',
+        charter: 'STRUM (AI auto-charted)',
+      }),
+    );
+
+    expect(song.charter).toBe('');
+    expect(song.autoChartTool).toBe('STRUM (OCTAVE AI auto-charter)');
+  });
 });
 
 describe('chartGlobPattern', () => {

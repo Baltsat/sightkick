@@ -7,6 +7,8 @@ export interface SongData {
   album: string;
   album_track: string;
   artist: string;
+  auto_chart: string;
+  auto_chart_tool: string;
   banner_link_a: string;
   banner_link_b: string;
   charter: string;
@@ -67,6 +69,7 @@ export interface Song {
   artist: string;
   album: string;
   charter: string;
+  autoChartTool?: string;
   genre: string;
   year: string;
   fiveLaneDrums: boolean;
@@ -227,6 +230,36 @@ export interface IpcLoadSongListResponse {
 export interface IpcScanProgressResponse {
   current: number;
   total: number;
+}
+
+export interface IpcImportSongPreview {
+  sourceDir: string;
+  name: string;
+  artist: string;
+  album: string;
+  charter: string;
+  autoChartTool?: string;
+  chartFormat: 'mid' | 'chart';
+  audioCount: number;
+  drumDifficulties: Difficulty[];
+  albumCoverDataUrl?: string;
+  coverSource: 'existing' | 'embedded' | 'none';
+}
+
+export interface IpcSelectImportSongResponse {
+  preview?: IpcImportSongPreview;
+  cancelled?: boolean;
+  error?: string;
+}
+
+export interface IpcImportSongRequest {
+  sourceDir: string;
+}
+
+export interface IpcImportSongResponse {
+  success: boolean;
+  song?: Song;
+  error?: string;
 }
 
 export interface StorageSchema {

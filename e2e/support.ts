@@ -7,6 +7,7 @@ const MAIN_ENTRY = path.join(__dirname, '..', 'out', 'main', 'index.js');
 
 export interface Harness {
   app: ElectronApplication;
+  importDir: string;
   libraryDir: string;
 }
 
@@ -14,6 +15,30 @@ const ALBUM_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
   'base64',
 );
+const EXPERT_DRUM_CHART = [
+  '[Song]',
+  '{',
+  '  Resolution = 480',
+  '}',
+  '[SyncTrack]',
+  '{',
+  '  0 = TS 4',
+  '  0 = B 120000',
+  '}',
+  '[ExpertDrums]',
+  '{',
+  '  0 = N 0 0',
+  '  480 = N 1 0',
+  '  960 = N 0 0',
+  '  1440 = N 1 0',
+  '  1920 = N 0 0',
+  '  2400 = N 2 0',
+  '  2400 = N 66 0',
+  '  2880 = N 0 0',
+  '  3360 = N 1 0',
+  '}',
+  '',
+].join('\n');
 
 function writeFixtureLibrary(): string {
   const libraryDir = mkdtempSync(path.join(tmpdir(), 'sightkick-library-'));
@@ -37,35 +62,37 @@ function writeFixtureLibrary(): string {
     ].join('\n'),
   );
 
+  writeFileSync(path.join(songDir, 'notes.chart'), EXPERT_DRUM_CHART);
+
+  return libraryDir;
+}
+
+function writeImportFixture(): string {
+  const root = mkdtempSync(path.join(tmpdir(), 'sightkick-import-'));
+  const songDir = path.join(root, 'prepared-song');
+
+  mkdirSync(songDir);
+  writeFileSync(path.join(songDir, 'album.png'), ALBUM_PNG);
+  writeFileSync(path.join(songDir, 'notes.chart'), EXPERT_DRUM_CHART);
+  writeFileSync(path.join(songDir, 'song.mp3'), 'test audio');
   writeFileSync(
-    path.join(songDir, 'notes.chart'),
+    path.join(songDir, 'song.ini'),
     [
-      '[Song]',
-      '{',
-      '  Resolution = 480',
-      '}',
-      '[SyncTrack]',
-      '{',
-      '  0 = TS 4',
-      '  0 = B 120000',
-      '}',
-      '[ExpertDrums]',
-      '{',
-      '  0 = N 0 0',
-      '  480 = N 1 0',
-      '  960 = N 0 0',
-      '  1440 = N 1 0',
-      '  1920 = N 0 0',
-      '  2400 = N 2 0',
-      '  2400 = N 66 0',
-      '  2880 = N 0 0',
-      '  3360 = N 1 0',
-      '}',
+      '[song]',
+      'name = Raging',
+      'artist = Kygo feat. Kodaline',
+      'album = Cloud Nine',
+      'auto_chart = True',
+      'auto_chart_tool = STRUM (OCTAVE AI auto-charter)',
+      'charter = STRUM',
+      'pro_drums = True',
+      'five_lane_drums = False',
+      'diff_drums = 2',
       '',
     ].join('\n'),
   );
 
-  return libraryDir;
+  return songDir;
 }
 
 function seedUserData(seed: Record<string, unknown>): string {
@@ -83,6 +110,7 @@ export async function launchApp(
   options: { seedLibrary?: boolean } = {},
 ): Promise<Harness> {
   const libraryDir = writeFixtureLibrary();
+  const importDir = writeImportFixture();
   const userDataDir = seedUserData(
     options.seedLibrary ? { lastOpenedPath: libraryDir } : {},
   );
@@ -95,5 +123,5 @@ export async function launchApp(
     },
   });
 
-  return { app, libraryDir };
+  return { app, importDir, libraryDir };
 }
