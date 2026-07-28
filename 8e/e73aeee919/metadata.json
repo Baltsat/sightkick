@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "8ee73aeee919",
+  "strategy": "manual-commit",
+  "branch": "codex/whestbench-campaign",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "research/e152_exact_line_preintegration_oracle/oracle.py",
+    "research/e152_exact_line_preintegration_oracle/test_oracle.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/8e/e73aeee919/0/metadata.json",
+      "transcript": "/8e/e73aeee919/0/full.jsonl",
+      "compact_transcript": "/8e/e73aeee919/0/transcript.jsonl",
+      "content_hash": "/8e/e73aeee919/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 14,
+    "cache_creation_tokens": 128811,
+    "cache_read_tokens": 511347,
+    "output_tokens": 62381,
+    "api_call_count": 7
+  }
+}
