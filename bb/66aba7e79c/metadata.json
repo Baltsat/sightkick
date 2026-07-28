@@ -3,7 +3,7 @@
   "checkpoint_id": "bb66aba7e79c",
   "strategy": "manual-commit",
   "branch": "codex/whestbench-campaign",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "artifacts/e151_e141_compute_audit_kill.json",
     "research/e151_e141_compute_audit/RESULTS.md",
@@ -17,6 +17,13 @@
       "compact_transcript": "/bb/66aba7e79c/0/transcript.jsonl",
       "content_hash": "/bb/66aba7e79c/0/content_hash.txt",
       "prompt": "/bb/66aba7e79c/0/prompt.txt"
+    },
+    {
+      "metadata": "/bb/66aba7e79c/1/metadata.json",
+      "transcript": "/bb/66aba7e79c/1/full.jsonl",
+      "compact_transcript": "/bb/66aba7e79c/1/transcript.jsonl",
+      "content_hash": "/bb/66aba7e79c/1/content_hash.txt",
+      "prompt": "/bb/66aba7e79c/1/prompt.txt"
     }
   ],
   "token_usage": {
