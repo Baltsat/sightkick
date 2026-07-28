@@ -8,6 +8,7 @@ import { SettingsButton } from '../../components/SettingsButton';
 import { SortButton } from '../../components/SortButton';
 import { SplittingQueue } from '../../components/SplittingQueue';
 import { EmptySongState } from '../../components/EmptySongState';
+import { AutoChart } from '../../components/AutoChart';
 import { SongImport } from '../../components/SongImport';
 import { useApp } from '../../context/AppContext';
 import { useInput } from '../../context/InputContext';
@@ -205,6 +206,10 @@ export function SongListView() {
               onChangeLibraryMode={setLibraryMode}
             />
             <SongImport
+              disabled={currentPath === null}
+              onImported={handleSongImported}
+            />
+            <AutoChart
               disabled={currentPath === null}
               onImported={handleSongImported}
             />

@@ -243,6 +243,7 @@ export interface IpcImportSongPreview {
   audioCount: number;
   drumDifficulties: Difficulty[];
   albumCoverDataUrl?: string;
+  thumbnailUrl?: string;
   coverSource: 'existing' | 'embedded' | 'remote' | 'none';
 }
 
@@ -259,6 +260,41 @@ export interface IpcImportSongRequest {
 
 export interface IpcImportSongResponse {
   success: boolean;
+  song?: Song;
+  error?: string;
+}
+
+export type AutoChartStage =
+  | 'queued'
+  | 'resolving'
+  | 'processing'
+  | 'preview-ready'
+  | 'importing'
+  | 'imported'
+  | 'failed'
+  | 'cancelled';
+
+export interface IpcCreateAutoChartRequest {
+  youtubeUrl?: string;
+}
+
+export interface IpcAutoChartMetadata {
+  title: string;
+  authorName: string;
+  songName?: string;
+  artistName?: string;
+  thumbnailUrl?: string;
+}
+
+export interface IpcAutoChartJob {
+  id: string;
+  attempt: number;
+  stage: AutoChartStage;
+  message: string;
+  percent?: number;
+  sourceName?: string;
+  metadata?: IpcAutoChartMetadata;
+  preview?: IpcImportSongPreview;
   song?: Song;
   error?: string;
 }

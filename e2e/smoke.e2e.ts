@@ -79,6 +79,97 @@ test.describe('seeded library', () => {
     }
   });
 
+  test('creates and reviews a real local OCTAVE chart when requested', async () => {
+    test.skip(
+      !process.env.SIGHTKICK_AUTO_CHART_AUDIO,
+      'set SIGHTKICK_AUTO_CHART_AUDIO for the live OCTAVE proof',
+    );
+    test.setTimeout(180_000);
+
+    harness = await launchApp({ seedLibrary: true });
+    await harness.app.evaluate(({ dialog }, audioPath) => {
+      dialog.showOpenDialog = async () => ({
+        canceled: false,
+        filePaths: [audioPath],
+      });
+    }, process.env.SIGHTKICK_AUTO_CHART_AUDIO!);
+    page = await harness.app.firstWindow();
+
+    await page.getByRole('button', { name: 'Create chart' }).click();
+    await expect(page.getByText('Create local drum chart')).toBeVisible();
+
+    if (process.env.SIGHTKICK_AUTO_CHART_YOUTUBE_URL) {
+      await page
+        .getByTestId('auto-chart-youtube-url')
+        .fill(process.env.SIGHTKICK_AUTO_CHART_YOUTUBE_URL);
+    }
+
+    if (process.env.SIGHTKICK_AUTO_CHART_START_PROOF) {
+      await page.screenshot({
+        path: process.env.SIGHTKICK_AUTO_CHART_START_PROOF,
+      });
+    }
+
+    await page.getByRole('button', { name: 'Choose local audio' }).click();
+    await expect(page.getByTestId('auto-chart-progress')).toBeVisible();
+
+    const review = page.getByText('Review generated drum chart');
+    const failed = page.getByText('failed', { exact: true });
+
+    await expect(review.or(failed)).toBeVisible({ timeout: 150_000 });
+
+    if (await failed.isVisible()) {
+      throw new Error(
+        await page.getByTestId('auto-chart-progress').innerText(),
+      );
+    }
+
+    await expect(page.getByText('Auto-charted with STRUM')).toBeVisible();
+
+    if (process.env.SIGHTKICK_AUTO_CHART_PREVIEW_PROOF) {
+      await page.screenshot({
+        path: process.env.SIGHTKICK_AUTO_CHART_PREVIEW_PROOF,
+      });
+    }
+
+    await page.getByRole('button', { name: 'Add to library' }).click();
+
+    const generated = page.getByTestId(/song-item-/).filter({
+      hasText:
+        process.env.SIGHTKICK_AUTO_CHART_EXPECTED_NAME ?? 'raging-drop-25s',
+    });
+
+    await expect(generated).toBeVisible({ timeout: 30_000 });
+    await expect(generated.getByText('Auto-charted with STRUM')).toBeVisible();
+    await expect(review).toBeHidden();
+
+    if (process.env.SIGHTKICK_AUTO_CHART_AFTER_PROOF) {
+      await page.screenshot({
+        path: process.env.SIGHTKICK_AUTO_CHART_AFTER_PROOF,
+      });
+    }
+
+    await generated.click();
+    await page.getByRole('button', { name: 'perform' }).click();
+
+    const generatedSheet = page.locator('svg').first();
+
+    await expect(generatedSheet).toBeVisible();
+    await expect
+      .poll(async () => page.locator('svg path').count(), { timeout: 30_000 })
+      .toBeGreaterThan(0);
+    await expect(page.getByTestId('play-toggle')).not.toHaveClass(
+      /ant-btn-loading/,
+      { timeout: 30_000 },
+    );
+
+    if (process.env.SIGHTKICK_AUTO_CHART_SHEET_PROOF) {
+      await page.screenshot({
+        path: process.env.SIGHTKICK_AUTO_CHART_SHEET_PROOF,
+      });
+    }
+  });
+
   test('scans the folder, lists the song, and renders real sheet music', async () => {
     harness = await launchApp({ seedLibrary: true });
     page = await harness.app.firstWindow();

@@ -6,6 +6,7 @@ import {
   IpcImportSongRequest,
   IpcImportSongResponse,
   IpcSelectImportSongResponse,
+  Song,
   SongData,
   StorageSchema,
 } from '../../types';
@@ -19,7 +20,7 @@ import {
   writeSongIdFile,
 } from '../util';
 
-function validateSongDir(dir: string): SongData {
+export function validateSongDir(dir: string): SongData {
   const song = buildSongFromDir(dir);
 
   if (!song) {
@@ -37,6 +38,30 @@ function validateSongDir(dir: string): SongData {
   }
 
   return song;
+}
+
+export async function previewPreparedSong(
+  sourceDir: string,
+  options: Pick<IpcImportSongPreview, 'thumbnailUrl'> = {},
+): Promise<IpcImportSongPreview> {
+  const stored = validateSongDir(sourceDir);
+  const song = toSong(stored);
+  const cover = await previewSongCover(sourceDir);
+
+  return {
+    sourceDir,
+    name: song.name,
+    artist: song.artist,
+    album: song.album,
+    charter: song.charter,
+    autoChartTool: song.autoChartTool,
+    chartFormat: song.format,
+    audioCount: song.audio.length,
+    drumDifficulties: song.drumDifficulties ?? [],
+    albumCoverDataUrl: cover.dataUrl,
+    thumbnailUrl: options.thumbnailUrl,
+    coverSource: cover.source,
+  };
 }
 
 function destinationName(song: SongData, sourceDir: string): string {
@@ -93,23 +118,8 @@ export async function selectImportSong(event: IpcMainEvent): Promise<void> {
     }
 
     const sourceDir = result.filePaths[0];
-    const stored = validateSongDir(sourceDir);
-    const song = toSong(stored);
-    const cover = await previewSongCover(sourceDir);
     const response: IpcSelectImportSongResponse = {
-      preview: {
-        sourceDir,
-        name: song.name,
-        artist: song.artist,
-        album: song.album,
-        charter: song.charter,
-        autoChartTool: song.autoChartTool,
-        chartFormat: song.format,
-        audioCount: song.audio.length,
-        drumDifficulties: song.drumDifficulties ?? [],
-        albumCoverDataUrl: cover.dataUrl,
-        coverSource: cover.source,
-      },
+      preview: await previewPreparedSong(sourceDir),
     };
 
     event.reply('select-import-song', response);
@@ -120,10 +130,10 @@ export async function selectImportSong(event: IpcMainEvent): Promise<void> {
   }
 }
 
-export async function importSong(
-  event: IpcMainEvent,
-  { sourceDir, artworkUrl }: IpcImportSongRequest,
-): Promise<void> {
+export async function importPreparedSong({
+  sourceDir,
+  artworkUrl,
+}: IpcImportSongRequest): Promise<Song> {
   let outputDir: string | undefined;
   let outputCreated = false;
 
@@ -177,20 +187,31 @@ export async function importSong(
 
     appState.store.set('songs', { ...songs, [id]: songData });
 
-    const response: IpcImportSongResponse = {
-      success: true,
-      song: toSong({
-        ...songData,
-        updatedAt: fs.statSync(outputDir).mtime.toISOString(),
-      }),
-    };
-
-    event.reply('import-song', response);
+    return toSong({
+      ...songData,
+      updatedAt: fs.statSync(outputDir).mtime.toISOString(),
+    });
   } catch (error) {
     if (outputCreated && outputDir && fs.existsSync(outputDir)) {
       fs.rmSync(outputDir, { recursive: true, force: true });
     }
 
+    throw error;
+  }
+}
+
+export async function importSong(
+  event: IpcMainEvent,
+  request: IpcImportSongRequest,
+): Promise<void> {
+  try {
+    const song = await importPreparedSong(request);
+
+    event.reply('import-song', {
+      success: true,
+      song,
+    } satisfies IpcImportSongResponse);
+  } catch (error) {
     event.reply('import-song', {
       success: false,
       error: error instanceof Error ? error.message : String(error),

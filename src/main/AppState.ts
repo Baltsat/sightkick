@@ -25,6 +25,14 @@ import { updateSong } from './ipc/updateSong';
 import { rescanSongs } from './ipc/rescanSongs';
 import { exportPdf } from './ipc/exportPdf';
 import { importSong, selectImportSong } from './ipc/importSong';
+import {
+  autoChartQueue,
+  cancelAutoChart,
+  createAutoChart,
+  discardAutoChartPreview,
+  importAutoChart,
+  retryAutoChart,
+} from './ipc/autoChart';
 
 class AppState {
   private static instance: AppState;
@@ -103,6 +111,11 @@ class AppState {
     ipcMain.on('download-song', downloadSong);
     ipcMain.on('select-import-song', selectImportSong);
     ipcMain.on('import-song', importSong);
+    ipcMain.on('create-auto-chart', createAutoChart);
+    ipcMain.on('cancel-auto-chart', cancelAutoChart);
+    ipcMain.on('retry-auto-chart', retryAutoChart);
+    ipcMain.on('discard-auto-chart-preview', discardAutoChartPreview);
+    ipcMain.on('import-auto-chart', importAutoChart);
 
     ipcMain.on('check-stem-tools', checkStemTools);
     ipcMain.on('check-stem-tools-update', checkStemToolsUpdate);
@@ -203,6 +216,7 @@ class AppState {
     stopListenMidi();
     killActiveSplit();
     cancelStemTools();
+    void autoChartQueue.shutdown();
   }
 }
 
