@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "f6f759c40edb",
+  "strategy": "manual-commit",
+  "branch": "codex/whestbench-campaign",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "artifacts/e146_coordinate_sign_oracle_result.json",
+    "research/e146_coordinate_sign_oracle/RESULTS.md",
+    "research/e146_coordinate_sign_oracle/gate.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/f6/f759c40edb/0/metadata.json",
+      "transcript": "/f6/f759c40edb/0/full.jsonl",
+      "compact_transcript": "/f6/f759c40edb/0/transcript.jsonl",
+      "content_hash": "/f6/f759c40edb/0/content_hash.txt",
+      "prompt": "/f6/f759c40edb/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 2,
+    "cache_creation_tokens": 77445,
+    "cache_read_tokens": 5943,
+    "output_tokens": 2323,
+    "api_call_count": 1
+  }
+}

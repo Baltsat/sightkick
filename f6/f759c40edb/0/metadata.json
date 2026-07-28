@@ -1,0 +1,57 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "f6f759c40edb",
+  "session_id": "51981324-680a-4f92-ba5e-cd894924f088",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-28T15:00:02.716512Z",
+  "branch": "codex/whestbench-campaign",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "artifacts/e146_coordinate_sign_oracle_result.json",
+    "research/e146_coordinate_sign_oracle/RESULTS.md",
+    "research/e146_coordinate_sign_oracle/gate.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5",
+  "turn_id": "52db13037208",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 2,
+    "cache_creation_tokens": 77445,
+    "cache_read_tokens": 5943,
+    "output_tokens": 2323,
+    "api_call_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-28T15:00:02.461903Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 39067,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 39067,
+    "total_lines_changed": 39067,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 39280,
+      "user_lines_removed": 126,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.json": 84,
+        ".codex/config.toml": 3,
+        ".codex/hooks.json": 52,
+        "CAMPAIGN.md": 126,
+        "artifacts/e146_coordinate_sign_oracle_result.json": 38525,
+        "research/e146_coordinate_sign_oracle/gate.py": 490
+      },
+      "user_removed_per_file": {
+        "CAMPAIGN.md": 126
+      }
+    }
+  ]
+}
