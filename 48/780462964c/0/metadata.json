@@ -1,0 +1,61 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "48780462964c",
+  "session_id": "7ea07eac-2773-46d3-b335-67f1a8104167",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-29T05:04:39.408333Z",
+  "branch": "codex/whestbench-campaign",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "artifacts/e168_e141_bias_variance_result.json",
+    "research/e168_e141_bias_variance/RESULTS.md",
+    "research/e168_e141_bias_variance/gate.py",
+    "research/e168_e141_bias_variance/test_gate.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "d1f5b743eeab",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-29T05:04:39.314578Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 23,
+    "total_committed": 17,
+    "total_lines_changed": 23,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 495,
+      "user_lines_removed": 149,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.json": 84,
+        ".codex/config.toml": 3,
+        ".codex/hooks.json": 52,
+        "CAMPAIGN.md": 126,
+        "artifacts/e168_e141_bias_variance_result.json": 139,
+        "research/e168_e141_bias_variance/RESULTS.md": 25,
+        "research/e168_e141_bias_variance/gate.py": 44,
+        "research/e168_e141_bias_variance/test_gate.py": 22
+      },
+      "user_removed_per_file": {
+        "CAMPAIGN.md": 126,
+        "research/e168_e141_bias_variance/gate.py": 23
+      }
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "48780462964c",
+  "strategy": "manual-commit",
+  "branch": "codex/whestbench-campaign",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "artifacts/e168_e141_bias_variance_result.json",
+    "research/e168_e141_bias_variance/RESULTS.md",
+    "research/e168_e141_bias_variance/gate.py",
+    "research/e168_e141_bias_variance/test_gate.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/48/780462964c/0/metadata.json",
+      "transcript": "/48/780462964c/0/full.jsonl",
+      "compact_transcript": "/48/780462964c/0/transcript.jsonl",
+      "content_hash": "/48/780462964c/0/content_hash.txt",
+      "prompt": "/48/780462964c/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
