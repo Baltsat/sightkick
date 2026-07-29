@@ -1,0 +1,64 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "32de4c638873",
+  "session_id": "1734bb10-5d0e-41f1-b03d-410f7382bacd",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-29T04:41:45.86282Z",
+  "branch": "codex/whestbench-campaign",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "artifacts/e167_pair_fiber_teacher_forced_range_manifest.json",
+    "artifacts/e167_pair_fiber_teacher_forced_result.json",
+    "research/e167_pair_fiber_teacher_forced/RESULTS.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-fable-5",
+  "turn_id": "705a53b9788c",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 6,
+    "cache_creation_tokens": 132962,
+    "cache_read_tokens": 130271,
+    "output_tokens": 26155,
+    "api_call_count": 3
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-29T04:41:45.704995Z",
+    "agent_lines": 716,
+    "agent_removed": 0,
+    "human_added": 50,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 766,
+    "total_lines_changed": 813,
+    "agent_percentage": 88.06888068880689,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 1375,
+      "user_lines_removed": 126,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.json": 84,
+        ".codex/config.toml": 3,
+        ".codex/hooks.json": 52,
+        "CAMPAIGN.md": 126,
+        "artifacts/e167_pair_fiber_teacher_forced_model_receipt.json": 113,
+        "artifacts/e167_pair_fiber_teacher_forced_preregistration.json": 89,
+        "artifacts/e167_pair_fiber_teacher_forced_reserve_prediction_receipt.json": 9,
+        "research/e167_pair_fiber_teacher_forced/gate.py": 839,
+        "research/e167_pair_fiber_teacher_forced/test_gate.py": 60
+      },
+      "user_removed_per_file": {
+        "CAMPAIGN.md": 126
+      }
+    }
+  ]
+}
