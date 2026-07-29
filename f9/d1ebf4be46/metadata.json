@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "f9d1ebf4be46",
+  "strategy": "manual-commit",
+  "branch": "codex/whestbench-campaign",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "artifacts/e161_global_alpha_bin_hypothesis_screen_kill.json"
+  ],
+  "sessions": [
+    {
+      "metadata": "/f9/d1ebf4be46/0/metadata.json",
+      "transcript": "/f9/d1ebf4be46/0/full.jsonl",
+      "compact_transcript": "/f9/d1ebf4be46/0/transcript.jsonl",
+      "content_hash": "/f9/d1ebf4be46/0/content_hash.txt",
+      "prompt": "/f9/d1ebf4be46/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 4,
+    "cache_creation_tokens": 89589,
+    "cache_read_tokens": 32580,
+    "output_tokens": 14128,
+    "api_call_count": 2
+  }
+}
