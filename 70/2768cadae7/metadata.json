@@ -3,10 +3,11 @@
   "checkpoint_id": "702768cadae7",
   "strategy": "manual-commit",
   "branch": "codex/whestbench-campaign",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "research/e160_terminal_gate_gaussian_control/fresh_gate.py",
     "research/e160_terminal_gate_gaussian_control/oracle.py",
+    "research/e160_terminal_gate_gaussian_control/preregistration.json",
     "research/e160_terminal_gate_gaussian_control/test_oracle.py"
   ],
   "sessions": [
@@ -16,13 +17,20 @@
       "compact_transcript": "/70/2768cadae7/0/transcript.jsonl",
       "content_hash": "/70/2768cadae7/0/content_hash.txt",
       "prompt": "/70/2768cadae7/0/prompt.txt"
+    },
+    {
+      "metadata": "/70/2768cadae7/1/metadata.json",
+      "transcript": "/70/2768cadae7/1/full.jsonl",
+      "compact_transcript": "/70/2768cadae7/1/transcript.jsonl",
+      "content_hash": "/70/2768cadae7/1/content_hash.txt",
+      "prompt": "/70/2768cadae7/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 6,
-    "cache_creation_tokens": 170472,
-    "cache_read_tokens": 90656,
-    "output_tokens": 31425,
-    "api_call_count": 3
+    "input_tokens": 14,
+    "cache_creation_tokens": 400357,
+    "cache_read_tokens": 336253,
+    "output_tokens": 71700,
+    "api_call_count": 7
   }
 }
