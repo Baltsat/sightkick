@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "702768cadae7",
+  "strategy": "manual-commit",
+  "branch": "codex/whestbench-campaign",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "research/e160_terminal_gate_gaussian_control/fresh_gate.py",
+    "research/e160_terminal_gate_gaussian_control/oracle.py",
+    "research/e160_terminal_gate_gaussian_control/test_oracle.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/70/2768cadae7/0/metadata.json",
+      "transcript": "/70/2768cadae7/0/full.jsonl",
+      "compact_transcript": "/70/2768cadae7/0/transcript.jsonl",
+      "content_hash": "/70/2768cadae7/0/content_hash.txt",
+      "prompt": "/70/2768cadae7/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 6,
+    "cache_creation_tokens": 170472,
+    "cache_read_tokens": 90656,
+    "output_tokens": 31425,
+    "api_call_count": 3
+  }
+}
