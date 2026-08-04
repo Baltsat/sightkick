@@ -15,6 +15,13 @@ function existingCoverPath(dir: string): string | undefined {
   ).find((file) => fs.existsSync(file));
 }
 
+// Node's Buffer is a Uint8Array view but is no longer structurally
+// assignable to the plain Uint8Array<ArrayBufferLike> type; build an
+// explicit zero-copy view instead of widening the type with `as`.
+function toUint8Array(buffer: Buffer): Uint8Array {
+  return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+}
+
 function imageDataUrl(data: Uint8Array): string | undefined {
   const image = nativeImage.createFromBuffer(Buffer.from(data));
 
@@ -102,7 +109,7 @@ export async function previewSongCover(
 
   if (existing) {
     return {
-      dataUrl: imageDataUrl(fs.readFileSync(existing)),
+      dataUrl: imageDataUrl(toUint8Array(fs.readFileSync(existing))),
       source: 'existing',
     };
   }
@@ -127,7 +134,10 @@ export async function ingestSongCover(
   const embedded = await embeddedArtwork(dir);
 
   if (embedded) {
-    fs.writeFileSync(path.join(dir, 'album.jpg'), jpegData(embedded));
+    fs.writeFileSync(
+      path.join(dir, 'album.jpg'),
+      toUint8Array(jpegData(embedded)),
+    );
 
     return 'embedded';
   }
@@ -135,7 +145,10 @@ export async function ingestSongCover(
   if (artworkUrl?.trim()) {
     const remote = await remoteArtwork(artworkUrl.trim());
 
-    fs.writeFileSync(path.join(dir, 'album.jpg'), jpegData(remote));
+    fs.writeFileSync(
+      path.join(dir, 'album.jpg'),
+      toUint8Array(jpegData(remote)),
+    );
 
     return 'remote';
   }

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AutoChartQueue,
   AutoChartRunner,
+  WorkerEvent,
   applyOfficialMetadata,
   canonicalizeYoutubeUrl,
   fetchOfficialYoutubeMetadata,
@@ -14,8 +15,11 @@ import {
 import { lastReply, makeEvent } from './test-support';
 
 interface Run {
-  payload: Record<string, unknown>;
-  emit: (event: Record<string, unknown>) => void;
+  // The worker payload always carries the runId the queue assigned it
+  // (see autoChart.ts's `runId: job.id`); narrowing it here keeps the
+  // emit() call sites below type-checked against the real WorkerEvent.
+  payload: Record<string, unknown> & { runId: string };
+  emit: (event: WorkerEvent) => void;
   finish: () => void;
   kill: ReturnType<typeof vi.fn>;
 }
@@ -73,7 +77,7 @@ function createHarness(audioPaths: string[]) {
     run(payloadPath, emit) {
       const payload = JSON.parse(
         fs.readFileSync(payloadPath, 'utf8'),
-      ) as Record<string, unknown>;
+      ) as Record<string, unknown> & { runId: string };
       let finish = () => {};
       const done = new Promise<void>((resolve) => {
         finish = resolve;

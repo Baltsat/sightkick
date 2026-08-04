@@ -135,7 +135,7 @@ describe('local song import', () => {
     expect(
       fs.readFileSync(path.join(reply.song.dir, 'song.ini'), 'utf-8'),
     ).toMatch(/^charter\s*=\s*$/m);
-    expect(storeHolder.current.get(`songs.${reply.song.id}`)).toMatchObject({
+    expect(storeHolder.current!.get(`songs.${reply.song.id}`)).toMatchObject({
       charter: '',
       auto_chart_tool: 'STRUM (OCTAVE AI auto-charter)',
     });

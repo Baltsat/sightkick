@@ -36,7 +36,7 @@ const REQUIRED_CHECKPOINTS = [
   'tom_refinement_demucs/best.pt',
 ];
 
-interface WorkerEvent {
+export interface WorkerEvent {
   kind: 'progress' | 'complete' | 'error';
   runId: string;
   stage?: string;
@@ -729,20 +729,21 @@ export class AutoChartQueue {
       return;
     }
 
+    const { audioPath } = previous;
     const job: AutoChartJob = {
       id: this.dependencies.makeId(),
       attempt: previous.attempt + 1,
       stage: 'queued',
       message: 'Chart queued for local OCTAVE processing',
       event,
-      audioPath: previous.audioPath,
+      audioPath,
       sourceName: previous.sourceName,
       metadata: previous.metadata,
       cancelled: false,
     };
 
     try {
-      job.audioPath = this.dependencies.validateAudio(job.audioPath);
+      job.audioPath = this.dependencies.validateAudio(audioPath);
       job.tempDir = await this.dependencies.createTempDir(job.id);
       this.jobs.set(job.id, job);
       this.notify(job);

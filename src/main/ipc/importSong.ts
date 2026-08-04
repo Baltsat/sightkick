@@ -3,6 +3,7 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import { dialog, IpcMainEvent } from 'electron';
 import {
+  IpcImportSongPreview,
   IpcImportSongRequest,
   IpcImportSongResponse,
   IpcSelectImportSongResponse,

@@ -24,6 +24,7 @@
     "postinstall": "node scripts/postinstall.js",
     "lint": "cross-env NODE_ENV=development eslint . --cache --cache-strategy content",
     "lint:fix": "cross-env NODE_ENV=development eslint . --cache --cache-strategy content --fix",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "package": "yarn build && electron-builder build --mac --publish never",
     "package:win": "yarn build && electron-builder build -w --x64 --publish never",
     "package:linux": "yarn build && electron-builder build -l --x64 --publish never",
