@@ -12,6 +12,23 @@ export const ELEMENT_TO_KEYS: Record<string, string[]> = {
   tom3: ['a/4'],
 } satisfies Partial<Record<InputElement, string[]>>;
 
+export const KEY_TO_ELEMENT: Record<string, InputElement> = Object.fromEntries(
+  Object.entries(ELEMENT_TO_KEYS).flatMap(([element, keys]) =>
+    keys.map((key) => [key, element as InputElement]),
+  ),
+);
+
+export const KIT_SHORT_LABEL: Partial<Record<InputElement, string>> = {
+  hihat: 'HH',
+  ride: 'RD',
+  crash: 'CR',
+  snare: 'SN',
+  tom1: 'T1',
+  tom2: 'T2',
+  tom3: 'T3',
+  kick: 'KK',
+};
+
 export const HIT_TOLERANCE_SECONDS = 0.1;
 
 export const ACCENT_VALUE_THRESHOLD = 90;
@@ -27,6 +44,14 @@ export const MISS_CLASS = 'vf-note-miss';
 export const HIT_CLASS = 'vf-note-hit';
 
 export const MISSED_CLASS = 'vf-note-missed';
+
+export const HIDDEN_CLASS = 'vf-note-hidden';
+
+export const MISS_MARKER_CLASS = 'vf-miss-marker';
+
+export const WRONG_HIT_MARKER_CLASS = 'vf-wronghit-marker';
+
+export const MISS_MARKER_Y_OFFSET = 18;
 
 export const LOOKAHEAD_SECONDS = 0.2;
 

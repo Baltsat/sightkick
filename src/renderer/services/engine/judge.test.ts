@@ -515,6 +515,114 @@ describe('Judge', () => {
     expect(engine.falseHitCount).toBe(0);
   });
 
+  it('judges a hit arriving late by exactly the latency offset as on-time', () => {
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 480)])] },
+      { tick: 720 },
+    );
+
+    engine.setLatencyMs(250);
+    engine.handleInput(hit('midi:38'));
+
+    expect(engine.isHit(480, 'c/5')).toBe(true);
+    expect(engine.falseHitCount).toBe(0);
+  });
+
+  it('misses the same late hit when latency compensation is left at zero', () => {
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 480)])] },
+      { tick: 720 },
+    );
+
+    engine.handleInput(hit('midi:38'));
+
+    expect(engine.hitCount).toBe(0);
+    expect(engine.falseHitCount).toBe(1);
+  });
+
+  it('resets latency compensation back to none when set to zero', () => {
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 480)])] },
+      { tick: 720 },
+    );
+
+    engine.setLatencyMs(250);
+    engine.setLatencyMs(0);
+    engine.handleInput(hit('midi:38'));
+
+    expect(engine.hitCount).toBe(0);
+    expect(engine.falseHitCount).toBe(1);
+  });
+
+  it('notifies an onFalseHit listener with the tick, controlId, resolved element and time of a wrong hit', () => {
+    const onFalseHit = vi.fn();
+    const { engine } = setup(
+      {
+        measures: [measure([note(['f/4'], 480)])],
+        mapping: { snare: ['midi:38'], kick: ['midi:36'] },
+      },
+      { tick: 480 },
+    );
+
+    engine.onFalseHit(onFalseHit);
+    engine.handleInput(hit('midi:38'));
+
+    expect(onFalseHit).toHaveBeenCalledWith({
+      tick: 480,
+      controlId: 'midi:38',
+      element: 'snare',
+      timeSeconds: expect.any(Number),
+    });
+  });
+
+  it('notifies an onFalseHit listener for a repeat hit on an already-hit note', () => {
+    const onFalseHit = vi.fn();
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 480)])] },
+      { tick: 480 },
+    );
+
+    engine.handleInput(hit('midi:38'));
+    engine.onFalseHit(onFalseHit);
+    engine.handleInput(hit('midi:38'));
+
+    expect(onFalseHit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tick: 480,
+        controlId: 'midi:38',
+        element: 'snare',
+      }),
+    );
+  });
+
+  it('does not notify onFalseHit for an unmapped controlId', () => {
+    const onFalseHit = vi.fn();
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 480)])] },
+      { tick: 480 },
+    );
+
+    engine.onFalseHit(onFalseHit);
+    engine.handleInput(hit('midi:99'));
+
+    expect(onFalseHit).not.toHaveBeenCalled();
+  });
+
+  it('stops notifying a removed false-hit listener', () => {
+    const onFalseHit = vi.fn();
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 5000)])] },
+      { tick: 480 },
+    );
+    const unsubscribe = engine.onFalseHit(onFalseHit);
+
+    unsubscribe();
+    engine.handleInput(hit('midi:38'));
+
+    expect(onFalseHit).not.toHaveBeenCalled();
+    expect(engine.falseHitCount).toBe(1);
+  });
+
   it('stops notifying a removed hit listener', () => {
     const onHit = vi.fn<JudgeHitHandler>();
     const engine = new Judge();

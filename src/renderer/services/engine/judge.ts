@@ -1,8 +1,15 @@
 import { Measure, Note, ParsedChart } from '../../../chart-parser/types';
-import { InputMapping } from '../../../types';
+import { InputElement, InputMapping } from '../../../types';
 import { InputEvent } from '../../input/types';
 import { secondsToTicks, ticksToSeconds } from '../../../chart-parser/timing';
-import { JudgeContext, JudgeHitHandler, NoteEntry, NotePos } from './types';
+import {
+  FalseHitRecord,
+  JudgeContext,
+  JudgeFalseHitHandler,
+  JudgeHitHandler,
+  NoteEntry,
+  NotePos,
+} from './types';
 import {
   ACCENT_VALUE_THRESHOLD,
   ELEMENT_TO_KEYS,
@@ -23,6 +30,8 @@ export class Judge {
   private hitTotal = 0;
   private falseHitTicks: number[] = [];
   private hitListeners = new Set<JudgeHitHandler>();
+  private falseHitListeners = new Set<JudgeFalseHitHandler>();
+  private latencyMs = 0;
 
   setContext(context: JudgeContext): void {
     const chartChanged = this.chart !== context.chart;
@@ -49,6 +58,10 @@ export class Judge {
     this.currentTick = tick;
   }
 
+  setLatencyMs(ms: number): void {
+    this.latencyMs = ms;
+  }
+
   rewindTo(tick: number): void {
     for (const [hitTick, prefixes] of this.hits) {
       if (hitTick >= tick) {
@@ -66,6 +79,14 @@ export class Judge {
 
     return () => {
       this.hitListeners.delete(listener);
+    };
+  }
+
+  onFalseHit(listener: JudgeFalseHitHandler): () => void {
+    this.falseHitListeners.add(listener);
+
+    return () => {
+      this.falseHitListeners.delete(listener);
     };
   }
 
@@ -154,12 +175,43 @@ export class Judge {
     return entry !== undefined && entry.tick <= tick + toleranceTicks;
   }
 
-  private maybeRecordFalseHit(tick: number, toleranceTicks: number): void {
+  private resolveElement(controlId: string): InputElement | undefined {
+    return (Object.keys(this.mapping) as (keyof InputMapping)[]).find(
+      (element) => this.mapping[element]?.includes(controlId),
+    );
+  }
+
+  private compensateLatency(rawTick: number, chart: ParsedChart): number {
+    if (this.latencyMs === 0) {
+      return rawTick;
+    }
+
+    const rawTimeS = ticksToSeconds(rawTick, chart.resolution, chart.tempos);
+    const adjustedTimeS = rawTimeS - this.latencyMs / 1000;
+
+    return secondsToTicks(adjustedTimeS, chart.resolution, chart.tempos);
+  }
+
+  private maybeRecordFalseHit(
+    tick: number,
+    toleranceTicks: number,
+    controlId: string,
+    timeSeconds: number,
+  ): void {
     if (
       !this.isInSilentRegion(tick) ||
       this.hasScoreableNoteNear(tick, toleranceTicks)
     ) {
       this.falseHitTicks.push(tick);
+
+      const record: FalseHitRecord = {
+        tick,
+        controlId,
+        element: this.resolveElement(controlId),
+        timeSeconds,
+      };
+
+      this.falseHitListeners.forEach((listener) => listener(record));
     }
   }
 
@@ -178,13 +230,14 @@ export class Judge {
       return;
     }
 
-    const tick = this.currentTick;
+    const rawTick = this.currentTick;
     const chart = this.chart;
 
-    if (tick === undefined || chart === undefined) {
+    if (rawTick === undefined || chart === undefined) {
       return;
     }
 
+    const tick = this.compensateLatency(rawTick, chart);
     const currentTimeS = ticksToSeconds(tick, chart.resolution, chart.tempos);
     const toleranceTicks =
       secondsToTicks(
@@ -225,7 +278,7 @@ export class Judge {
     }
 
     if (!bestNote || !bestPos) {
-      this.maybeRecordFalseHit(tick, toleranceTicks);
+      this.maybeRecordFalseHit(tick, toleranceTicks, controlId, currentTimeS);
 
       return;
     }
@@ -255,7 +308,7 @@ export class Judge {
       );
 
     if (newPrefixes.length === 0) {
-      this.maybeRecordFalseHit(tick, toleranceTicks);
+      this.maybeRecordFalseHit(tick, toleranceTicks, controlId, currentTimeS);
 
       return;
     }

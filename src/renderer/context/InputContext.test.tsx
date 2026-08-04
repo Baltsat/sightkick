@@ -172,9 +172,18 @@ describe('InputContext input mapping', () => {
 
     act(() => result.current.setSelectedDevice(DEVICE_A));
     act(() => result.current.assignControl('snare', 'midi:38'));
+
+    expect(result.current.inputMapping.snare).toEqual(['midi:38']);
+
     act(() => result.current.setSelectedDevice(DEVICE_B));
 
-    expect(result.current.inputMapping.snare).toEqual([]);
+    // DEVICE_B was never configured, so it falls back to its own DTX
+    // default rather than inheriting DEVICE_A's manual override.
+    expect(result.current.inputMapping.snare).toEqual([
+      'midi:38',
+      'midi:40',
+      'midi:37',
+    ]);
   });
 });
 
@@ -351,6 +360,93 @@ describe('InputContext keyboard default suppression', () => {
     act(() => result.current.setSelectedDevice(DEVICE_A));
 
     expect(dispatchKey('Space').defaultPrevented).toBe(false);
+  });
+});
+
+describe('InputContext DTX default mapping', () => {
+  it('seeds a freshly-selected MIDI device with the DTX/General-MIDI default map', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(DEVICE_A));
+
+    expect(result.current.inputMapping.snare).toEqual([
+      'midi:38',
+      'midi:40',
+      'midi:37',
+    ]);
+    expect(result.current.inputMapping.kick).toEqual(['midi:35', 'midi:36']);
+  });
+
+  it('does not seed defaults for a keyboard device', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(KEYBOARD));
+
+    expect(result.current.inputMapping.snare).toEqual([]);
+  });
+
+  it('lets a manual assignment override the default for just that lane, leaving other lanes on their default', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(DEVICE_A));
+    act(() => result.current.assignControl('snare', 'midi:99'));
+
+    expect(result.current.inputMapping.snare).toEqual(['midi:99']);
+    expect(result.current.inputMapping.kick).toEqual(['midi:35', 'midi:36']);
+    expect(result.current.inputMapping.hihat).toEqual([
+      'midi:42',
+      'midi:44',
+      'midi:46',
+      'midi:22',
+      'midi:26',
+    ]);
+  });
+
+  it('keeps an explicitly-cleared lane empty instead of refilling it with the default', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(DEVICE_A));
+    act(() => result.current.removeControl('snare', 'midi:38'));
+    act(() => result.current.removeControl('snare', 'midi:40'));
+    act(() => result.current.removeControl('snare', 'midi:37'));
+
+    expect(result.current.inputMapping.snare).toEqual([]);
+    expect(result.current.inputMapping.kick).toEqual(['midi:35', 'midi:36']);
+  });
+
+  it('scores a hit on the default snare note with no manual configuration', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(DEVICE_A));
+
+    expect(result.current.inputMapping.snare).toContain('midi:38');
+    expect(result.current.kitControlIds.has('midi:38')).toBe(true);
+  });
+});
+
+describe('InputContext input latency', () => {
+  it('defaults input latency to zero', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    expect(result.current.inputLatencyMs).toBe(0);
+  });
+
+  it('persists an updated input latency', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setInputLatencyMs(45));
+
+    expect(result.current.inputLatencyMs).toBe(45);
+  });
+
+  it('clamps input latency to the -200..200ms range', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setInputLatencyMs(9999));
+    expect(result.current.inputLatencyMs).toBe(200);
+
+    act(() => result.current.setInputLatencyMs(-9999));
+    expect(result.current.inputLatencyMs).toBe(-200);
   });
 });
 

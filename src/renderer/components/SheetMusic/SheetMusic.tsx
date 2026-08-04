@@ -52,6 +52,7 @@ export function SheetMusic({
   zoom,
 }: SheetMusicProps) {
   const cursorRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const highlightsRef = useMemo(
     () => renderData.map(() => createRef<HTMLDivElement>()),
     [renderData],
@@ -99,6 +100,7 @@ export function SheetMusic({
     engine?.setRendererRefs({
       cursorEl: cursorRef.current ?? undefined,
       highlightEls: highlightsRef.map((ref) => ref.current ?? undefined),
+      overlayEl: overlayRef.current ?? undefined,
     });
   }, [engine, renderData, highlightsRef]);
 
@@ -249,6 +251,11 @@ export function SheetMusic({
             />
             <div className="absolute w-0.75 bg-accent-bright h-full rounded-[3px] left-1/2 -translate-x-1/2" />
           </div>
+          <div
+            ref={overlayRef}
+            data-testid="sheet-music-overlay"
+            className="absolute top-0 left-0 z-2 pointer-events-none"
+          />
         </div>
       </div>
 

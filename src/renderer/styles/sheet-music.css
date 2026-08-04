@@ -113,6 +113,10 @@
   stroke: none;
 }
 
+.vf-note-hidden {
+  display: none;
+}
+
 .vf-note-active {
   transform-box: fill-box;
   transform-origin: center;
@@ -176,4 +180,34 @@
   80% {
     transform: translateX(-1.5px);
   }
+}
+
+.vf-miss-marker,
+.vf-wronghit-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-paper, #fff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.vf-miss-marker {
+  background-color: var(--color-text-muted, #888);
+  border: 1.5px solid var(--color-paper, #fff);
+}
+
+.vf-wronghit-marker {
+  border-radius: 50%;
+  background-color: var(--color-red-dark, #b91c1c);
+  border: 1.5px solid var(--color-red, #ef4444);
 }

@@ -416,6 +416,68 @@ describe('Engine', () => {
     );
   });
 
+  it('forwards a latency setting to the Judge so a late hit is judged on-time', async () => {
+    const note = staveNote(['c/5']);
+    const { engine, onEnded, player } = await setup({
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [rendered(480, note)],
+          [{ tick: 480, isRest: false, notes: ['c/5'] } as Note],
+        ),
+      ],
+    });
+
+    engine.setSettings({ playheadStyle: 'Cursor' });
+    engine.setRendererRefs({
+      cursorEl: document.createElement('div'),
+      highlightEls: [],
+    });
+    engine.setMapping({ snare: ['midi:38'] });
+    engine.setLatencyMs(250);
+    engine.playFromTick(0);
+    engine.seekSeconds(0.75);
+
+    emitInput('midi:38');
+
+    expect(hasClass(note, 'vf-note-hit')).toBe(true);
+
+    player.onEnded();
+    expect(onEnded).toHaveBeenCalledWith(
+      expect.objectContaining({ hitNotes: 1, falseHits: 0 }),
+    );
+  });
+
+  it('forwards a wrong hit to the renderer as a marker in the overlay', async () => {
+    const note = staveNote(['c/5']);
+    const { engine } = await setup({
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [rendered(480, note)],
+          [{ tick: 480, isRest: false, notes: ['c/5'] } as Note],
+        ),
+      ],
+    });
+    const overlayEl = document.createElement('div');
+
+    engine.setSettings({ playheadStyle: 'Cursor' });
+    engine.setRendererRefs({
+      cursorEl: document.createElement('div'),
+      highlightEls: [],
+      overlayEl,
+    });
+    engine.setMapping({ crash: ['midi:49'] });
+    engine.playFromTick(0);
+    engine.seekSeconds(0.5);
+
+    emitInput('midi:49');
+
+    expect(overlayEl.querySelector('.vf-wronghit-marker')).not.toBeNull();
+  });
+
   it('prunes a false hit made ahead of a seek when seeking back', async () => {
     const note = staveNote(['c/5']);
     const { engine, onEnded, player } = await setup({

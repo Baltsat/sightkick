@@ -5,7 +5,12 @@ import {
   RenderData,
   RenderedNote,
 } from '../../../chart-parser/types';
-import { getCursorX, getNoteSvg } from './cursor-geometry';
+import {
+  getCursorX,
+  getNoteGlyphElements,
+  getNoteSvg,
+  getXForTick,
+} from './cursor-geometry';
 
 type Tempo = ParsedChart['tempos'][number];
 
@@ -136,6 +141,120 @@ describe('getCursorX', () => {
 
       expect(getCursorX(0.25, CHART, data)).toBe(50);
     });
+  });
+});
+
+describe('getXForTick', () => {
+  describe('rest-only measure', () => {
+    const restMeasure = () =>
+      measureData(0, 1000, [renderedNote(0, 0, true)], 0, 200);
+
+    it('positions at the stave left edge at the measure start tick', () => {
+      expect(getXForTick(0, restMeasure())).toBe(0);
+    });
+
+    it('positions at the stave midpoint at the halfway tick', () => {
+      expect(getXForTick(500, restMeasure())).toBe(100);
+    });
+
+    it('reaches the stave right edge exactly at the measure end tick', () => {
+      expect(getXForTick(1000, restMeasure())).toBe(200);
+    });
+
+    it('clamps at the stave right edge when past the measure end tick', () => {
+      expect(getXForTick(2000, restMeasure())).toBe(200);
+    });
+  });
+
+  describe('non-rest notes', () => {
+    it('snaps to the first note when the tick precedes it', () => {
+      const data = measureData(0, 1000, [renderedNote(500, 100)]);
+
+      expect(getXForTick(0, data)).toBe(100);
+    });
+
+    it('returns the note x when the tick equals the note tick', () => {
+      const data = measureData(0, 1000, [
+        renderedNote(0, 50),
+        renderedNote(500, 150),
+      ]);
+
+      expect(getXForTick(0, data)).toBe(50);
+    });
+
+    it('interpolates linearly between two adjacent notes', () => {
+      const data = measureData(0, 1000, [
+        renderedNote(0, 50),
+        renderedNote(500, 150),
+      ]);
+
+      expect(getXForTick(250, data)).toBe(100);
+    });
+
+    it('interpolates from the last note toward the stave right edge within measure bounds', () => {
+      const data = measureData(0, 500, [renderedNote(0, 50)], 0, 200);
+
+      expect(getXForTick(250, data)).toBe(125);
+    });
+
+    it('clamps at the stave right edge when past the measure end tick', () => {
+      const data = measureData(0, 500, [renderedNote(0, 50)], 0, 200);
+
+      expect(getXForTick(1000, data)).toBe(200);
+    });
+  });
+
+  it('agrees with getCursorX for the equivalent time, since getCursorX now delegates to it', () => {
+    const CHART = {
+      resolution: 1,
+      tempos: [tempo(0, 60000, 0)],
+    } as unknown as ParsedChart;
+    const data = measureData(0, 1000, [
+      renderedNote(0, 50),
+      renderedNote(500, 150),
+    ]);
+
+    expect(getXForTick(250, data)).toBe(getCursorX(0.25, CHART, data));
+  });
+});
+
+describe('getNoteGlyphElements', () => {
+  function svgEl(): SVGElement {
+    return document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'path',
+    ) as SVGElement;
+  }
+
+  it("returns the note's own group element when available", () => {
+    const group = svgEl();
+    const headEl = svgEl();
+    const note = {
+      getSVGElement: () => group,
+      noteHeads: [{ getSVGElement: () => headEl }],
+    } as unknown as StaveNote;
+
+    expect(getNoteGlyphElements(note)).toEqual([group]);
+  });
+
+  it('falls back to noteheads and the stem element when the group is unavailable', () => {
+    const headEl = svgEl();
+    const stemEl = svgEl();
+    const note = {
+      noteHeads: [{ getSVGElement: () => headEl }],
+      getStem: () => ({ getSVGElement: () => stemEl }),
+    } as unknown as StaveNote;
+
+    expect(getNoteGlyphElements(note)).toEqual([headEl, stemEl]);
+  });
+
+  it('falls back to just the noteheads when neither the group nor the stem are available', () => {
+    const headEl = svgEl();
+    const note = {
+      noteHeads: [{ getSVGElement: () => headEl }],
+    } as unknown as StaveNote;
+
+    expect(getNoteGlyphElements(note)).toEqual([headEl]);
   });
 });
 

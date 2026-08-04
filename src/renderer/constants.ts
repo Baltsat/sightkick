@@ -205,3 +205,7 @@ export const CATEGORY_CONFLICTS: Record<ControlCategory, ControlCategory[]> = {
   library: ['shared', 'library'],
   game: ['shared', 'game'],
 };
+
+export const MIN_LATENCY_MS = -200;
+
+export const MAX_LATENCY_MS = 200;

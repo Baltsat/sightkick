@@ -4,7 +4,7 @@ import {
   ParsedChart,
   RenderData,
 } from '../../../chart-parser/types';
-import { InputMapping, ScoreData } from '../../../types';
+import { InputElement, InputMapping, ScoreData } from '../../../types';
 import { PlayheadStyle } from '../../types';
 import { InputEvent } from '../../input/types';
 import { AudioPlayerFactory, PlayerMode, TrackConfig } from '../audio-player';
@@ -34,6 +34,15 @@ export interface EngineSettings {
 
 export type JudgeHitHandler = (pos: NotePos, prefixes: string[]) => void;
 
+export interface FalseHitRecord {
+  tick: number;
+  controlId: string;
+  element: InputElement | undefined;
+  timeSeconds: number;
+}
+
+export type JudgeFalseHitHandler = (record: FalseHitRecord) => void;
+
 export interface JudgeContext {
   chart: ParsedChart | undefined;
   measures: Measure[];
@@ -50,6 +59,7 @@ export interface GameRendererContext {
 export interface GameRendererRefs {
   cursorEl: HTMLElement | undefined;
   highlightEls: (HTMLElement | undefined)[];
+  overlayEl?: HTMLElement;
 }
 
 export interface NotePos {

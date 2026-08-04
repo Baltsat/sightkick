@@ -32,6 +32,7 @@ export class Engine {
   private transportUnsub: () => void;
   private inputUnsub: () => void;
   private hitUnsub: () => void;
+  private falseHitUnsub: () => void;
 
   constructor(options: EngineOptions) {
     this.onEndedCb = options.onEnded;
@@ -61,6 +62,9 @@ export class Engine {
     );
     this.hitUnsub = this.judge.onHit((pos, prefixes) =>
       this.renderer.paintHit(pos, prefixes),
+    );
+    this.falseHitUnsub = this.judge.onFalseHit((record) =>
+      this.renderer.paintWrongHit(record),
     );
   }
 
@@ -105,6 +109,10 @@ export class Engine {
 
   setClickSettings(volume: number, tone: number): void {
     this.transport.setClickSettings(volume, tone);
+  }
+
+  setLatencyMs(ms: number): void {
+    this.judge.setLatencyMs(ms);
   }
 
   setMapping(mapping: InputMapping): void {
@@ -182,6 +190,7 @@ export class Engine {
     this.transportUnsub();
     this.inputUnsub();
     this.hitUnsub();
+    this.falseHitUnsub();
     this.transport.dispose();
   }
 
