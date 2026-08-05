@@ -1,6 +1,9 @@
 import { useCallback, useState } from 'react';
-import { Spin } from 'antd';
+import { Button, Spin } from 'antd';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPlay } from '@fortawesome/free-solid-svg-icons';
 import { Outlet, useNavigate, useOutlet } from 'react-router-dom';
+import appIcon from '../../../../assets/icon.png';
 import { Song } from '../../../types';
 import { SongFilter } from '../../components/SongFilter';
 import { SongList } from '../../components/SongList';
@@ -19,6 +22,8 @@ import { useDownload } from '../../hooks/useDownload';
 import { useSongFilter } from '../../hooks/useSongFilter';
 import { useInputControls } from '../../hooks/useInputControls';
 import { useGameModeSelector } from '../../hooks/useGameModeSelector';
+import { calculateAccuracy, getStarRating } from '../../scoring';
+import { Stars } from '../../components/Stars';
 import {
   nextDifficulty,
   nextSongIndex,
@@ -76,6 +81,16 @@ export function SongListView() {
   const [prevSort, setPrevSort] = useState(sort);
   const [prevSortAvailable, setPrevSortAvailable] = useState(sortAvailable);
   const gameModeSelector = useGameModeSelector();
+  const continuedSong = songList.find(
+    (song) => song.scoreData?.[difficulty] !== undefined,
+  );
+  const continuedScore = continuedSong?.scoreData?.[difficulty];
+  const continuedAccuracy = continuedScore
+    ? calculateAccuracy(continuedScore)
+    : undefined;
+  const songsWithProgress = songList.filter(
+    (song) => song.scoreData?.[difficulty] !== undefined,
+  ).length;
   const handleSongImported = useCallback(
     (song: Song) => {
       addSong(song);
@@ -187,11 +202,76 @@ export function SongListView() {
       {gameModeSelector.element}
 
       <div className="h-screen flex flex-col bg-bg">
-        <div
-          className="border-b border-divider p-4 z-10 flex flex-col gap-4"
+        <header
+          className="border-b border-divider px-5 py-4 z-10 flex flex-col gap-4"
           style={{ background: 'var(--gradient-header)' }}
         >
-          <div className="flex gap-2 items-center">
+          <div className="mx-auto flex w-full max-w-250 items-center justify-between gap-6">
+            <div className="min-w-0">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
+                Practice space
+              </div>
+              <h1 className="font-display text-3xl font-semibold leading-tight tracking-[-0.02em] text-text">
+                Your drum library
+              </h1>
+              <p className="mt-1 text-sm text-text-muted">
+                {songList.length} {songList.length === 1 ? 'song' : 'songs'} ·{' '}
+                {songsWithProgress} with progress on {difficulty}
+              </p>
+            </div>
+
+            {libraryMode === 'local' && continuedSong && continuedScore && (
+              <section
+                className="flex min-w-0 max-w-xl grow items-center gap-3 rounded-2xl border border-accent-soft-border bg-accent-soft-bg p-2.5 shadow-accent-soft"
+                data-testid="continue-practicing"
+                aria-labelledby="continue-practicing-title"
+              >
+                <img
+                  src={continuedSong.albumCover ?? appIcon}
+                  alt=""
+                  className="size-16 shrink-0 rounded-xl object-cover outline outline-1 -outline-offset-1 outline-white/10"
+                  onError={(event) => {
+                    event.currentTarget.src = appIcon;
+                  }}
+                />
+                <div className="min-w-0 grow">
+                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-accent-text">
+                    Continue practicing
+                  </div>
+                  <h2
+                    id="continue-practicing-title"
+                    className="truncate font-display text-xl font-semibold leading-tight text-text-body"
+                    title={continuedSong.name}
+                  >
+                    {continuedSong.name}
+                  </h2>
+                  <div className="mt-1 flex items-center gap-2 text-xs text-text-muted">
+                    <Stars
+                      rating={getStarRating(continuedScore)}
+                      perfect={continuedAccuracy === 1}
+                      size="xs"
+                      className="gap-1"
+                    />
+                    <span className="tabular-nums">
+                      {Math.round((continuedAccuracy ?? 0) * 100)}% best
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  type="primary"
+                  size="large"
+                  className="min-h-11 shrink-0"
+                  icon={<FontAwesomeIcon icon={faPlay} />}
+                  aria-label={`Play ${continuedSong.name}`}
+                  onClick={() => play(continuedSong.id)}
+                >
+                  Play
+                </Button>
+              </section>
+            )}
+          </div>
+
+          <div className="mx-auto flex w-full max-w-250 items-center gap-2">
             <SongFilter
               nameFilter={nameFilter}
               onChangeFilter={setNameFilter}
@@ -228,9 +308,12 @@ export function SongListView() {
             splitProgress={splitProgress}
             songList={songList}
           />
-        </div>
+        </header>
 
-        <div className="relative grow overflow-hidden w-full flex">
+        <main
+          id="library-content"
+          className="relative grow overflow-hidden w-full flex"
+        >
           <div className="relative w-full max-w-250 grow overflow-hidden mx-auto bg-bg flex flex-col">
             {filteredSongList.length > 0 ||
             (libraryMode === 'online' && onlineLoading) ? (
@@ -277,6 +360,9 @@ export function SongListView() {
                 libraryMode={libraryMode}
                 hasFolder={currentPath !== null}
                 hasSongs={songList.length > 0}
+                query={nameFilter}
+                onClearFilter={() => setNameFilter('')}
+                onBrowseOnline={() => setLibraryMode('online')}
               />
             )}
           </div>
@@ -286,7 +372,7 @@ export function SongListView() {
               <Spin size="large" />
             </div>
           )}
-        </div>
+        </main>
 
         <div className="fixed inset-0 pointer-events-none z-100">
           <Outlet />

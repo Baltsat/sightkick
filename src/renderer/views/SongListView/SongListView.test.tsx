@@ -8,13 +8,13 @@ import {
 
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: ({ count }: { count: number }) => ({
-    getTotalSize: () => count * 85,
+    getTotalSize: () => count * 76,
     getVirtualItems: () =>
       Array.from({ length: count }, (_, index) => ({
         index,
         key: index,
-        start: index * 85,
-        size: 85,
+        start: index * 76,
+        size: 76,
       })),
     measureElement: () => {},
     scrollToIndex: () => {},
@@ -42,6 +42,33 @@ describe('SongListView — loading the library', () => {
     expect(screen.getByText('Name a')).toBeInTheDocument();
     expect(screen.getByText('Name b')).toBeInTheDocument();
     expect(screen.getByText('2 results')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Your drum library' }),
+    ).toBeInTheDocument();
+  });
+
+  it('surfaces existing progress as a continue-practicing moment', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('played', {
+        name: 'Raging',
+        artist: 'Kygo',
+        scoreData: {
+          expert: { hitNotes: 92, totalNotes: 100, falseHits: 0 },
+        },
+      }),
+      makeListSong('unplayed'),
+    ]);
+
+    const hero = screen.getByTestId('continue-practicing');
+
+    expect(within(hero).getByText('Continue practicing')).toBeInTheDocument();
+    expect(within(hero).getByText('Raging')).toBeInTheDocument();
+    expect(within(hero).getByText('92% best')).toBeInTheDocument();
+    expect(
+      within(hero).getByRole('button', { name: 'Play Raging' }),
+    ).toBeEnabled();
   });
 
   it('guides to select a folder when none is chosen', () => {
@@ -57,8 +84,8 @@ describe('SongListView — loading the library', () => {
 
     view.loadSongs([], '/music');
 
-    expect(screen.getByText('No songs in this folder.')).toBeInTheDocument();
-    expect(screen.getByText('Download some')).toBeInTheDocument();
+    expect(screen.getByText('Build your practice library')).toBeInTheDocument();
+    expect(screen.getByText('Browse online songs')).toBeInTheDocument();
     expect(screen.queryByText('Select folder')).not.toBeInTheDocument();
   });
 
@@ -71,7 +98,10 @@ describe('SongListView — loading the library', () => {
     ]);
     view.search('nonexistent song');
 
-    expect(screen.getByText('No songs match your filter.')).toBeInTheDocument();
+    expect(
+      screen.getByText('No matches for “nonexistent song”'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear search' })).toBeEnabled();
     expect(screen.queryByText('Select folder')).not.toBeInTheDocument();
   });
 

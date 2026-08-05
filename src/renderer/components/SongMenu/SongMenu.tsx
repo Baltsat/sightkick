@@ -51,7 +51,8 @@ export function SongMenu({ dir, canSplit, splitting, onSplit }: Props) {
     >
       <IconButton
         data-testid="song-menu-trigger"
-        className="mt-auto"
+        aria-label="Song actions"
+        size="lg"
         icon={faEllipsisVertical}
         onClick={(event) => {
           event.preventDefault();

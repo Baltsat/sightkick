@@ -33,7 +33,12 @@ export function DifficultyRing({ value }: { value: number }) {
   });
 
   return (
-    <svg width={size} height={size}>
+    <svg
+      width={size}
+      height={size}
+      role="img"
+      aria-label={`Difficulty ${value} of 5`}
+    >
       {segments}
       <text
         x={cx}
