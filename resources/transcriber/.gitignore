@@ -1,0 +1,11 @@
+# Virtual environment (bootstrapped by run.sh via `uv`) — never commit.
+.venv/
+.uvtmp/
+
+# Python
+__pycache__/
+*.pyc
+
+# Local scratch / verify output — not part of the tool's source.
+verify_out/
+*.log
