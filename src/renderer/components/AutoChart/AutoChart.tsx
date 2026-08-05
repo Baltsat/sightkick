@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react';
 import { faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { App, Button, Input, Modal, Progress, Radio, Tag, Tooltip } from 'antd';
+import {
+  App,
+  Button,
+  Input,
+  Modal,
+  Progress,
+  Radio,
+  Steps,
+  Tag,
+  Tooltip,
+} from 'antd';
 import {
   AutoChartBackend,
   IpcAutoChartBackendsResponse,
@@ -27,6 +37,63 @@ function progressStatus(
 
 function backendName(backend: AutoChartBackend): string {
   return backend === 'octave' ? 'OCTAVE' : 'SightKick';
+}
+
+const chartSteps = [
+  { title: 'Download audio' },
+  { title: 'Separate drums' },
+  { title: 'Transcribe notes' },
+  { title: 'Build chart' },
+];
+
+function activeStep(job: IpcAutoChartJob): number {
+  if (['queued', 'resolving', 'downloading'].includes(job.stage)) {
+    return 0;
+  }
+
+  if (job.stage !== 'processing') {
+    return 3;
+  }
+
+  const message = job.message.toLowerCase();
+
+  if (message.includes('transcrib') || message.includes('note')) {
+    return 2;
+  }
+
+  if (message.includes('writ') || message.includes('build')) {
+    return 3;
+  }
+
+  return 1;
+}
+
+function stageLabel(job: IpcAutoChartJob): string {
+  switch (job.stage) {
+    case 'queued':
+      return 'Preparing';
+
+    case 'resolving':
+      return 'Finding video';
+
+    case 'downloading':
+      return 'Downloading audio';
+
+    case 'processing':
+      return job.message;
+
+    case 'importing':
+      return 'Adding to library';
+
+    case 'failed':
+      return 'Needs attention';
+
+    case 'cancelled':
+      return 'Cancelled';
+
+    default:
+      return job.message;
+  }
 }
 
 export function AutoChart({ disabled, onImported }: Props) {
@@ -133,43 +200,60 @@ export function AutoChart({ disabled, onImported }: Props) {
 
       <Modal
         open={createOpen}
-        title="Create a drum chart from YouTube"
+        title="Create a drum chart"
         onCancel={() => setCreateOpen(false)}
-        footer={[
-          <Button key="cancel" onClick={() => setCreateOpen(false)}>
-            Cancel
-          </Button>,
-          <Button
-            key="local"
-            data-testid="auto-chart-local-file"
-            onClick={createFromLocalFile}
+        footer={null}
+      >
+        <div className="flex flex-col gap-4 pt-2 text-text-muted">
+          <div>
+            <h2 className="text-balance font-display text-2xl font-semibold leading-tight text-text-body">
+              Paste a song. Get a playable drum chart.
+            </h2>
+            <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-text-muted">
+              SightKick downloads the audio, separates the drums, transcribes
+              the notes, and lets you review the chart before it joins your
+              library.
+            </p>
+          </div>
+
+          <label
+            htmlFor="auto-chart-youtube-url"
+            className="text-sm font-semibold text-text-body"
           >
-            Choose a local audio file instead
-          </Button>,
+            YouTube video URL
+          </label>
+          <Input
+            id="auto-chart-youtube-url"
+            data-testid="auto-chart-youtube-url"
+            value={youtubeUrl}
+            onChange={(event) => setYoutubeUrl(event.target.value)}
+            placeholder="https://youtube.com/watch?v=…"
+            size="large"
+            autoFocus
+          />
+
           <Button
-            key="youtube"
             type="primary"
+            size="large"
+            block
+            className="min-h-11"
             data-testid="auto-chart-from-youtube"
             disabled={!canDownloadFromYoutube}
             onClick={createFromYoutube}
           >
-            Download &amp; create chart
-          </Button>,
-        ]}
-      >
-        <div className="flex flex-col gap-3 pt-2 text-text-muted">
-          <Input
-            data-testid="auto-chart-youtube-url"
-            value={youtubeUrl}
-            onChange={(event) => setYoutubeUrl(event.target.value)}
-            placeholder="Paste a YouTube video URL"
-            autoFocus
-          />
-          <div className="text-sm">
-            Paste a link and SightKick downloads the audio, separates the drums,
-            transcribes the pattern, and builds a chart automatically. You
-            review it before it is added to your library.
-          </div>
+            Create my drum chart
+          </Button>
+
+          <Button
+            type="text"
+            size="large"
+            block
+            className="min-h-11"
+            data-testid="auto-chart-local-file"
+            onClick={createFromLocalFile}
+          >
+            Choose a local audio file instead
+          </Button>
 
           {backends && backends.sightkick && backends.octave && (
             <div data-testid="auto-chart-backend-select">
@@ -199,11 +283,12 @@ export function AutoChart({ disabled, onImported }: Props) {
 
           {noBackendAvailable && (
             <div
-              className="text-sm text-red-400"
+              className="rounded-xl border border-red/40 bg-red/10 p-3 text-sm leading-relaxed text-text-body"
               data-testid="auto-chart-no-backend"
+              role="alert"
             >
-              No auto-chart engine is available. Reinstall SightKick or install
-              OCTAVE.app to enable chart creation.
+              No auto-chart engine is available. Reinstall SightKick, or install
+              OCTAVE.app, then try again.
             </div>
           )}
 
@@ -216,15 +301,17 @@ export function AutoChart({ disabled, onImported }: Props) {
 
       {job && job.stage !== 'preview-ready' && job.stage !== 'imported' && (
         <div
-          className="fixed bottom-5 right-5 z-50 w-96 rounded-lg border border-border-soft bg-bg p-4 shadow-frame"
+          className="fixed bottom-5 right-5 z-50 w-112 rounded-2xl border border-border-soft bg-surface-raised p-5 shadow-frame"
           data-testid="auto-chart-progress"
+          role={job.stage === 'failed' ? 'alert' : 'status'}
+          aria-live={job.stage === 'failed' ? 'assertive' : 'polite'}
         >
           <div className="mb-2 flex items-center justify-between gap-3">
             <div className="font-semibold text-text-body">Create chart</div>
             <div className="flex gap-2">
               <Tag color="blue">{backendName(job.backend)}</Tag>
               <Tag color={job.stage === 'failed' ? 'red' : 'purple'}>
-                {job.stage}
+                {stageLabel(job)}
               </Tag>
             </div>
           </div>
@@ -232,12 +319,27 @@ export function AutoChart({ disabled, onImported }: Props) {
             {job.error ?? job.message}
           </div>
           {job.sourceName && (
-            <div className="mb-3 text-xs text-text-faint">{job.sourceName}</div>
+            <div
+              className="mb-4 truncate text-xs text-text-faint"
+              title={job.sourceName}
+            >
+              {job.sourceName}
+            </div>
           )}
+          <Steps
+            className="mb-4"
+            data-testid="auto-chart-steps"
+            size="small"
+            current={activeStep(job)}
+            status={job.stage === 'failed' ? 'error' : 'process'}
+            items={chartSteps}
+            responsive={false}
+          />
           {typeof job.percent === 'number' && (
             <Progress
               percent={job.percent}
               status={progressStatus(job.stage)}
+              className="tabular-nums"
             />
           )}
           <div className="mt-3 flex justify-end gap-2">
@@ -281,7 +383,7 @@ export function AutoChart({ disabled, onImported }: Props) {
         preview={job?.stage === 'preview-ready' ? job.preview : undefined}
         importing={job?.stage === 'importing'}
         artworkUrl={artworkUrl}
-        title="Review generated drum chart"
+        title="Add this song to your library"
         allowArtworkUrl={false}
         onArtworkUrlChange={setArtworkUrl}
         onConfirm={() => {

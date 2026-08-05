@@ -83,6 +83,7 @@ describe('AutoChart', () => {
     emitBackends({ sightkick: true, octave: false, default: 'sightkick' });
 
     fireEvent.click(screen.getByTestId('create-chart-trigger'));
+    expect(screen.getByLabelText('YouTube video URL')).toBeInTheDocument();
     fireEvent.change(screen.getByTestId('auto-chart-youtube-url'), {
       target: { value: 'https://youtu.be/abcdefghijk' },
     });
@@ -109,10 +110,22 @@ describe('AutoChart', () => {
       percent: 10,
     });
     expect(screen.getByTestId('auto-chart-progress')).toHaveTextContent(
-      'downloading',
+      'Downloading audio',
     );
     expect(screen.getByTestId('auto-chart-progress')).toHaveTextContent(
       'SightKick',
+    );
+    expect(screen.getByTestId('auto-chart-steps')).toHaveTextContent(
+      'Download audio',
+    );
+    expect(screen.getByTestId('auto-chart-steps')).toHaveTextContent(
+      'Separate drums',
+    );
+    expect(screen.getByTestId('auto-chart-steps')).toHaveTextContent(
+      'Transcribe notes',
+    );
+    expect(screen.getByTestId('auto-chart-steps')).toHaveTextContent(
+      'Build chart',
     );
 
     emitJob({
@@ -134,7 +147,9 @@ describe('AutoChart', () => {
       message: 'Chart is ready to review before adding it to your library',
       preview,
     });
-    expect(screen.getByText('Review generated drum chart')).toBeInTheDocument();
+    expect(
+      screen.getByText('Add this song to your library'),
+    ).toBeInTheDocument();
     expect(screen.getByText('Official title')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Add to library' }));
