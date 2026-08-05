@@ -5,17 +5,21 @@ import os from 'os';
 import path from 'path';
 import { app, dialog, IpcMainEvent } from 'electron';
 import {
+  AutoChartBackend,
   AutoChartStage,
+  IpcAutoChartBackendsResponse,
   IpcAutoChartJob,
   IpcAutoChartMetadata,
   IpcCreateAutoChartRequest,
   IpcImportSongPreview,
   Song,
 } from '../../types';
+import { caCertEnv, getBinaryPath } from '../stemTools';
 import { ingestSongCover } from '../songCover';
 import { importPreparedSong, previewPreparedSong } from './importSong';
 
 const EVENT_PREFIX = '__OCTAVE_EVENT__';
+const SK_EVENT_PREFIX = '__SK_EVENT__ ';
 const MAX_AUDIO_BYTES = 2 * 1024 * 1024 * 1024;
 const AUDIO_EXTENSIONS = new Set(['.wav', '.mp3', '.ogg', '.opus', '.flac']);
 const REQUIRED_CHECKPOINTS = [
@@ -36,6 +40,8 @@ const REQUIRED_CHECKPOINTS = [
   'tom_refinement_demucs/best.pt',
 ];
 
+// OCTAVE's local STRUM worker protocol: one child process handles a batch
+// of runIds, so every event names the run it belongs to.
 export interface WorkerEvent {
   kind: 'progress' | 'complete' | 'error';
   runId: string;
@@ -46,6 +52,17 @@ export interface WorkerEvent {
   outputDir?: string;
   songFolders?: string[];
   errors?: string[];
+}
+
+// resources/transcriber/run.sh's protocol: one process per job, so there is
+// no runId to correlate against.
+export interface SkWorkerEvent {
+  kind: 'progress' | 'complete' | 'error';
+  stage?: 'download' | 'separate' | 'beats' | 'transcribe' | 'write';
+  message?: string;
+  percent?: number;
+  success?: boolean;
+  songDir?: string;
 }
 
 interface WorkerHandle {
@@ -61,10 +78,29 @@ interface OctaveRuntime {
   ffmpegDir: string;
 }
 
+interface AutoChartBackends {
+  sightkick: boolean;
+  octave: boolean;
+}
+
+interface SightkickRunInput {
+  tempDir: string;
+  youtubeUrl?: string;
+  audioPath?: string;
+  difficulty?: string;
+}
+
 export interface AutoChartRunner {
   run: (
     payloadPath: string,
     onEvent: (event: WorkerEvent) => void,
+  ) => WorkerHandle;
+}
+
+export interface SightkickRunner {
+  run: (
+    input: SightkickRunInput,
+    onEvent: (event: SkWorkerEvent) => void,
   ) => WorkerHandle;
 }
 
@@ -75,8 +111,11 @@ interface AutoChartDependencies {
   ) => Promise<IpcAutoChartMetadata | undefined>;
   validateAudio: (filePath: string) => string;
   createTempDir: (id: string) => Promise<string>;
-  preflight: () => OctaveRuntime;
-  runner: AutoChartRunner;
+  detectBackends: () => AutoChartBackends;
+  preflightOctave: () => OctaveRuntime;
+  preflightSightkick: () => void;
+  octaveRunner: AutoChartRunner;
+  sightkickRunner: SightkickRunner;
   preview: (
     sourceDir: string,
     thumbnailUrl?: string,
@@ -93,6 +132,7 @@ interface AutoChartDependencies {
 interface AutoChartJob extends IpcAutoChartJob {
   event: IpcMainEvent;
   audioPath?: string;
+  youtubeUrl?: string;
   tempDir?: string;
   preparedDir?: string;
   cancelled: boolean;
@@ -103,6 +143,7 @@ function toPublicJob(job: AutoChartJob): IpcAutoChartJob {
   const {
     event: _event,
     audioPath: _audioPath,
+    youtubeUrl: _youtubeUrl,
     tempDir: _tempDir,
     preparedDir: _preparedDir,
     cancelled: _cancelled,
@@ -130,6 +171,10 @@ function isInside(parent: string, candidate: string): boolean {
 
 function safeMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function backendLabel(backend: AutoChartBackend): string {
+  return backend === 'octave' ? 'local OCTAVE' : 'SightKick';
 }
 
 export function canonicalizeYoutubeUrl(value: string): string {
@@ -418,6 +463,16 @@ function preflightOctaveRuntime(): OctaveRuntime {
   return runtime;
 }
 
+function isOctaveAvailable(): boolean {
+  try {
+    resolveOctaveRuntime();
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function workerEnvironment(runtime: OctaveRuntime): NodeJS.ProcessEnv {
   const runtimePath = [runtime.ffmpegDir, process.env.PATH]
     .filter(Boolean)
@@ -456,6 +511,34 @@ export function parseWorkerLine(line: string): WorkerEvent | undefined {
     }
 
     return value as WorkerEvent;
+  } catch {
+    return undefined;
+  }
+}
+
+// resources/transcriber/run.sh streams "__SK_EVENT__ {json}\n" lines on
+// stdout. Only lines carrying that exact prefix (with its trailing space)
+// and a well-formed event object are treated as events; everything else on
+// stdout is ignored so stray tool output can never be misparsed.
+export function parseSkEventLine(line: string): SkWorkerEvent | undefined {
+  if (!line.startsWith(SK_EVENT_PREFIX)) {
+    return undefined;
+  }
+
+  try {
+    const value = JSON.parse(line.slice(SK_EVENT_PREFIX.length)) as unknown;
+
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      !['progress', 'complete', 'error'].includes(
+        (value as Record<string, unknown>).kind as string,
+      )
+    ) {
+      return undefined;
+    }
+
+    return value as SkWorkerEvent;
   } catch {
     return undefined;
   }
@@ -503,6 +586,112 @@ function createChildRunner(): AutoChartRunner {
             onEvent(event);
           }
         }),
+      };
+    },
+  };
+}
+
+function resolveSightkickRunnerPath(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'transcriber', 'run.sh')
+    : path.join(__dirname, '../../resources/transcriber', 'run.sh');
+}
+
+function isSightkickRunnerAvailable(): boolean {
+  try {
+    return fs.statSync(resolveSightkickRunnerPath()).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function sightkickArgs(input: SightkickRunInput): string[] {
+  const args: string[] = [];
+
+  if (input.audioPath) {
+    args.push('--audio', input.audioPath);
+  } else if (input.youtubeUrl) {
+    args.push('--url', input.youtubeUrl);
+  } else {
+    throw new Error(
+      'SightKick auto-chart requires a YouTube URL or local audio file',
+    );
+  }
+
+  args.push('--out', input.tempDir);
+
+  const stemsBin = getBinaryPath();
+
+  if (fs.existsSync(stemsBin)) {
+    args.push('--stems-bin', stemsBin);
+  }
+
+  args.push('--difficulty', input.difficulty ?? 'expert');
+
+  return args;
+}
+
+interface SkEventReader {
+  push: (chunk: string) => void;
+  flush: () => void;
+}
+
+// stdout arrives from the child process in arbitrary OS-level chunks, so a
+// "__SK_EVENT__ {...}\n" line can be split anywhere: mid-prefix, mid-JSON,
+// or with several events landing in one chunk. This reader buffers between
+// pushes and only ever hands parseSkEventLine complete, newline-terminated
+// lines, so a chunk boundary can never corrupt an event.
+export function createSkEventReader(
+  onEvent: (event: SkWorkerEvent) => void,
+): SkEventReader {
+  let buffer = '';
+
+  return {
+    push(chunk: string) {
+      buffer += chunk;
+
+      const lines = buffer.split(/\r?\n/);
+
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        const event = parseSkEventLine(line);
+
+        if (event) {
+          onEvent(event);
+        }
+      }
+    },
+    flush() {
+      const event = parseSkEventLine(buffer);
+
+      if (event) {
+        onEvent(event);
+      }
+
+      buffer = '';
+    },
+  };
+}
+
+function createSightkickRunner(): SightkickRunner {
+  return {
+    run(input, onEvent) {
+      const child = spawn(resolveSightkickRunnerPath(), sightkickArgs(input), {
+        cwd: input.tempDir,
+        env: { ...process.env, ...caCertEnv() },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      const reader = createSkEventReader(onEvent);
+
+      child.stdout?.on('data', (chunk: Buffer) =>
+        reader.push(chunk.toString('utf8')),
+      );
+      child.stderr?.pipe(process.stderr);
+
+      return {
+        kill: () => child.kill('SIGTERM'),
+        done: waitForChild(child, () => reader.flush()),
       };
     },
   };
@@ -595,6 +784,26 @@ export async function applyOfficialMetadata(
   }
 }
 
+function detectBackends(): AutoChartBackends {
+  return {
+    sightkick: isSightkickRunnerAvailable(),
+    octave: isOctaveAvailable(),
+  };
+}
+
+function preferredBackend(backends: AutoChartBackends): AutoChartBackend {
+  return backends.sightkick ? 'sightkick' : 'octave';
+}
+
+export function checkAutoChartBackends(event: IpcMainEvent): void {
+  const backends = detectBackends();
+
+  event.reply('auto-chart-backends', {
+    ...backends,
+    default: preferredBackend(backends),
+  } satisfies IpcAutoChartBackendsResponse);
+}
+
 function defaultDependencies(): AutoChartDependencies {
   return {
     selectAudio: async () => {
@@ -614,8 +823,17 @@ function defaultDependencies(): AutoChartDependencies {
     resolveMetadata: fetchOfficialYoutubeMetadata,
     validateAudio: validateLocalAudioFile,
     createTempDir,
-    preflight: preflightOctaveRuntime,
-    runner: createChildRunner(),
+    detectBackends,
+    preflightOctave: preflightOctaveRuntime,
+    preflightSightkick: () => {
+      if (!isSightkickRunnerAvailable()) {
+        throw new Error(
+          'The bundled SightKick transcriber is missing; reinstall SightKick or switch to the OCTAVE backend',
+        );
+      }
+    },
+    octaveRunner: createChildRunner(),
+    sightkickRunner: createSightkickRunner(),
     preview: (sourceDir, thumbnailUrl) =>
       previewPreparedSong(sourceDir, { thumbnailUrl }),
     importSong: (sourceDir, artworkUrl) =>
@@ -644,9 +862,22 @@ export class AutoChartQueue {
       attempt: 1,
       stage: 'resolving',
       message: 'Checking optional YouTube metadata',
+      backend: 'sightkick',
       event,
       cancelled: false,
     };
+
+    try {
+      job.backend = this.resolveBackend(
+        request?.backend,
+        this.dependencies.detectBackends(),
+      );
+    } catch (error) {
+      this.jobs.set(job.id, job);
+      await this.fail(job, safeMessage(error));
+
+      return;
+    }
 
     this.jobs.set(job.id, job);
     this.notify(job);
@@ -663,28 +894,37 @@ export class AutoChartQueue {
         return;
       }
 
-      job.message = 'Choose local audio you own or are allowed to process';
-      this.notify(job);
+      const wantsLocalFile =
+        Boolean(request?.localFile) || !youtubeUrl || job.backend === 'octave';
 
-      const selectedAudio = await this.dependencies.selectAudio();
+      if (wantsLocalFile) {
+        job.message = 'Choose local audio you own or are allowed to process';
+        this.notify(job);
 
-      if (job.cancelled) {
-        return;
+        const selectedAudio = await this.dependencies.selectAudio();
+
+        if (job.cancelled) {
+          return;
+        }
+
+        if (!selectedAudio) {
+          await this.cancelJob(job);
+
+          return;
+        }
+
+        job.audioPath = this.dependencies.validateAudio(selectedAudio);
+        job.sourceName = path.basename(job.audioPath);
+      } else {
+        job.youtubeUrl = canonicalizeYoutubeUrl(youtubeUrl!);
+        job.sourceName = job.metadata?.title ?? job.youtubeUrl;
       }
 
-      if (!selectedAudio) {
-        await this.cancelJob(job);
-
-        return;
-      }
-
-      job.audioPath = this.dependencies.validateAudio(selectedAudio);
-      job.sourceName = path.basename(job.audioPath);
       job.tempDir = await this.dependencies.createTempDir(job.id);
       this.transition(
         job,
         'queued',
-        'Chart queued for local OCTAVE processing',
+        `Chart queued for ${backendLabel(job.backend)} processing`,
       );
       this.pending.push(job.id);
       void this.processNext();
@@ -724,26 +964,30 @@ export class AutoChartQueue {
     if (
       !previous ||
       !['failed', 'cancelled'].includes(previous.stage) ||
-      !previous.audioPath
+      (!previous.audioPath && !previous.youtubeUrl)
     ) {
       return;
     }
 
-    const { audioPath } = previous;
     const job: AutoChartJob = {
       id: this.dependencies.makeId(),
       attempt: previous.attempt + 1,
       stage: 'queued',
-      message: 'Chart queued for local OCTAVE processing',
+      message: `Chart queued for ${backendLabel(previous.backend)} processing`,
       event,
-      audioPath,
+      audioPath: previous.audioPath,
+      youtubeUrl: previous.youtubeUrl,
       sourceName: previous.sourceName,
       metadata: previous.metadata,
+      backend: previous.backend,
       cancelled: false,
     };
 
     try {
-      job.audioPath = this.dependencies.validateAudio(audioPath);
+      if (job.audioPath) {
+        job.audioPath = this.dependencies.validateAudio(job.audioPath);
+      }
+
       job.tempDir = await this.dependencies.createTempDir(job.id);
       this.jobs.set(job.id, job);
       this.notify(job);
@@ -812,6 +1056,31 @@ export class AutoChartQueue {
     );
   }
 
+  private resolveBackend(
+    requested: AutoChartBackend | undefined,
+    backends: AutoChartBackends,
+  ): AutoChartBackend {
+    if (requested === 'octave' && backends.octave) {
+      return 'octave';
+    }
+
+    if (requested === 'sightkick' && backends.sightkick) {
+      return 'sightkick';
+    }
+
+    if (backends.sightkick) {
+      return 'sightkick';
+    }
+
+    if (backends.octave) {
+      return 'octave';
+    }
+
+    throw new Error(
+      'No auto-chart backend is available. Bundle the SightKick transcriber (resources/transcriber) or install OCTAVE.app',
+    );
+  }
+
   private async processNext(): Promise<void> {
     if (this.activeId || this.pending.length === 0) {
       return;
@@ -841,60 +1110,36 @@ export class AutoChartQueue {
 
   private async run(job: AutoChartJob): Promise<void> {
     try {
-      if (!job.audioPath || !job.tempDir) {
-        throw new Error('Auto-chart job has no local audio input');
+      if (!job.tempDir) {
+        throw new Error('Auto-chart job has no working directory');
       }
 
-      job.audioPath = this.dependencies.validateAudio(job.audioPath);
+      if (job.backend === 'octave') {
+        if (!job.audioPath) {
+          throw new Error('OCTAVE auto-chart requires a local audio file');
+        }
 
-      const runtime = this.dependencies.preflight();
-      const payloadPath = path.join(job.tempDir, 'payload.json');
-      const payload = {
-        runId: job.id,
-        cacheDir: runtime.cacheDir,
-        outputDir: job.tempDir,
-        files: [job.audioPath],
-        urls: [],
-        includeKeys: false,
-        enabledTracks: {
-          drums: true,
-          bass: false,
-          guitar: false,
-          keys: false,
-          vocals: false,
-          proKeys: false,
-        },
-        keepStems: true,
-        autoTempo: true,
-        autoTempoDrift: true,
-        autoTempoSnap: true,
-      };
+        job.audioPath = this.dependencies.validateAudio(job.audioPath);
+        await this.runOctave(job);
+      } else {
+        if (job.audioPath) {
+          job.audioPath = this.dependencies.validateAudio(job.audioPath);
+        } else if (!job.youtubeUrl) {
+          throw new Error(
+            'SightKick auto-chart requires a YouTube URL or local audio file',
+          );
+        }
 
-      await fs.promises.writeFile(payloadPath, JSON.stringify(payload), {
-        encoding: 'utf8',
-        mode: 0o600,
-      });
-      this.transition(
-        job,
-        'processing',
-        'OCTAVE is preparing a drum chart locally',
-        0,
-      );
-
-      let workerEvents = Promise.resolve();
-
-      job.worker = this.dependencies.runner.run(payloadPath, (event) => {
-        workerEvents = workerEvents
-          .then(() => this.handleWorkerEvent(job, event))
-          .catch((error) => this.fail(job, safeMessage(error)));
-      });
-      await job.worker.done;
-      await workerEvents;
+        await this.runSightkick(job);
+      }
 
       if (job.cancelled && !isTerminal(job.stage)) {
         await this.cancelJob(job);
       } else if (!isTerminal(job.stage) && job.stage !== 'preview-ready') {
-        await this.fail(job, 'OCTAVE worker exited before preparing a chart');
+        await this.fail(
+          job,
+          'Auto-chart worker exited before preparing a chart',
+        );
       }
     } catch (error) {
       if (job.cancelled) {
@@ -907,7 +1152,93 @@ export class AutoChartQueue {
     }
   }
 
-  private async handleWorkerEvent(
+  private async runOctave(job: AutoChartJob): Promise<void> {
+    if (!job.tempDir || !job.audioPath) {
+      throw new Error('Auto-chart job has no local audio input');
+    }
+
+    const runtime = this.dependencies.preflightOctave();
+    const payloadPath = path.join(job.tempDir, 'payload.json');
+    const payload = {
+      runId: job.id,
+      cacheDir: runtime.cacheDir,
+      outputDir: job.tempDir,
+      files: [job.audioPath],
+      urls: [],
+      includeKeys: false,
+      enabledTracks: {
+        drums: true,
+        bass: false,
+        guitar: false,
+        keys: false,
+        vocals: false,
+        proKeys: false,
+      },
+      keepStems: true,
+      autoTempo: true,
+      autoTempoDrift: true,
+      autoTempoSnap: true,
+    };
+
+    await fs.promises.writeFile(payloadPath, JSON.stringify(payload), {
+      encoding: 'utf8',
+      mode: 0o600,
+    });
+    this.transition(
+      job,
+      'processing',
+      'OCTAVE is preparing a drum chart locally',
+      0,
+    );
+
+    let workerEvents = Promise.resolve();
+
+    job.worker = this.dependencies.octaveRunner.run(payloadPath, (event) => {
+      workerEvents = workerEvents
+        .then(() => this.handleOctaveEvent(job, event))
+        .catch((error) => this.fail(job, safeMessage(error)));
+    });
+    await job.worker.done;
+    await workerEvents;
+  }
+
+  private async runSightkick(job: AutoChartJob): Promise<void> {
+    if (!job.tempDir) {
+      throw new Error('Auto-chart job has no working directory');
+    }
+
+    this.dependencies.preflightSightkick();
+
+    const downloading = !job.audioPath;
+
+    this.transition(
+      job,
+      downloading ? 'downloading' : 'processing',
+      downloading
+        ? 'Downloading audio from YouTube'
+        : 'SightKick is preparing a drum chart',
+      0,
+    );
+
+    let workerEvents = Promise.resolve();
+
+    job.worker = this.dependencies.sightkickRunner.run(
+      {
+        tempDir: job.tempDir,
+        youtubeUrl: job.youtubeUrl,
+        audioPath: job.audioPath,
+      },
+      (event) => {
+        workerEvents = workerEvents
+          .then(() => this.handleSightkickEvent(job, event))
+          .catch((error) => this.fail(job, safeMessage(error)));
+      },
+    );
+    await job.worker.done;
+    await workerEvents;
+  }
+
+  private async handleOctaveEvent(
     job: AutoChartJob,
     event: WorkerEvent,
   ): Promise<void> {
@@ -916,20 +1247,7 @@ export class AutoChartQueue {
     }
 
     if (event.kind === 'progress') {
-      const percent =
-        typeof event.percent === 'number'
-          ? Math.max(
-              job.percent ?? 0,
-              Math.min(100, Math.max(0, event.percent)),
-            )
-          : job.percent;
-
-      this.transition(
-        job,
-        'processing',
-        event.message || 'OCTAVE is processing local audio',
-        percent,
-      );
+      this.applyProgress(job, event.message, event.percent, false);
 
       return;
     }
@@ -949,8 +1267,79 @@ export class AutoChartQueue {
       return;
     }
 
-    const preparedDir = this.validPreparedDir(job, event);
+    const preparedDir = this.validOctavePreparedDir(job, event);
 
+    await this.completeWithPreparedDir(job, preparedDir);
+  }
+
+  private async handleSightkickEvent(
+    job: AutoChartJob,
+    event: SkWorkerEvent,
+  ): Promise<void> {
+    if (isTerminal(job.stage) || job.cancelled) {
+      return;
+    }
+
+    if (event.kind === 'progress') {
+      this.applyProgress(
+        job,
+        event.message,
+        event.percent,
+        event.stage === 'download',
+      );
+
+      return;
+    }
+
+    if (event.kind === 'error') {
+      await this.fail(
+        job,
+        event.message || 'SightKick could not prepare a chart',
+      );
+
+      return;
+    }
+
+    if (!event.success || !event.songDir) {
+      await this.fail(
+        job,
+        event.message || 'SightKick could not prepare a chart',
+      );
+
+      return;
+    }
+
+    const preparedDir = this.validSightkickPreparedDir(job, event.songDir);
+
+    await this.completeWithPreparedDir(job, preparedDir);
+  }
+
+  private applyProgress(
+    job: AutoChartJob,
+    message: string | undefined,
+    rawPercent: number | undefined,
+    downloading: boolean,
+  ): void {
+    const percent =
+      typeof rawPercent === 'number'
+        ? Math.max(job.percent ?? 0, Math.min(100, Math.max(0, rawPercent)))
+        : job.percent;
+
+    this.transition(
+      job,
+      downloading ? 'downloading' : 'processing',
+      message ||
+        (downloading
+          ? 'Downloading audio from YouTube'
+          : `${backendLabel(job.backend)} is processing audio`),
+      percent,
+    );
+  }
+
+  private async completeWithPreparedDir(
+    job: AutoChartJob,
+    preparedDir: string,
+  ): Promise<void> {
     await this.dependencies.applyMetadata(preparedDir, job.metadata);
     job.preparedDir = preparedDir;
     job.preview = await this.dependencies.preview(
@@ -965,7 +1354,10 @@ export class AutoChartQueue {
     );
   }
 
-  private validPreparedDir(job: AutoChartJob, event: WorkerEvent): string {
+  private validOctavePreparedDir(
+    job: AutoChartJob,
+    event: WorkerEvent,
+  ): string {
     if (!job.tempDir || !event.outputDir || event.songFolders?.length !== 1) {
       throw new Error('OCTAVE returned an unexpected prepared-chart location');
     }
@@ -982,6 +1374,31 @@ export class AutoChartQueue {
       !isInside(tempDir, preparedDir)
     ) {
       throw new Error('OCTAVE returned an unsafe prepared-chart location');
+    }
+
+    return preparedDir;
+  }
+
+  private validSightkickPreparedDir(
+    job: AutoChartJob,
+    songDir: string,
+  ): string {
+    if (!job.tempDir) {
+      throw new Error(
+        'SightKick returned an unexpected prepared-chart location',
+      );
+    }
+
+    const preparedDir = fs.realpathSync(songDir);
+    const tempDir = fs.realpathSync(job.tempDir);
+    const stat = fs.lstatSync(preparedDir);
+
+    if (
+      stat.isSymbolicLink() ||
+      !stat.isDirectory() ||
+      !isInside(tempDir, preparedDir)
+    ) {
+      throw new Error('SightKick returned an unsafe prepared-chart location');
     }
 
     return preparedDir;

@@ -28,6 +28,7 @@ import { importSong, selectImportSong } from './ipc/importSong';
 import {
   autoChartQueue,
   cancelAutoChart,
+  checkAutoChartBackends,
   createAutoChart,
   discardAutoChartPreview,
   importAutoChart,
@@ -111,6 +112,7 @@ class AppState {
     ipcMain.on('download-song', downloadSong);
     ipcMain.on('select-import-song', selectImportSong);
     ipcMain.on('import-song', importSong);
+    ipcMain.on('check-auto-chart-backends', checkAutoChartBackends);
     ipcMain.on('create-auto-chart', createAutoChart);
     ipcMain.on('cancel-auto-chart', cancelAutoChart);
     ipcMain.on('retry-auto-chart', retryAutoChart);

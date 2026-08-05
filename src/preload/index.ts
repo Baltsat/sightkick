@@ -11,6 +11,8 @@ export type Channels =
   | 'download-song'
   | 'select-import-song'
   | 'import-song'
+  | 'check-auto-chart-backends'
+  | 'auto-chart-backends'
   | 'create-auto-chart'
   | 'auto-chart-update'
   | 'cancel-auto-chart'

@@ -96,7 +96,9 @@ test.describe('seeded library', () => {
     page = await harness.app.firstWindow();
 
     await page.getByRole('button', { name: 'Create chart' }).click();
-    await expect(page.getByText('Create local drum chart')).toBeVisible();
+    await expect(
+      page.getByText('Create a drum chart from YouTube'),
+    ).toBeVisible();
 
     if (process.env.SIGHTKICK_AUTO_CHART_YOUTUBE_URL) {
       await page
@@ -110,7 +112,16 @@ test.describe('seeded library', () => {
       });
     }
 
-    await page.getByRole('button', { name: 'Choose local audio' }).click();
+    // This proof is specifically for the local OCTAVE runtime; force it
+    // when the bundled SightKick transcriber is also available and the
+    // backend picker is showing.
+    const octaveOption = page.getByRole('radio', { name: 'OCTAVE' });
+
+    if (await octaveOption.isVisible()) {
+      await octaveOption.click();
+    }
+
+    await page.getByTestId('auto-chart-local-file').click();
     await expect(page.getByTestId('auto-chart-progress')).toBeVisible();
 
     const review = page.getByText('Review generated drum chart');

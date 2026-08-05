@@ -5,21 +5,32 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AutoChartQueue,
   AutoChartRunner,
+  SightkickRunner,
+  SkWorkerEvent,
   WorkerEvent,
   applyOfficialMetadata,
   canonicalizeYoutubeUrl,
+  createSkEventReader,
   fetchOfficialYoutubeMetadata,
+  parseSkEventLine,
   parseWorkerLine,
   validateLocalAudioFile,
 } from './autoChart';
 import { lastReply, makeEvent } from './test-support';
 
-interface Run {
+interface OctaveRun {
   // The worker payload always carries the runId the queue assigned it
   // (see autoChart.ts's `runId: job.id`); narrowing it here keeps the
   // emit() call sites below type-checked against the real WorkerEvent.
   payload: Record<string, unknown> & { runId: string };
   emit: (event: WorkerEvent) => void;
+  finish: () => void;
+  kill: ReturnType<typeof vi.fn>;
+}
+
+interface SkRun {
+  input: { tempDir: string; youtubeUrl?: string; audioPath?: string };
+  emit: (event: SkWorkerEvent) => void;
   finish: () => void;
   kill: ReturnType<typeof vi.fn>;
 }
@@ -47,16 +58,35 @@ function latestJob(event: ReturnType<typeof makeEvent>) {
     id: string;
     attempt: number;
     stage: string;
+    backend?: string;
     percent?: number;
+    error?: string;
     preview?: { sourceDir: string };
   };
 }
 
-function createHarness(audioPaths: string[]) {
+function writeAudio(root: string, name: string): string {
+  const filePath = path.join(root, name);
+
+  fs.writeFileSync(filePath, 'audio');
+
+  return filePath;
+}
+
+interface HarnessOptions {
+  audioPaths?: string[];
+  backends?: { sightkick: boolean; octave: boolean };
+}
+
+function createHarness(options: HarnessOptions = {}) {
+  const backends = options.backends ?? { sightkick: false, octave: true };
+  const audioPaths = options.audioPaths ?? [];
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auto-chart-test-'));
-  const runs: Run[] = [];
-  let index = 0;
+  const octaveRuns: OctaveRun[] = [];
+  const skRuns: SkRun[] = [];
+  let audioIndex = 0;
   let jobIndex = 0;
+  let selectAudioCalls = 0;
   const importSong = vi.fn(async (sourceDir: string) => ({
     id: 'imported-song',
     dir: sourceDir,
@@ -73,7 +103,7 @@ function createHarness(audioPaths: string[]) {
     format: 'mid' as const,
     audio: [],
   }));
-  const runner: AutoChartRunner = {
+  const octaveRunner: AutoChartRunner = {
     run(payloadPath, emit) {
       const payload = JSON.parse(
         fs.readFileSync(payloadPath, 'utf8'),
@@ -84,18 +114,36 @@ function createHarness(audioPaths: string[]) {
       });
       const run = { payload, emit, finish, kill: vi.fn() };
 
-      runs.push(run);
+      octaveRuns.push(run);
+
+      return { kill: run.kill, done };
+    },
+  };
+  const sightkickRunner: SightkickRunner = {
+    run(input, emit) {
+      let finish = () => {};
+      const done = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      const run = { input, emit, finish, kill: vi.fn() };
+
+      skRuns.push(run);
 
       return { kill: run.kill, done };
     },
   };
   const queue = new AutoChartQueue({
-    selectAudio: async () => audioPaths[index++],
+    selectAudio: async () => {
+      selectAudioCalls += 1;
+
+      return audioPaths[audioIndex++];
+    },
     resolveMetadata: async () => undefined,
     validateAudio: validateLocalAudioFile,
     createTempDir: async (id: string) =>
       fs.promises.mkdtemp(path.join(root, `${id}-`)),
-    preflight: () =>
+    detectBackends: () => backends,
+    preflightOctave: () =>
       ({
         cacheDir: root,
         pythonPath: '',
@@ -103,7 +151,15 @@ function createHarness(audioPaths: string[]) {
         sourceDir: '',
         ffmpegDir: '',
       }) as never,
-    runner,
+    preflightSightkick: () => {
+      if (!backends.sightkick) {
+        throw new Error(
+          'The bundled SightKick transcriber is missing; reinstall SightKick or switch to the OCTAVE backend',
+        );
+      }
+    },
+    octaveRunner,
+    sightkickRunner,
     preview: async (sourceDir: string) => preview(sourceDir),
     importSong,
     cleanup: async (tempDir?: string) => {
@@ -114,7 +170,7 @@ function createHarness(audioPaths: string[]) {
     applyMetadata: async () => {},
     makeId: () => `job-${++jobIndex}`,
   } as never);
-  const complete = async (run: Run) => {
+  const completeOctave = async (run: OctaveRun) => {
     const outputDir = run.payload.outputDir as string;
     const songDir = path.join(outputDir, 'prepared');
 
@@ -132,15 +188,17 @@ function createHarness(audioPaths: string[]) {
     await nextTurn();
   };
 
-  return { root, runs, queue, importSong, complete };
-}
-
-function writeAudio(root: string, name: string): string {
-  const filePath = path.join(root, name);
-
-  fs.writeFileSync(filePath, 'audio');
-
-  return filePath;
+  return {
+    root,
+    octaveRuns,
+    skRuns,
+    queue,
+    importSong,
+    completeOctave,
+    get selectAudioCalls() {
+      return selectAudioCalls;
+    },
+  };
 }
 
 describe('auto-chart source and worker protocol', () => {
@@ -273,7 +331,108 @@ describe('auto-chart source and worker protocol', () => {
   });
 });
 
-describe('auto-chart queue', () => {
+describe('sightkick sidecar __SK_EVENT__ parser', () => {
+  it('parses only well-formed, correctly-prefixed events', () => {
+    expect(
+      parseSkEventLine(
+        '__SK_EVENT__ {"kind":"progress","stage":"download","percent":10,"message":"Downloading"}',
+      ),
+    ).toEqual({
+      kind: 'progress',
+      stage: 'download',
+      percent: 10,
+      message: 'Downloading',
+    });
+    expect(
+      parseSkEventLine(
+        '__SK_EVENT__ {"kind":"complete","success":true,"songDir":"/tmp/prepared"}',
+      ),
+    ).toEqual({ kind: 'complete', success: true, songDir: '/tmp/prepared' });
+    expect(
+      parseSkEventLine('__SK_EVENT__ {"kind":"error","message":"boom"}'),
+    ).toEqual({ kind: 'error', message: 'boom' });
+  });
+
+  it('ignores stray sidecar output, missing the required space, malformed JSON, and unknown kinds', () => {
+    expect(parseSkEventLine('regular sidecar log output')).toBeUndefined();
+    expect(parseSkEventLine('')).toBeUndefined();
+    // Missing the mandated trailing space in the prefix.
+    expect(parseSkEventLine('__SK_EVENT__{"kind":"progress"}')).toBeUndefined();
+    expect(parseSkEventLine('__SK_EVENT__ {not json')).toBeUndefined();
+    expect(parseSkEventLine('__SK_EVENT__ null')).toBeUndefined();
+    expect(parseSkEventLine('__SK_EVENT__ "a string"')).toBeUndefined();
+    expect(parseSkEventLine('__SK_EVENT__ {"kind":"unknown"}')).toBeUndefined();
+  });
+});
+
+describe('sightkick sidecar chunked stdout reader', () => {
+  it('parses well-formed lines and drops malformed ones interleaved between them', () => {
+    const events: SkWorkerEvent[] = [];
+    const reader = createSkEventReader((event) => events.push(event));
+
+    reader.push('some unrelated log noise\n');
+    reader.push(
+      '__SK_EVENT__ {"kind":"progress","stage":"separate","percent":30,"message":"Separating"}\n',
+    );
+    reader.push('__SK_EVENT__ not json\n');
+    reader.push('__SK_EVENT__{"kind":"progress","percent":1}\n');
+    reader.push('__SK_EVENT__ {"kind":"unknown"}\n');
+
+    expect(events).toEqual([
+      {
+        kind: 'progress',
+        stage: 'separate',
+        percent: 30,
+        message: 'Separating',
+      },
+    ]);
+  });
+
+  it('reassembles a single event whose JSON body is split across multiple stdout chunks', () => {
+    const events: SkWorkerEvent[] = [];
+    const reader = createSkEventReader((event) => events.push(event));
+
+    reader.push('__SK_EVENT__ {"kind":"progress",');
+    reader.push('"stage":"beats","percent":');
+    reader.push('60}\n');
+
+    expect(events).toEqual([{ kind: 'progress', stage: 'beats', percent: 60 }]);
+  });
+
+  it('parses multiple events in one chunk and one split across the next chunk without corruption', () => {
+    const events: SkWorkerEvent[] = [];
+    const reader = createSkEventReader((event) => events.push(event));
+
+    reader.push(
+      '__SK_EVENT__ {"kind":"progress","stage":"download","percent":5}\n' +
+        '__SK_EVENT__ {"kind":"progress","stage":"transcribe","percent":80}\n' +
+        '__SK_EVENT__ {"kind":"comp',
+    );
+    reader.push('lete","success":true,"songDir":"/tmp/prepared"}\n');
+
+    expect(events).toEqual([
+      { kind: 'progress', stage: 'download', percent: 5 },
+      { kind: 'progress', stage: 'transcribe', percent: 80 },
+      { kind: 'complete', success: true, songDir: '/tmp/prepared' },
+    ]);
+  });
+
+  it('only emits a final unterminated line once flushed, and never duplicates it', () => {
+    const events: SkWorkerEvent[] = [];
+    const reader = createSkEventReader((event) => events.push(event));
+
+    reader.push('__SK_EVENT__ {"kind":"error","message":"boom"}');
+    expect(events).toEqual([]);
+
+    reader.flush();
+    expect(events).toEqual([{ kind: 'error', message: 'boom' }]);
+
+    reader.flush();
+    expect(events).toHaveLength(1);
+  });
+});
+
+describe('auto-chart queue — octave backend (local file only)', () => {
   const cleanup: string[] = [];
 
   afterEach(() => {
@@ -289,10 +448,12 @@ describe('auto-chart queue', () => {
 
     cleanup.push(sourceRoot);
 
-    const harness = createHarness([
-      writeAudio(sourceRoot, 'one.mp3'),
-      writeAudio(sourceRoot, 'two.mp3'),
-    ]);
+    const harness = createHarness({
+      audioPaths: [
+        writeAudio(sourceRoot, 'one.mp3'),
+        writeAudio(sourceRoot, 'two.mp3'),
+      ],
+    });
 
     cleanup.push(harness.root);
 
@@ -301,10 +462,11 @@ describe('auto-chart queue', () => {
 
     await harness.queue.create(first as never, {});
     await harness.queue.create(second as never, {});
-    await vi.waitFor(() => expect(harness.runs).toHaveLength(1));
+    await vi.waitFor(() => expect(harness.octaveRuns).toHaveLength(1));
     await nextTurn();
-    expect(harness.runs[0].payload.runId).toBe(latestJob(first).id);
-    expect(harness.runs[0].payload).toMatchObject({
+    expect(harness.octaveRuns[0].payload.runId).toBe(latestJob(first).id);
+    expect(latestJob(first).backend).toBe('octave');
+    expect(harness.octaveRuns[0].payload).toMatchObject({
       files: [fs.realpathSync(path.join(sourceRoot, 'one.mp3'))],
       urls: [],
       includeKeys: false,
@@ -321,9 +483,9 @@ describe('auto-chart queue', () => {
       autoTempoDrift: true,
       autoTempoSnap: true,
     });
-    harness.runs[0].emit({
+    harness.octaveRuns[0].emit({
       kind: 'progress',
-      runId: harness.runs[0].payload.runId,
+      runId: harness.octaveRuns[0].payload.runId,
       percent: 25,
     });
     await vi.waitFor(() =>
@@ -333,13 +495,13 @@ describe('auto-chart queue', () => {
       }),
     );
 
-    const outputDir = harness.runs[0].payload.outputDir as string;
+    const outputDir = harness.octaveRuns[0].payload.outputDir as string;
     const songDir = path.join(outputDir, 'prepared');
 
     fs.mkdirSync(songDir, { recursive: true });
-    harness.runs[0].emit({
+    harness.octaveRuns[0].emit({
       kind: 'complete',
-      runId: harness.runs[0].payload.runId,
+      runId: harness.octaveRuns[0].payload.runId,
       success: true,
       outputDir,
       songFolders: [songDir],
@@ -348,8 +510,8 @@ describe('auto-chart queue', () => {
     await vi.waitFor(() =>
       expect(latestJob(first)).toMatchObject({ stage: 'preview-ready' }),
     );
-    harness.runs[0].finish();
-    await vi.waitFor(() => expect(harness.runs).toHaveLength(2));
+    harness.octaveRuns[0].finish();
+    await vi.waitFor(() => expect(harness.octaveRuns).toHaveLength(2));
     expect(harness.importSong).not.toHaveBeenCalled();
 
     const previewDir = latestJob(first).preview?.sourceDir;
@@ -367,10 +529,12 @@ describe('auto-chart queue', () => {
 
     cleanup.push(sourceRoot);
 
-    const harness = createHarness([
-      writeAudio(sourceRoot, 'one.mp3'),
-      writeAudio(sourceRoot, 'two.mp3'),
-    ]);
+    const harness = createHarness({
+      audioPaths: [
+        writeAudio(sourceRoot, 'one.mp3'),
+        writeAudio(sourceRoot, 'two.mp3'),
+      ],
+    });
 
     cleanup.push(harness.root);
 
@@ -379,18 +543,18 @@ describe('auto-chart queue', () => {
 
     await harness.queue.create(first as never, {});
     await harness.queue.create(second as never, {});
-    await vi.waitFor(() => expect(harness.runs).toHaveLength(1));
+    await vi.waitFor(() => expect(harness.octaveRuns).toHaveLength(1));
     await nextTurn();
 
-    const activeTempDir = harness.runs[0].payload.outputDir as string;
+    const activeTempDir = harness.octaveRuns[0].payload.outputDir as string;
 
     await harness.queue.cancel(latestJob(second).id);
     expect(latestJob(second)).toMatchObject({ stage: 'cancelled' });
-    expect(harness.runs).toHaveLength(1);
+    expect(harness.octaveRuns).toHaveLength(1);
 
     await harness.queue.cancel(latestJob(first).id);
-    expect(harness.runs[0].kill).toHaveBeenCalledOnce();
-    harness.runs[0].finish();
+    expect(harness.octaveRuns[0].kill).toHaveBeenCalledOnce();
+    harness.octaveRuns[0].finish();
     await vi.waitFor(() =>
       expect(latestJob(first)).toMatchObject({ stage: 'cancelled' }),
     );
@@ -406,17 +570,19 @@ describe('auto-chart queue', () => {
 
     cleanup.push(sourceRoot);
 
-    const harness = createHarness([writeAudio(sourceRoot, 'one.mp3')]);
+    const harness = createHarness({
+      audioPaths: [writeAudio(sourceRoot, 'one.mp3')],
+    });
 
     cleanup.push(harness.root);
 
     const event = makeEvent();
 
     await harness.queue.create(event as never, {});
-    await vi.waitFor(() => expect(harness.runs).toHaveLength(1));
+    await vi.waitFor(() => expect(harness.octaveRuns).toHaveLength(1));
     await nextTurn();
 
-    const firstRun = harness.runs[0];
+    const firstRun = harness.octaveRuns[0];
     const firstJob = latestJob(event);
 
     firstRun.emit({
@@ -449,8 +615,311 @@ describe('auto-chart queue', () => {
     );
 
     await harness.queue.retry(event as never, firstJob.id);
-    await vi.waitFor(() => expect(harness.runs).toHaveLength(2));
+    await vi.waitFor(() => expect(harness.octaveRuns).toHaveLength(2));
     expect(latestJob(event)).toMatchObject({ attempt: 2, stage: 'processing' });
     expect(latestJob(event).id).not.toBe(firstJob.id);
+  });
+});
+
+describe('auto-chart queue — sightkick backend', () => {
+  const cleanup: string[] = [];
+
+  afterEach(() => {
+    for (const root of cleanup.splice(0)) {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('downloads audio automatically from a pasted YouTube URL without prompting for a local file', async () => {
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://youtu.be/abcdefghijk',
+    });
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+    await nextTurn();
+
+    expect(harness.selectAudioCalls).toBe(0);
+    expect(harness.skRuns[0].input).toMatchObject({
+      youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+      audioPath: undefined,
+    });
+    expect(latestJob(event)).toMatchObject({
+      stage: 'downloading',
+      backend: 'sightkick',
+    });
+
+    harness.skRuns[0].emit({
+      kind: 'progress',
+      stage: 'download',
+      percent: 40,
+      message: 'Downloading from YouTube',
+    });
+    await vi.waitFor(() =>
+      expect(latestJob(event)).toMatchObject({
+        stage: 'downloading',
+        percent: 40,
+      }),
+    );
+
+    harness.skRuns[0].emit({
+      kind: 'progress',
+      stage: 'separate',
+      percent: 65,
+      message: 'Separating stems',
+    });
+    await vi.waitFor(() =>
+      expect(latestJob(event)).toMatchObject({
+        stage: 'processing',
+        percent: 65,
+      }),
+    );
+
+    const songDir = path.join(harness.skRuns[0].input.tempDir, 'prepared');
+
+    fs.mkdirSync(songDir, { recursive: true });
+
+    const preparedRealPath = fs.realpathSync(songDir);
+
+    harness.skRuns[0].emit({
+      kind: 'complete',
+      success: true,
+      songDir,
+    });
+    await vi.waitFor(() =>
+      expect(latestJob(event)).toMatchObject({ stage: 'preview-ready' }),
+    );
+    expect(latestJob(event).preview?.sourceDir).toBe(preparedRealPath);
+
+    harness.skRuns[0].finish();
+    await nextTurn();
+
+    await harness.queue.import(latestJob(event).id);
+    expect(harness.importSong).toHaveBeenCalledWith(
+      preparedRealPath,
+      undefined,
+    );
+    expect(latestJob(event)).toMatchObject({ stage: 'imported' });
+  });
+
+  it('still supports choosing a local audio file with the sightkick backend', async () => {
+    const sourceRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'auto-chart-audio-'),
+    );
+
+    cleanup.push(sourceRoot);
+
+    const harness = createHarness({
+      audioPaths: [writeAudio(sourceRoot, 'one.mp3')],
+      backends: { sightkick: true, octave: false },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, { localFile: true });
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+    await nextTurn();
+
+    expect(harness.selectAudioCalls).toBe(1);
+    expect(harness.skRuns[0].input.audioPath).toBe(
+      fs.realpathSync(path.join(sourceRoot, 'one.mp3')),
+    );
+    expect(harness.skRuns[0].input.youtubeUrl).toBeUndefined();
+    expect(latestJob(event)).toMatchObject({ stage: 'processing' });
+  });
+
+  it('cancels a YouTube download mid-flight, kills the sidecar process, and cleans up the temp dir', async () => {
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://youtu.be/abcdefghijk',
+    });
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+    await nextTurn();
+
+    const tempDir = harness.skRuns[0].input.tempDir;
+
+    expect(fs.existsSync(tempDir)).toBe(true);
+    expect(latestJob(event)).toMatchObject({ stage: 'downloading' });
+
+    await harness.queue.cancel(latestJob(event).id);
+    expect(harness.skRuns[0].kill).toHaveBeenCalledOnce();
+
+    harness.skRuns[0].finish();
+    await vi.waitFor(() =>
+      expect(latestJob(event)).toMatchObject({ stage: 'cancelled' }),
+    );
+    expect(fs.existsSync(tempDir)).toBe(false);
+  });
+
+  it('cancels a download queued behind another active job before it ever starts', async () => {
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+    });
+
+    cleanup.push(harness.root);
+
+    const first = makeEvent();
+    const second = makeEvent();
+
+    await harness.queue.create(first as never, {
+      youtubeUrl: 'https://youtu.be/abcdefghijk',
+    });
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+    await harness.queue.create(second as never, {
+      youtubeUrl: 'https://youtu.be/aaaaaaaaaaa',
+    });
+    await vi.waitFor(() =>
+      expect(latestJob(second)).toMatchObject({ stage: 'queued' }),
+    );
+
+    await harness.queue.cancel(latestJob(second).id);
+    expect(latestJob(second)).toMatchObject({ stage: 'cancelled' });
+    expect(harness.skRuns).toHaveLength(1);
+  });
+
+  it('surfaces a sidecar error (e.g. an age-restricted or unavailable video) as a failed job with an honest message', async () => {
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://youtu.be/abcdefghijk',
+    });
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+
+    harness.skRuns[0].emit({
+      kind: 'error',
+      message: 'This video is age-restricted and cannot be downloaded',
+    });
+    harness.skRuns[0].finish();
+    await vi.waitFor(() =>
+      expect(latestJob(event)).toMatchObject({
+        stage: 'failed',
+        error: 'This video is age-restricted and cannot be downloaded',
+      }),
+    );
+  });
+});
+
+describe('auto-chart backend selection and fallback', () => {
+  const cleanup: string[] = [];
+
+  afterEach(() => {
+    for (const root of cleanup.splice(0)) {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('prefers sightkick by default when both backends are available', async () => {
+    const harness = createHarness({
+      backends: { sightkick: true, octave: true },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://youtu.be/abcdefghijk',
+    });
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+    expect(latestJob(event).backend).toBe('sightkick');
+    expect(harness.octaveRuns).toHaveLength(0);
+  });
+
+  it('falls back to octave when sightkick is unavailable and no backend is explicitly requested', async () => {
+    const sourceRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'auto-chart-audio-'),
+    );
+
+    cleanup.push(sourceRoot);
+
+    const harness = createHarness({
+      audioPaths: [writeAudio(sourceRoot, 'one.mp3')],
+      backends: { sightkick: false, octave: true },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, {});
+    await vi.waitFor(() => expect(harness.octaveRuns).toHaveLength(1));
+    expect(latestJob(event).backend).toBe('octave');
+  });
+
+  it('honors an explicit backend request when that backend is available', async () => {
+    const sourceRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'auto-chart-audio-'),
+    );
+
+    cleanup.push(sourceRoot);
+
+    const harness = createHarness({
+      audioPaths: [writeAudio(sourceRoot, 'one.mp3')],
+      backends: { sightkick: true, octave: true },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, { backend: 'octave' });
+    await vi.waitFor(() => expect(harness.octaveRuns).toHaveLength(1));
+    expect(latestJob(event).backend).toBe('octave');
+    expect(harness.skRuns).toHaveLength(0);
+  });
+
+  it('falls back to the available backend when the explicitly requested one is missing', async () => {
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://youtu.be/abcdefghijk',
+      backend: 'octave',
+    });
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+    expect(latestJob(event).backend).toBe('sightkick');
+  });
+
+  it('fails clearly, without ever prompting for a file, when no auto-chart backend is available', async () => {
+    const harness = createHarness({
+      backends: { sightkick: false, octave: false },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, {});
+    expect(latestJob(event)).toMatchObject({
+      stage: 'failed',
+      error: expect.stringContaining('No auto-chart backend is available'),
+    });
+    expect(harness.selectAudioCalls).toBe(0);
   });
 });

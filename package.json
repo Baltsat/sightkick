@@ -190,7 +190,11 @@
       "output": "release/build"
     },
     "extraResources": [
-      "./assets/**"
+      "./assets/**",
+      {
+        "from": "resources/transcriber",
+        "to": "transcriber"
+      }
     ],
     "publish": {
       "provider": "github",

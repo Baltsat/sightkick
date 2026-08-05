@@ -267,6 +267,7 @@ export interface IpcImportSongResponse {
 export type AutoChartStage =
   | 'queued'
   | 'resolving'
+  | 'downloading'
   | 'processing'
   | 'preview-ready'
   | 'importing'
@@ -274,8 +275,18 @@ export type AutoChartStage =
   | 'failed'
   | 'cancelled';
 
+export type AutoChartBackend = 'sightkick' | 'octave';
+
 export interface IpcCreateAutoChartRequest {
   youtubeUrl?: string;
+  localFile?: boolean;
+  backend?: AutoChartBackend;
+}
+
+export interface IpcAutoChartBackendsResponse {
+  sightkick: boolean;
+  octave: boolean;
+  default: AutoChartBackend;
 }
 
 export interface IpcAutoChartMetadata {
@@ -291,6 +302,7 @@ export interface IpcAutoChartJob {
   attempt: number;
   stage: AutoChartStage;
   message: string;
+  backend: AutoChartBackend;
   percent?: number;
   sourceName?: string;
   metadata?: IpcAutoChartMetadata;
