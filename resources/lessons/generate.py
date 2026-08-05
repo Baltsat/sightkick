@@ -3,7 +3,9 @@
 
 Deterministically turns resources/lessons/curriculum.yaml into playable
 SightKick song folders: notes.mid (PART DRUMS, expert difficulty),
-song.ogg (a synthesized click/metronome track), and song.ini.
+song.ogg (a synthesized click/metronome track), drums.ogg (a rendering of
+the exercise's own pattern using real drum one-shot samples, sample-
+accurately aligned with song.ogg), and song.ini.
 
 Usage:
     python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
@@ -11,9 +13,11 @@ Usage:
     .venv/bin/python3 generate.py --out-dir /some/other/dir --only 03.03,04.04
     .venv/bin/python3 generate.py --dry-run
 
-Requires: Python 3.12, PyYAML (see requirements.txt), and ffmpeg on PATH
-(used only to transcode the generated click WAV into a small mono OGG --
-no drum sounds are ever encoded, the drummer supplies those).
+Requires: Python 3.12, PyYAML (see requirements.txt), ffmpeg on PATH (used
+to transcode both the click WAV and the drums WAV into small mono OGG
+files), and the vendored one-shot samples in resources/lessons/samples/
+(see samples/ATTRIBUTION.md -- CC0-licensed, fetched once, committed to
+git; no network access needed at generation time).
 
 See README.md for the full design writeup (MIDI note map, notation
 legend, gamification fields, duration/loop math, and what was merged from
@@ -28,8 +32,18 @@ import shutil
 import struct
 import subprocess
 import sys
+import warnings
 import wave
 from pathlib import Path
+
+with warnings.catch_warnings():
+    # audioop is stdlib in Python 3.12 (this project's pinned version) and
+    # gives C-speed PCM mixing/gain with no extra dependency; it's slated
+    # for removal in 3.13, which is a future-portability note, not a
+    # problem for this pinned interpreter -- silence the noise, don't
+    # paper over a real issue.
+    warnings.simplefilter("ignore", DeprecationWarning)
+    import audioop
 
 try:
     import yaml
@@ -82,6 +96,47 @@ CLICK_ACCENT_AMP = 0.85
 
 MIN_EXERCISE_SECONDS = 30.0
 MAX_EXERCISE_SECONDS = 90.0
+
+# ---------------------------------------------------------------------------
+# drums.ogg: real drum one-shots (see samples/ATTRIBUTION.md -- CC0) placed
+# at each pattern hit's exact tick time with velocity-scaled gain, mixed at
+# C speed via the stdlib `audioop` module (no numpy dependency).
+# ---------------------------------------------------------------------------
+
+DRUM_SAMPLE_RATE = 44100
+DRUM_OGG_BITRATE = "64k"
+SAMPLES_DIR = HERE / "samples"
+
+# one vendored one-shot per lane, except the snare which has a dedicated
+# rimshot sample used only for accented hits (see _sample_key_for)
+SAMPLE_FILES = {
+    "kick": "kick.wav",
+    "snare": "snare.wav",
+    "snare_rimshot": "snare_rimshot.wav",
+    "hihat_closed": "hihat_closed.wav",
+    "hihat_open": "hihat_open.wav",
+    "ride": "ride.wav",
+    "crash": "crash.wav",
+    "tom_high": "tom_high.wav",
+    "tom_mid": "tom_mid.wav",
+    "tom_low": "tom_low.wav",
+}
+
+LANE_SAMPLE = {
+    "K": "kick",
+    "S": "snare",
+    "H": "hihat_closed",
+    "O": "hihat_open",
+    "R": "ride",
+    "C": "crash",
+    "T1": "tom_high",
+    "T2": "tom_mid",
+    "T3": "tom_low",
+}
+
+# linear gain per notation symbol, derived from the same VELOCITY table
+# that drives notes.mid (0-127 MIDI velocity -> 0.0-1.0 amplitude scale)
+GAIN = {sym: vel / 127.0 for sym, vel in VELOCITY.items()}
 
 DEFAULT_OUT_DIR = Path.home() / "Music" / "SightKick"
 FOLDER_PREFIX = "SightKick Method - Lesson"
@@ -374,7 +429,9 @@ def build_click_wav_bytes(timeline: Timeline, bpm: int, out_path: Path) -> None:
         w.writeframes(struct.pack(f"<{len(buffer)}h", *buffer))
 
 
-def wav_to_ogg(wav_path: Path, ogg_path: Path) -> None:
+def wav_to_ogg(
+    wav_path: Path, ogg_path: Path, sample_rate: int, bitrate: str = "48k"
+) -> None:
     subprocess.run(
         [
             "ffmpeg",
@@ -386,15 +443,107 @@ def wav_to_ogg(wav_path: Path, ogg_path: Path) -> None:
             "-ac",
             "1",
             "-ar",
-            str(CLICK_SAMPLE_RATE),
+            str(sample_rate),
             "-c:a",
             "libvorbis",
             "-b:a",
-            "48k",
+            bitrate,
             str(ogg_path),
         ],
         check=True,
     )
+
+
+# ---------------------------------------------------------------------------
+# drums.ogg: real one-shot samples placed at each hit's exact tick time
+# ---------------------------------------------------------------------------
+
+_sample_pcm_cache: dict[str, bytes] = {}
+_scaled_sample_cache: dict[tuple[str, str], bytes] = {}
+
+
+def _load_sample_pcm(key: str) -> bytes:
+    """Reads a vendored one-shot as raw 16-bit mono PCM, once, cached for
+    the life of the process. Fails loudly (not silently) if a sample is
+    missing or isn't the mono/16-bit/44.1kHz format the mixer assumes --
+    every vendored file must be pre-converted to exactly that format by
+    samples/_vendor_pipeline.py, so a mismatch means the samples/ dir was
+    tampered with, not something to paper over here."""
+    if key not in _sample_pcm_cache:
+        path = SAMPLES_DIR / SAMPLE_FILES[key]
+        if not path.exists():
+            sys.exit(
+                f"missing drum sample: {path}\n"
+                "Run resources/lessons/samples/_vendor_pipeline.py once, or "
+                "restore samples/*.wav from git."
+            )
+        with wave.open(str(path), "rb") as w:
+            if (w.getnchannels(), w.getsampwidth(), w.getframerate()) != (
+                1,
+                2,
+                DRUM_SAMPLE_RATE,
+            ):
+                sys.exit(
+                    f"{path} is not mono/16-bit/{DRUM_SAMPLE_RATE}Hz PCM "
+                    f"(got {w.getnchannels()}ch/{w.getsampwidth() * 8}bit/{w.getframerate()}Hz) "
+                    "-- re-run samples/_vendor_pipeline.py"
+                )
+            _sample_pcm_cache[key] = w.readframes(w.getnframes())
+    return _sample_pcm_cache[key]
+
+
+def _scaled_sample(key: str, sym: str) -> bytes:
+    """Gain-scaled copy of a one-shot for one notation symbol's velocity,
+    computed once via audioop's C-level multiply (fixed, non-random
+    rounding -- deterministic across runs) and cached."""
+    cache_key = (key, sym)
+    if cache_key not in _scaled_sample_cache:
+        pcm = _load_sample_pcm(key)
+        _scaled_sample_cache[cache_key] = audioop.mul(pcm, 2, GAIN[sym])
+    return _scaled_sample_cache[cache_key]
+
+
+def _sample_key_for(lane: str, sym: str) -> str:
+    # accented snare hits get the rimshot one-shot instead of a louder
+    # copy of the center hit -- a real timbral change, not just gain
+    # (see samples/ATTRIBUTION.md). Every other lane/symbol combination
+    # uses its single vendored one-shot, scaled by GAIN[sym] only.
+    if lane == "S" and sym == "X":
+        return "snare_rimshot"
+    return LANE_SAMPLE[lane]
+
+
+def build_drums_wav_bytes(timeline: Timeline, bpm: int, out_path: Path) -> None:
+    """Mixes every hit in the timeline (including the count-in hi-hat
+    pulses -- they're already in timeline.hits) into one mono PCM buffer,
+    sample-accurately aligned to the same tick->seconds conversion
+    build_click_wav_bytes uses, so drums.ogg and song.ogg always end up
+    the same duration. Mixing is done with audioop.add, which saturates
+    (clamps) on overflow instead of wrapping -- deterministic, no
+    dithering, no random source anywhere in the path."""
+    total_seconds = timeline.total_ticks / TICKS_PER_QUARTER * 60 / bpm
+    total_samples = int(round(total_seconds * DRUM_SAMPLE_RATE))
+    buffer = bytearray(total_samples * 2)  # silence (zero bytes)
+
+    for tick, lane, sym in timeline.hits:
+        frag = _scaled_sample(_sample_key_for(lane, sym), sym)
+        t_seconds = tick / TICKS_PER_QUARTER * 60 / bpm
+        start = int(round(t_seconds * DRUM_SAMPLE_RATE))
+        offset = start * 2
+        if offset >= len(buffer):
+            continue
+        end = min(offset + len(frag), len(buffer))
+        if end <= offset:
+            continue
+        frag = frag[: end - offset]
+        mixed = audioop.add(bytes(buffer[offset:end]), frag, 2)
+        buffer[offset:end] = mixed
+
+    with wave.open(str(out_path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(DRUM_SAMPLE_RATE)
+        w.writeframes(bytes(buffer))
 
 
 # ---------------------------------------------------------------------------
@@ -468,8 +617,16 @@ def generate_one(
     wav_path = folder / "_click_tmp.wav"
     ogg_path = folder / "song.ogg"
     build_click_wav_bytes(timeline, exercise["bpm_target"], wav_path)
-    wav_to_ogg(wav_path, ogg_path)
+    wav_to_ogg(wav_path, ogg_path, CLICK_SAMPLE_RATE, bitrate="48k")
     wav_path.unlink(missing_ok=True)
+
+    drums_wav_path = folder / "_drums_tmp.wav"
+    drums_ogg_path = folder / "drums.ogg"
+    build_drums_wav_bytes(timeline, exercise["bpm_target"], drums_wav_path)
+    wav_to_ogg(
+        drums_wav_path, drums_ogg_path, DRUM_SAMPLE_RATE, bitrate=DRUM_OGG_BITRATE
+    )
+    drums_wav_path.unlink(missing_ok=True)
 
     return folder
 
@@ -488,7 +645,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if shutil.which("ffmpeg") is None and not args.dry_run:
-        sys.exit("ffmpeg not found on PATH -- required to encode song.ogg")
+        sys.exit("ffmpeg not found on PATH -- required to encode song.ogg/drums.ogg")
 
     curriculum = load_curriculum(args.curriculum)
     only = set(args.only.split(",")) if args.only else None

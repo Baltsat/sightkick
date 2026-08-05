@@ -1,0 +1,8 @@
+# Binary audio assets -- override the repo root's blanket `* text eol=lf`
+# rule. Without this, git's CRLF normalization would treat these as text
+# and mangle raw PCM bytes (any 0x0D 0x0A pair in real audio data) on
+# checkout, silently corrupting the vendored drum samples.
+*.wav binary
+*.ogg binary
+*.mp3 binary
+*.flac binary

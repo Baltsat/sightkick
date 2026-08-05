@@ -2,7 +2,9 @@
 
 A deterministic pipeline that turns `curriculum.yaml` (117 drumset exercises,
 hand-authored in this repo) into playable SightKick song folders: a chart
-(`notes.mid`), a click track (`song.ogg`), and metadata (`song.ini`).
+(`notes.mid`), a click track (`song.ogg`), an audible drum-pattern demo
+rendered from real (CC0) drum samples (`drums.ogg`), and metadata
+(`song.ini`).
 
 ## Inspiration and copyright
 
@@ -135,9 +137,12 @@ Useful flags:
 - `--only 03.03,04.04` — regenerate just a few exercises by id.
 - `--dry-run` — print what would be written without touching disk.
 
-`ffmpeg` must be on `PATH` (used only to transcode the generated click WAV
-into a small mono OGG — no drum sounds are ever synthesized or shipped;
-the drummer supplies those on their own kit).
+`ffmpeg` must be on `PATH` (used to transcode both the generated click WAV
+and the generated drums WAV into small mono OGG files). The 10 one-shot
+drum samples `drums.ogg` is rendered from are already vendored in
+`samples/` (see `samples/ATTRIBUTION.md`) — no network access is needed to
+run `generate.py` itself, only if you re-run `samples/_vendor_pipeline.py`
+to change which source samples are used.
 
 ### Why a venv instead of pure stdlib
 
@@ -161,6 +166,53 @@ from the same tick timeline as the MIDI. The final compressed `.ogg`
 container bytes can vary a few bytes run to run because libvorbis embeds
 a random Ogg stream serial number by default; this has no audible or
 functional effect and doesn't change the file's duration.
+
+`drums.ogg` is deterministic the same way: no randomness or dithering
+anywhere in the mix path (`audioop.mul`/`audioop.add` are pure functions
+of their inputs), so the pre-encode WAV is byte-identical across runs and
+the post-encode decoded PCM is identical too (verified by hashing two
+independent full-pipeline runs of the same exercise).
+
+## drums.ogg — audible pattern demo
+
+The book ships audio examples of every exercise; this project can't
+reproduce those (copyright), so `generate.py` synthesizes an equivalent
+directly from the same pattern data that drives `notes.mid` — real drum
+one-shot samples (see `samples/ATTRIBUTION.md` — CC0-licensed, vendored
+in-repo) placed at each hit's exact tick time:
+
+- **Sample-accurate alignment with `song.ogg`**: `drums.ogg` is built from
+  the identical `Timeline` (same ticks, same `bpm_target`, same
+  tick→seconds conversion) as the click track, so the two files are
+  always the same duration and every drum hit lands exactly where its
+  click/beat does. The count-in bar's hi-hat pulses are real hi-hat hits
+  here too, not just clicks.
+- **Velocity-scaled gain, not different samples per dynamic**: each lane
+  has one vendored one-shot (`kick.wav`, `snare.wav`,
+  `hihat_closed.wav`/`hihat_open.wav`, `ride.wav`, `crash.wav`,
+  `tom_high.wav`/`tom_mid.wav`/`tom_low.wav`), scaled by
+  `VELOCITY[sym] / 127` — accent (`X`) hits louder, ghosts (`g`) quiet —
+  the same three-level dynamic the MIDI already encodes. One exception:
+  accented snare hits (`X`) use a separate `snare_rimshot.wav` one-shot
+  instead of a louder copy of the center hit, since accented backbeats are
+  authentically rimshots in real drumming.
+- **Mixing**: samples are mixed via the stdlib `audioop` module (C-speed
+  add/multiply on raw PCM, no numpy dependency) into one mono 44.1kHz
+  buffer, then transcoded to a modest-bitrate (64kbps) mono OGG — the same
+  ffmpeg step `song.ogg` already uses, just at a different sample
+  rate/bitrate suited to real drum timbre vs. a synthesized click.
+- **Mutable in the app for free**: the app already treats any audio
+  filename containing `"drums"` as a separately mixable/mutable stem
+  (`src/renderer/hooks/useSongLoader.ts`), and `scan-chart`'s own stem
+  whitelist (`hasAudioName` in `scan-chart/src/utils.ts`) recognizes
+  `drums` as a valid Clone-Hero-style stem name — no app code changed for
+  this feature; naming the file `drums.ogg` was sufficient.
+- **Offline after vendoring**: the 10 one-shot `.wav` files live in
+  `samples/` and are read directly by `generate.py` via the stdlib `wave`
+  module — no network access, no re-fetching, at generation time. Only
+  `samples/_vendor_pipeline.py` (a separate, manually-run one-time script)
+  needs network access, and only if you want to re-derive the `.wav`
+  files from a different source layer/mic position.
 
 ## How exercise length and the count-in work
 
@@ -209,6 +261,23 @@ Clone Hero's pro-drums format has no distinct open-hat signal to target.
 - **`ffprobe`** on 3 sample `song.ogg` files: measured duration matched
   the `song.ini` `song_length` field to well under 1ms in every case
   (target was 200ms).
+- **`drums.ogg` addition (2026-08-05)**: regenerated all 117 folders after
+  adding the drum-sample renderer.
+  - `scan-chart`'s real `scanChartFolder` (not a hand-rolled check) ran
+    against every one of the 117 folders' full file sets: **117/117**
+    come back `playable: true`, with a `drums` instrument track present
+    and zero `noAudio`/`invalidAudio`/`multipleAudio` folder issues —
+    `drums.ogg`'s stem name is on `scan-chart`'s own recognized-stem
+    whitelist, so it's treated as a first-class audio stem, not an
+    unrecognized extra file.
+  - `ffprobe` duration of `drums.ogg` vs. `song.ogg` on 5 folders spread
+    across the curriculum (different meters/tempos/lengths): worst
+    observed difference was **0.023ms** (target was 50ms).
+  - Determinism: hashed two independent in-process `build_drums_wav_bytes`
+    runs of the same exercise (identical SHA-1), and separately hashed the
+    ffmpeg-decoded PCM of two independent full-pipeline `drums.ogg`
+    outputs for the same exercise (identical SHA-1) — confirms no
+    randomness/dithering anywhere in the sample-mixing or encode path.
 
 ## Gamification data (no UI here — this feeds a future Lessons screen)
 
