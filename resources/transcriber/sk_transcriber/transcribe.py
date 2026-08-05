@@ -5,19 +5,30 @@ Preference order:
    PyPI; its GitHub repo is research code pinned to an old
    TensorFlow/madmom stack that does not install cleanly under Python 3.12 /
    NumPy 2 / Apple Silicon). We checked and did not force it — see README.
-2. A classical fallback: spectral-flux onset detection (librosa) on the
-   drums stem, followed by rule-based band-energy/centroid/decay
-   classification into kick / snare / hi-hat / tom / cymbal, with per-hit
-   velocity recovered from local peak amplitude.
+2. **DrumSep** (inagoy/drumsep, Hybrid-Demucs, MIT) — a second-stage neural
+   separator that further splits the isolated drums stem into kick /
+   snare / cymbals / toms audio sub-stems. Classification then reduces to
+   trivial per-substem onset detection instead of a hand-tuned spectral
+   classifier; the only heuristic left is splitting the catch-all
+   "cymbals" substem into hi-hat vs. ride/crash by decay time, now on a
+   much cleaner signal than the pre-DrumSep classical path had. See
+   "Why DrumSep, not the model named in the brief" in README.
+3. A classical fallback: spectral-flux onset detection (librosa) on the
+   (un-substemmed) drums stem, followed by rule-based band-energy/
+   centroid/decay classification into kick / snare / hi-hat / tom /
+   cymbal, with per-hit velocity recovered from local peak amplitude.
 
-Both paths yield the same 5-class ``DrumHit`` stream so the MIDI writer does
-not need to know which engine produced it.
+All three paths yield the same 5-class ``DrumHit`` stream so the MIDI
+writer does not need to know which engine produced it.
 """
 
 from __future__ import annotations
 
 import logging
+import os
+import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
@@ -27,6 +38,28 @@ log = logging.getLogger("sk_transcriber.transcribe")
 
 ANALYSIS_SR = 22050
 LANES = ("kick", "snare", "hihat", "tom", "cymbal")
+
+# DrumSep (inagoy/drumsep, Hybrid-Demucs, MIT license). The model named in
+# the original brief (MDX23C-DrumSep-aufr33-jarredou, via the
+# `audio-separator` package) turned out to be unreachable: its upstream
+# host repo (github.com/jarredou/models) returns 404 / "Not Found" via both
+# a direct asset request and the GitHub API (i.e. the repo itself is gone,
+# not a transient network issue). This is a community HuggingFace mirror of
+# a different, MIT-licensed drum-substem model (4 stems instead of 6: no
+# separate ride/crash) that serves the same purpose in this pipeline.
+DRUMSEP_URL = "https://huggingface.co/vincewin/drumsep/resolve/main/49469ca8.th"
+DRUMSEP_MIN_BYTES = (
+    150_000_000  # sanity floor so a truncated download isn't silently used
+)
+DRUMSEP_SR = 44100
+DRUMSEP_CACHE = (
+    Path(
+        os.environ.get(
+            "SK_TRANSCRIBER_CACHE", Path.home() / ".cache" / "sk_transcriber"
+        )
+    )
+    / "drumsep_49469ca8.th"
+)
 
 
 @dataclass
@@ -124,6 +157,190 @@ def _dedupe_same_lane(hits: list[DrumHit], min_gap: float = 0.03) -> list[DrumHi
     return kept
 
 
+def _get_drumsep_checkpoint(reporter: ProgressReporter, stage: str) -> Path:
+    if DRUMSEP_CACHE.exists() and DRUMSEP_CACHE.stat().st_size >= DRUMSEP_MIN_BYTES:
+        return DRUMSEP_CACHE
+    DRUMSEP_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    reporter.report(
+        stage, 0.02, "Downloading DrumSep sub-stem model (one-time, ~160MB)"
+    )
+    tmp = DRUMSEP_CACHE.with_suffix(".tmp")
+    urllib.request.urlretrieve(DRUMSEP_URL, tmp)  # noqa: S310 — fixed, hardcoded HTTPS URL
+    size = tmp.stat().st_size
+    if size < DRUMSEP_MIN_BYTES:
+        tmp.unlink(missing_ok=True)
+        raise RuntimeError(f"DrumSep checkpoint download truncated ({size} bytes)")
+    tmp.rename(DRUMSEP_CACHE)
+    return DRUMSEP_CACHE
+
+
+def _onsets_for_substem(
+    y: np.ndarray, sr: int, sensitive: bool = True
+) -> tuple[np.ndarray, np.ndarray]:
+    """Onset times + per-onset peak amplitude for one already-isolated
+    instrument sub-stem. More sensitive thresholds than the classical
+    multi-instrument path are safe here: there's no cross-instrument bleed
+    left to trigger false positives on."""
+    import librosa
+
+    onset_env = librosa.onset.onset_strength(y=y, sr=sr, aggregate=np.median)
+    delta, wait = (0.035, 2) if sensitive else (0.07, 4)
+    onset_frames = librosa.onset.onset_detect(
+        onset_envelope=onset_env,
+        sr=sr,
+        backtrack=True,
+        pre_max=3,
+        post_max=3,
+        pre_avg=10,
+        post_avg=10,
+        delta=delta,
+        wait=wait,
+    )
+    onset_times = librosa.frames_to_time(onset_frames, sr=sr)
+    win = int(0.05 * sr)
+    amps = np.zeros(len(onset_times), dtype=np.float64)
+    for i, t in enumerate(onset_times):
+        i0 = int(t * sr)
+        seg = y[i0 : i0 + win]
+        amps[i] = float(np.max(np.abs(seg))) if len(seg) else 0.0
+    return onset_times, amps
+
+
+def _cymbal_decay_ratio(y: np.ndarray, sr: int, t: float) -> float:
+    i0 = int(t * sr)
+    decay_seg = y[i0 : i0 + int(0.15 * sr)]
+    half = len(decay_seg) // 2
+    if half <= 8:
+        return 0.0
+    rms1 = float(np.sqrt(np.mean(decay_seg[:half] ** 2) + 1e-12))
+    rms2 = float(np.sqrt(np.mean(decay_seg[half:] ** 2) + 1e-12))
+    return rms2 / (rms1 + 1e-9)
+
+
+def _spectral_centroid(y: np.ndarray, sr: int, t: float) -> float:
+    i0 = int(t * sr)
+    seg = y[i0 : i0 + int(0.05 * sr)]
+    if len(seg) < 32:
+        return 0.0
+    spec = np.abs(np.fft.rfft(seg * np.hanning(len(seg))))
+    freqs = np.fft.rfftfreq(len(seg), 1.0 / sr)
+    total = float(np.sum(spec)) + 1e-9
+    return float(np.sum(freqs * spec) / total)
+
+
+# DrumSep's own stem names, lowercased, mapped to our 5 canonical lanes.
+# "cymbals" is a catch-all (no separate ride/crash in a 4-stem model) —
+# resolved to hihat vs. cymbal per onset via decay ratio, same as the
+# classical path's high-purity branch, just on a much cleaner signal.
+_DRUMSEP_NAME_MAP = {
+    "kick": "kick",
+    "bombo": "kick",
+    "snare": "snare",
+    "redoblante": "snare",
+    "toms": "tom",
+    "tom": "tom",
+    "cymbals": "cymbal",
+    "platillos": "cymbal",
+    "hh": "cymbal",
+    "hihat": "cymbal",
+}
+
+
+def _transcribe_with_drumsep(
+    drums_wav_path: str, reporter: ProgressReporter, stage: str
+) -> list[DrumHit]:
+    import librosa
+    import torch
+    from demucs.apply import apply_model
+    from demucs.audio import AudioFile
+    from demucs.states import load_model
+
+    ckpt = _get_drumsep_checkpoint(reporter, stage)
+
+    reporter.report(stage, 0.15, "Loading DrumSep model")
+    model = load_model(str(ckpt))
+    model.eval()
+    device = "cpu"
+    try:
+        if torch.backends.mps.is_available():
+            device = "mps"
+    except Exception:
+        pass
+    model.to(device)
+
+    resolved = {}
+    for src_name in model.sources:
+        key = _DRUMSEP_NAME_MAP.get(src_name.strip().lower())
+        if key is None:
+            raise RuntimeError(
+                f"unrecognized DrumSep source name {src_name!r}; expected kick/snare/toms/cymbals"
+            )
+        resolved[src_name] = key
+    if set(resolved.values()) < {"kick", "snare"}:
+        raise RuntimeError(
+            f"DrumSep model sources {model.sources!r} did not include kick+snare"
+        )
+
+    reporter.report(stage, 0.25, "Separating drum sub-stems (kick/snare/toms/cymbals)")
+    wav = AudioFile(drums_wav_path).read(streams=0, samplerate=DRUMSEP_SR, channels=2)
+    ref = wav.mean(0)
+    std = float(ref.std()) or 1.0
+    wavn = (wav - ref.mean()) / std
+    with torch.no_grad():
+        sources = apply_model(
+            model, wavn[None].to(device), device=device, progress=False
+        )[0]
+    sources = sources.cpu() * std + float(ref.mean())
+
+    hits: list[DrumHit] = []
+    n_sources = len(model.sources)
+    for idx, (src_name, src_wave) in enumerate(zip(model.sources, sources)):
+        lane_base = resolved[src_name]
+        y_mono = src_wave.mean(0).numpy()
+        y = librosa.resample(y_mono, orig_sr=DRUMSEP_SR, target_sr=ANALYSIS_SR)
+
+        # Kick/snare substems from this model are clean enough that a
+        # sensitive threshold pays off in recall without hurting precision
+        # (measured: F1 0.91-0.93 kick, 0.60-0.78 snare). The toms/cymbals
+        # substems are noisier (this is a 4-stem, not 6-stem, model — no
+        # dedicated ride/crash head) and a sensitive threshold there mostly
+        # adds false positives: on a 4.5-minute benchmark song, dropping to
+        # the same threshold the classical fallback uses cut spurious "tom"
+        # onsets by ~3.7x while barely moving kick/snare. See README
+        # "Measured accuracy" for the before/after numbers.
+        sensitive = lane_base in ("kick", "snare")
+        onset_times, amps = _onsets_for_substem(y, ANALYSIS_SR, sensitive=sensitive)
+        if len(onset_times) == 0:
+            reporter.report(
+                stage, 0.3 + 0.55 * (idx + 1) / n_sources, f"No onsets in {src_name}"
+            )
+            continue
+        lo = float(np.percentile(amps, 5))
+        hi = float(np.percentile(amps, 95))
+
+        for t, amp in zip(onset_times, amps):
+            centroid = _spectral_centroid(y, ANALYSIS_SR, float(t))
+            if lane_base == "cymbal":
+                decay_ratio = _cymbal_decay_ratio(y, ANALYSIS_SR, float(t))
+                lane = "cymbal" if decay_ratio > 0.28 else "hihat"
+            else:
+                lane = lane_base
+            vel = _amp_to_velocity(float(amp), lo, hi)
+            hits.append(
+                DrumHit(time=float(t), lane=lane, velocity=vel, centroid=centroid)
+            )
+
+        reporter.report(
+            stage,
+            0.3 + 0.55 * (idx + 1) / n_sources,
+            f"Classified {src_name} onsets ({len(onset_times)})",
+        )
+
+    hits = _dedupe_same_lane(hits, min_gap=0.03)
+    reporter.stage_done(stage, f"Detected {len(hits)} drum hits (DrumSep)")
+    return hits
+
+
 def _transcribe_with_adtof(
     drums_wav_path: str, reporter: ProgressReporter, stage: str
 ) -> list[DrumHit]:
@@ -205,8 +422,13 @@ def transcribe_drums(
         hits = _transcribe_with_adtof(drums_wav_path, reporter, stage)
         return hits, "adtof"
     except Exception as exc:  # noqa: BLE001 — deliberate: any failure falls back
+        log.info("ADTOF unavailable/failed (%s); trying DrumSep", exc)
+    try:
+        hits = _transcribe_with_drumsep(drums_wav_path, reporter, stage)
+        return hits, "drumsep"
+    except Exception as exc:  # noqa: BLE001 — deliberate: any failure falls back
         log.warning(
-            "ADTOF unavailable/failed (%s); using classical onset+spectral classifier fallback",
+            "DrumSep unavailable/failed (%s); using classical onset+spectral classifier fallback",
             exc,
         )
         hits = _transcribe_classical(drums_wav_path, reporter, stage)

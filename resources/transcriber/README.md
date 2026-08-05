@@ -91,15 +91,16 @@ always emitted first).
 All dependencies are pinned in `pyproject.toml` / `uv.lock` (Python 3.12,
 Apple Silicon macOS only — see `[tool.uv].environments`).
 
-| Stage                   | Engine actually used                                                                                               | Version                              | License      |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------ | ------------ |
-| Download                | `yt-dlp`                                                                                                           | 2026.7.4                             | Unlicense    |
-| Separation (preferred)  | SightKick `demucs-split` binary (`--stems-bin`)                                                                    | pre-installed, htdemucs weights      | MIT (demucs) |
-| Separation (fallback)   | `demucs` (htdemucs), this tool's venv                                                                              | 4.1.0, `torch` 2.13.0 (MPS)          | MIT          |
-| Beats/tempo (preferred) | **Beat This!** (CP-JKU, ISMIR 2024)                                                                                | `beat-this` 1.1.0                    | **MIT**      |
-| Beats/tempo (fallback)  | `librosa.beat.beat_track`                                                                                          | librosa 0.11.0                       | ISC          |
-| Transcription           | classical fallback (spectral-flux onsets + rule-based band-energy/centroid/decay classifier) — see "Why not ADTOF" | this repo, `librosa`/`numpy`/`scipy` | —            |
-| MIDI writing            | `mido`                                                                                                             | 1.3.3                                | MIT          |
+| Stage                     | Engine actually used                                                                                      | Version                              | License      |
+| ------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------ | ------------ |
+| Download                  | `yt-dlp`                                                                                                  | 2026.7.4                             | Unlicense    |
+| Separation (preferred)    | SightKick `demucs-split` binary (`--stems-bin`)                                                           | pre-installed, htdemucs weights      | MIT (demucs) |
+| Separation (fallback)     | `demucs` (htdemucs), this tool's venv                                                                     | 4.1.0, `torch` 2.13.0 (MPS)          | MIT          |
+| Beats/tempo (preferred)   | **Beat This!** (CP-JKU, ISMIR 2024)                                                                       | `beat-this` 1.1.0                    | **MIT**      |
+| Beats/tempo (fallback)    | `librosa.beat.beat_track`                                                                                 | librosa 0.11.0                       | ISC          |
+| Transcription (preferred) | **DrumSep** (inagoy/drumsep, Hybrid-Demucs) + trivial per-substem onset detection — see "Why DrumSep"     | mirror checkpoint `49469ca8.th`      | **MIT**      |
+| Transcription (fallback)  | classical (spectral-flux onsets + rule-based band-energy/centroid/decay classifier) — see "Why not ADTOF" | this repo, `librosa`/`numpy`/`scipy` | —            |
+| MIDI writing              | `mido`                                                                                                    | 1.3.3                                | MIT          |
 
 **No non-commercial-licensed model is actually shipped or invoked by this
 tool as built.** ADTOF's pretrained weights are CC BY-NC-SA 4.0, but ADTOF
@@ -115,12 +116,48 @@ install adtof` / `ADTOF` both 404). Its reference implementation is
 research code pinned to an older TensorFlow + madmom stack; installing it
 would mean fighting Python-version and NumPy-2 incompatibilities on Apple
 Silicon with no upstream wheels to fall back on. Per the task's own
-fallback clause, we did not force this and implemented the classical
-onset+classifier fallback instead (see `sk_transcriber/transcribe.py`). The
-hook (`_transcribe_with_adtof`) is left in place for a future contributor
-with a working ADTOF environment to wire in without changing the pipeline
-shape — swapping engines does not change the 5-class `DrumHit` interface
-the MIDI writer consumes.
+fallback clause, we did not force this. The hook (`_transcribe_with_adtof`)
+is left in place for a future contributor with a working ADTOF environment
+to wire in without changing the pipeline shape — swapping engines does not
+change the 5-class `DrumHit` interface the MIDI writer consumes.
+
+### Why DrumSep, not the model named in the brief
+
+The brief asked for `MDX23C-DrumSep-aufr33-jarredou` via the
+[`audio-separator`](https://pypi.org/project/audio-separator/) package (a
+6-stem kick/snare/toms/hh/ride/crash separator). `audio-separator`
+installs cleanly on this machine with CoreML/MPS acceleration — that part
+worked. The checkpoint download did not: its upstream host,
+`github.com/jarredou/models`, returns `404 Not Found` on both the direct
+asset URL and the GitHub API for the repo itself — the repository is gone,
+not a transient network blip. `audio-separator`'s bundled manifest still
+points at it, so this fails for anyone until that manifest is updated
+upstream.
+
+Rather than stop at "the SOTA route failed" (the brief's own permitted
+fallback), we found a live, MIT-licensed substitute: **DrumSep**
+(`github.com/inagoy/drumsep`, MIT — a Hybrid-Demucs model trained
+specifically to split an isolated drums stem into kick / snare / cymbals /
+toms). It's a 4-stem model, not 6 — no separate ride/crash — but it is
+real, it downloads, and it turns "classify this onset" into "which
+sub-stem did this onset come from," which is a much stronger signal than
+any hand-tuned spectral heuristic. We use a HuggingFace community mirror
+of the checkpoint (`huggingface.co/vincewin/drumsep`, `49469ca8.th`,
+167MB) since the original Colab/GDrive distribution isn't a stable direct
+URL; the model itself and its weights are unchanged, only the hosting
+differs. It is downloaded once, on first use, to
+`~/.cache/sk_transcriber/drumsep_49469ca8.th`
+(`sk_transcriber/transcribe.py::_get_drumsep_checkpoint`), the same
+lazy-download pattern Beat This! already uses for its own weights.
+
+With DrumSep active, classification is nearly free: each sub-stem is
+already single-instrument, so onset detection can run with a much more
+sensitive threshold than the classical path safely allows (no
+cross-instrument bleed left to false-positive on) and the resulting onset
+_is_ the class. The only heuristic left is splitting the catch-all
+"cymbals" sub-stem into hi-hat vs. ride/crash by decay ratio — the same
+idea as the classical path's high-purity branch, just applied to a signal
+that's already cymbal-only instead of a full drum mix.
 
 ### Stem separation — the SSL bug
 
@@ -234,107 +271,152 @@ lands on either way is correct and plenty fast for onset arrays this
 small, so we skip the noisy JIT attempt entirely rather than spam stderr
 with ~130 tracebacks per run.
 
-## Measured accuracy (step 4 of VERIFY)
+## Measured accuracy (step 4 of VERIFY, extended in an accuracy sprint)
 
-Cross-validated `notes.mid` (Expert lanes) generated from
-`/Users/konstantinbaltsat/Music/SightKick/Coldplay - Yellow (Harmonix)/song.opus`
-against that folder's human-authored `notes.mid`, greedy-matched onsets at
-±50ms:
+### The benchmark was wrong at first -- root-caused, then fixed
 
-| Lane (any = union) | precision | recall | F1        | ref count | generated count | matched |
-| ------------------ | --------- | ------ | --------- | --------- | --------------- | ------- |
-| any-lane           | 0.492     | 0.113  | **0.184** | 1112      | 256             | 126     |
-| kick               | 0.000     | 0.000  | 0.000     | 289       | 0               | 0       |
-| snare              | 0.431     | 0.323  | 0.369     | 164       | 123             | 53      |
-| yellow (hi-hat)    | 0.014     | 0.002  | 0.003     | 528       | 73              | 1       |
-| blue (ride)        | 0.367     | 0.108  | 0.167     | 102       | 30              | 11      |
-| green (crash)      | 0.033     | 0.034  | 0.034     | 29        | 30              | 1       |
+The first pass of this benchmark fed `song.opus` alone into the pipeline as
+"the full mix" and got a dismal any-lane F1 of 0.184 against Yellow's
+ground truth. Root-causing that (three independent methods: `ffmpeg
+silencedetect`, cross-correlation, and calling demucs's Python API
+directly, bypassing this tool's own code) found the real problem:
+**`song.opus` in these Harmonix/SightKick library folders is not the full
+mix.** It's a backing/crowd layer; the actual instruments ship as separate
+stems (`drums_1/2/3.opus`, `guitar.opus`, `vocals.opus`, `rhythm.opus`,
+`keys.opus`). Feeding `song.opus` alone starved demucs of ~98% of the
+song's actual energy -- a benchmark-construction bug, not a transcriber
+bug. Confirmed once fixed: separating a proper reconstruction (`ffmpeg
+amix` of every instrument stem in the folder) behaves completely normally
+(drums stem captures real energy, comparable magnitude to the mix), and F1
+jumps from 0.184 to the 0.6-0.75 range on the same song with the same code.
 
-BPM: generated median 85.71 vs. reference median 86.73 (1.2% off) — tempo
-tracking (Beat This!) is solid on this file even though transcription is
-not (see below).
+**Methodology below, applied to 4 library songs with their own
+`notes.mid`:**
 
-Per-difficulty note counts, generated vs. reference (reference counts are
-each difficulty's _own_ full note range, not a subset of Expert):
+- **Full mix** = `ffmpeg amix` of every instrument stem in the folder
+  (`song`/`song.ogg` + `guitar` + `vocals` + `drums_*` + `rhythm` + `keys`,
+  whichever exist), fed into the _unmodified shipped_ `run.sh --audio` --
+  this is "end-to-end" (e2e): separate -> beats -> transcribe -> write.
+- **Transcription-only** = the folder's own drums stem(s) (`drums_1`+
+  `drums_2`[+`drums_3`], or a single `drums.opus`/`drums.ogg`) fed
+  directly into the transcribe stage in-process, skipping demucs
+  separation entirely -- isolates the classifier/DrumSep from separation
+  quality. Beats/tempo still come from the reconstructed full mix (a
+  drums-only stem has no reliable tempo information beyond the drum
+  pattern itself).
+- Both are compared to each song's own `notes.mid` at +/-50ms, same greedy
+  onset matching as before.
+- Benchmark harness: a standalone script (not shipped, not committed --
+  test tooling against a personal music library, not part of the
+  product); its methodology is documented here so the numbers are
+  reproducible in spirit even without the script itself.
 
-| Difficulty | reference notes | generated notes | generated notes/min |
-| ---------- | --------------- | --------------- | ------------------- |
-| Easy       | 595             | 122             | 28.7                |
-| Medium     | 964             | 197             | 46.4                |
-| Hard       | 1046            | 256             | 60.3                |
-| Expert     | 1112            | 256             | 60.3                |
+**Songs**: Coldplay - Yellow (Harmonix, human-charted); Queen - Another
+One Bites the Dust (Harmonix, human-charted); Queen - Bohemian Rhapsody
+(Harmonix, human-charted, 6 minutes, complex tempo/section changes); Kygo
+& OneRepublic - Lose Somebody (**chart is itself AI-generated** -- its
+`song.ini` says `auto_chart_tool = STRUM (OCTAVE AI auto-charter)`, and
+its tempo map has 435 segments for a single song, an unusually jittery
+result -- treat this one as agreement-with-another-AI, not
+agreement-with-a-human, and weight it accordingly).
 
-**This F-measure is honest but not a clean read on the transcriber's real
-capability — the specific `song.opus` file has a data-quality problem,
-found and root-caused during this work, not caused by this tool:**
+### Before (classical fallback) vs. after (DrumSep) -- any-lane F1
 
-- Independently confirmed with `ffmpeg -af silencedetect`: this exact file
-  has three unnaturally long silent gaps (5.5–16.6s, 40.9–55.2s,
-  262.4–273.5s, ~36s total) that do not exist in the real Coldplay
-  recording — almost certainly an artifact of however this specific
-  Rock Band/Harmonix asset was ripped/exported.
-- More importantly: **demucs fails to separate this file at all.** Tested
-  three ways — the SightKick `demucs-split` binary, this tool's own venv
-  fallback on MPS, and calling demucs's Python API directly on CPU,
-  bypassing every line of this tool's own code — all three route ~98% of
-  the signal energy into the catch-all `other` stem (verified by
-  time-aligned cross-correlation, r≈0.98 between `other` and the original
-  mix), leaving `drums`/`bass`/`vocals` at roughly -60dB, i.e. noise
-  floor. A synthetic kick+hi-hat test signal run through the exact same
-  code separates correctly (drums stem captures 99.9% of the input
-  energy), which rules out a demucs-install or MPS-numerics bug on this
-  machine. Whatever is atypical about this specific `.opus` encoding
-  defeats htdemucs specifically for this file.
-- Given a near-silent, effectively noise-floor "drums" stem, both onset
-  detection (256 onsets found vs. ~1112 expected — even excluding the
-  silent 36s, a clean 17-40s window shows 19 detected vs. 109 expected)
-  and classification downstream of it are working on garbage input. This
-  explains the near-zero kick recall and poor hi-hat recall above far
-  better than "the classifier is bad" does.
-- **Sanity check that the pipeline itself is healthy**: `--url
-https://www.youtube.com/watch?v=dQw4w9WgXcQ` (a normal, freshly
-  downloaded YouTube video, no known anomaly) separates completely
-  normally — `drums.ogg` peak 0.676 vs. `song.ogg` peak 0.832, same order
-  of magnitude, not -60dB down — and yields 1021 Expert-lane onsets over
-  213s (4.79 notes/sec), a musically plausible density for a pop/rock
-  drum part, versus Yellow's 0.94 notes/sec on the broken source.
+| Song                       | Classical e2e | Classical transcr.-only | DrumSep e2e | DrumSep transcr.-only |
+| -------------------------- | ------------- | ----------------------- | ----------- | --------------------- |
+| Yellow                     | 0.620         | 0.620                   | **0.731**   | **0.754**             |
+| Another One Bites the Dust | 0.594         | 0.706                   | **0.701**   | **0.795**             |
+| Bohemian Rhapsody          | 0.570         | 0.587                   | **0.644**   | **0.671**             |
+| Lose Somebody (AI chart)   | 0.393         | 0.414                   | **0.481**   | **0.499**             |
+| **average**                | **0.544**     | **0.582**               | **0.639**   | **0.680**             |
 
-**Root-cause bug found and fixed during this work** (documented for
-transparency, not to pad the numbers): the first version of the classical
-classifier gated "kick" on `spectral_centroid < 250Hz`, which is wrong —
-even a kick's beater-click energy drags its energy-weighted centroid into
-four figures, so that gate almost never fired. On a first pass, that bug
-routed ~95% of all real onsets into "cymbal" regardless of their true
-class. Caught by validating the classifier against five synthetic
-kick/snare/hihat/cymbal/tom test signals with known ground truth (all 5
-misclassified before the fix, all 5 correct after) before trusting it on
-real audio — see "Drum transcription" above for the corrected decision
-tree. The numbers in this section are from the fixed classifier.
+DrumSep improves every single cell: e2e by +9.5pp average, transcription-only
+by +9.8pp average. Per-lane breakdown, DrumSep e2e (the number that
+matters -- what a real `--url`/`--audio` run actually produces):
+
+| Song                       | kick F1 | snare F1 | hi-hat F1 | blue(ride) F1 | green(crash) F1 |
+| -------------------------- | ------- | -------- | --------- | ------------- | --------------- |
+| Yellow                     | 0.928   | 0.728    | 0.088     | 0.173         | 0.027           |
+| Another One Bites the Dust | 0.397   | 0.471    | 0.499     | 0.000         | 0.000           |
+| Bohemian Rhapsody          | 0.801   | 0.438    | 0.228     | 0.226         | 0.217           |
+| Lose Somebody              | 0.280   | 0.304    | 0.306     | 0.037         | 0.022           |
+
+**Honest pattern, not a flattering one**: kick and snare are the strong
+lanes (kick F1 up to 0.93; the exception, Another One Bites the Dust at
+0.397 kick, is a _separation_-stage loss -- its transcription-only kick F1
+is 0.642, so the isolated substem finds the kicks fine, but demucs's first
+pass on that particular mix loses some of them before DrumSep ever sees
+them). **Hi-hat, ride, and crash remain the weak lanes** -- see "Known
+limitations" for why (a sensitivity trade-off we made and didn't have time
+to fully resolve). Lose Somebody's numbers are also depressed by its own
+ground truth being another AI's imperfect auto-chart (435 tempo segments)
+and by DrumSep -- trained on acoustic kits -- generalizing worse to Kygo's
+electronic/programmed drum production.
+
+BPM: Beat This! tracks tempo correctly (<2% off) on 3 of 4 songs. On
+Bohemian Rhapsody it locks to exactly 2x the reference tempo (142.86 vs.
+71.38 BPM) -- a classic beat-tracker octave error, unsurprising on a song
+with extreme, deliberate tempo/meter changes (ballad -> opera -> hard rock
+-> outro). This is a beats-stage limitation, unrelated to the
+transcription upgrade below.
+
+### DrumSep sensitivity tuning (see "Why DrumSep" above for the model choice itself)
+
+The brief named `MDX23C-DrumSep-aufr33-jarredou` via `audio-separator`.
+That checkpoint's host repo (`github.com/jarredou/models`) is gone -- 404
+on the direct asset URL and on the GitHub API for the repo itself, not a
+timeout. We substituted **DrumSep** (`github.com/inagoy/drumsep`,
+Hybrid-Demucs, **MIT**), a 4-stem (kick/snare/cymbals/toms) version of the
+same idea, via a HuggingFace community mirror of its checkpoint. Full
+reasoning in "Why DrumSep, not the model named in the brief" above.
+
+Kick/snare substems from this model are clean; run at a sensitive onset
+threshold (delta=0.035) they're the strongest lanes in the whole table.
+The toms/cymbals substems are noisier -- a first pass at the same
+sensitivity produced enormous tom/cymbal over-triggering (e.g. Another One
+Bites the Dust: 155 generated "blue" notes against a reference of 10; 195
+generated "green" against a reference of 0). Dropping _only_ those two
+substems to the classical fallback's threshold (delta=0.07) cut the
+false-positive rate substantially (measured on that song: 638->149 raw tom
+onsets) and is what the numbers above reflect. This is an incomplete fix,
+not a solved problem -- see "Known limitations".
 
 ### Wall-clock timing
 
-| Run                                  | Song                           | Path                                                                                                     | Wall time |
-| ------------------------------------ | ------------------------------ | -------------------------------------------------------------------------------------------------------- | --------- |
-| `--audio`, warm cache                | Yellow, 273.5s                 | venv-fallback demucs (MPS)                                                                               | 75.6s     |
-| `--url`, warm cache                  | Rick Astley, 213.0s (~3.5 min) | venv-fallback demucs (MPS), yt-dlp download                                                              | 77.9s     |
-| `--url`, cold cache (first ever run) | Rick Astley, 213.0s            | `--stems-bin`, incl. one-time model-weight downloads (~230MB total: beat_this + demucs) + video download | 266.2s    |
+| Run                                  | Song                               | Path                                                                                                        | Wall time                                                                       |
+| ------------------------------------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `--audio`, warm cache, DrumSep       | Yellow, 273.5s                     | demucs (MPS) -> Beat This! -> DrumSep                                                                       | 63.8s                                                                           |
+| `--audio`, warm cache, DrumSep       | Another One Bites the Dust, 222.6s | same                                                                                                        | 56.3s                                                                           |
+| `--audio`, warm cache, DrumSep       | Lose Somebody, 200.7s              | same                                                                                                        | 46.5s                                                                           |
+| `--audio`, warm cache, DrumSep       | Bohemian Rhapsody, 360.0s (6 min)  | same                                                                                                        | 78.1s                                                                           |
+| `--url`, cold cache (first ever run) | Rick Astley, 213.0s                | `--stems-bin`, incl. one-time model downloads (beat_this + demucs + DrumSep, ~400MB total) + video download | ~290s (measured 266.2s pre-DrumSep + DrumSep's own ~25s one-time download/load) |
 
-"Warm cache" = `uv sync` already done and model weights already downloaded
-from a prior run (both are one-time costs — `.venv/` and
-`~/.cache/torch/hub/checkpoints/` persist). A genuinely first-ever
-invocation on a clean machine additionally pays for `uv sync` itself
-(installing torch/demucs/librosa/etc., a few minutes depending on network)
-on top of the cold-cache number above.
+"Warm cache" = `uv sync`, demucs/Beat This!/DrumSep weights all already on
+disk (all one-time costs: `.venv/`, `~/.cache/torch/hub/checkpoints/`,
+`~/.cache/sk_transcriber/`). Even the longest song (Bohemian Rhapsody, 6
+minutes) transcribes in under 90 seconds warm. A genuinely first-ever
+invocation on a clean machine additionally pays for `uv sync` itself (a
+few minutes, network-dependent) on top of the cold-cache number above.
 
 ## Known limitations
 
-- Onset-detection recall on real audio is unproven above ~5 notes/sec of
-  true density — both verification songs happened to land below that (see
-  "Measured accuracy"). The any-lane F1 of 0.184 measured against Yellow's
-  ground truth is depressed by that file's separation failure (see above)
-  and should not be read as "this tool's accuracy" in general; treat it as
-  a floor, not a representative number, until re-measured against a
-  healthy-separation ground-truth pair.
+- **Hi-hat, ride, and crash detection is still the weakest part of the
+  pipeline even with DrumSep** (measured F1 as low as 0.03-0.23 per song,
+  see "Measured accuracy"). Root cause: our own tuning trade-off. DrumSep's
+  "cymbals" substem covers hi-hat AND ride AND crash together (this is a
+  4-stem model, not the 6-stem one the brief named); hi-hat needs a
+  _sensitive_ onset threshold (it fires constantly, every 8th/16th note)
+  while ride/crash need a _strict_ one (rare, loud, easily confused with
+  bleed) -- but both currently share one threshold setting per substem.
+  We lowered that shared threshold to fix tom/cymbal false positives,
+  which necessarily also suppressed real hi-hat recall. A real fix needs
+  either a genuinely 6-stem separator (ride/crash split from hi-hat, as
+  the originally-named-but-unreachable model would have given) or a
+  per-lane onset threshold within the cymbals substem instead of one
+  shared value.
+- Ride-vs-crash sub-typing within DrumSep's "cymbals" substem still uses
+  the same decay-ratio heuristic as the classical fallback (see "Drum
+  transcription"), just on a cleaner signal -- not a learned classifier.
 - Ride-vs-crash and tom-pitch sub-typing (98/99/100 sub-classification) is
   a heuristic on spectral centroid, not a learned classifier — see
   "Drum transcription" above.
