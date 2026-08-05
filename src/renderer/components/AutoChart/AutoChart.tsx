@@ -101,6 +101,7 @@ export function AutoChart({ disabled, onImported }: Props) {
   const [createOpen, setCreateOpen] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [job, setJob] = useState<IpcAutoChartJob>();
+  const [jobStep, setJobStep] = useState(0);
   const [artworkUrl, setArtworkUrl] = useState('');
   const [backends, setBackends] = useState<IpcAutoChartBackendsResponse>();
   const [backend, setBackend] = useState<AutoChartBackend>();
@@ -130,6 +131,10 @@ export function AutoChart({ disabled, onImported }: Props) {
       'auto-chart-update',
       (nextJob) => {
         setJob(nextJob);
+
+        if (!['failed', 'cancelled'].includes(nextJob.stage)) {
+          setJobStep(activeStep(nextJob));
+        }
 
         if (nextJob.stage === 'preview-ready') {
           setArtworkUrl('');
@@ -173,6 +178,7 @@ export function AutoChart({ disabled, onImported }: Props) {
     }
 
     setJob(undefined);
+    setJobStep(0);
     setArtworkUrl('');
   };
 
@@ -330,7 +336,7 @@ export function AutoChart({ disabled, onImported }: Props) {
             className="mb-4"
             data-testid="auto-chart-steps"
             size="small"
-            current={activeStep(job)}
+            current={jobStep}
             status={job.stage === 'failed' ? 'error' : 'process'}
             items={chartSteps}
             responsive={false}

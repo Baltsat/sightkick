@@ -245,6 +245,11 @@ describe('AutoChart', () => {
     expect(screen.getByTestId('auto-chart-progress')).toHaveTextContent(
       'This video is age-restricted and cannot be downloaded',
     );
+    expect(
+      screen
+        .getByTestId('auto-chart-steps')
+        .querySelector('.ant-steps-item-error'),
+    ).toHaveTextContent('Download audio');
   });
 
   it('lets the user cancel an in-flight chart at any stage', () => {
