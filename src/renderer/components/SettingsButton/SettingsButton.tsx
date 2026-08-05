@@ -80,6 +80,8 @@ export const SettingsButton = memo(function Settings({
         <Button
           icon={<FontAwesomeIcon icon={faCog} />}
           size="large"
+          className="min-h-11 min-w-11"
+          aria-label="Open settings"
           data-testid="settings-trigger"
         />
       </Popover>

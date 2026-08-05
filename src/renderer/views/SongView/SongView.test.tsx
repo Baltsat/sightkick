@@ -750,7 +750,8 @@ describe('the score summary', () => {
     const modal = screen.getByTestId('score-modal');
 
     expect(within(modal).getByText('13% accuracy')).toBeInTheDocument();
-    expect(within(modal).getByText('8 notes hit')).toBeInTheDocument();
+    expect(within(modal).getByText('1 note hit')).toBeInTheDocument();
+    expect(within(modal).getByText('7 notes missed')).toBeInTheDocument();
     expect(within(modal).getByText('0 false hits')).toBeInTheDocument();
   });
 

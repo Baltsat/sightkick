@@ -20,8 +20,8 @@ const TYPE_CLASSES: Record<IconButtonType, string> = {
 };
 const SIZE_CLASSES: Record<IconButtonSize, string> = {
   sm: 'w-3 h-3',
-  md: 'w-6 h-6',
-  lg: 'w-10 h-10',
+  md: 'w-10 h-10',
+  lg: 'w-11 h-11',
 };
 const ICON_SIZE: Record<IconButtonSize, SizeProp> = {
   sm: 'xs',
@@ -40,7 +40,7 @@ export function IconButton({
     <button
       {...rest}
       className={cn(
-        'inline-flex items-center justify-center shrink-0 rounded-md bg-transparent p-0 border-0 cursor-pointer transition hover:brightness-150 disabled:opacity-40 disabled:cursor-default',
+        'inline-flex items-center justify-center shrink-0 rounded-lg bg-transparent p-0 border-0 cursor-pointer hover:brightness-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-safe:transition-[filter,color,opacity,transform] motion-safe:active:scale-[0.96] disabled:opacity-40 disabled:cursor-default',
         SIZE_CLASSES[size],
         TYPE_CLASSES[type],
         className,

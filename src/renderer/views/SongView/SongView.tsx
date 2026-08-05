@@ -305,19 +305,21 @@ export function SongView() {
         difficulty={difficulty}
         scoreData={scoreData}
       />
-      <div
-        className="flex items-center p-4 gap-5"
+      <header
+        className="flex min-h-20 items-center gap-4 border-b border-divider px-5 py-3"
         style={{ background: 'var(--gradient-header)' }}
       >
         <Button
           icon={<FontAwesomeIcon icon={faArrowLeft} />}
           data-testid="back-button"
+          aria-label="Back to library"
           onClick={() => {
             cancel();
             pause();
             navigate('/');
           }}
           size="large"
+          className="min-h-11 min-w-11 shrink-0"
         />
 
         <Button
@@ -325,6 +327,9 @@ export function SongView() {
           icon={<FontAwesomeIcon icon={isPlaying ? faPause : faPlay} />}
           loading={audioLoading}
           data-testid="play-toggle"
+          aria-label={
+            isCounting ? 'Cancel count-in' : isPlaying ? 'Pause' : 'Play'
+          }
           onClick={() => {
             if (isCounting) {
               cancel();
@@ -342,17 +347,26 @@ export function SongView() {
           }}
           shape="circle"
           size="large"
-          style={{ width: 50, height: 50 }}
+          style={{ width: 52, height: 52 }}
+          className="shrink-0"
         />
 
-        <div>
-          <div className="text-text-body font-ui text-[18px]">
-            {songData?.name}
+        <div className="min-w-0 max-w-72">
+          <div className="mb-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-accent-text">
+            {gameMode === 'practice' ? 'Practice mode' : 'Perform mode'}
           </div>
-          <div className="text-text-faint flex items-center gap-1">
-            <div>{songData?.artist}</div>
-            <div>·</div>
-            <div className="capitalize">{difficulty}</div>
+          <h1
+            className="truncate font-display text-xl font-semibold leading-tight text-text-body"
+            title={songData?.name}
+          >
+            {songData?.name}
+          </h1>
+          <div className="flex items-center gap-1 truncate text-sm text-text-faint">
+            <span className="truncate" title={songData?.artist}>
+              {songData?.artist}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span className="shrink-0 capitalize">{difficulty}</span>
           </div>
         </div>
 
@@ -370,7 +384,7 @@ export function SongView() {
           }}
         />
         {(policy.speedControl || policy.looping) && (
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 rounded-xl bg-fill px-3 py-2">
             {policy.speedControl && (
               <div className="flex gap-2 items-center">
                 <div className="text-text-faint">Speed:</div>
@@ -442,7 +456,7 @@ export function SongView() {
           onExportPdf={onExportPdf}
           isExporting={isExporting}
         />
-      </div>
+      </header>
 
       <div className="relative grow flex min-h-0">
         <Content className="grow p-6 m-0 overflow-auto flex flex-col items-center font-display text-ink">

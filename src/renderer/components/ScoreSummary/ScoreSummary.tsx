@@ -17,6 +17,10 @@ interface Props {
   scoreData?: ScoreData;
 }
 
+function noteCountLabel(count: number, verb: string): string {
+  return `${count} note${count === 1 ? '' : 's'} ${verb}`;
+}
+
 export function ScoreSummary({
   isOpen,
   onRetry,
@@ -39,15 +43,18 @@ export function ScoreSummary({
 
     return calculateAccuracy(scoreData) === 1;
   }, [scoreData]);
+  const accuracy = scoreData ? calculateAccuracy(scoreData) : 0;
+  const hitNotes = scoreData?.hitNotes ?? 0;
+  const missedNotes = Math.max(0, (scoreData?.totalNotes ?? 0) - hitNotes);
   const header = (
     <>
-      <div className="text-accent-text font-semibold text-xs uppercase">
-        Song Complete
+      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
+        Run complete
       </div>
       <div>
-        <div className="text-text-body text-2xl font-bold">
+        <h2 className="text-balance font-display text-3xl font-semibold leading-tight text-text-body">
           {songData?.name}
-        </div>
+        </h2>
         <div className="text-text-faint flex items-center gap-1 text-sm">
           <div>{songData?.artist}</div>
           <div>·</div>
@@ -65,7 +72,7 @@ export function ScoreSummary({
         icon={<FontAwesomeIcon icon={faRepeat} />}
         size="large"
       >
-        Retry
+        Play again
       </Button>
       <Button
         data-testid="score-next"
@@ -74,7 +81,7 @@ export function ScoreSummary({
         onClick={() => onNextSong()}
         size="large"
       >
-        Next song
+        Back to library
       </Button>
     </div>
   );
@@ -94,7 +101,7 @@ export function ScoreSummary({
       wrapProps={{ 'data-testid': 'score-modal' }}
       zIndex={MODAL_ABOVE_POPOVER_Z_INDEX}
     >
-      <div className="flex flex-col gap-5 items-center">
+      <div className="flex flex-col items-center gap-6 py-2">
         <Stars
           rating={starRating}
           perfect={isPerfect}
@@ -102,24 +109,31 @@ export function ScoreSummary({
           size="3x"
           className="gap-3"
         />
-        {isPerfect ? (
-          <div className="text-text-muted text-[18px]">Perfect</div>
-        ) : (
-          <div className="text-text-muted text-[18px]">
-            {Math.round((scoreData ? calculateAccuracy(scoreData) : 0) * 100)}%
-            accuracy
-          </div>
-        )}
-        <div className="flex flex-col gap-1 items-center">
-          <div className="flex items-center text-text-muted text-[18px] gap-2">
-            <div className="text-text-body font-bold text-4xl">
-              {scoreData?.hitNotes ?? 0}
+        <div className="text-center">
+          {isPerfect ? (
+            <div className="font-display text-5xl font-semibold leading-none text-text">
+              Perfect
             </div>
-            <div>/</div>
-            <div>{scoreData?.totalNotes} notes hit</div>
+          ) : (
+            <div className="font-display text-5xl font-semibold leading-none text-text tabular-nums">
+              {Math.round(accuracy * 100)}% accuracy
+            </div>
+          )}
+          <div className="mt-2 text-sm text-text-muted">
+            {isPerfect
+              ? 'Every note landed.'
+              : `${starRating} of 5 stars on this run`}
           </div>
-          <div className="flex items-center text-text-dim text-[14px] gap-2">
-            {scoreData?.falseHits} false hits
+        </div>
+        <div className="grid w-full grid-cols-3 gap-2 text-center tabular-nums">
+          <div className="rounded-xl bg-fill p-3 text-sm text-text-muted">
+            {noteCountLabel(hitNotes, 'hit')}
+          </div>
+          <div className="rounded-xl bg-fill p-3 text-sm text-text-muted">
+            {noteCountLabel(missedNotes, 'missed')}
+          </div>
+          <div className="rounded-xl bg-fill p-3 text-sm text-text-muted">
+            {`${scoreData?.falseHits ?? 0} false hits`}
           </div>
         </div>
       </div>
