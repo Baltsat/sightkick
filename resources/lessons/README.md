@@ -54,11 +54,21 @@ exercises instead of every permutation:
 - Lesson 4 paradiddle family (single/double/triple/diddle): kept single
   paradiddle only; double/triple are a natural Method-2-level follow-up.
 - Lesson 4 8th-note groove variations: ~19 → 7.
+- Lesson 5 toms sticking-permutation/quarter-note-beat/beats-with-toms
+  exercises plus 3 named songs: ~20 book pieces → 8 exercises (05.01–05.08).
 - Lesson 6 ties/rests + basic-beat variations: ~20 → 6.
+- Lesson 8 accent-shifting drill (8 positions, one per eighth-note
+  position in the bar) → 3 exercises (08.01–08.03); the "Fills Exercise"
+  vocabulary block (10 numbered fill lines, several both-sticks/unison) →
+  1 dedicated time-keeping exercise (08.07), with the fill-vocabulary
+  variety itself spread across 08.04–08.08 as separately named exercises.
 - Lesson 9 two-bar beats/fills/backbeat-shift variations: ~28 → 8.
 - Lesson 10: the book's four progressive versions of one song ("Version
   1/2/3/Full") → one capstone "Full-Form Etude" that already contains the
-  full intro/verse/chorus/bridge/outro arc.
+  full intro/verse/chorus/fill/outro arc. The book also pairs a 4/4 and a
+  3/4 demonstration of the same "crash marks a new phrase" idea; only the
+  4/4 case (10.01) is kept here since the 3/4 case is already covered by
+  06.06 "Accented Crash Downbeat in 3".
 - Lesson 11 16th-note groove options and variations: ~24 → 10.
 - Lesson 12 new-rhythm patterns and grooves: ~32 → 5.
 - Lesson 14 triplet/jazz-ride/comping family: ~40 → 9.
@@ -66,14 +76,23 @@ exercises instead of every permutation:
 - Lesson 16 shuffle/hi-hat-shuffle/jazz-waltz family: ~20 → 12 (kept more
   of these since each shuffle variant — rock 1, rock 2, Texas, straight,
   hi-hat shuffle, jazz waltz in one/in three — is a genuinely distinct,
-  named piece of vocabulary, not a permutation).
+  named piece of vocabulary, not a permutation). The book's "Jazz
+  Shuffle" variant (a 5th named shuffle) was not carried over separately.
 - Lesson 17 12/8, 6/8, and cut-time beat variations: ~11 → 8.
+- Lesson 18 (Encore charts): the book's song-form navigation reading
+  (repeat-to-sign, first/second endings, coda jumps) has no representation
+  in the flat, linear `mode: loop` chart format used here — that's a
+  format limitation, not a content cut, and is out of scope until a
+  future chart format supports section jumps.
 
 117 exercises is the result — comfortably inside the "expect 50–120"
 target while still touching every lesson, every meter (4/4, 3/4, 6/8,
 12/8, 2/2 cut time), every subdivision (8th, 16th, triplet, shuffle), and
-every technique (dynamics, ghost notes, cross-stick, flams, tom fills,
-open hi-hat) the book introduces.
+every technique (dynamics, ghost notes, cross-stick, tom fills, open
+hi-hat) the book introduces. Flams (a grace note landing almost
+simultaneously with its primary note) are not currently representable —
+the notation grid has no sub-step timing offset — so no exercise claims
+to teach a true flam.
 
 ## Notation format
 
