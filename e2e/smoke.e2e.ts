@@ -96,9 +96,7 @@ test.describe('seeded library', () => {
     page = await harness.app.firstWindow();
 
     await page.getByRole('button', { name: 'Create chart' }).click();
-    await expect(
-      page.getByText('Create a drum chart from YouTube'),
-    ).toBeVisible();
+    await expect(page.getByText('Create a drum chart')).toBeVisible();
 
     if (process.env.SIGHTKICK_AUTO_CHART_YOUTUBE_URL) {
       await page
@@ -124,7 +122,7 @@ test.describe('seeded library', () => {
     await page.getByTestId('auto-chart-local-file').click();
     await expect(page.getByTestId('auto-chart-progress')).toBeVisible();
 
-    const review = page.getByText('Review generated drum chart');
+    const review = page.getByText('Add this song to your library');
     const failed = page.getByText('failed', { exact: true });
 
     await expect(review.or(failed)).toBeVisible({ timeout: 150_000 });
@@ -179,6 +177,73 @@ test.describe('seeded library', () => {
         path: process.env.SIGHTKICK_AUTO_CHART_SHEET_PROOF,
       });
     }
+  });
+
+  test('creates a URL-only chart through the SightKick sidecar protocol', async () => {
+    test.setTimeout(90_000);
+
+    const transcriberPath = path.join(
+      __dirname,
+      'fixtures',
+      'fake-transcriber.sh',
+    );
+
+    harness = await launchApp({
+      seedLibrary: true,
+      env: {
+        SIGHTKICK_TRANSCRIBER_PATH: transcriberPath,
+        SIGHTKICK_DISABLE_YOUTUBE_METADATA: '1',
+      },
+    });
+    await harness.app.evaluate(({ dialog }) => {
+      dialog.showOpenDialog = async () => {
+        throw new Error('URL-only flow opened a file dialog');
+      };
+    });
+    page = await harness.app.firstWindow();
+
+    await page.getByRole('button', { name: 'Create chart' }).click();
+    await page
+      .getByTestId('auto-chart-youtube-url')
+      .fill('https://youtu.be/abcdefghijk');
+
+    const sightkickOption = page.getByRole('radio', { name: 'SightKick' });
+
+    if (await sightkickOption.isVisible()) {
+      await sightkickOption.click();
+    }
+
+    await page.getByTestId('auto-chart-from-youtube').click();
+    await expect(page.getByTestId('auto-chart-progress')).toContainText(
+      'Downloading fake audio',
+    );
+    await expect(page.getByTestId('auto-chart-progress')).toContainText(
+      'Separating fake drums',
+    );
+    await expect(page.getByTestId('auto-chart-progress')).toContainText(
+      'Transcribing fake notes',
+    );
+    await expect(page.getByText('Add this song to your library')).toBeVisible();
+    await expect(page.getByText('夜のドラム 🥁')).toBeVisible();
+    await expect(page.getByText('Тестовый артист')).toBeVisible();
+
+    if (process.env.SIGHTKICK_SIDECAR_E2E_PROOF) {
+      await page.screenshot({ path: process.env.SIGHTKICK_SIDECAR_E2E_PROOF });
+    }
+
+    await page.getByRole('button', { name: 'Add to library' }).click();
+
+    const imported = page
+      .getByTestId(/song-item-/)
+      .filter({ hasText: '夜のドラム 🥁' });
+
+    await expect(imported).toBeVisible();
+    await expect(imported).toContainText('Тестовый артист');
+    expect(
+      existsSync(
+        path.join(harness.libraryDir, 'Тестовый артист - 夜のドラム 🥁'),
+      ),
+    ).toBe(true);
   });
 
   test('scans the folder, lists the song, and renders real sheet music', async () => {

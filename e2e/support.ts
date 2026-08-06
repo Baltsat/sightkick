@@ -107,7 +107,7 @@ function seedUserData(seed: Record<string, unknown>): string {
 }
 
 export async function launchApp(
-  options: { seedLibrary?: boolean } = {},
+  options: { seedLibrary?: boolean; env?: NodeJS.ProcessEnv } = {},
 ): Promise<Harness> {
   const libraryDir = writeFixtureLibrary();
   const importDir = writeImportFixture();
@@ -120,6 +120,7 @@ export async function launchApp(
       ...process.env,
       NODE_ENV: 'production',
       START_MINIMIZED: '1',
+      ...options.env,
     },
   });
 

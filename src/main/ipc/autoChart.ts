@@ -635,6 +635,10 @@ function createChildRunner(): AutoChartRunner {
 }
 
 function resolveSightkickRunnerPath(): string {
+  if (process.env.SIGHTKICK_TRANSCRIBER_PATH) {
+    return process.env.SIGHTKICK_TRANSCRIBER_PATH;
+  }
+
   return app.isPackaged
     ? path.join(process.resourcesPath, 'transcriber', 'run.sh')
     : path.join(__dirname, '../../resources/transcriber', 'run.sh');
