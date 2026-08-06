@@ -1,7 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Spin } from 'antd';
+import { Button, Modal, Spin, Tooltip } from 'antd';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faGraduationCap, faPlay } from '@fortawesome/free-solid-svg-icons';
+import {
+  faGraduationCap,
+  faMusic,
+  faPlay,
+} from '@fortawesome/free-solid-svg-icons';
 import { Outlet, useNavigate, useOutlet } from 'react-router-dom';
 import appIcon from '../../../../assets/icon.png';
 import { Song } from '../../../types';
@@ -14,6 +18,7 @@ import { EmptySongState } from '../../components/EmptySongState';
 import { AutoChart } from '../../components/AutoChart';
 import { SongImport } from '../../components/SongImport';
 import { SongSearch } from '../../components/SongSearch';
+import { MyMusic } from '../../components/MyMusic';
 import { LessonsView } from '../../components/LessonsView';
 import { useApp } from '../../context/AppContext';
 import { useInput } from '../../context/InputContext';
@@ -91,6 +96,7 @@ export function SongListView() {
   const [prevSortAvailable, setPrevSortAvailable] = useState(sortAvailable);
   const gameModeSelector = useGameModeSelector();
   const [view, setView] = useState<LibraryView>('songs');
+  const [myMusicOpen, setMyMusicOpen] = useState(false);
   // The Lessons unlock chain always looks at every lesson song, regardless
   // of the app's globally selected difficulty tab — lesson charts only ever
   // carry an Expert drum track, so filtering by difficulty here would hide
@@ -356,6 +362,23 @@ export function SongListView() {
                   disabled={currentPath === null}
                   onImported={handleSongImported}
                 />
+                <Tooltip
+                  title={
+                    currentPath === null
+                      ? 'Select a library folder first'
+                      : 'Add songs from your YouTube Music Liked playlist'
+                  }
+                >
+                  <Button
+                    icon={<FontAwesomeIcon icon={faMusic} />}
+                    size="large"
+                    data-testid="my-music-trigger"
+                    disabled={currentPath === null}
+                    onClick={() => setMyMusicOpen(true)}
+                  >
+                    My Music
+                  </Button>
+                </Tooltip>
                 <AutoChart
                   disabled={currentPath === null}
                   onImported={handleSongImported}
@@ -378,6 +401,18 @@ export function SongListView() {
             songList={songList}
           />
         </header>
+
+        <Modal
+          open={myMusicOpen}
+          onCancel={() => setMyMusicOpen(false)}
+          footer={null}
+          width={640}
+        >
+          <MyMusic
+            librarySongs={librarySongs}
+            disabled={currentPath === null}
+          />
+        </Modal>
 
         <main
           id="library-content"

@@ -369,6 +369,38 @@ export interface IpcSearchYoutubeResponse {
   results: IpcYoutubeSearchResult[];
 }
 
+export interface IpcMyMusicRequest {
+  limit?: number;
+}
+
+export interface MyMusicSong {
+  videoId: string;
+  title: string;
+  artist?: string;
+  durationSec?: number;
+  thumbnailUrl?: string;
+  watchUrl: string;
+}
+
+export interface IpcMyMusicResponse {
+  songs: MyMusicSong[];
+}
+
+export type MyMusicErrorCode =
+  | 'chrome-cookie-locked'
+  | 'chrome-cookies-unavailable'
+  | 'not-signed-in'
+  | 'yt-dlp-missing'
+  | 'timeout'
+  | 'unknown';
+
+export interface IpcMyMusicError {
+  error: string;
+  code: MyMusicErrorCode;
+}
+
+export type IpcMyMusicReply = IpcMyMusicResponse | IpcMyMusicError;
+
 export interface StorageSchema {
   songs: {
     [key: string]: SongData;

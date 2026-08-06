@@ -40,6 +40,7 @@ import {
   saveAndTestRemoteAutoChart,
 } from './ipc/remoteAutoChart';
 import { searchYoutube } from './ipc/searchYoutube';
+import { fetchMyMusic } from './ipc/myMusic';
 import { savePracticeRun, loadPracticeRuns } from './ipc/practiceStats';
 
 class AppState {
@@ -130,6 +131,7 @@ class AppState {
     ipcMain.on('get-auto-chart-remote-settings', getRemoteAutoChartSettings);
     ipcMain.on('save-test-auto-chart-remote', saveAndTestRemoteAutoChart);
     ipcMain.on('search-youtube', searchYoutube);
+    ipcMain.on('my-music-fetch', fetchMyMusic);
 
     ipcMain.on('check-stem-tools', checkStemTools);
     ipcMain.on('check-stem-tools-update', checkStemToolsUpdate);

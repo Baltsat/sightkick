@@ -1,37 +1,25 @@
-// Renderer-side copy of the 'my-music-fetch' IPC contract declared in
-// src/main/ipc/myMusic.ts. Once the Codex lane's shared bundle lands and
-// src/types.ts gains the equivalent IpcMyMusic* interfaces, this file
-// should be replaced by an import from '../../../types' instead of
-// declaring its own copy — see src/renderer/components/SongSearch/types.ts
-// for the established precedent (a renderer bundle can't import a
-// main-process module that pulls in 'electron'/'child_process'/'fs').
-export interface MyMusicSong {
-  videoId: string;
-  title: string;
-  artist?: string;
-  durationSec?: number;
-  thumbnailUrl?: string;
-  watchUrl: string;
-}
+// Renderer-side re-export of the 'my-music-fetch' IPC contract declared in
+// src/types.ts (see src/main/ipc/myMusic.ts for the handler). Kept as
+// local aliases — rather than importing src/types.ts's names directly at
+// every call site — so this component's public surface (MyMusic.tsx,
+// helpers.ts, useMyMusic.ts, and their tests) doesn't need to change;
+// mirrors src/renderer/components/SongSearch/types.ts's precedent for the
+// same "renderer can't import a main-process module" reason.
+import {
+  IpcMyMusicError,
+  IpcMyMusicReply,
+  IpcMyMusicResponse,
+  MyMusicErrorCode,
+  MyMusicSong,
+} from '../../../types';
 
-export type MyMusicErrorCode =
-  | 'chrome-cookie-locked'
-  | 'chrome-cookies-unavailable'
-  | 'not-signed-in'
-  | 'yt-dlp-missing'
-  | 'timeout'
-  | 'unknown';
+export type { MyMusicSong, MyMusicErrorCode };
 
-export interface MyMusicSuccess {
-  songs: MyMusicSong[];
-}
+export type MyMusicSuccess = IpcMyMusicResponse;
 
-export interface MyMusicError {
-  error: string;
-  code: MyMusicErrorCode;
-}
+export type MyMusicError = IpcMyMusicError;
 
-export type MyMusicReply = MyMusicSuccess | MyMusicError;
+export type MyMusicReply = IpcMyMusicReply;
 
 export function isMyMusicError(reply: MyMusicReply): reply is MyMusicError {
   return 'error' in reply;

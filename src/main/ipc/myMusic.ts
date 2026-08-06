@@ -2,36 +2,20 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { app, IpcMainEvent } from 'electron';
+import { IpcMyMusicReply, IpcMyMusicRequest, MyMusicSong } from '../../types';
 import { caCertEnv } from '../stemTools';
 
 // Contract for the 'my-music-fetch' channel: "My Music" reads the user's
 // YouTube Music Liked Songs playlist through their already-signed-in Chrome
 // session (via yt-dlp --cookies-from-browser chrome), so the app never asks
 // for a separate login. This mirrors src/main/ipc/searchYoutube.ts's
-// IpcSearchYoutube*/IpcResult<T> convention; once the shared Codex lane's
-// bundle lands, these interfaces move into src/types.ts verbatim and this
-// file switches to importing them from there instead of declaring its own
-// copy. The renderer-side copy lives at
-// src/renderer/components/MyMusic/types.ts for the same "renderer can't
-// import main-process modules" reason searchYoutube.ts's copy exists in
-// SongSearch/types.ts.
-export interface IpcMyMusicRequest {
-  limit?: number;
-}
-
-export interface MyMusicSong {
-  videoId: string;
-  title: string;
-  artist?: string;
-  durationSec?: number;
-  thumbnailUrl?: string;
-  watchUrl: string;
-}
-
-export interface IpcMyMusicResponse {
-  songs: MyMusicSong[];
-}
-
+// IpcSearchYoutube*/IpcResult<T> convention. The shared interfaces
+// (IpcMyMusicRequest, MyMusicSong, IpcMyMusicResponse, MyMusicErrorCode,
+// IpcMyMusicError, IpcMyMusicReply) live in src/types.ts; the renderer-side
+// re-export lives at src/renderer/components/MyMusic/types.ts for the
+// "renderer can't import main-process modules" reason searchYoutube.ts's
+// copy exists in SongSearch/types.ts.
+//
 // Distinct, honest error codes the renderer can branch on instead of
 // pattern-matching human-readable text:
 // - 'chrome-cookie-locked': Chrome is running and holds its cookie DB open
@@ -44,20 +28,6 @@ export interface IpcMyMusicResponse {
 // - 'yt-dlp-missing': no yt-dlp binary could be resolved at all.
 // - 'timeout': the fetch did not finish inside MY_MUSIC_TIMEOUT_MS.
 // - 'unknown': any other failure; the message carries yt-dlp's own detail.
-export type MyMusicErrorCode =
-  | 'chrome-cookie-locked'
-  | 'chrome-cookies-unavailable'
-  | 'not-signed-in'
-  | 'yt-dlp-missing'
-  | 'timeout'
-  | 'unknown';
-
-export interface IpcMyMusicError {
-  error: string;
-  code: MyMusicErrorCode;
-}
-
-export type IpcMyMusicReply = IpcMyMusicResponse | IpcMyMusicError;
 
 const MY_MUSIC_TIMEOUT_MS = 30_000;
 const DEFAULT_LIMIT = 50;

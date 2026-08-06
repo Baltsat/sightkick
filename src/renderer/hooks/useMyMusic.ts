@@ -6,26 +6,6 @@ import {
   MyMusicSong,
 } from '../components/MyMusic/types';
 
-// 'my-music-fetch' is not yet part of preload/index.ts's Channels union (the
-// Codex lane owns that file — see the concurrency plan for this feature, and
-// src/renderer/hooks/useYoutubeSearch.ts for the identical precedent with
-// 'search-youtube'). This narrow, locally-typed view of
-// window.electron.ipcRenderer keeps this hook fully type-safe without
-// widening — or waiting on — that shared union. Once Channels grows a
-// 'my-music-fetch' entry, calls below can drop this cast and use
-// window.electron.ipcRenderer directly.
-interface MyMusicIpc {
-  sendMessage: (channel: 'my-music-fetch', request: { limit?: number }) => void;
-  once: <T>(
-    channel: 'my-music-fetch',
-    listener: (payload: T) => void,
-  ) => () => void;
-}
-
-function myMusicIpc(): MyMusicIpc {
-  return window.electron.ipcRenderer as unknown as MyMusicIpc;
-}
-
 export interface UseMyMusicResult {
   songs: MyMusicSong[];
   loading: boolean;
@@ -58,7 +38,7 @@ export function useMyMusic(): UseMyMusicResult {
     setLoading(true);
     setError(undefined);
 
-    offRef.current = myMusicIpc().once<MyMusicReply>(
+    offRef.current = window.electron.ipcRenderer.once<MyMusicReply>(
       'my-music-fetch',
       (reply) => {
         offRef.current = undefined;
@@ -76,7 +56,10 @@ export function useMyMusic(): UseMyMusicResult {
       },
     );
 
-    myMusicIpc().sendMessage('my-music-fetch', limit ? { limit } : {});
+    window.electron.ipcRenderer.sendMessage(
+      'my-music-fetch',
+      limit ? { limit } : {},
+    );
   }, []);
 
   return { songs, loading, error, hasFetched, refresh };
