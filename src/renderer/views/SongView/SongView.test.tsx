@@ -1165,3 +1165,260 @@ describe('the reference legend', () => {
     });
   });
 });
+
+// Carries a real note track for two difficulties, with Medium truncated to
+// far fewer measures than Expert - lets tests prove a switch actually
+// re-parses the chart (different note/measure counts per difficulty)
+// rather than just relabeling the same data.
+const MULTI_DIFFICULTY_CHART = `[Song]
+{
+  Name = "Fixture"
+  Resolution = 192
+}
+[SyncTrack]
+{
+  0 = TS 4
+  0 = B 120000
+}
+[Events]
+{
+}
+[ExpertDrums]
+{
+  0 = N 1 0
+  192 = N 1 0
+  384 = N 1 0
+  576 = N 1 0
+  768 = N 1 0
+  960 = N 1 0
+  1152 = N 1 0
+  1344 = N 1 0
+}
+[MediumDrums]
+{
+  0 = N 1 0
+  384 = N 1 0
+}
+`;
+
+function openDifficultySelect() {
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Difficulty' }));
+}
+
+function pickDifficulty(value: string) {
+  openDifficultySelect();
+  fireEvent.click(screen.getByRole('option', { name: value }));
+}
+
+describe('in-practice difficulty switching', () => {
+  it('lists only the difficulties this chart actually has', async () => {
+    const view = setupSongView();
+
+    await view.loadSong(
+      makeSong({ drumDifficulties: ['medium', 'hard', 'expert'] }),
+    );
+
+    openDifficultySelect();
+
+    expect(screen.getByRole('option', { name: 'medium' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'hard' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'expert' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('option', { name: 'easy' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('disables the selector when the chart only has one difficulty', async () => {
+    const view = setupSongView();
+
+    await view.loadSong(makeSong({ drumDifficulties: ['expert'] }));
+
+    expect(screen.getByRole('combobox', { name: 'Difficulty' })).toBeDisabled();
+  });
+
+  it('reloads the parsed chart at the new difficulty', async () => {
+    const view = setupSongView({ settings: { countIn: false } });
+
+    await view.loadSong(
+      makeSong({ drumDifficulties: ['medium', 'expert'] }),
+      MULTI_DIFFICULTY_CHART,
+    );
+
+    pickDifficulty('medium');
+
+    view.clickPlay();
+    await view.finishSong();
+
+    const modal = screen.getByTestId('score-modal');
+
+    // Medium only carries 2 notes in the fixture (vs Expert's 8) - a
+    // run with zero hits missing exactly 2 proves the medium track, not
+    // the expert one, was actually parsed and scored against.
+    expect(within(modal).getByText('2 notes missed')).toBeInTheDocument();
+  });
+
+  it('preserves the playback position across a switch', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong(
+      makeSong({ drumDifficulties: ['medium', 'expert'] }),
+      MULTI_DIFFICULTY_CHART,
+    );
+
+    view.seekToEnd();
+    await waitFor(() => expect(view.currentTimeText()).toBe('00:04'));
+
+    pickDifficulty('medium');
+
+    await waitFor(() => expect(view.currentTimeText()).toBe('00:04'));
+  });
+
+  it('pauses playback on switch', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      settings: { countIn: false },
+    });
+
+    await view.loadSong(makeSong({ drumDifficulties: ['medium', 'expert'] }));
+
+    view.clickPlay();
+    // Practice mode's playback goes through the speed-controllable player
+    // (a chunked, async-scheduled implementation - see
+    // services/audio-player/speed/player.ts), so the buffer-source-level
+    // startedSources() harness (built around the default player's
+    // synchronous createBufferSource().start()) doesn't apply here.
+    // Transport's own play/pause state is player-agnostic and flips
+    // synchronously, so assert on that via the header toggle instead.
+    expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+      'aria-label',
+      'Pause',
+    );
+
+    pickDifficulty('medium');
+
+    expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+      'aria-label',
+      'Play',
+    );
+  });
+
+  it("resets the run's judge/score state on a mid-run switch", async () => {
+    const view = setupSongView({
+      settings: { countIn: false },
+      keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+    });
+
+    await view.loadSong(
+      makeSong({ drumDifficulties: ['medium', 'expert'] }),
+      MULTI_DIFFICULTY_CHART,
+    );
+
+    view.clickPlay();
+    await view.pressKey('KeyJ'); // pre-switch hit
+
+    pickDifficulty('medium'); // pauses the run - see the switch's requirement (a)
+
+    // Real usage: a switch only pauses, it never auto-resumes - the
+    // player has to press Play again to keep going (and to let it reach
+    // a natural end for finishSong() to simulate below). Pausing suspends
+    // the (fake) AudioContext, so resuming genuinely awaits
+    // ctx.resume() inside Transport/beginPlayback - wait for that to
+    // actually land rather than asserting immediately after the click.
+    view.clickPlay();
+    await waitFor(() => {
+      expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+        'aria-label',
+        'Pause',
+      );
+    });
+
+    await view.finishSong();
+
+    const modal = screen.getByTestId('score-modal');
+
+    expect(within(modal).getByText('0 notes hit')).toBeInTheDocument();
+    // Medium only carries 2 notes in the fixture - confirms the reset
+    // reparsed at the new difficulty rather than just clearing hits
+    // against the stale Expert note count.
+    expect(within(modal).getByText('2 notes missed')).toBeInTheDocument();
+  });
+
+  it('persists the switch as the app-global difficulty setting', async () => {
+    const view = setupSongView();
+
+    await view.loadSong(makeSong({ drumDifficulties: ['medium', 'expert'] }));
+
+    pickDifficulty('medium');
+
+    expect(
+      JSON.parse(window.localStorage.getItem('settings.difficulty') ?? '""'),
+    ).toBe('medium');
+  });
+
+  it('keys the score under the new difficulty after a mid-run switch, with only the post-switch hit counted', async () => {
+    const view = setupSongView({
+      settings: { countIn: false },
+      keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+    });
+
+    await view.loadSong(
+      makeSong({ drumDifficulties: ['medium', 'expert'] }),
+      MULTI_DIFFICULTY_CHART,
+    );
+
+    view.clickPlay();
+    await view.pressKey('KeyJ'); // would-be Expert hit, discarded by the switch
+
+    pickDifficulty('medium'); // pauses the run
+
+    // Real usage: resume after the switch (the engine only judges hits
+    // while actively playing) before landing the one hit that should
+    // survive. Pausing suspends the (fake) AudioContext, so wait for the
+    // resume's genuine ctx.resume() await to actually land.
+    view.clickPlay();
+    await waitFor(() => {
+      expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+        'aria-label',
+        'Pause',
+      );
+    });
+
+    await view.pressKey('KeyJ'); // the only hit that should count
+
+    await view.finishSong();
+
+    expect(view.updateSongPayloads()).toEqual([
+      {
+        id: 'song-1',
+        // Medium's 2-note track (not Expert's 8) proves the score was
+        // computed against the newly-parsed chart, and hitNotes: 1 (not
+        // 2) proves the pre-switch Expert hit was actually discarded.
+        scoreData: { medium: { hitNotes: 1, totalNotes: 2, falseHits: 0 } },
+      },
+    ]);
+  });
+
+  it('clears a practice section selection whose measures no longer exist at the new difficulty', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong(
+      makeSong({ drumDifficulties: ['medium', 'expert'] }),
+      MULTI_DIFFICULTY_CHART,
+    );
+
+    // Expert has 2 measures here; Medium's last note (tick 384) truncates
+    // it to just 1. Select the second (Expert-only) measure.
+    const highlights = view.measureHighlights();
+
+    fireEvent.mouseDown(highlights[1]);
+    fireEvent.mouseUp(document.body);
+
+    expect(screen.getByText('Looping Section')).toBeInTheDocument();
+
+    pickDifficulty('medium');
+
+    await waitFor(() => {
+      expect(screen.queryByText('Looping Section')).not.toBeInTheDocument();
+    });
+  });
+});

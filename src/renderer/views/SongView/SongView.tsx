@@ -6,10 +6,12 @@ import {
   Drawer,
   InputNumber,
   Layout,
+  Select,
   Spin,
   Switch,
 } from 'antd';
 import { Content } from 'antd/es/layout/layout';
+import { Difficulty } from 'scan-chart';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Playback } from '../../components/Playback';
 import { SettingsButton } from '../../components/SettingsButton';
@@ -44,11 +46,12 @@ import { PracticeStats } from '../../components/PracticeStats';
 import { buildSheetPdfHtml } from '../../services/pdf-export';
 import { serializeMeasureToDsl } from '../../components/SheetMusic';
 import { AudioVolume } from '../../components/AudioVolume';
-import { GameMode } from '../../types';
+import { GameMode, PracticeRange } from '../../types';
 import { resolveModePolicy } from '../../modes';
+import { RenderData } from '../../../chart-parser/types';
 
 export function SongView() {
-  const { difficulty, isDev } = useApp();
+  const { difficulty, setDifficulty, isDev } = useApp();
   const { inputMapping, controlMapping, kitControlIds } = useInput();
   const {
     playheadStyle,
@@ -76,6 +79,14 @@ export function SongView() {
   const policy = useMemo(() => resolveModePolicy(gameMode), [gameMode]);
   const navigate = useNavigate();
   const { fileData, format, songData, trackData } = useSongLoader(id);
+  // The difficulties this specific chart actually carries - auto-charted
+  // songs usually have all four, lesson charts often only Expert. Falls
+  // back to just the currently-loaded difficulty (rather than every
+  // possible value) when a song predates drumDifficulties being recorded,
+  // so the selector never lists an option the chart can't parse.
+  const availableDifficulties: Difficulty[] = songData?.drumDifficulties?.length
+    ? songData.drumDifficulties
+    : [difficulty];
   const { chart, parsedMidi, renderData, vexflowContainerRef } = useSheetMusic({
     fileData,
     format,
@@ -276,6 +287,83 @@ export function SongView() {
     isEnded,
     onExit: () => navigate('/'),
   });
+  // Snapshot taken at the moment the user picks a new difficulty, consumed
+  // once the reparsed chart's renderData actually lands (useSheetMusic
+  // re-parses asynchronously - see its parsedMidi/renderData effect).
+  const pendingDifficultySwitchRef = useRef<{
+    time: number;
+    range: PracticeRange | undefined;
+    renderData: RenderData[];
+  } | null>(null);
+  const handleDifficultyChange = useCallback(
+    (next: Difficulty) => {
+      if (next === difficulty) {
+        return;
+      }
+
+      pause();
+      pendingDifficultySwitchRef.current = {
+        time: timeStore.get(),
+        range: practiceRange,
+        renderData,
+      };
+      // App-global, same setter the library header tabs use - the choice
+      // sticks, and it's also what keys scoreData on song end (below), so
+      // a mid-run switch can never misattribute the run's score.
+      setDifficulty(next);
+    },
+    [difficulty, pause, timeStore, practiceRange, renderData, setDifficulty],
+  );
+
+  useEffect(() => {
+    const pending = pendingDifficultySwitchRef.current;
+
+    if (!pending || !engine) {
+      return;
+    }
+
+    pendingDifficultySwitchRef.current = null;
+
+    // A difficulty switch reparses the chart at a different note density,
+    // so a partial run's hits no longer line up with real notes. Seeking
+    // to 0 first drives Engine's existing onSeek -> Judge.rewindTo(0) path
+    // (the same one every other seek already goes through) to wipe every
+    // hit/false-hit, then the second seek restores the on-screen position
+    // without resurrecting any of the discarded judge state.
+    seekSeconds(0);
+    seekSeconds(pending.time);
+
+    // A stale focus/loop-anchor index from the old renderData can point
+    // past the end of a shorter new one - always clear it here, same as
+    // toggling looping off already does.
+    clearSelection();
+
+    if (!pending.range) {
+      return;
+    }
+
+    const startTick =
+      pending.renderData[pending.range.start]?.measure.startTick;
+    const endTick = pending.renderData[pending.range.end]?.measure.startTick;
+    const newStart = renderData.findIndex(
+      (rd) => rd.measure.startTick === startTick,
+    );
+    const newEnd = renderData.findIndex(
+      (rd) => rd.measure.startTick === endTick,
+    );
+    const stillExists =
+      startTick !== undefined &&
+      endTick !== undefined &&
+      newStart !== -1 &&
+      newEnd !== -1;
+
+    // Preserve the practice selection only if both its boundary measures
+    // still exist at the new difficulty - otherwise clear it honestly
+    // rather than keep a range that no longer means the same thing.
+    onPracticeRangeChange(
+      stillExists ? { start: newStart, end: newEnd } : undefined,
+    );
+  }, [renderData, engine, seekSeconds, onPracticeRangeChange, clearSelection]);
 
   useInputControls(
     controlMapping,
@@ -435,7 +523,20 @@ export function SongView() {
               {songData?.artist}
             </span>
             <span aria-hidden="true">·</span>
-            <span className="shrink-0 capitalize">{difficulty}</span>
+            <Select
+              size="small"
+              className="capitalize shrink-0"
+              popupMatchSelectWidth={false}
+              value={difficulty}
+              data-testid="song-difficulty-select"
+              aria-label="Difficulty"
+              disabled={availableDifficulties.length <= 1}
+              onChange={(value) => handleDifficultyChange(value as Difficulty)}
+              options={availableDifficulties.map((d) => ({
+                value: d,
+                label: d,
+              }))}
+            />
           </div>
         </div>
 
