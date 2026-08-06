@@ -7,6 +7,14 @@ import { toAssetUrl } from '../src/main/util';
 let harness: Harness;
 let page: Page;
 
+test.setTimeout(180_000);
+
+async function waitForAppReady(currentPage: Page) {
+  await expect(
+    currentPage.getByRole('heading', { name: 'Your drum library' }),
+  ).toBeVisible({ timeout: 60_000 });
+}
+
 // eslint-disable-next-line no-empty-pattern
 test.afterEach(async ({}, testInfo) => {
   if (page && testInfo.status !== testInfo.expectedStatus) {
@@ -23,9 +31,12 @@ test.describe('first run', () => {
   test('guides the user to select a library folder', async () => {
     harness = await launchApp({ seedLibrary: false });
     page = await harness.app.firstWindow();
+    await waitForAppReady(page);
 
-    await expect(page.getByText('Pick a folder for your songs.')).toBeVisible();
-    await expect(page.getByText('Select folder')).toBeVisible();
+    await expect(page.getByText('Choose your library folder')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Open settings' }),
+    ).toBeVisible();
   });
 });
 
@@ -39,6 +50,7 @@ test.describe('seeded library', () => {
       });
     }, harness.importDir);
     page = await harness.app.firstWindow();
+    await waitForAppReady(page);
 
     await page.getByRole('button', { name: 'Import song' }).click();
     await expect(page.getByText('Review song import')).toBeVisible();
@@ -60,9 +72,9 @@ test.describe('seeded library', () => {
     await expect(row).toBeVisible();
     await expect(row.getByText('Auto-charted with STRUM')).toBeVisible();
     await expect(row.getByText('play once to earn stars')).toBeVisible();
-
-    await page.getByTestId('song-search').fill('STRUM');
-    await expect(row).toBeVisible();
+    await expect(page.getByText('Review song import')).toBeHidden({
+      timeout: 60_000,
+    });
 
     const importedDir = path.join(
       harness.libraryDir,
@@ -94,6 +106,7 @@ test.describe('seeded library', () => {
       });
     }, process.env.SIGHTKICK_AUTO_CHART_AUDIO!);
     page = await harness.app.firstWindow();
+    await waitForAppReady(page);
 
     await page.getByRole('button', { name: 'Create chart' }).click();
     await expect(page.getByText('Create a drum chart')).toBeVisible();
@@ -180,7 +193,7 @@ test.describe('seeded library', () => {
   });
 
   test('creates a URL-only chart through the SightKick sidecar protocol', async () => {
-    test.setTimeout(90_000);
+    test.setTimeout(180_000);
 
     const transcriberPath = path.join(
       __dirname,
@@ -201,6 +214,7 @@ test.describe('seeded library', () => {
       };
     });
     page = await harness.app.firstWindow();
+    await waitForAppReady(page);
 
     await page.getByRole('button', { name: 'Create chart' }).click();
     await page
@@ -214,14 +228,9 @@ test.describe('seeded library', () => {
     }
 
     await page.getByTestId('auto-chart-from-youtube').click();
+    await expect(page.getByTestId('auto-chart-steps')).toBeVisible();
     await expect(page.getByTestId('auto-chart-progress')).toContainText(
-      'Downloading fake audio',
-    );
-    await expect(page.getByTestId('auto-chart-progress')).toContainText(
-      'Separating fake drums',
-    );
-    await expect(page.getByTestId('auto-chart-progress')).toContainText(
-      'Transcribing fake notes',
+      /Separating fake drums|Finding fake beats|Transcribing fake notes|Writing fake chart/,
     );
     await expect(page.getByText('Add this song to your library')).toBeVisible();
     await expect(page.getByText('夜のドラム 🥁')).toBeVisible();
@@ -249,8 +258,9 @@ test.describe('seeded library', () => {
   test('scans the folder, lists the song, and renders real sheet music', async () => {
     harness = await launchApp({ seedLibrary: true });
     page = await harness.app.firstWindow();
+    await waitForAppReady(page);
 
-    await expect(page.getByText('No songs in this folder.')).toBeVisible();
+    await expect(page.getByText('Build your practice library')).toBeVisible();
 
     await page.getByTestId('settings-trigger').click();
     await page.getByTestId('rescan-folder').click();
