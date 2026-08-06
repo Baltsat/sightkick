@@ -272,6 +272,20 @@ export class Engine {
   };
 
   private handleEnded(): void {
+    // Transport.handleEnded() never calls onEndedCb while a loop region is
+    // active — it restarts the loop instead (see transport.ts) — so this
+    // only runs once playback reaches the *true* end of the song (loop off,
+    // or no region set). That means runRecords here reflects a genuine
+    // full pass, not a partial loop iteration.
+    //
+    // Within that pass, a looped section replayed multiple times before
+    // looping was turned off (or before this final run) doesn't
+    // double-count: every loop-back is a seek, and the onSeek handler above
+    // prunes runRecords at/after the rewound tick the same way
+    // Judge.rewindTo() prunes its own hit state. So a bar played 3 times in
+    // a loop only ever contributes its *last* pass's hits/misses to the
+    // summary below — honest evidence of the most recent attempt, not a
+    // growing tally that rewards repetition over accuracy.
     const practiceSummary = summarizeRun(
       [...this.runRecords, ...this.deriveMisses()],
       new Date().toISOString(),

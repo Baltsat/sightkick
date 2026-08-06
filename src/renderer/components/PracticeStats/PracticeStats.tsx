@@ -23,6 +23,27 @@ function hasAnyAttempt(summary: RunSummary): boolean {
   return summary.totalHits + summary.totalMisses + summary.totalWrong > 0;
 }
 
+/**
+ * "Perform run", "Practice run", or "Practice run at 0.7x" — omitted
+ * entirely for runs stored before `mode` existed (undefined stays
+ * undefined, never guessed at). Speed only appears in Practice, and only
+ * when it's off the 1x default — Perform locks speed at 1x, so it would
+ * never say anything there anyway.
+ */
+function runModeLabel(summary: RunSummary): string | undefined {
+  if (!summary.mode) {
+    return undefined;
+  }
+
+  const label = summary.mode === 'practice' ? 'Practice run' : 'Perform run';
+  const showsSpeed =
+    summary.mode === 'practice' &&
+    summary.playbackSpeed !== undefined &&
+    summary.playbackSpeed !== 1;
+
+  return showsSpeed ? `${label} at ${summary.playbackSpeed}x` : label;
+}
+
 export function PracticeStats({
   summary,
   trend = [],
@@ -43,6 +64,8 @@ export function PracticeStats({
     );
   }
 
+  const modeLabel = runModeLabel(summary);
+
   return (
     <div
       className={cn(
@@ -53,6 +76,15 @@ export function PracticeStats({
       data-testid="practice-stats"
       data-variant={variant}
     >
+      {modeLabel && (
+        <div
+          data-testid="practice-run-mode"
+          className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint"
+        >
+          {modeLabel}
+        </div>
+      )}
+
       <section className="flex flex-col gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint">
           Accuracy per drum

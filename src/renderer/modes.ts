@@ -2,6 +2,17 @@ import { GameMode, PlayheadStyle } from './types';
 
 export interface ModePolicy {
   player: 'default' | 'speed';
+  /**
+   * Perform-only. Gates the star rating / accuracy modal chrome and
+   * high-score submission in SongView's onEnded, and picks which control
+   * handlers useInputControls wires up (transport-style vs practice
+   * navigation). It does NOT gate per-hit analytics capture,
+   * save-practice-run, or the practice stats summary shown in
+   * ScoreSummary/PracticeStats — those fire in both modes whenever a run
+   * actually ends with a real attempt. A practice run with looping/speed
+   * is still evidence of progression, so it earns the same analytics as a
+   * Perform run even though it never earns stars.
+   */
   scoring: boolean;
   allowScrubbing: boolean;
   looping: boolean;

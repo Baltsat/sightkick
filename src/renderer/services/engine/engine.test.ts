@@ -297,13 +297,25 @@ describe('Engine', () => {
 
     player.onEnded();
 
+    // Every non-rest model note went unplayed, so all three chart notes
+    // (c/5 -> snare, g/5 -> hihat, f/4 -> kick) come back as misses in the
+    // per-lane analytics, not just as the aggregate score.
     expect(onEnded).toHaveBeenCalledWith(
       {
         hitNotes: 0,
         falseHits: 0,
         totalNotes: 3,
       },
-      expect.any(Object),
+      expect.objectContaining({
+        totalHits: 0,
+        totalMisses: 3,
+        totalWrong: 0,
+        laneAccuracy: [
+          { element: 'kick', hits: 0, misses: 1, accuracy: 0 },
+          { element: 'snare', hits: 0, misses: 1, accuracy: 0 },
+          { element: 'hihat', hits: 0, misses: 1, accuracy: 0 },
+        ],
+      }),
     );
   });
 
@@ -414,9 +426,16 @@ describe('Engine', () => {
     expect(hasClass(note, 'vf-note-hit')).toBe(true);
 
     player.onEnded();
+    // The struck snare lane comes back with exactly one hit and no misses
+    // in the per-lane analytics, not just in the aggregate score.
     expect(onEnded).toHaveBeenCalledWith(
       expect.objectContaining({ hitNotes: 1, falseHits: 0 }),
-      expect.any(Object),
+      expect.objectContaining({
+        totalHits: 1,
+        totalMisses: 0,
+        totalWrong: 0,
+        laneAccuracy: [{ element: 'snare', hits: 1, misses: 0, accuracy: 1 }],
+      }),
     );
   });
 
@@ -448,9 +467,18 @@ describe('Engine', () => {
     expect(hasClass(note, 'vf-note-hit')).toBe(true);
 
     player.onEnded();
+    // The 250ms compensation lands the hit exactly on the note (0.75s
+    // struck - 0.25s compensated = the note's own 0.5s), so the analytics'
+    // timing bias comes back at 0ms, not +250ms late - the compensation is
+    // visible in the stored stats, not just in the raw hit/miss count.
     expect(onEnded).toHaveBeenCalledWith(
       expect.objectContaining({ hitNotes: 1, falseHits: 0 }),
-      expect.any(Object),
+      expect.objectContaining({
+        totalHits: 1,
+        totalMisses: 0,
+        laneAccuracy: [{ element: 'snare', hits: 1, misses: 0, accuracy: 1 }],
+        timingBias: expect.objectContaining({ meanMs: 0, sampleCount: 1 }),
+      }),
     );
   });
 
@@ -503,9 +531,19 @@ describe('Engine', () => {
     engine.seekSeconds(0.1);
 
     player.onEnded();
+    // Seeking back to before the wrong hit's tick prunes it from the
+    // practice-stats records too (mirroring Judge.rewindTo's own cutoff -
+    // see the comment on Engine's onSeek handler), so the analytics show
+    // zero wrong hits and the still-unplayed snare note comes back as a
+    // miss, not a phantom wrong hit surviving the seek.
     expect(onEnded).toHaveBeenCalledWith(
       expect.objectContaining({ falseHits: 0 }),
-      expect.any(Object),
+      expect.objectContaining({
+        totalWrong: 0,
+        totalMisses: 1,
+        wrongHitCounts: [],
+        laneAccuracy: [{ element: 'snare', hits: 0, misses: 1, accuracy: 0 }],
+      }),
     );
   });
 

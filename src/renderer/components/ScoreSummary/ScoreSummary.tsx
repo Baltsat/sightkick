@@ -106,40 +106,60 @@ export function ScoreSummary({
       zIndex={MODAL_ABOVE_POPOVER_Z_INDEX}
     >
       <div className="flex flex-col items-center gap-6 py-2">
-        <Stars
-          rating={starRating}
-          perfect={isPerfect}
-          glow
-          size="3x"
-          className="gap-3"
-        />
-        <div className="text-center">
-          {isPerfect ? (
-            <div className="font-display text-5xl font-semibold leading-none text-text">
-              Perfect
+        {scoreData ? (
+          // Star rating, accuracy headline and the hit/missed/false-hit grid
+          // are all derived from `scoreData` — Perform-only (see
+          // ModePolicy.scoring's doc comment). A Practice run never sets
+          // scoreData, so this block simply doesn't render for one; its
+          // PracticeStats below still does.
+          <>
+            <Stars
+              rating={starRating}
+              perfect={isPerfect}
+              glow
+              size="3x"
+              className="gap-3"
+            />
+            <div className="text-center">
+              {isPerfect ? (
+                <div className="font-display text-5xl font-semibold leading-none text-text">
+                  Perfect
+                </div>
+              ) : (
+                <div className="font-display text-5xl font-semibold leading-none text-text tabular-nums">
+                  {Math.round(accuracy * 100)}% accuracy
+                </div>
+              )}
+              <div className="mt-2 text-sm text-text-muted">
+                {isPerfect
+                  ? 'Every note landed.'
+                  : `${starRating} of 5 stars on this run`}
+              </div>
             </div>
-          ) : (
-            <div className="font-display text-5xl font-semibold leading-none text-text tabular-nums">
-              {Math.round(accuracy * 100)}% accuracy
+            <div className="grid w-full grid-cols-3 gap-2 text-center tabular-nums">
+              <div className="rounded-xl bg-fill p-3 text-sm text-text-muted">
+                {noteCountLabel(hitNotes, 'hit')}
+              </div>
+              <div className="rounded-xl bg-fill p-3 text-sm text-text-muted">
+                {noteCountLabel(missedNotes, 'missed')}
+              </div>
+              <div className="rounded-xl bg-fill p-3 text-sm text-text-muted">
+                {`${scoreData?.falseHits ?? 0} false hits`}
+              </div>
             </div>
-          )}
-          <div className="mt-2 text-sm text-text-muted">
-            {isPerfect
-              ? 'Every note landed.'
-              : `${starRating} of 5 stars on this run`}
-          </div>
-        </div>
-        <div className="grid w-full grid-cols-3 gap-2 text-center tabular-nums">
-          <div className="rounded-xl bg-fill p-3 text-sm text-text-muted">
-            {noteCountLabel(hitNotes, 'hit')}
-          </div>
-          <div className="rounded-xl bg-fill p-3 text-sm text-text-muted">
-            {noteCountLabel(missedNotes, 'missed')}
-          </div>
-          <div className="rounded-xl bg-fill p-3 text-sm text-text-muted">
-            {`${scoreData?.falseHits ?? 0} false hits`}
-          </div>
-        </div>
+          </>
+        ) : (
+          practiceSummary && (
+            <div className="text-center">
+              <div className="font-display text-3xl font-semibold leading-tight text-text">
+                Nice reps
+              </div>
+              <div className="mt-2 text-sm text-text-muted">
+                Here&apos;s how this practice run went.
+              </div>
+            </div>
+          )
+        )}
         <PracticeStats
           summary={practiceSummary}
           variant="inline"

@@ -77,6 +77,14 @@ export function SongView() {
     return (searchParams.get('gameMode') as GameMode) ?? undefined;
   }, [searchParams]);
   const policy = useMemo(() => resolveModePolicy(gameMode), [gameMode]);
+  // usePracticeSession (below) owns playbackSpeed, but it needs `engine`
+  // from useEngine (below that), and useEngine's onEnded (right here) needs
+  // the speed to stamp onto the saved run summary. Mirror the ref-sync
+  // pattern useEngine itself already uses for onEnded/isDev/player: this
+  // ref is kept current by an effect once playbackSpeed exists, and by the
+  // time a run actually ends (a later event, never the same tick as render)
+  // it always holds this render's value.
+  const playbackSpeedRef = useRef(1);
   const navigate = useNavigate();
   const { fileData, format, songData, trackData } = useSongLoader(id);
   // The difficulties this specific chart actually carries - auto-charted
@@ -146,31 +154,45 @@ export function SongView() {
     playheadStyle: policy.playheadOverride ?? playheadStyle,
     mapping: inputMapping,
     onEnded: (score, summary) => {
-      if (!policy.scoring) {
-        return;
-      }
-
-      setScoreData(score);
-      setPracticeSummary(summary);
-      setIsScoreModalOpen(true);
-
-      const previousScore = songData?.scoreData?.[difficulty];
-      const isHighScore =
-        !previousScore ||
-        calculateAccuracy(score) > calculateAccuracy(previousScore);
+      // Star rating / high-score submission stay Perform-only (see
+      // ModePolicy.scoring's doc comment), but per-hit analytics capture,
+      // save-practice-run, and showing the stats summary are NOT
+      // Perform-only — a Practice run with looping/speed dialed in is still
+      // real evidence of progression, so it earns the same analytics as a
+      // Perform run even though it never earns stars. `mode`/`playbackSpeed`
+      // are stamped on here (not in the pure summarizeRun) so stored runs
+      // can tell a Practice rep at 0.7x apart from a full-speed Perform
+      // pass.
+      const runSummary: RunSummary = {
+        ...summary,
+        mode: gameMode ?? 'perform',
+        playbackSpeed: playbackSpeedRef.current,
+      };
       const isAttempt = (score.hitNotes ?? 0) > 0;
 
-      if (id && isHighScore && isAttempt) {
-        window.electron.ipcRenderer.sendMessage('update-song', {
-          id,
-          scoreData: { [difficulty]: score },
-        });
+      setPracticeSummary(runSummary);
+      setIsScoreModalOpen(true);
+
+      if (policy.scoring) {
+        setScoreData(score);
+
+        const previousScore = songData?.scoreData?.[difficulty];
+        const isHighScore =
+          !previousScore ||
+          calculateAccuracy(score) > calculateAccuracy(previousScore);
+
+        if (id && isHighScore && isAttempt) {
+          window.electron.ipcRenderer.sendMessage('update-song', {
+            id,
+            scoreData: { [difficulty]: score },
+          });
+        }
       }
 
       if (id && isAttempt) {
         window.electron.ipcRenderer.sendMessage('save-practice-run', {
           songId: id,
-          summary,
+          summary: runSummary,
         });
       }
     },
@@ -287,6 +309,11 @@ export function SongView() {
     isEnded,
     onExit: () => navigate('/'),
   });
+
+  useEffect(() => {
+    playbackSpeedRef.current = playbackSpeed;
+  }, [playbackSpeed]);
+
   // Snapshot taken at the moment the user picks a new difficulty, consumed
   // once the reparsed chart's renderData actually lands (useSheetMusic
   // re-parses asynchronously - see its parsedMidi/renderData effect).

@@ -1129,6 +1129,38 @@ describe('the score summary', () => {
     expect(within(modal).getByText('Perfect')).toBeInTheDocument();
     expect(modal.querySelectorAll('[data-filled]')).toHaveLength(5);
   });
+
+  it('also saves a practice-run analytics record, stamped Perform at 1x, alongside the score', async () => {
+    const view = setupSongView({
+      settings: { countIn: false },
+      keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+    });
+
+    await view.loadSong();
+
+    view.clickPlay();
+    await view.pressKey('KeyJ');
+    await view.finishSong();
+
+    const practiceRunPayloads = view.ipc.sent
+      .filter((s) => s.channel === 'save-practice-run')
+      .map((s) => s.args[0]);
+
+    expect(practiceRunPayloads).toEqual([
+      {
+        songId: 'song-1',
+        summary: expect.objectContaining({
+          mode: 'perform',
+          playbackSpeed: 1,
+          totalHits: 1,
+        }),
+      },
+    ]);
+
+    const modal = screen.getByTestId('score-modal');
+
+    expect(within(modal).getByTestId('practice-stats')).toBeInTheDocument();
+  });
 });
 
 describe('the playback time display', () => {

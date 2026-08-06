@@ -1,4 +1,5 @@
 import { InputMapping } from '../../../types';
+import { GameMode } from '../../types';
 
 /**
  * A drum-kit lane a hit record can be attributed to. Deliberately narrower
@@ -65,6 +66,12 @@ export interface TimingBiasStats {
  * Everything computed for one completed run. `completedAt` is supplied by
  * the caller (an ISO timestamp) — this module never touches the clock, so
  * the same input always produces the same output.
+ *
+ * `mode` and `playbackSpeed` are not computed here — `summarizeRun` stays a
+ * pure function of `HitRecord[]`, which knows nothing about game mode or
+ * player controls. SongView stamps both onto the summary it stores/sends,
+ * additively, after `summarizeRun` returns it. They're optional so runs
+ * persisted before this field existed still deserialize cleanly.
  */
 export interface RunSummary {
   completedAt: string;
@@ -77,6 +84,13 @@ export interface RunSummary {
   laneBias: LaneBias[];
   timingBias: TimingBiasStats;
   wrongHitCounts: WrongHitCount[];
+  /** Which mode this run was played in. Absent on runs stored before this
+   * field existed. */
+  mode?: GameMode;
+  /** Playback speed the run was played at. Perform locks speed at 1x, so
+   * a Perform run is always 1 here; Practice reflects whatever the player
+   * had dialed in via the speed control at the moment the run ended. */
+  playbackSpeed?: number;
 }
 
 export interface RunTrendPoint {
