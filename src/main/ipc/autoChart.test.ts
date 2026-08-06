@@ -36,6 +36,8 @@ interface SkRun {
   kill: ReturnType<typeof vi.fn>;
 }
 
+type RemoteRun = SkRun;
+
 function preview(sourceDir: string) {
   return {
     sourceDir,
@@ -76,7 +78,7 @@ function writeAudio(root: string, name: string): string {
 
 interface HarnessOptions {
   audioPaths?: string[];
-  backends?: { sightkick: boolean; octave: boolean };
+  backends?: { sightkick: boolean; remote?: boolean; octave: boolean };
   resolveMetadata?: typeof fetchOfficialYoutubeMetadata;
 }
 
@@ -86,6 +88,7 @@ function createHarness(options: HarnessOptions = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auto-chart-test-'));
   const octaveRuns: OctaveRun[] = [];
   const skRuns: SkRun[] = [];
+  const remoteRuns: RemoteRun[] = [];
   let audioIndex = 0;
   let jobIndex = 0;
   let selectAudioCalls = 0;
@@ -134,6 +137,19 @@ function createHarness(options: HarnessOptions = {}) {
       return { kill: run.kill, done };
     },
   };
+  const remoteRunner: SightkickRunner = {
+    run(input, emit) {
+      let finish = () => {};
+      const done = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      const run = { input, emit, finish, kill: vi.fn() };
+
+      remoteRuns.push(run);
+
+      return { kill: run.kill, done };
+    },
+  };
   const queue = new AutoChartQueue({
     selectAudio: async () => {
       selectAudioCalls += 1;
@@ -166,8 +182,13 @@ function createHarness(options: HarnessOptions = {}) {
         dataDir: '/transcriber-data',
       };
     },
+    preflightRemote: () => ({
+      endpoint: 'http://localhost:18010',
+      token: 'test-token',
+    }),
     octaveRunner,
     sightkickRunner,
+    remoteRunner,
     preview: async (sourceDir: string) => preview(sourceDir),
     importSong,
     cleanup: async (tempDir?: string) => {
@@ -200,6 +221,7 @@ function createHarness(options: HarnessOptions = {}) {
     root,
     octaveRuns,
     skRuns,
+    remoteRuns,
     queue,
     importSong,
     completeOctave,
@@ -953,6 +975,75 @@ describe('auto-chart queue — sightkick backend', () => {
         errorCode: 'no-drums',
       }),
     );
+  });
+});
+
+describe('auto-chart queue — remote backend', () => {
+  const cleanup: string[] = [];
+
+  afterEach(() => {
+    for (const root of cleanup.splice(0)) {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('uses the remote runner and the same contained preview/import path', async () => {
+    const harness = createHarness({
+      backends: { sightkick: false, remote: true, octave: false },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://youtu.be/abcdefghijk',
+      backend: 'remote',
+    });
+    await vi.waitFor(() => expect(harness.remoteRuns).toHaveLength(1));
+
+    const run = harness.remoteRuns[0];
+    const songDir = path.join(run.input.tempDir, 'Artist - Song');
+
+    expect(harness.selectAudioCalls).toBe(0);
+    expect(run.input).toMatchObject({
+      youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+    });
+    expect(latestJob(event)).toMatchObject({
+      stage: 'downloading',
+      backend: 'remote',
+    });
+
+    run.emit({
+      kind: 'progress',
+      stage: 'transcribe',
+      percent: 75,
+      message: 'Transcribing notes remotely',
+    });
+    await vi.waitFor(() =>
+      expect(latestJob(event)).toMatchObject({
+        stage: 'processing',
+        percent: 75,
+      }),
+    );
+
+    fs.mkdirSync(songDir);
+
+    const preparedRealPath = fs.realpathSync(songDir);
+
+    run.emit({ kind: 'complete', success: true, songDir });
+    await vi.waitFor(() =>
+      expect(latestJob(event)).toMatchObject({ stage: 'preview-ready' }),
+    );
+    expect(latestJob(event).preview?.sourceDir).toBe(preparedRealPath);
+
+    run.finish();
+    await harness.queue.import(latestJob(event).id);
+    expect(harness.importSong).toHaveBeenCalledWith(
+      preparedRealPath,
+      undefined,
+    );
+    expect(latestJob(event)).toMatchObject({ stage: 'imported' });
   });
 });
 

@@ -298,7 +298,7 @@ export type AutoChartStage =
   | 'failed'
   | 'cancelled';
 
-export type AutoChartBackend = 'sightkick' | 'octave';
+export type AutoChartBackend = 'sightkick' | 'remote' | 'octave';
 
 export interface IpcCreateAutoChartRequest {
   youtubeUrl?: string;
@@ -308,8 +308,24 @@ export interface IpcCreateAutoChartRequest {
 
 export interface IpcAutoChartBackendsResponse {
   sightkick: boolean;
+  remote: boolean;
   octave: boolean;
   default: AutoChartBackend;
+}
+
+export interface IpcAutoChartRemoteSettings {
+  endpoint: string;
+  tokenConfigured: boolean;
+}
+
+export interface IpcSaveAutoChartRemoteSettingsRequest {
+  endpoint: string;
+  token?: string;
+}
+
+export interface IpcAutoChartRemoteTestResponse {
+  ok: boolean;
+  message: string;
 }
 
 export interface IpcAutoChartMetadata {

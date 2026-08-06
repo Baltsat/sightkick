@@ -16,6 +16,8 @@ import {
   AutoChartBackend,
   IpcAutoChartBackendsResponse,
   IpcAutoChartJob,
+  IpcAutoChartRemoteSettings,
+  IpcAutoChartRemoteTestResponse,
   Song,
 } from '../../../types';
 import { SongImportReview } from '../SongImport/SongImport';
@@ -36,7 +38,11 @@ function progressStatus(
 }
 
 function backendName(backend: AutoChartBackend): string {
-  return backend === 'octave' ? 'OCTAVE' : 'SightKick';
+  if (backend === 'octave') {
+    return 'OCTAVE';
+  }
+
+  return backend === 'remote' ? 'Remote' : 'SightKick';
 }
 
 const chartSteps = [
@@ -105,25 +111,80 @@ export function AutoChart({ disabled, onImported }: Props) {
   const [artworkUrl, setArtworkUrl] = useState('');
   const [backends, setBackends] = useState<IpcAutoChartBackendsResponse>();
   const [backend, setBackend] = useState<AutoChartBackend>();
+  const [remoteEndpoint, setRemoteEndpoint] = useState('');
+  const [remoteToken, setRemoteToken] = useState('');
+  const [remoteTokenConfigured, setRemoteTokenConfigured] = useState(false);
+  const [remoteTest, setRemoteTest] =
+    useState<IpcAutoChartRemoteTestResponse>();
   const active = Boolean(
     job && !['imported', 'failed', 'cancelled'].includes(job.stage),
   );
   const noBackendAvailable = Boolean(
-    backends && !backends.sightkick && !backends.octave,
+    backends && !backends.sightkick && !backends.remote && !backends.octave,
   );
-  const canDownloadFromYoutube =
-    Boolean(backends?.sightkick) && youtubeUrl.trim().length > 0;
+  const canDownloadFromYoutube = Boolean(
+    youtubeUrl.trim() &&
+      ((backend === 'sightkick' && backends?.sightkick) ||
+        (backend === 'remote' && backends?.remote)),
+  );
+  const availableBackends = [
+    backends?.sightkick
+      ? {
+          label: 'SightKick',
+          value: 'sightkick' as const,
+        }
+      : undefined,
+    backends?.remote
+      ? { label: 'Remote', value: 'remote' as const }
+      : undefined,
+    backends?.octave
+      ? { label: 'OCTAVE', value: 'octave' as const }
+      : undefined,
+  ].filter((option): option is { label: string; value: AutoChartBackend } =>
+    Boolean(option),
+  );
 
   useEffect(() => {
     window.electron.ipcRenderer.sendMessage('check-auto-chart-backends');
+    window.electron.ipcRenderer.sendMessage('get-auto-chart-remote-settings');
 
-    return window.electron.ipcRenderer.on<IpcAutoChartBackendsResponse>(
-      'auto-chart-backends',
-      (response) => {
-        setBackends(response);
-        setBackend((current) => current ?? response.default);
-      },
-    );
+    const removeBackends =
+      window.electron.ipcRenderer.on<IpcAutoChartBackendsResponse>(
+        'auto-chart-backends',
+        (response) => {
+          setBackends(response);
+          setBackend((current) => current ?? response.default);
+        },
+      );
+    const removeSettings =
+      window.electron.ipcRenderer.on<IpcAutoChartRemoteSettings>(
+        'auto-chart-remote-settings',
+        (settings) => {
+          setRemoteEndpoint(settings.endpoint);
+          setRemoteTokenConfigured(settings.tokenConfigured);
+        },
+      );
+    const removeTest =
+      window.electron.ipcRenderer.on<IpcAutoChartRemoteTestResponse>(
+        'auto-chart-remote-test',
+        (response) => {
+          setRemoteTest(response);
+
+          if (response.ok) {
+            setRemoteToken('');
+            setRemoteTokenConfigured(true);
+            window.electron.ipcRenderer.sendMessage(
+              'check-auto-chart-backends',
+            );
+          }
+        },
+      );
+
+    return () => {
+      removeBackends();
+      removeSettings();
+      removeTest();
+    };
   }, []);
 
   useEffect(() => {
@@ -167,6 +228,13 @@ export function AutoChart({ disabled, onImported }: Props) {
       ...(youtubeUrl.trim() ? { youtubeUrl: youtubeUrl.trim() } : {}),
       localFile: true,
       backend,
+    });
+  };
+  const saveAndTestRemote = () => {
+    setRemoteTest(undefined);
+    window.electron.ipcRenderer.sendMessage('save-test-auto-chart-remote', {
+      endpoint: remoteEndpoint.trim(),
+      ...(remoteToken ? { token: remoteToken } : {}),
     });
   };
   const dismiss = () => {
@@ -261,19 +329,59 @@ export function AutoChart({ disabled, onImported }: Props) {
             Choose a local audio file instead
           </Button>
 
-          {backends && backends.sightkick && backends.octave && (
+          {availableBackends.length > 1 && (
             <div data-testid="auto-chart-backend-select">
               <Radio.Group
                 value={backend}
                 onChange={(event) => setBackend(event.target.value)}
                 optionType="button"
-                options={[
-                  { label: 'SightKick', value: 'sightkick' },
-                  { label: 'OCTAVE', value: 'octave' },
-                ]}
+                options={availableBackends}
               />
             </div>
           )}
+
+          <div className="rounded-xl border border-border-soft p-3">
+            <div className="mb-2 text-sm font-semibold text-text-body">
+              Remote transcriber
+            </div>
+            <div className="flex flex-col gap-2">
+              <Input
+                aria-label="Remote transcriber endpoint"
+                data-testid="auto-chart-remote-endpoint"
+                value={remoteEndpoint}
+                onChange={(event) => setRemoteEndpoint(event.target.value)}
+                placeholder="http://localhost:18010"
+              />
+              <Input.Password
+                aria-label="Remote transcriber token"
+                data-testid="auto-chart-remote-token"
+                value={remoteToken}
+                onChange={(event) => setRemoteToken(event.target.value)}
+                placeholder={
+                  remoteTokenConfigured ? 'Saved token' : 'Bearer token'
+                }
+              />
+              <Button
+                data-testid="auto-chart-remote-test"
+                disabled={
+                  !remoteEndpoint.trim() ||
+                  (!remoteToken.trim() && !remoteTokenConfigured)
+                }
+                onClick={saveAndTestRemote}
+              >
+                Save and test connection
+              </Button>
+              {remoteTest && (
+                <div
+                  data-testid="auto-chart-remote-test-result"
+                  role={remoteTest.ok ? 'status' : 'alert'}
+                  className={remoteTest.ok ? 'text-green' : 'text-red'}
+                >
+                  {remoteTest.message}
+                </div>
+              )}
+            </div>
+          </div>
 
           {backends && !noBackendAvailable && (
             <div
@@ -294,7 +402,7 @@ export function AutoChart({ disabled, onImported }: Props) {
               role="alert"
             >
               No auto-chart engine is available. Reinstall SightKick, or install
-              OCTAVE.app, then try again.
+              OCTAVE.app, or configure the remote transcriber, then try again.
             </div>
           )}
 

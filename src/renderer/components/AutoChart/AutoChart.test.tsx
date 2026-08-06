@@ -33,6 +33,12 @@ function emitBackends(response: IpcAutoChartBackendsResponse) {
   });
 }
 
+function emitRemoteSettings(endpoint = '', tokenConfigured = false) {
+  act(() => {
+    ipc.emit('auto-chart-remote-settings', { endpoint, tokenConfigured });
+  });
+}
+
 const preview = {
   sourceDir: '/tmp/prepared-song',
   name: 'Official title',
@@ -75,12 +81,21 @@ describe('AutoChart', () => {
       channel: 'check-auto-chart-backends',
       args: [],
     });
+    expect(ipc.sent).toContainEqual({
+      channel: 'get-auto-chart-remote-settings',
+      args: [],
+    });
   });
 
   it('pastes a YouTube URL and downloads, separates, transcribes and builds a chart automatically end to end', () => {
     const onImported = renderAutoChart();
 
-    emitBackends({ sightkick: true, octave: false, default: 'sightkick' });
+    emitBackends({
+      sightkick: true,
+      remote: false,
+      octave: false,
+      default: 'sightkick',
+    });
 
     fireEvent.click(screen.getByTestId('create-chart-trigger'));
     expect(screen.getByLabelText('YouTube video URL')).toBeInTheDocument();
@@ -172,7 +187,12 @@ describe('AutoChart', () => {
 
   it('keeps choosing a local audio file working as a secondary path', () => {
     renderAutoChart();
-    emitBackends({ sightkick: true, octave: false, default: 'sightkick' });
+    emitBackends({
+      sightkick: true,
+      remote: false,
+      octave: false,
+      default: 'sightkick',
+    });
 
     fireEvent.click(screen.getByTestId('create-chart-trigger'));
     fireEvent.click(screen.getByTestId('auto-chart-local-file'));
@@ -185,7 +205,12 @@ describe('AutoChart', () => {
 
   it('disables the YouTube download action until sightkick is available', () => {
     renderAutoChart();
-    emitBackends({ sightkick: false, octave: true, default: 'octave' });
+    emitBackends({
+      sightkick: false,
+      remote: false,
+      octave: true,
+      default: 'octave',
+    });
 
     fireEvent.click(screen.getByTestId('create-chart-trigger'));
     fireEvent.change(screen.getByTestId('auto-chart-youtube-url'), {
@@ -197,7 +222,12 @@ describe('AutoChart', () => {
 
   it('lets the user pick between two available backends and shows which one is used', () => {
     renderAutoChart();
-    emitBackends({ sightkick: true, octave: true, default: 'sightkick' });
+    emitBackends({
+      sightkick: true,
+      remote: false,
+      octave: true,
+      default: 'sightkick',
+    });
 
     fireEvent.click(screen.getByTestId('create-chart-trigger'));
     expect(screen.getByTestId('auto-chart-backend-select')).toBeInTheDocument();
@@ -213,7 +243,12 @@ describe('AutoChart', () => {
 
   it('shows a clear error when no auto-chart backend is available', () => {
     renderAutoChart();
-    emitBackends({ sightkick: false, octave: false, default: 'sightkick' });
+    emitBackends({
+      sightkick: false,
+      remote: false,
+      octave: false,
+      default: 'sightkick',
+    });
 
     fireEvent.click(screen.getByTestId('create-chart-trigger'));
 
@@ -224,7 +259,12 @@ describe('AutoChart', () => {
 
   it('shows a clear, honest error when a YouTube download fails', () => {
     renderAutoChart();
-    emitBackends({ sightkick: true, octave: false, default: 'sightkick' });
+    emitBackends({
+      sightkick: true,
+      remote: false,
+      octave: false,
+      default: 'sightkick',
+    });
 
     fireEvent.click(screen.getByTestId('create-chart-trigger'));
     fireEvent.change(screen.getByTestId('auto-chart-youtube-url'), {
@@ -254,7 +294,12 @@ describe('AutoChart', () => {
 
   it('lets the user cancel an in-flight chart at any stage', () => {
     renderAutoChart();
-    emitBackends({ sightkick: true, octave: false, default: 'sightkick' });
+    emitBackends({
+      sightkick: true,
+      remote: false,
+      octave: false,
+      default: 'sightkick',
+    });
 
     fireEvent.click(screen.getByTestId('create-chart-trigger'));
     fireEvent.change(screen.getByTestId('auto-chart-youtube-url'), {
@@ -276,6 +321,59 @@ describe('AutoChart', () => {
     expect(ipc.sent).toContainEqual({
       channel: 'cancel-auto-chart',
       args: ['job-1'],
+    });
+  });
+
+  it('stores, tests, and selects a configured remote backend', () => {
+    renderAutoChart();
+    emitRemoteSettings('http://localhost:18010', false);
+    emitBackends({
+      sightkick: false,
+      remote: false,
+      octave: true,
+      default: 'octave',
+    });
+
+    fireEvent.click(screen.getByTestId('create-chart-trigger'));
+    fireEvent.change(screen.getByTestId('auto-chart-remote-token'), {
+      target: { value: 'secret-token' },
+    });
+    fireEvent.click(screen.getByTestId('auto-chart-remote-test'));
+
+    expect(ipc.sent).toContainEqual({
+      channel: 'save-test-auto-chart-remote',
+      args: [
+        {
+          endpoint: 'http://localhost:18010',
+          token: 'secret-token',
+        },
+      ],
+    });
+
+    act(() => {
+      ipc.emit('auto-chart-remote-test', {
+        ok: true,
+        message: 'Remote transcriber is reachable',
+      });
+    });
+    emitBackends({
+      sightkick: false,
+      remote: true,
+      octave: true,
+      default: 'remote',
+    });
+    fireEvent.click(screen.getByRole('radio', { name: 'Remote' }));
+    fireEvent.change(screen.getByTestId('auto-chart-youtube-url'), {
+      target: { value: 'https://youtu.be/abcdefghijk' },
+    });
+    fireEvent.click(screen.getByTestId('auto-chart-from-youtube'));
+
+    expect(
+      screen.getByTestId('auto-chart-remote-test-result'),
+    ).toHaveTextContent('Remote transcriber is reachable');
+    expect(ipc.sent).toContainEqual({
+      channel: 'create-auto-chart',
+      args: [{ youtubeUrl: 'https://youtu.be/abcdefghijk', backend: 'remote' }],
     });
   });
 });

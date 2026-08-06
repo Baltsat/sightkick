@@ -29,7 +29,7 @@ repo, and not reproduced here. Get it from whoever deployed the service.
 
 ## Endpoints
 
-### `POST /jobs` → `201`-ish `{"jobId": "<uuid>"}`
+### `POST /jobs` → `200` `{"jobId": "<uuid>"}`
 
 Two ways to submit, distinguished by `Content-Type`:
 

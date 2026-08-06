@@ -17,6 +17,12 @@ import {
 import { caCertEnv, getBinaryPath } from '../stemTools';
 import { ingestSongCover } from '../songCover';
 import { importPreparedSong, previewPreparedSong } from './importSong';
+import {
+  createRemoteAutoChartRunner,
+  getRemoteAutoChartRuntime,
+  isRemoteAutoChartAvailable,
+  RemoteAutoChartRunner,
+} from './remoteAutoChart';
 
 const EVENT_PREFIX = '__OCTAVE_EVENT__';
 const SK_EVENT_PREFIX = '__SK_EVENT__ ';
@@ -66,7 +72,7 @@ export interface SkWorkerEvent {
   code?: string;
 }
 
-interface WorkerHandle {
+export interface WorkerHandle {
   kill: () => void;
   done: Promise<void>;
 }
@@ -81,6 +87,7 @@ interface OctaveRuntime {
 
 interface AutoChartBackends {
   sightkick: boolean;
+  remote?: boolean;
   octave: boolean;
 }
 
@@ -121,11 +128,13 @@ interface AutoChartDependencies {
   ) => Promise<IpcAutoChartMetadata | undefined>;
   validateAudio: (filePath: string) => string;
   createTempDir: (id: string) => Promise<string>;
-  detectBackends: () => AutoChartBackends;
+  detectBackends: () => AutoChartBackends | Promise<AutoChartBackends>;
   preflightOctave: () => OctaveRuntime;
   preflightSightkick: () => SightkickRuntime;
+  preflightRemote: typeof getRemoteAutoChartRuntime;
   octaveRunner: AutoChartRunner;
   sightkickRunner: SightkickRunner;
+  remoteRunner: RemoteAutoChartRunner;
   preview: (
     sourceDir: string,
     thumbnailUrl?: string,
@@ -184,7 +193,11 @@ function safeMessage(error: unknown): string {
 }
 
 function backendLabel(backend: AutoChartBackend): string {
-  return backend === 'octave' ? 'local OCTAVE' : 'SightKick';
+  if (backend === 'octave') {
+    return 'local OCTAVE';
+  }
+
+  return backend === 'remote' ? 'remote SightKick' : 'SightKick';
 }
 
 export function canonicalizeYoutubeUrl(value: string): string {
@@ -300,6 +313,10 @@ export async function fetchOfficialYoutubeMetadata(
   youtubeUrl?: string,
 ): Promise<IpcAutoChartMetadata | undefined> {
   if (!youtubeUrl?.trim()) {
+    return undefined;
+  }
+
+  if (process.env.SIGHTKICK_DISABLE_YOUTUBE_METADATA === '1') {
     return undefined;
   }
 
@@ -938,24 +955,31 @@ export async function applyOfficialMetadata(
   }
 }
 
-function detectBackends(): AutoChartBackends {
+async function detectBackends(): Promise<AutoChartBackends> {
   return {
     sightkick: isSightkickRunnerAvailable(),
+    remote: await isRemoteAutoChartAvailable(),
     octave: isOctaveAvailable(),
   };
 }
 
 function preferredBackend(backends: AutoChartBackends): AutoChartBackend {
-  return backends.sightkick ? 'sightkick' : 'octave';
+  if (backends.sightkick) {
+    return 'sightkick';
+  }
+
+  return backends.remote ? 'remote' : 'octave';
 }
 
 export function checkAutoChartBackends(event: IpcMainEvent): void {
-  const backends = detectBackends();
-
-  event.reply('auto-chart-backends', {
-    ...backends,
-    default: preferredBackend(backends),
-  } satisfies IpcAutoChartBackendsResponse);
+  void detectBackends().then((backends) => {
+    event.reply('auto-chart-backends', {
+      sightkick: backends.sightkick,
+      remote: Boolean(backends.remote),
+      octave: backends.octave,
+      default: preferredBackend(backends),
+    } satisfies IpcAutoChartBackendsResponse);
+  });
 }
 
 function defaultDependencies(): AutoChartDependencies {
@@ -980,8 +1004,10 @@ function defaultDependencies(): AutoChartDependencies {
     detectBackends,
     preflightOctave: preflightOctaveRuntime,
     preflightSightkick: preflightSightkickRuntime,
+    preflightRemote: getRemoteAutoChartRuntime,
     octaveRunner: createChildRunner(),
     sightkickRunner: createSightkickRunner(),
+    remoteRunner: createRemoteAutoChartRunner(),
     preview: (sourceDir, thumbnailUrl) =>
       previewPreparedSong(sourceDir, { thumbnailUrl }),
     importSong: (sourceDir, artworkUrl) =>
@@ -1018,7 +1044,7 @@ export class AutoChartQueue {
     try {
       job.backend = this.resolveBackend(
         request?.backend,
-        this.dependencies.detectBackends(),
+        await this.dependencies.detectBackends(),
       );
     } catch (error) {
       this.jobs.set(job.id, job);
@@ -1216,8 +1242,16 @@ export class AutoChartQueue {
       return 'sightkick';
     }
 
+    if (requested === 'remote' && backends.remote) {
+      return 'remote';
+    }
+
     if (backends.sightkick) {
       return 'sightkick';
+    }
+
+    if (backends.remote) {
+      return 'remote';
     }
 
     if (backends.octave) {
@@ -1269,7 +1303,7 @@ export class AutoChartQueue {
 
         job.audioPath = this.dependencies.validateAudio(job.audioPath);
         await this.runOctave(job);
-      } else {
+      } else if (job.backend === 'sightkick') {
         if (job.audioPath) {
           job.audioPath = this.dependencies.validateAudio(job.audioPath);
         } else if (!job.youtubeUrl) {
@@ -1279,6 +1313,16 @@ export class AutoChartQueue {
         }
 
         await this.runSightkick(job);
+      } else {
+        if (job.audioPath) {
+          job.audioPath = this.dependencies.validateAudio(job.audioPath);
+        } else if (!job.youtubeUrl) {
+          throw new Error(
+            'Remote auto-chart requires a YouTube URL or local audio file',
+          );
+        }
+
+        await this.runRemote(job);
       }
 
       if (job.cancelled && !isTerminal(job.stage)) {
@@ -1386,6 +1430,42 @@ export class AutoChartQueue {
     await workerEvents;
   }
 
+  private async runRemote(job: AutoChartJob): Promise<void> {
+    if (!job.tempDir) {
+      throw new Error('Auto-chart job has no working directory');
+    }
+
+    const runtime = this.dependencies.preflightRemote();
+    const downloading = !job.audioPath;
+
+    this.transition(
+      job,
+      downloading ? 'downloading' : 'processing',
+      downloading
+        ? 'Sending the YouTube URL to the remote transcriber'
+        : 'Uploading audio to the remote transcriber',
+      0,
+    );
+
+    let workerEvents = Promise.resolve();
+
+    job.worker = this.dependencies.remoteRunner.run(
+      {
+        tempDir: job.tempDir,
+        youtubeUrl: job.youtubeUrl,
+        audioPath: job.audioPath,
+        runtime,
+      },
+      (event) => {
+        workerEvents = workerEvents
+          .then(() => this.handleSightkickEvent(job, event))
+          .catch((error) => this.fail(job, safeMessage(error)));
+      },
+    );
+    await job.worker.done;
+    await workerEvents;
+  }
+
   private async handleOctaveEvent(
     job: AutoChartJob,
     event: WorkerEvent,
@@ -1442,7 +1522,8 @@ export class AutoChartQueue {
     if (event.kind === 'error') {
       await this.fail(
         job,
-        event.message || 'SightKick could not prepare a chart',
+        event.message ||
+          `${backendLabel(job.backend)} could not prepare a chart`,
         event.code,
       );
 
@@ -1452,7 +1533,8 @@ export class AutoChartQueue {
     if (!event.success || !event.songDir) {
       await this.fail(
         job,
-        event.message || 'SightKick could not prepare a chart',
+        event.message ||
+          `${backendLabel(job.backend)} could not prepare a chart`,
       );
 
       return;
