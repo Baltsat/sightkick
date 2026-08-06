@@ -3,7 +3,7 @@ import fs from 'fs';
 import ini from 'ini';
 import { randomUUID } from 'crypto';
 import { Difficulty, parseChartFile } from 'scan-chart';
-import { AudioData, Song, SongData } from '../types';
+import { AudioData, Song, SongData, SongLessonInfo } from '../types';
 import { ALL_DIFFICULTIES } from '../constants';
 
 export const SONG_ID_FILE = '.sightkick';
@@ -22,6 +22,28 @@ function readSongIdFile(dir: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Parses the Lessons curriculum's `sk_*` song.ini fields into a
+ * SongLessonInfo. Returns undefined when the song isn't part of the
+ * lessons chain (i.e. sk_lesson_id is absent), so regular songs are
+ * untouched.
+ */
+export function parseLessonInfo(stored: SongData): SongLessonInfo | undefined {
+  if (!stored.sk_lesson_id) {
+    return undefined;
+  }
+
+  const starsToUnlock = parseInt(stored.sk_stars_to_unlock ?? '', 10);
+
+  return {
+    id: stored.sk_lesson_id,
+    starsToUnlock: Number.isNaN(starsToUnlock) ? 0 : starsToUnlock,
+    next: stored.sk_next || undefined,
+    unit: stored.sk_unit ?? '',
+    title: stored.sk_lesson_title ?? '',
+  };
 }
 
 export function toSong(stored: SongData): Song {
@@ -50,6 +72,7 @@ export function toSong(stored: SongData): Song {
     liked: stored.liked,
     updatedAt: stored.updatedAt,
     scoreData: stored.scoreData,
+    lesson: parseLessonInfo(stored),
   };
 }
 

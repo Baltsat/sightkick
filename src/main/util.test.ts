@@ -316,6 +316,62 @@ describe('toSong', () => {
     expect(song.charter).toBe('');
     expect(song.autoChartTool).toBe('STRUM (OCTAVE AI auto-charter)');
   });
+
+  describe('lesson fields', () => {
+    it('leaves lesson undefined for a regular song', () => {
+      expect(toSong(stored()).lesson).toBeUndefined();
+    });
+
+    it('parses the sk_ fields into a lesson object', () => {
+      const song = toSong(
+        stored({
+          sk_lesson_id: '04.02',
+          sk_stars_to_unlock: '37',
+          sk_next: '04.03',
+          sk_unit: 'Unit 4 — Sticking',
+          sk_lesson_title: 'Right Hand Steady, Left Hand Answers',
+        }),
+      );
+
+      expect(song.lesson).toEqual({
+        id: '04.02',
+        starsToUnlock: 37,
+        next: '04.03',
+        unit: 'Unit 4 — Sticking',
+        title: 'Right Hand Steady, Left Hand Answers',
+      });
+    });
+
+    it('treats the first lesson (stars 0) as a valid chain position', () => {
+      const song = toSong(
+        stored({
+          sk_lesson_id: '01.01',
+          sk_stars_to_unlock: '0',
+          sk_unit: 'Unit 1',
+          sk_lesson_title: 'Alternating Singles Warm-Up',
+        }),
+      );
+
+      expect(song.lesson?.starsToUnlock).toBe(0);
+    });
+
+    it('defaults starsToUnlock to 0 when missing or unparseable', () => {
+      expect(
+        toSong(stored({ sk_lesson_id: '01.01', sk_stars_to_unlock: undefined }))
+          .lesson?.starsToUnlock,
+      ).toBe(0);
+      expect(
+        toSong(stored({ sk_lesson_id: '01.01', sk_stars_to_unlock: 'nope' }))
+          .lesson?.starsToUnlock,
+      ).toBe(0);
+    });
+
+    it('omits an empty sk_next as undefined', () => {
+      expect(
+        toSong(stored({ sk_lesson_id: '18.02', sk_next: '' })).lesson?.next,
+      ).toBeUndefined();
+    });
+  });
 });
 
 describe('chartGlobPattern', () => {

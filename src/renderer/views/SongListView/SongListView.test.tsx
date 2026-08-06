@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   makeEnchorChart,
+  makeLessonSong,
   makeListSong,
   setupSongListView,
 } from '../test-support';
@@ -821,6 +822,181 @@ describe('SongListView — library folder', () => {
     expect(view.ipc.sent).toContainEqual({
       channel: 'rescan-songs',
       args: [],
+    });
+  });
+});
+
+describe('SongListView — lessons filter split', () => {
+  it('hides lesson songs from the default Songs view', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('a', { name: 'Master of Puppets' }),
+      makeLessonSong('lesson-1', { id: '01.01', title: 'Warm-Up Groove' }),
+    ]);
+
+    expect(screen.getByText('Master of Puppets')).toBeInTheDocument();
+    expect(screen.queryByText('Warm-Up Groove')).not.toBeInTheDocument();
+  });
+
+  it('still finds a lesson song when the user searches for it', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('a', { name: 'Master of Puppets' }),
+      makeLessonSong('lesson-1', { id: '01.01', title: 'Warm-Up Groove' }),
+    ]);
+    view.search('Warm-Up Groove');
+
+    expect(screen.getByText('Warm-Up Groove')).toBeInTheDocument();
+  });
+});
+
+describe('SongListView — Lessons surface', () => {
+  it('switches to a Lessons view showing only lessons, grouped and ordered by unit', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('a', { name: 'Master of Puppets' }),
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Warm-Up Groove',
+        unit: 'Unit 1 — Foundations',
+        starsToUnlock: 0,
+      }),
+      makeLessonSong('lesson-2', {
+        id: '02.01',
+        title: 'Second Unit Groove',
+        unit: 'Unit 2 — Reading',
+        starsToUnlock: 3,
+      }),
+    ]);
+
+    view.selectView('lessons');
+
+    expect(screen.getByTestId('lesson-item-01.01')).toBeInTheDocument();
+    expect(screen.getByTestId('lesson-item-02.01')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('lesson-group-Unit 1 — Foundations'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('lesson-group-Unit 2 — Reading'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Master of Puppets')).not.toBeInTheDocument();
+  });
+
+  it('shows chain progress and a continue card for the furthest unmastered unlocked lesson', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeLessonSong(
+        'lesson-1',
+        { id: '01.01', title: 'Warm-Up Groove', starsToUnlock: 0 },
+        {
+          scoreData: {
+            expert: { hitNotes: 50, totalNotes: 100, falseHits: 0 },
+          },
+        }, // 2 stars — unlocked, not mastered
+      ),
+    ]);
+
+    view.selectView('lessons');
+
+    expect(screen.getByTestId('lesson-progress-summary')).toHaveTextContent(
+      '1 of 1 unlocked · 2⭐ earned',
+    );
+
+    const card = screen.getByTestId('lesson-continue-card');
+
+    expect(within(card).getByText('Warm-Up Groove')).toBeInTheDocument();
+  });
+
+  it('greys out a locked lesson with an "Earn N more" hint', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Warm-Up Groove',
+        starsToUnlock: 0,
+      }),
+      makeLessonSong('lesson-2', {
+        id: '01.02',
+        title: 'Locked Groove',
+        starsToUnlock: 12,
+      }),
+    ]);
+
+    view.selectView('lessons');
+
+    const locked = screen.getByTestId('lesson-item-01.02');
+
+    expect(locked).toHaveAttribute('data-locked', 'true');
+    expect(within(locked).getByText('Earn 12 more ⭐')).toBeInTheDocument();
+  });
+
+  it('shows an honest message instead of a dead click on a locked lesson', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Warm-Up Groove',
+        starsToUnlock: 0,
+      }),
+      makeLessonSong('lesson-2', {
+        id: '01.02',
+        title: 'Locked Groove',
+        starsToUnlock: 12,
+      }),
+    ]);
+
+    view.selectView('lessons');
+    view.clickLesson('01.02');
+
+    expect(screen.getByText('This lesson is locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('song-view-stub')).not.toBeInTheDocument();
+  });
+
+  it('keeps lessons visible in the Lessons tab regardless of the selected difficulty', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Warm-Up Groove',
+        starsToUnlock: 0,
+      }),
+    ]);
+    // Lesson charts only carry an Expert track — pick a difficulty the
+    // lesson was never charted for while still in the Songs view.
+    view.selectDifficulty('easy');
+
+    view.selectView('lessons');
+
+    expect(screen.getByTestId('lesson-item-01.01')).toBeInTheDocument();
+  });
+
+  it('opens an unlocked lesson at its charted difficulty, ignoring the selected difficulty tab', async () => {
+    const view = setupSongListView({ settings: { difficulty: 'hard' } });
+
+    view.loadSongs([
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Warm-Up Groove',
+        starsToUnlock: 0,
+      }),
+    ]);
+
+    view.selectView('lessons');
+    view.clickLesson('01.01');
+    view.chooseGameMode('perform');
+
+    expect(await screen.findByTestId('song-view-stub')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(window.localStorage.getItem('settings.difficulty')).toBe(
+        '"expert"',
+      );
     });
   });
 });

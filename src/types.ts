@@ -59,6 +59,12 @@ export interface SongData {
   audio: AudioData[];
   drumDifficulties?: Difficulty[];
   scoreData?: Partial<Record<Difficulty, ScoreData>>;
+  // Lessons curriculum fields (raw ini strings), see SongLessonInfo below.
+  sk_lesson_id?: string;
+  sk_stars_to_unlock?: string;
+  sk_next?: string;
+  sk_unit?: string;
+  sk_lesson_title?: string;
 }
 
 export interface Song {
@@ -82,6 +88,23 @@ export interface Song {
   liked?: boolean;
   updatedAt?: string;
   scoreData?: Partial<Record<Difficulty, ScoreData>>;
+  // Present only for SightKick Method lesson songs.
+  lesson?: SongLessonInfo;
+}
+
+/**
+ * Parsed view of a lesson song's sk_* song.ini fields (the Lessons unlock
+ * chain data contract). Absent on regular (non-lesson) songs.
+ */
+export interface SongLessonInfo {
+  /** e.g. "04.02" */
+  id: string;
+  /** 0-based cumulative-star position in the unlock chain. */
+  starsToUnlock: number;
+  /** Next exercise id in the chain, if any. */
+  next?: string;
+  unit: string;
+  title: string;
 }
 
 export interface ScoreData {
