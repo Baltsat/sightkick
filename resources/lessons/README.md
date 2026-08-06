@@ -1,6 +1,6 @@
 # SightKick Method — Lesson Library Generator
 
-A deterministic pipeline that turns `curriculum.yaml` (117 drumset exercises,
+A deterministic pipeline that turns `curriculum.yaml` (118 drumset exercises,
 hand-authored in this repo) into playable SightKick song folders: a chart
 (`notes.mid`), a click track (`song.ogg`), an audible drum-pattern demo
 rendered from real (CC0) drum samples (`drums.ogg`), and metadata
@@ -29,13 +29,13 @@ here in different words with a different note pattern.
 
 7 units → 18 lessons (17 map 1:1 to the book's Lesson 1–17; the 18th,
 "Encore Repertoire", stands in for the book's two capstone song charts) →
-117 exercises.
+118 exercises.
 
 | Unit | Name                             | Exercises |
 | ---- | -------------------------------- | --------- |
 | A    | Foundations                      | 6         |
 | B    | First Grooves                    | 12        |
-| C    | Toms, Dynamics & Fills I         | 29        |
+| C    | Toms, Dynamics & Fills I         | 30        |
 | D    | Groove Vocabulary & Musical Form | 10        |
 | E    | 16th-Note Mastery                | 22        |
 | F    | Triplets, Jazz & Shuffle         | 28        |
@@ -64,6 +64,11 @@ exercises instead of every permutation:
   vocabulary block (10 numbered fill lines, several both-sticks/unison) →
   1 dedicated time-keeping exercise (08.07), with the fill-vocabulary
   variety itself spread across 08.04–08.08 as separately named exercises.
+  The book also teaches open hi-hat as its own Lesson-8 topic (a groove
+  built on alternating open/closed hi-hat); that's now its own dedicated
+  exercise, 08.10 "Open Hi-Hat Backbeat Splash" — the hi-hat opens on the
+  "and" right before each backbeat and clamps shut exactly on beats 2
+  and 4.
 - Lesson 9 two-bar beats/fills/backbeat-shift variations: ~28 → 8.
 - Lesson 10: the book's four progressive versions of one song ("Version
   1/2/3/Full") → one capstone "Full-Form Etude" that already contains the
@@ -85,16 +90,43 @@ exercises instead of every permutation:
   (repeat-to-sign, first/second endings, coda jumps) has no representation
   in the flat, linear `mode: loop` chart format used here — that's a
   format limitation, not a content cut, and is out of scope until a
-  future chart format supports section jumps.
+  future chart format supports section jumps. 07.04 (now "Groove with a
+  Turnaround Tag", formerly "Second-Ending Turnaround") had the same gap:
+  its original cue promised a first/second-ending song-form move the
+  format can't render. The title and cue were corrected to describe what
+  the chart actually plays — one consistent turnaround tag every pass —
+  instead of overpromising navigation the loop format doesn't support.
 
-117 exercises is the result — comfortably inside the "expect 50–120"
+118 exercises is the result — comfortably inside the "expect 50–120"
 target while still touching every lesson, every meter (4/4, 3/4, 6/8,
 12/8, 2/2 cut time), every subdivision (8th, 16th, triplet, shuffle), and
 every technique (dynamics, ghost notes, cross-stick, tom fills, open
-hi-hat) the book introduces. Flams (a grace note landing almost
-simultaneously with its primary note) are not currently representable —
-the notation grid has no sub-step timing offset — so no exercise claims
-to teach a true flam.
+hi-hat) the book introduces. A few notation gaps are worth calling out
+explicitly, all format/vocabulary limitations rather than content cuts:
+
+- **Flams** (a grace note landing almost simultaneously with its primary
+  note) are not currently representable — the notation grid has no
+  sub-step timing offset — so no exercise claims to teach a true flam.
+- **Fermata** (a held/paused note) has no representation either — every
+  step in the grid is a fixed-duration hit, and there's no sustain/hold
+  symbol — so where the book pauses on a held cymbal or fermata-marked
+  figure, this curriculum either omits that pause or lets the phrase's
+  final crash ring out under `mode: loop`'s natural bar-boundary silence,
+  which is not the same thing as a notated fermata.
+- **Single ride voice, no bell**: the `R` lane is one ride-cymbal voice
+  (the shank/bow strike used for standard ride patterns). There's no
+  dedicated ride-bell lane or symbol, so where the book calls for a bell
+  accent (a common jazz/rock ride articulation), this curriculum plays it
+  as a regular `R` hit (optionally `X`-accented) rather than a distinct
+  timbre — a notation-vocabulary gap, not a musical error.
+- **Open hi-hat is a MIDI-vocabulary constraint, not just a chart quirk**:
+  Clone Hero/Rock Band's pro-drums MIDI vocabulary has no distinct note
+  for open vs. closed hi-hat (`H`/`O`/`T1` all share MIDI note 98), so
+  `notes.mid` itself is identical either way — a real Clone Hero session
+  can't tell the two apart from the chart data. Only `drums.ogg`'s
+  audible demo (via the `o` step symbol — see "Notation format" below)
+  and the `O` lane's notation-only bookkeeping distinguish open from
+  closed hi-hat for a human reading the chart.
 
 ## Notation format
 
@@ -105,7 +137,27 @@ version). Summary:
 - **Lanes**: `K` kick, `S` snare, `H` hi-hat closed, `O` hi-hat open, `R`
   ride, `C` crash, `T1`/`T2`/`T3` high/mid/floor tom.
 - **Symbols** (one character per step): `.` rest, `x` normal hit, `X`
-  accent, `g` ghost note.
+  accent, `g` ghost note, `o` open-hihat color hit (see below).
+- **`o` — open-hihat color within a lane's own pattern**: written inside a
+  lane's step string (in this curriculum, always the `H` lane) instead of
+  switching to the `O` lane, for exercises where a single pattern mixes
+  open and closed hi-hat within the same bar (a shuffle groove where the
+  foot opens and closes mid-pattern — see 08.10, 16.07, 16.08). MIDI-wise
+  it's identical to a closed hit on the same lane (see "MIDI mapping"
+  below), but `generate.py`'s `drums.ogg` renderer swaps in the vendored
+  `hihat_open.wav` sample for `o` events specifically, so the demo audio
+  is audibly distinct from a closed hit even though the chart data is not.
+- **Graded dynamics — `1`–`6`**: a six-step dynamics tier (`1`=pp,
+  `2`=p, `3`=mp, `4`=mf, `5`=f, `6`=ff; velocities 30/45/60/80/100/115)
+  layered on top of the original binary `x`/`X`/`g` notation. Used only on
+  the handful of exercises where the book gives a genuine multi-step
+  dynamic arc rather than a binary loud/soft contrast: 05.01, 05.05,
+  05.06, 09.04, 10.02 (the Lesson 10 capstone), and 18.01/18.02 (the two
+  Encore etudes). Every other exercise keeps the original binary
+  dynamics. `f`/`ff` (100/115) clear the judge's
+  `ACCENT_VALUE_THRESHOLD` (90) the same way `X` (115) always has, and
+  `pp`/`p` (30/45) clear `GHOST_VALUE_THRESHOLD` (50) the same way `g`
+  (40) always has — see `src/renderer/services/engine/constants.ts`.
 - Each lane's string length is that bar's step count (8 for 8th notes, 16
   for 16ths, 12 for 8th-note triplets in 4/4, etc). All lanes in one bar
   share the same step count; different bars in the same exercise may use
@@ -240,12 +292,17 @@ is baked into _both_ `notes.mid` and `song.ogg` identically, so no
 | Snare (`S`)      | 97   |     | Crash (`C`) | 100                          |
 | Hi-hat (`H`/`O`) | 98   |     | Tom markers | `T1`→110, `T2`→111, `T3`→112 |
 
-Velocities: accent (`X`) 115, normal (`x`/`o`) 96, ghost (`g`) 40.
+Velocities: accent (`X`) 115, normal (`x`/`o`) 96, ghost (`g`) 40, and the
+graded-dynamics tier `1`–`6` (pp/p/mp/mf/f/ff) 30/45/60/80/100/115 — see
+"Notation format" above for where the graded tier applies.
 `notes.mid` is SMF format 1, 480 ticks/quarter, 2 tracks (a conductor
 track with the tempo/time-signature map, and `PART DRUMS` with the notes).
-Open hi-hat (`O`) is tracked separately in the notation for a future UI's
-benefit but currently renders to the same MIDI note as closed hi-hat —
-Clone Hero's pro-drums format has no distinct open-hat signal to target.
+Open hi-hat (`O` lane, and the `o` step symbol within other lanes) is
+tracked separately in the notation for a future UI's benefit but
+currently renders to the same MIDI note as closed hi-hat — Clone Hero's
+pro-drums format has no distinct open-hat signal to target. The `o`
+symbol's audible distinction lives only in `drums.ogg` (a different
+sample), not in `notes.mid`.
 
 ## Validation performed
 
@@ -255,8 +312,8 @@ Clone Hero's pro-drums format has no distinct open-hat signal to target.
   tom-marker notes), correct tempo (µs/quarter matches `bpm_target`), and
   a velocity spread of both 96/115 (and 40 where ghosts are used).
 - **`scan-chart` (the app's own dependency)**: ran `parseChartFile` with
-  `{pro_drums: true}` against every one of the 117 generated
-  `notes.mid` files — **117/117 pass**: each has a `drums` track at
+  `{pro_drums: true}` against every one of the 118 generated
+  `notes.mid` files — **118/118 pass**: each has a `drums` track at
   `expert` difficulty and at least one audio file next to it.
 - **`ffprobe`** on 3 sample `song.ogg` files: measured duration matched
   the `song.ini` `song_length` field to well under 1ms in every case
@@ -278,6 +335,34 @@ Clone Hero's pro-drums format has no distinct open-hat signal to target.
     ffmpeg-decoded PCM of two independent full-pipeline `drums.ogg`
     outputs for the same exercise (identical SHA-1) — confirms no
     randomness/dithering anywhere in the sample-mixing or encode path.
+- **Curriculum-gap closure pass (2026-08-06)**: fixed the `o`-symbol audio
+  bug (see "Notation format" — `_sample_key_for` now routes `o` events to
+  `hihat_open.wav` instead of silently falling through to the closed-hat
+  sample), added graded dynamics, added 08.10, and renumbered the unlock
+  chain to 118 exercises. Full battery re-run after regenerating all 118
+  folders:
+  - `parseChartFile`: **118/118 pass**.
+  - `scanChartFolder`: **118/118** `playable: true`, zero
+    `noAudio`/`invalidAudio`/`badAudio`/`multipleAudio` folder issues
+    (the only folder issue present anywhere is the pre-existing, expected
+    `noAlbumArt` — no cover art is authored for this library).
+  - `ffprobe` spot-check across 8 folders spread through the curriculum:
+    worst `song.ogg`-vs-`song.ini` difference **0.28ms**, worst
+    `song.ogg`-vs-`drums.ogg` difference **0.02ms** (targets 200ms/50ms).
+  - Determinism: two independent full-pipeline runs of 08.10, 09.04,
+    16.07, 16.08, and 18.02 (the exercises this pass touched) produced
+    byte-identical `notes.mid` SHA-1s and identical decoded-PCM SHA-1s
+    for both `song.ogg` and `drums.ogg`.
+  - Chain connectivity: a dedicated script (not hand-verification) walks
+    `id → next` from the first exercise and confirms it visits all 118
+    ids exactly once, in document order, with `stars_to_unlock` equal to
+    each exercise's 0-based position throughout.
+  - Audible-difference check for the `o` fix: `hihat_open.wav` (122,268
+    frames / 2.77s, a ringing open cymbal) vs. `hihat_closed.wav` (29,318
+    frames / 0.66s, a short choked hit) are unambiguously different
+    one-shots, and `_sample_key_for("H", "o")` now returns `"hihat_open"`
+    (previously `"hihat_closed"`, same as a plain `x`) — verified directly
+    against the regenerated 16.07/16.08 `drums.ogg`.
 
 ## Gamification data (no UI here — this feeds a future Lessons screen)
 
@@ -292,9 +377,17 @@ Every exercise carries:
 - `next`: the id of the next exercise in recommended order (`null` for
   the very last one, `18.02`).
 
+These two fields are also written into every generated `song.ini` as
+custom fields, so a Lessons UI can read the unlock chain without
+re-parsing `curriculum.yaml`: `sk_lesson_id`, `sk_stars_to_unlock`,
+`sk_next` (empty string for the last exercise), `sk_unit`, and
+`sk_lesson_title`. Unknown `.ini` fields are ignored by the app's own
+parser, so this is additive and safe. These five field names are a
+contract with that UI — don't rename them without updating both sides.
+
 ### Suggested progression UX
 
-- **Unlock chain**: render the 117 exercises as one path (or a
+- **Unlock chain**: render the 118 exercises as one path (or a
   per-lesson row within a per-unit map). A locked exercise shows the
   `stars_to_unlock` threshold; once the player's total star count meets
   it, unlock and highlight it as "next" using the `next` pointer chain.

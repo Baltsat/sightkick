@@ -84,7 +84,21 @@ CYMBAL_LANES = {"H", "O", "R", "C"}
 # which cymbal lane(s) share a pad with which tom lane
 PAD_CONFLICT_PAIRS = [("H", "T1"), ("O", "T1"), ("R", "T2"), ("C", "T3")]
 
-VELOCITY = {"X": 115, "x": 96, "o": 96, "g": 40}
+VELOCITY = {
+    "X": 115,
+    "x": 96,
+    "o": 96,  # open-hihat color hit, played within a lane's own step string
+    "g": 40,
+    # graded dynamics (see curriculum.yaml meta.notation_legend.symbols):
+    # pp/p/mp/mf/f/ff, applied only to exercises with an authored dynamic arc.
+    "1": 30,  # pp
+    "2": 45,  # p
+    "3": 60,  # mp
+    "4": 80,  # mf
+    "5": 100,  # f
+    "6": 115,  # ff (same loudness as the accent symbol X)
+}
+VALID_SYMBOLS = ".xXog123456"
 HIT_LENGTH_TICKS = 10  # short, percussive note-on/off length for actual hits
 
 CLICK_SAMPLE_RATE = 22050
@@ -271,7 +285,7 @@ def _validate_bar(exercise_id: str, bar: dict) -> None:
         raise ValueError(f"{exercise_id}: bar lanes have mismatched step counts: {bar}")
     for lane, pattern in bar.items():
         for ch in pattern:
-            if ch not in ".xXog":
+            if ch not in VALID_SYMBOLS:
                 raise ValueError(
                     f"{exercise_id}: lane {lane} has invalid symbol {ch!r} in {pattern!r}"
                 )
@@ -504,11 +518,19 @@ def _scaled_sample(key: str, sym: str) -> bytes:
 
 
 def _sample_key_for(lane: str, sym: str) -> str:
+    # the "o" symbol means "open hi-hat color", regardless of which lane
+    # it's written on (in practice always H, since a lane switch to O
+    # would already get hihat_open via LANE_SAMPLE) -- without this branch
+    # every "o" step silently played the *closed* hi-hat one-shot (same as
+    # a plain "x"), so the open-hat color the notation calls for never
+    # actually sounded in drums.ogg. This is the fix for that bug.
+    if sym == "o":
+        return "hihat_open"
     # accented snare hits get the rimshot one-shot instead of a louder
     # copy of the center hit -- a real timbral change, not just gain
-    # (see samples/ATTRIBUTION.md). Every other lane/symbol combination
-    # uses its single vendored one-shot, scaled by GAIN[sym] only.
-    if lane == "S" and sym == "X":
+    # (see samples/ATTRIBUTION.md). "6" (ff) is velocity-identical to "X"
+    # (115), so it gets the same rimshot treatment for the same reason.
+    if lane == "S" and sym in ("X", "6"):
         return "snare_rimshot"
     return LANE_SAMPLE[lane]
 
@@ -557,8 +579,11 @@ def build_song_name(exercise: dict, title: str) -> str:
     return f"Lesson {lesson_num:02d}.{ex_num:02d} — {title}"
 
 
-def build_ini_text(exercise: dict, unit_name: str, song_length_ms: int) -> str:
+def build_ini_text(
+    exercise: dict, unit_name: str, lesson_name: str, song_length_ms: int
+) -> str:
     name = build_song_name(exercise, exercise["title"])
+    next_id = exercise.get("next") or ""
     lines = [
         "[song]",
         f'name = "{name}"',
@@ -572,6 +597,16 @@ def build_ini_text(exercise: dict, unit_name: str, song_length_ms: int) -> str:
         f"song_length = {song_length_ms}",
         "preview_start_time = 0",
         "delay = 0",
+        # Custom fields carrying the gamification unlock chain into song.ini
+        # so the (in-progress) Lessons UI can read it without re-parsing
+        # curriculum.yaml. Unknown ini fields are ignored by the app's
+        # parser, so these are safe to add. Field names are a contract with
+        # that UI -- do not rename without updating both sides.
+        f'sk_lesson_id = "{exercise["id"]}"',
+        f"sk_stars_to_unlock = {exercise['stars_to_unlock']}",
+        f'sk_next = "{next_id}"',
+        f'sk_unit = "{unit_name}"',
+        f'sk_lesson_title = "{lesson_name}"',
         "",
     ]
     return "\n".join(lines)
@@ -604,7 +639,7 @@ def generate_one(
     song_length_ms = round(
         timeline.total_ticks / TICKS_PER_QUARTER * 60 / exercise["bpm_target"] * 1000
     )
-    ini_text = build_ini_text(exercise, unit["name"], song_length_ms)
+    ini_text = build_ini_text(exercise, unit["name"], lesson["name"], song_length_ms)
 
     folder = out_dir / folder_name_for(exercise, unit["id"])
     if dry_run:

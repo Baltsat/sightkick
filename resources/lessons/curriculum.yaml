@@ -27,6 +27,33 @@ meta:
         ghost note; also reused for cross-stick in ballad-style exercises (07.05, 07.06) since the
         format has no dedicated cross-stick symbol -- distinguishable only via the exercise's coaching
         cue, not in the generated chart
+      o:
+        open-hihat color hit at normal velocity, written within a lane's own step string (in this
+        curriculum, always the H lane) instead of switching to the O lane -- useful when one pattern
+        mixes open and closed hi-hat within the same bar (e.g. a shuffle groove where the foot opens
+        and closes mid-pattern, see 08.10/16.07/16.08). MIDI-wise it is identical to a closed hit on
+        the same lane -- Clone Hero's pro-drums vocabulary has no distinct open-hat note (see
+        README.md's MIDI mapping section) -- but generate.py's drums.ogg renderer swaps in the
+        vendored hihat_open.wav sample for 'o' events specifically, so the audible demo is
+        distinguishable from a closed hit even though the chart data is not.
+      '1': pp (pianissimo), graded-dynamics tier -- velocity 30
+      '2': p (piano), graded-dynamics tier -- velocity 45
+      '3': mp (mezzo-piano), graded-dynamics tier -- velocity 60
+      '4': mf (mezzo-forte), graded-dynamics tier -- velocity 80
+      '5': f (forte), graded-dynamics tier -- velocity 100
+      '6':
+        ff (fortissimo), graded-dynamics tier -- velocity 115, the same loudness as the accent
+        symbol X
+    graded_dynamics:
+      Symbols '1'-'6' (pp/p/mp/mf/f/ff) are a six-step dynamics tier layered on top of the
+      original four-symbol notation ('.'/'x'/'X'/'g'). They are used only on the handful of
+      exercises where the book gives a genuine multi-step dynamic arc, not a binary loud/soft
+      contrast -- 05.01, 05.05, 05.06, 09.04, 10.02 (the Lesson 10 capstone), and 18.01/18.02 (the
+      two Encore etudes). Every other exercise keeps the original binary x/X/g dynamics. The tier
+      is deliberately velocity-compatible with the judge's existing accent/ghost thresholds in
+      src/renderer/services/engine/constants.ts (ACCENT_VALUE_THRESHOLD=90, GHOST_VALUE_THRESHOLD=50)
+      -- f/ff (100/115) clear the accent threshold the same way X (115) always has, and pp/p
+      (30/45) clear the ghost threshold the same way g (40) always has.
     step_resolution:
       Each lane's value is a string, one character per step. A bar's step count is the
       string length and may differ bar to bar (e.g. 8 steps for 8th notes, 16 for 16ths, 12 for 8th-note
@@ -56,6 +83,12 @@ meta:
     accent: 115
     normal: 96
     ghost: 40
+    pp: 30
+    p: 45
+    mp: 60
+    mf: 80
+    f: 100
+    ff: 115
   ticks_per_quarter: 480
   gamification:
     stars_to_unlock:
@@ -474,12 +507,10 @@ units:
             diff_drums: 2
             mode: loop
             bars:
-              - &id021
-                S: X.X.X.X.X.X.X.X.
-              - &id022
-                S: x.x.x.x.x.x.x.x.
-              - *id021
-              - *id022
+              - S: '5.5.5.5.5.5.5.5.'
+              - S: '3.3.3.3.3.3.3.3.'
+              - S: '2.2.2.2.2.2.2.2.'
+              - S: '4.4.4.4.4.4.4.4.'
             stars_to_unlock: 18
             next: '05.02'
           - id: '05.02'
@@ -548,7 +579,9 @@ units:
           - id: '05.05'
             lesson: 5
             title: Tom Groove with Swell
-            cue: Same tom groove, but crescendo from soft to loud across the phrase.
+            cue:
+              Same tom groove, four-step crescendo -- pianissimo, mezzo-piano, forte, fortissimo --
+              each bar noticeably louder than the last.
             time_signature:
               - 4
               - 4
@@ -557,28 +590,30 @@ units:
             diff_drums: 2
             mode: loop
             bars:
-              - H: x.x.x.x.
-                S: ..x...x.
-                K: x.......
-                T1: '.......x'
-              - H: X.X.X.X.
-                S: ..X...X.
-                K: X.......
-                T1: '.......X'
-              - H: x.x.x.x.
-                S: ..x...x.
-                K: x.......
-                T1: '.......x'
-              - H: X.X.X.X.
-                S: ..X...X.
-                K: X.......
-                T1: '.......X'
+              - H: '1.1.1.1.'
+                S: '..1...1.'
+                K: '1.......'
+                T1: '.......1'
+              - H: '3.3.3.3.'
+                S: '..3...3.'
+                K: '3.......'
+                T1: '.......3'
+              - H: '5.5.5.5.'
+                S: '..5...5.'
+                K: '5.......'
+                T1: '.......5'
+              - H: '6.6.6.6.'
+                S: '..6...6.'
+                K: '6.......'
+                T1: '.......6'
             stars_to_unlock: 22
             next: '05.06'
           - id: '05.06'
             lesson: 5
             title: Roadhouse Cat
-            cue: A tom-driven tune that swells from a whisper to a shout and back.
+            cue:
+              A tom-driven tune that swells from a whisper to a shout and eases back down --
+              pianissimo, forte, fortissimo, mezzo-piano across the four bars.
             time_signature:
               - 4
               - 4
@@ -587,14 +622,14 @@ units:
             diff_drums: 3
             mode: loop
             bars:
-              - H: x.x.x.x.
-                K: x..x....
-              - H: X.X.X.X.
-                K: X..X....
-              - T1: X.X.X.X.
-                K: X..X....
-              - T3: x.x.x.x.
-                K: x..x....
+              - H: '1.1.1.1.'
+                K: '1..1....'
+              - H: '5.5.5.5.'
+                K: '5..5....'
+              - T1: '6.6.6.6.'
+                K: '6..6....'
+              - T3: '3.3.3.3.'
+                K: '3..3....'
             stars_to_unlock: 23
             next: '05.07'
           - id: '05.07'
@@ -847,8 +882,10 @@ units:
             next: '07.04'
           - id: '07.04'
             lesson: 7
-            title: Second-Ending Turnaround
-            cue: Play the phrase once into the first ending, then repeat into the second.
+            title: Groove with a Turnaround Tag
+            cue:
+              A crash-and-broken-snare tag caps the phrase every time through -- this loop format
+              has no true first/second ending (see README.md), so the same turnaround plays each pass.
             time_signature:
               - 4
               - 4
@@ -1106,6 +1143,29 @@ units:
               - *id047
               - *id047
             stars_to_unlock: 46
+            next: '08.10'
+          - id: '08.10'
+            lesson: 8
+            title: Open Hi-Hat Backbeat Splash
+            cue:
+              Let the hi-hat ring open on the 'and' right before each backbeat, then clamp it shut
+              exactly on beats 2 and 4.
+            time_signature:
+              - 4
+              - 4
+            bpm_slow: 85
+            bpm_target: 115
+            diff_drums: 3
+            mode: loop
+            bars:
+              - &id047b
+                H: x.o.x.x.x.o.x.x.
+                K: X.......X.......
+                S: '....X.......X...'
+              - *id047b
+              - *id047b
+              - *id047b
+            stars_to_unlock: 47
             next: '09.01'
   - id: D
     name: Groove Vocabulary & Musical Form
@@ -1132,7 +1192,7 @@ units:
               - *id048
               - *id048
               - *id048
-            stars_to_unlock: 47
+            stars_to_unlock: 48
             next: '09.02'
           - id: '09.02'
             lesson: 9
@@ -1156,7 +1216,7 @@ units:
                 K: X.....x.x.......
               - *id049
               - *id050
-            stars_to_unlock: 48
+            stars_to_unlock: 49
             next: '09.03'
           - id: '09.03'
             lesson: 9
@@ -1180,14 +1240,14 @@ units:
                 K: X.......X.......
               - *id051
               - *id052
-            stars_to_unlock: 49
+            stars_to_unlock: 50
             next: '09.04'
           - id: '09.04'
             lesson: 9
             title: Two-Bar Fill Idea
             cue:
-              Two bars of time, then a snare-to-tom fill -- start it soft and swell into the crash
-              that opens the next phrase.
+              Two bars of time, then a snare-to-tom fill -- it swells pianissimo to fortissimo hit
+              by hit, landing on the ff crash that opens the next phrase.
             time_signature:
               - 4
               - 4
@@ -1202,13 +1262,13 @@ units:
               - H: x.x.x.x.x.x.x.x.
                 S: '....X.......X...'
                 K: X.......X.......
-              - S: x.x.x.x.........
-                T1: '....x.x.........'
-                T3: '........x.x.x.x.'
-              - C: X...............
+              - S: '1.2.3.4.........'
+                T1: '....3.4.........'
+                T3: '........5.5.6.6.'
+              - C: '6...............'
                 S: '....X.......X...'
                 K: X.......X.......
-            stars_to_unlock: 50
+            stars_to_unlock: 51
             next: '09.05'
           - id: '09.05'
             lesson: 9
@@ -1229,7 +1289,7 @@ units:
               - *id053
               - *id053
               - *id053
-            stars_to_unlock: 51
+            stars_to_unlock: 52
             next: '09.06'
           - id: '09.06'
             lesson: 9
@@ -1250,7 +1310,7 @@ units:
               - *id054
               - *id054
               - *id054
-            stars_to_unlock: 52
+            stars_to_unlock: 53
             next: '09.07'
           - id: '09.07'
             lesson: 9
@@ -1276,7 +1336,7 @@ units:
               - C: X...............
                 S: '....X.......X...'
                 K: X.......X.......
-            stars_to_unlock: 53
+            stars_to_unlock: 54
             next: '09.08'
           - id: '09.08'
             lesson: 9
@@ -1302,7 +1362,7 @@ units:
               - C: X...............
                 S: '....X.......X...'
                 K: X.......X.......
-            stars_to_unlock: 54
+            stars_to_unlock: 55
             next: '10.01'
       - id: 10
         name: Musical Form
@@ -1332,12 +1392,15 @@ units:
               - H: x.x.x.x.x.x.x.x.
                 S: '....x.......x...'
                 K: x.......x.......
-            stars_to_unlock: 55
+            stars_to_unlock: 56
             next: '10.02'
           - id: '10.02'
             lesson: 10
             title: Full-Form Etude
-            cue: A complete intro/verse/chorus/fill/outro piece -- the capstone of everything so far.
+            cue:
+              A complete intro/verse/chorus/fill/outro piece with a graded dynamic arc from a
+              hushed pickup through a mezzo-piano verse to a fortissimo chorus, tom-fill crescendo,
+              and outro -- the capstone of everything so far.
             time_signature:
               - 4
               - 4
@@ -1346,33 +1409,33 @@ units:
             diff_drums: 3
             mode: loop
             bars:
-              - C: X...............
-                S: x.......x.......
+              - C: '4...............'
+                S: '2.......2.......'
               - H: x.x.x.x.x.x.x.x.
-                S: '....x.......x...'
-                K: x.......x.......
+                S: '....3.......3...'
+                K: '3.......3.......'
               - H: x.x.x.x.x.x.x.x.
-                S: '....x.......x...'
-                K: x.......x.......
+                S: '....3.......3...'
+                K: '3.......3.......'
               - H: x.x.x.x.x.x.x.x.
-                S: '....X.......X...'
-                K: X.......X.......
+                S: '....5.......5...'
+                K: '5.......5.......'
               - H: x.x.x.x.x.x.x.x.
-                S: '....X.......X...'
-                K: X.......X.......
+                S: '....6.......6...'
+                K: '6.......6.......'
               - H: x.x.x.x.x.x.x.x.
-                S: '....X.......X...'
-                K: X.......X.......
+                S: '....6.......6...'
+                K: '6.......6.......'
               - H: x.x.x.x.x.x.x.x.
-                S: '....X.......X...'
-                K: X.......X.......
-              - C: X...............
-                T1: ..x.x...........
-                T3: '........x.x.x.x.'
-              - C: X...............
-                S: '....X.......X...'
-                K: X.......X.......
-            stars_to_unlock: 56
+                S: '....5.......5...'
+                K: '5.......5.......'
+              - C: '6...............'
+                T1: '..4.4...........'
+                T3: '........5.5.6.6.'
+              - C: '6...............'
+                S: '....6.......6...'
+                K: '6.......6.......'
+            stars_to_unlock: 57
             next: '11.01'
   - id: E
     name: 16th-Note Mastery
@@ -1397,7 +1460,7 @@ units:
               - *id056
               - *id056
               - *id056
-            stars_to_unlock: 57
+            stars_to_unlock: 58
             next: '11.02'
           - id: '11.02'
             lesson: 11
@@ -1416,7 +1479,7 @@ units:
               - *id057
               - *id057
               - *id057
-            stars_to_unlock: 58
+            stars_to_unlock: 59
             next: '11.03'
           - id: '11.03'
             lesson: 11
@@ -1437,7 +1500,7 @@ units:
               - *id058
               - *id058
               - *id058
-            stars_to_unlock: 59
+            stars_to_unlock: 60
             next: '11.04'
           - id: '11.04'
             lesson: 11
@@ -1458,7 +1521,7 @@ units:
               - *id059
               - *id059
               - *id059
-            stars_to_unlock: 60
+            stars_to_unlock: 61
             next: '11.05'
           - id: '11.05'
             lesson: 11
@@ -1479,7 +1542,7 @@ units:
               - *id060
               - *id060
               - *id060
-            stars_to_unlock: 61
+            stars_to_unlock: 62
             next: '11.06'
           - id: '11.06'
             lesson: 11
@@ -1502,7 +1565,7 @@ units:
               - *id061
               - *id061
               - *id061
-            stars_to_unlock: 62
+            stars_to_unlock: 63
             next: '11.07'
           - id: '11.07'
             lesson: 11
@@ -1523,7 +1586,7 @@ units:
               - *id062
               - *id062
               - *id062
-            stars_to_unlock: 63
+            stars_to_unlock: 64
             next: '11.08'
           - id: '11.08'
             lesson: 11
@@ -1544,7 +1607,7 @@ units:
               - *id063
               - *id063
               - *id063
-            stars_to_unlock: 64
+            stars_to_unlock: 65
             next: '11.09'
           - id: '11.09'
             lesson: 11
@@ -1566,7 +1629,7 @@ units:
               - H: xxxxxxxxxxxxxxxx
                 S: '....g.......g...'
                 C: '..............X.'
-            stars_to_unlock: 65
+            stars_to_unlock: 66
             next: '11.10'
           - id: '11.10'
             lesson: 11
@@ -1589,7 +1652,7 @@ units:
               - H: xxxxxxxxxxxxxxxx
                 S: '....X.....x.X...'
                 K: X.......X.......
-            stars_to_unlock: 66
+            stars_to_unlock: 67
             next: '12.01'
       - id: 12
         name: New Rhythms
@@ -1611,7 +1674,7 @@ units:
               - *id066
               - *id066
               - *id066
-            stars_to_unlock: 67
+            stars_to_unlock: 68
             next: '12.02'
           - id: '12.02'
             lesson: 12
@@ -1630,7 +1693,7 @@ units:
               - *id067
               - *id067
               - *id067
-            stars_to_unlock: 68
+            stars_to_unlock: 69
             next: '12.03'
           - id: '12.03'
             lesson: 12
@@ -1651,7 +1714,7 @@ units:
               - *id068
               - *id068
               - *id068
-            stars_to_unlock: 69
+            stars_to_unlock: 70
             next: '12.04'
           - id: '12.04'
             lesson: 12
@@ -1672,7 +1735,7 @@ units:
               - *id069
               - *id069
               - *id069
-            stars_to_unlock: 70
+            stars_to_unlock: 71
             next: '12.05'
           - id: '12.05'
             lesson: 12
@@ -1695,7 +1758,7 @@ units:
               - H: x.xxx.xxx.xxx.xx
                 S: '....X.....x.X...'
                 K: X.......X.......
-            stars_to_unlock: 71
+            stars_to_unlock: 72
             next: '13.01'
       - id: 13
         name: 16th-Note Fills
@@ -1719,7 +1782,7 @@ units:
               - *id071
               - *id071
               - *id071
-            stars_to_unlock: 72
+            stars_to_unlock: 73
             next: '13.02'
           - id: '13.02'
             lesson: 13
@@ -1741,7 +1804,7 @@ units:
               - *id072
               - *id072
               - *id072
-            stars_to_unlock: 73
+            stars_to_unlock: 74
             next: '13.03'
           - id: '13.03'
             lesson: 13
@@ -1764,7 +1827,7 @@ units:
               - S: xxxx............
                 T1: '....xxxx........'
                 T3: '........xxxxxxxx'
-            stars_to_unlock: 74
+            stars_to_unlock: 75
             next: '13.04'
           - id: '13.04'
             lesson: 13
@@ -1788,7 +1851,7 @@ units:
               - *id074
               - T1: XxXxXxXx........
                 T3: '........XxXxXxXx'
-            stars_to_unlock: 75
+            stars_to_unlock: 76
             next: '13.05'
           - id: '13.05'
             lesson: 13
@@ -1813,7 +1876,7 @@ units:
               - H: x.x.x.x.x.x.....
                 S: '....X.......xxxx'
                 K: X.......X......X
-            stars_to_unlock: 76
+            stars_to_unlock: 77
             next: '13.06'
           - id: '13.06'
             lesson: 13
@@ -1837,7 +1900,7 @@ units:
                 S: '....X...........'
                 K: X...............
                 T1: '........xxxxxxxx'
-            stars_to_unlock: 77
+            stars_to_unlock: 78
             next: '13.07'
           - id: '13.07'
             lesson: 13
@@ -1863,7 +1926,7 @@ units:
               - C: X...............
                 S: '....X.......X...'
                 K: X.......X.......
-            stars_to_unlock: 78
+            stars_to_unlock: 79
             next: '14.01'
   - id: F
     name: Triplets, Jazz & Shuffle
@@ -1888,7 +1951,7 @@ units:
               - *id077
               - *id077
               - *id077
-            stars_to_unlock: 79
+            stars_to_unlock: 80
             next: '14.02'
           - id: '14.02'
             lesson: 14
@@ -1907,7 +1970,7 @@ units:
               - *id078
               - *id078
               - *id078
-            stars_to_unlock: 80
+            stars_to_unlock: 81
             next: '14.03'
           - id: '14.03'
             lesson: 14
@@ -1926,7 +1989,7 @@ units:
               - *id079
               - *id079
               - *id079
-            stars_to_unlock: 81
+            stars_to_unlock: 82
             next: '14.04'
           - id: '14.04'
             lesson: 14
@@ -1945,7 +2008,7 @@ units:
               - *id080
               - *id080
               - *id080
-            stars_to_unlock: 82
+            stars_to_unlock: 83
             next: '14.05'
           - id: '14.05'
             lesson: 14
@@ -1964,7 +2027,7 @@ units:
               - *id081
               - *id081
               - *id081
-            stars_to_unlock: 83
+            stars_to_unlock: 84
             next: '14.06'
           - id: '14.06'
             lesson: 14
@@ -1983,7 +2046,7 @@ units:
               - *id082
               - *id082
               - *id082
-            stars_to_unlock: 84
+            stars_to_unlock: 85
             next: '14.07'
           - id: '14.07'
             lesson: 14
@@ -2003,7 +2066,7 @@ units:
               - *id083
               - *id083
               - *id083
-            stars_to_unlock: 85
+            stars_to_unlock: 86
             next: '14.08'
           - id: '14.08'
             lesson: 14
@@ -2024,7 +2087,7 @@ units:
               - *id084
               - *id084
               - *id084
-            stars_to_unlock: 86
+            stars_to_unlock: 87
             next: '14.09'
           - id: '14.09'
             lesson: 14
@@ -2051,7 +2114,7 @@ units:
               - R: X.xX.xX.xX.x
                 H: '...x.....x..'
                 S: ..x....g....
-            stars_to_unlock: 87
+            stars_to_unlock: 88
             next: '15.01'
       - id: 15
         name: Jazz Drumming
@@ -2073,7 +2136,7 @@ units:
               - *id085
               - *id085
               - *id085
-            stars_to_unlock: 88
+            stars_to_unlock: 89
             next: '15.02'
           - id: '15.02'
             lesson: 15
@@ -2092,7 +2155,7 @@ units:
               - *id086
               - *id086
               - *id086
-            stars_to_unlock: 89
+            stars_to_unlock: 90
             next: '15.03'
           - id: '15.03'
             lesson: 15
@@ -2111,7 +2174,7 @@ units:
               - *id087
               - *id087
               - *id087
-            stars_to_unlock: 90
+            stars_to_unlock: 91
             next: '15.04'
           - id: '15.04'
             lesson: 15
@@ -2132,7 +2195,7 @@ units:
               - *id088
               - *id088
               - S: XxxXxxXxxXxx
-            stars_to_unlock: 91
+            stars_to_unlock: 92
             next: '15.05'
           - id: '15.05'
             lesson: 15
@@ -2154,7 +2217,7 @@ units:
               - *id089
               - S: Xxx.....
                 T3: '....XxxX'
-            stars_to_unlock: 92
+            stars_to_unlock: 93
             next: '15.06'
           - id: '15.06'
             lesson: 15
@@ -2175,7 +2238,7 @@ units:
               - *id090
               - *id090
               - S: X..X..X..X..
-            stars_to_unlock: 93
+            stars_to_unlock: 94
             next: '15.07'
           - id: '15.07'
             lesson: 15
@@ -2199,7 +2262,7 @@ units:
                 H: '...x.....x..'
                 K: x...........
               - S: XxxXxxXxxXxx
-            stars_to_unlock: 94
+            stars_to_unlock: 95
             next: '16.01'
       - id: 16
         name: The Shuffle
@@ -2221,7 +2284,7 @@ units:
               - *id091
               - *id091
               - *id091
-            stars_to_unlock: 95
+            stars_to_unlock: 96
             next: '16.02'
           - id: '16.02'
             lesson: 16
@@ -2244,7 +2307,7 @@ units:
               - *id092
               - *id092
               - *id092
-            stars_to_unlock: 96
+            stars_to_unlock: 97
             next: '16.03'
           - id: '16.03'
             lesson: 16
@@ -2265,7 +2328,7 @@ units:
               - *id093
               - *id093
               - *id093
-            stars_to_unlock: 97
+            stars_to_unlock: 98
             next: '16.04'
           - id: '16.04'
             lesson: 16
@@ -2288,7 +2351,7 @@ units:
               - *id094
               - *id094
               - *id094
-            stars_to_unlock: 98
+            stars_to_unlock: 99
             next: '16.05'
           - id: '16.05'
             lesson: 16
@@ -2309,7 +2372,7 @@ units:
               - *id095
               - *id095
               - *id095
-            stars_to_unlock: 99
+            stars_to_unlock: 100
             next: '16.06'
           - id: '16.06'
             lesson: 16
@@ -2330,7 +2393,7 @@ units:
               - *id096
               - *id096
               - *id096
-            stars_to_unlock: 100
+            stars_to_unlock: 101
             next: '16.07'
           - id: '16.07'
             lesson: 16
@@ -2350,7 +2413,7 @@ units:
               - *id097
               - *id097
               - *id097
-            stars_to_unlock: 101
+            stars_to_unlock: 102
             next: '16.08'
           - id: '16.08'
             lesson: 16
@@ -2372,7 +2435,7 @@ units:
                 H: '...x.....x..'
               - R: X.xX.xX.xX.x
                 H: '...x.....x..'
-            stars_to_unlock: 102
+            stars_to_unlock: 103
             next: '16.09'
           - id: '16.09'
             lesson: 16
@@ -2392,7 +2455,7 @@ units:
               - *id098
               - *id098
               - *id098
-            stars_to_unlock: 103
+            stars_to_unlock: 104
             next: '16.10'
           - id: '16.10'
             lesson: 16
@@ -2412,7 +2475,7 @@ units:
               - *id099
               - *id099
               - *id099
-            stars_to_unlock: 104
+            stars_to_unlock: 105
             next: '16.11'
           - id: '16.11'
             lesson: 16
@@ -2433,7 +2496,7 @@ units:
               - *id100
               - *id100
               - *id100
-            stars_to_unlock: 105
+            stars_to_unlock: 106
             next: '16.12'
           - id: '16.12'
             lesson: 16
@@ -2455,7 +2518,7 @@ units:
                 H: '......x..'
               - R: X.xx.xx.x
                 H: '......x..'
-            stars_to_unlock: 106
+            stars_to_unlock: 107
             next: '17.01'
   - id: G
     name: New Meters & Capstones
@@ -2482,7 +2545,7 @@ units:
               - *id101
               - *id101
               - *id101
-            stars_to_unlock: 107
+            stars_to_unlock: 108
             next: '17.02'
           - id: '17.02'
             lesson: 17
@@ -2503,7 +2566,7 @@ units:
               - *id102
               - *id102
               - *id102
-            stars_to_unlock: 108
+            stars_to_unlock: 109
             next: '17.03'
           - id: '17.03'
             lesson: 17
@@ -2524,7 +2587,7 @@ units:
               - *id103
               - *id103
               - *id103
-            stars_to_unlock: 109
+            stars_to_unlock: 110
             next: '17.04'
           - id: '17.04'
             lesson: 17
@@ -2545,7 +2608,7 @@ units:
               - *id104
               - *id104
               - *id104
-            stars_to_unlock: 110
+            stars_to_unlock: 111
             next: '17.05'
           - id: '17.05'
             lesson: 17
@@ -2566,7 +2629,7 @@ units:
               - *id105
               - *id105
               - *id105
-            stars_to_unlock: 111
+            stars_to_unlock: 112
             next: '17.06'
           - id: '17.06'
             lesson: 17
@@ -2587,7 +2650,7 @@ units:
               - *id106
               - *id106
               - *id106
-            stars_to_unlock: 112
+            stars_to_unlock: 113
             next: '17.07'
           - id: '17.07'
             lesson: 17
@@ -2608,7 +2671,7 @@ units:
               - *id107
               - *id107
               - *id107
-            stars_to_unlock: 113
+            stars_to_unlock: 114
             next: '17.08'
           - id: '17.08'
             lesson: 17
@@ -2634,7 +2697,7 @@ units:
               - R: X..x..X..x..
                 H: '....x.......'
                 K: X...........
-            stars_to_unlock: 114
+            stars_to_unlock: 115
             next: '18.01'
       - id: 18
         name: Encore Repertoire
@@ -2643,8 +2706,9 @@ units:
             lesson: 18
             title: Encore Etude One
             cue:
-              A capstone rock tune with a full intro, verse, chorus, and outro -- everything you've learned,
-              together.
+              A capstone rock tune with a full intro, verse, chorus, and outro, now with a graded
+              dynamic arc from a hushed pickup up through a fortissimo finish -- everything you've
+              learned, together.
             time_signature:
               - 4
               - 4
@@ -2653,38 +2717,40 @@ units:
             diff_drums: 6
             mode: loop
             bars:
-              - C: X...............
-                K: x...............
-              - H: x.x.x.x.x.x.x.x.
+              - C: '4...............'
+                K: '2...............'
+              - H: '3.3.3.3.3.3.3.3.'
                 S: '....g.......g...'
-                K: x...............
-              - H: xxxxxxxxxxxxxxxx
+                K: '3...............'
+              - H: '3333333333333333'
                 S: '....g.......g...'
-                K: x...............
+                K: '3...............'
               - H: x.x.x.x.x.x.x.x.
-                S: '....X.......X...'
-                K: X.......X.......
+                S: '....5.......5...'
+                K: '5.......5.......'
               - H: xxxxxxxxxxxxxxxx
-                S: '....X.......X...'
-                K: X..x....X......x
+                S: '....6.......6...'
+                K: '6..x....6......x'
               - H: x.xx.xx.xx.x
-                S: '...X.....X..'
-                K: X...........
+                S: '...5.....5..'
+                K: '5...........'
               - H: x.x.x.x.x.x.x.x.
-                S: '....X.......X...'
-                K: X.....x.....X...
-              - C: X...............
-                T1: ..x.x...........
-                T3: '........x.x.x.x.'
-              - C: X...............
-                S: '....X.......X...'
-                K: X.......X.......
-            stars_to_unlock: 115
+                S: '....6.......6...'
+                K: '6.....x.....6...'
+              - C: '6...............'
+                T1: '..4.4...........'
+                T3: '........5.5.6.6.'
+              - C: '6...............'
+                S: '....6.......6...'
+                K: '6.......6.......'
+            stars_to_unlock: 116
             next: '18.02'
           - id: '18.02'
             lesson: 18
             title: Encore Etude Two
-            cue: An energetic capstone with a half-time bridge before the final full-energy return.
+            cue:
+              An energetic capstone that drops into a quiet half-time bridge before rebuilding
+              into the final fortissimo full-energy return.
             time_signature:
               - 4
               - 4
@@ -2693,31 +2759,31 @@ units:
             diff_drums: 6
             mode: loop
             bars:
-              - C: X...............
-                K: x...............
+              - C: '4...............'
+                K: '2...............'
               - H: x.x.x.x.x.x.x.x.
-                S: '....X.......X...'
-                K: X.......X.......
+                S: '....5.......5...'
+                K: '5.......5.......'
               - H: x.x.x.x.x.x.x.x.
-                S: '....X.......X...'
-                K: X.......X.......
+                S: '....5.......5...'
+                K: '5.......5.......'
               - H: xxxxxxxxxxxxxxxx
-                S: '....X.......X...'
-                K: X..x....X.......
+                S: '....5.......5...'
+                K: '5..x....5.......'
               - H: xxxxxxxxxxxxxxxx
-                S: '....X.......X...'
-                K: X..x....X.......
-              - H: x.......x.......
-                S: '....X...........'
-                K: x...............
-              - H: x.......x.......
-                S: '....X...........'
-                K: x...............
-              - C: X...............
-                T1: X...X...X...X...
-                T3: '............X...'
-              - C: X...............
-                S: '....X.......X...'
-                K: X.......X.......
-            stars_to_unlock: 116
+                S: '....5.......5...'
+                K: '5..x....5.......'
+              - H: '2.......2.......'
+                S: '....2...........'
+                K: '2...............'
+              - H: '2.......2.......'
+                S: '....2...........'
+                K: '2...............'
+              - C: '6...............'
+                T1: '3...4...5...6...'
+                T3: '............6...'
+              - C: '6...............'
+                S: '....6.......6...'
+                K: '6.......6.......'
+            stars_to_unlock: 117
             next: null
