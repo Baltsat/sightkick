@@ -35,6 +35,7 @@
     "preview:clean": "node scripts/clean-userdata.js && cross-env SK_USER_DATA_DIR=./.userdata/clean electron-vite preview",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
+    "pretest": "node scripts/ensure-native-arch.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "yarn build && playwright test",
