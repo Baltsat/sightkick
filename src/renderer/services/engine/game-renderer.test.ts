@@ -448,8 +448,14 @@ describe('GameRenderer whole-note vanish on hit', () => {
   });
 });
 
-describe('GameRenderer miss markers', () => {
-  it('creates a persistent marker in the overlay for a missed note', () => {
+describe('GameRenderer missed note treatment', () => {
+  // The pinned above-line chip badges (vf-miss-marker) are gone: a missed
+  // note now stays in the notation with a persistent in-staff colour
+  // (vf-note-missed, see sheet-music.css) instead of spawning a separate
+  // overlay element. These tests assert that treatment and, in several
+  // cases, that no overlay chip is created at all any more.
+
+  it('colours a passed un-hit note with the persistent missed class, and creates no overlay chip', () => {
     const n0 = staveNote(['c/5']);
     const n1 = staveNote(['d/5']);
     const overlay = div();
@@ -460,31 +466,11 @@ describe('GameRenderer miss markers', () => {
 
     view.render(0, 480);
 
-    expect(overlay.querySelector('.vf-miss-marker')).not.toBeNull();
+    expect(hasClass(n0, 'vf-note-missed')).toBe(true);
+    expect(overlay.children.length).toBe(0);
   });
 
-  it('pins the marker above the top of the system', () => {
-    const n0 = staveNote(['c/5']);
-    const n1 = staveNote(['d/5']);
-    const overlay = div();
-    const view = setup(
-      [measureData(0, 1920, [rendered(0, n0), rendered(480, n1)])],
-      { overlayEl: overlay },
-    );
-
-    view.render(0, 480);
-
-    const marker = overlay.querySelector('.vf-miss-marker') as HTMLElement;
-    const [, y] = marker.style.transform.match(
-      /translate3d\(([^,]+), ([^,]+),/,
-    )!;
-
-    // the fake stave used across these tests has getY() === 10, so anything
-    // less than that sits above the top of the system.
-    expect(parseFloat(y)).toBeLessThan(10);
-  });
-
-  it('does not create a miss marker for a note that was hit', () => {
+  it('does not mark a hit note as missed', () => {
     const n0 = staveNote(['c/5']);
     const n1 = staveNote(['d/5']);
     const overlay = div();
@@ -497,53 +483,47 @@ describe('GameRenderer miss markers', () => {
 
     view.render(0, 480);
 
-    expect(overlay.querySelector('.vf-miss-marker')).toBeNull();
-  });
-
-  it('clears miss markers on reset so they do not leak across songs', () => {
-    const n0 = staveNote(['c/5']);
-    const n1 = staveNote(['d/5']);
-    const overlay = div();
-    const view = setup(
-      [measureData(0, 1920, [rendered(0, n0), rendered(480, n1)])],
-      { overlayEl: overlay },
-    );
-
-    view.render(0, 480);
-    expect(overlay.children.length).toBeGreaterThan(0);
-
-    view.reset();
-
+    expect(hasClass(n0, 'vf-note-missed')).toBe(false);
+    expect(hasClass(n0, 'vf-note-hit')).toBe(true);
     expect(overlay.children.length).toBe(0);
   });
 
-  it('clears a miss marker on backward seek', () => {
+  it('clears the missed class on reset so it does not leak across songs', () => {
+    const n0 = staveNote(['c/5']);
+    const n1 = staveNote(['d/5']);
+    const view = setup([
+      measureData(0, 1920, [rendered(0, n0), rendered(480, n1)]),
+    ]);
+
+    view.render(0, 480);
+    expect(hasClass(n0, 'vf-note-missed')).toBe(true);
+
+    view.reset();
+
+    expect(hasClass(n0, 'vf-note-missed')).toBe(false);
+  });
+
+  it('clears the missed class on backward seek', () => {
     const n0 = staveNote(['c/5']);
     const n1 = staveNote(['d/5']);
     const n2 = staveNote(['e/5']);
-    const overlay = div();
-    const view = setup(
-      [
-        measureData(0, 1920, [
-          rendered(0, n0),
-          rendered(240, n1),
-          rendered(480, n2),
-        ]),
-      ],
-      { overlayEl: overlay },
-    );
+    const view = setup([
+      measureData(0, 1920, [
+        rendered(0, n0),
+        rendered(240, n1),
+        rendered(480, n2),
+      ]),
+    ]);
 
     view.render(0, 480);
-    expect(overlay.querySelectorAll('.vf-miss-marker').length).toBeGreaterThan(
-      0,
-    );
+    expect(hasClass(n0, 'vf-note-missed')).toBe(true);
 
     view.render(0, 0);
 
-    expect(overlay.querySelectorAll('.vf-miss-marker').length).toBe(0);
+    expect(hasClass(n0, 'vf-note-missed')).toBe(false);
   });
 
-  it('marks the final note of a chart as missed once playback reaches the end', () => {
+  it('marks the final note of a chart as missed once playback reaches the end, with no overlay chip', () => {
     // A single-note chart: there is no "next" note whose activation would
     // normally walk and resolve this one, so it needs the chart-ended
     // path to ever receive its persistent miss treatment.
@@ -554,12 +534,12 @@ describe('GameRenderer miss markers', () => {
     });
 
     view.render(0, 0);
-    expect(overlay.querySelector('.vf-miss-marker')).toBeNull();
+    expect(hasClass(n0, 'vf-note-missed')).toBe(false);
 
     view.render(0, 480);
 
-    expect(overlay.querySelector('.vf-miss-marker')).not.toBeNull();
     expect(hasClass(n0, 'vf-note-missed')).toBe(true);
+    expect(overlay.children.length).toBe(0);
   });
 });
 
@@ -588,7 +568,7 @@ describe('GameRenderer paintWrongHit', () => {
     expect(marker?.textContent).toBe('CR');
   });
 
-  it('is visually distinct from a miss marker', () => {
+  it('is visually distinct from the persistent missed-note treatment', () => {
     const overlay = div();
     const view = setup(
       [
@@ -608,7 +588,10 @@ describe('GameRenderer paintWrongHit', () => {
 
     const marker = overlay.querySelector('.vf-wronghit-marker');
 
-    expect(marker?.className).not.toBe('vf-miss-marker');
+    // The wrong-hit marker is its own overlay element (it marks a struck
+    // tick with no notehead of its own) - it never carries the missed
+    // note's in-staff colouring class.
+    expect(marker?.classList.contains('vf-note-missed')).toBe(false);
   });
 
   it('does nothing when the tick falls outside any known measure', () => {

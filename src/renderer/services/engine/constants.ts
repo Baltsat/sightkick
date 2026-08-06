@@ -12,12 +12,6 @@ export const ELEMENT_TO_KEYS: Record<string, string[]> = {
   tom3: ['a/4'],
 } satisfies Partial<Record<InputElement, string[]>>;
 
-export const KEY_TO_ELEMENT: Record<string, InputElement> = Object.fromEntries(
-  Object.entries(ELEMENT_TO_KEYS).flatMap(([element, keys]) =>
-    keys.map((key) => [key, element as InputElement]),
-  ),
-);
-
 export const KIT_SHORT_LABEL: Partial<Record<InputElement, string>> = {
   hihat: 'HH',
   ride: 'RD',
@@ -47,11 +41,7 @@ export const MISSED_CLASS = 'vf-note-missed';
 
 export const HIDDEN_CLASS = 'vf-note-hidden';
 
-export const MISS_MARKER_CLASS = 'vf-miss-marker';
-
 export const WRONG_HIT_MARKER_CLASS = 'vf-wronghit-marker';
-
-export const MISS_MARKER_Y_OFFSET = 18;
 
 export const LOOKAHEAD_SECONDS = 0.2;
 
@@ -70,3 +60,15 @@ export const SNAPSHOT_KEYS: (keyof PlaybackSnapshot)[] = [
   'isReady',
   'duration',
 ];
+
+/**
+ * Inverse of `ELEMENT_TO_KEYS`: which kit lane a notated VexFlow key
+ * belongs to. Used to derive misses (practice-stats) from the fixed
+ * key-to-lane table used to draw the chart — not `InputMapping`, which is
+ * the player's controller mapping and answers a different question.
+ */
+export const KEY_TO_ELEMENT: Record<string, InputElement> = Object.fromEntries(
+  Object.entries(ELEMENT_TO_KEYS).flatMap(([element, keys]) =>
+    keys.map((key) => [key, element as InputElement]),
+  ),
+);

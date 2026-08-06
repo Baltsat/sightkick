@@ -1,6 +1,5 @@
 import { StaveNote } from 'vexflow';
 import { ParsedChart, RenderData } from '../../../chart-parser/types';
-import { InputElement } from '../../../types';
 import { PlayheadStyle } from '../../types';
 import { KIT_ELEMENTS } from '../../constants';
 import {
@@ -21,11 +20,8 @@ import {
   ACTIVE_CLASS,
   HIDDEN_CLASS,
   HIT_CLASS,
-  KEY_TO_ELEMENT,
   KIT_SHORT_LABEL,
   MISS_CLASS,
-  MISS_MARKER_CLASS,
-  MISS_MARKER_Y_OFFSET,
   MISSED_CLASS,
   POP_CLASS,
   WRONG_HIT_MARKER_CLASS,
@@ -55,7 +51,6 @@ export class GameRenderer {
   private activeEls: SVGElement[] = [];
   private filledEls = new Set<SVGElement>();
   private vanishedNotes = new Map<StaveNote, SVGElement[]>();
-  private missMarkers = new Map<string, HTMLElement>();
   private wrongHitMarkers: { tick: number; el: HTMLElement }[] = [];
 
   constructor(private isHit: IsHit) {}
@@ -198,8 +193,6 @@ export class GameRenderer {
       els.forEach((el) => el.classList.remove(HIDDEN_CLASS)),
     );
     this.vanishedNotes.clear();
-    this.missMarkers.forEach((marker) => marker.remove());
-    this.missMarkers.clear();
     this.wrongHitMarkers.forEach(({ el }) => el.remove());
     this.wrongHitMarkers = [];
   }
@@ -326,8 +319,6 @@ export class GameRenderer {
         els.forEach((el) => el.classList.remove(HIDDEN_CLASS)),
       );
       this.vanishedNotes.clear();
-      this.missMarkers.forEach((marker) => marker.remove());
-      this.missMarkers.clear();
     };
 
     if (!target) {
@@ -372,11 +363,11 @@ export class GameRenderer {
         flashClass(el, MISS_CLASS);
       }
     };
-    const walkNote = (mIdx: number, note: StaveNote, tick: number) => {
+    const walkNote = (note: StaveNote, tick: number) => {
       const isRest = note.isRest();
 
       forEachNoteHead(note, (el, key) => colorNote(el, tick, key, isRest));
-      this.syncNoteState(mIdx, note, tick, isRest);
+      this.syncNoteState(note, tick, isRest);
     };
 
     if (isBackward) {
@@ -385,14 +376,14 @@ export class GameRenderer {
 
       for (let m = 0; m < measureIdx; m++) {
         this.renderData[m]?.renderedNotes.forEach(({ note, tick }) =>
-          walkNote(m, note, tick),
+          walkNote(note, tick),
         );
       }
 
       for (let i = 0; i < endExclusive; i++) {
         const { note, tick } = curNotes[i];
 
-        walkNote(measureIdx, note, tick);
+        walkNote(note, tick);
       }
     } else {
       const fromMeasure = prev?.measureIdx ?? 0;
@@ -402,7 +393,7 @@ export class GameRenderer {
         for (let i = fromNote; i < endExclusive; i++) {
           const { note, tick } = curNotes[i];
 
-          walkNote(measureIdx, note, tick);
+          walkNote(note, tick);
         }
       } else {
         const prevMeasureNotes =
@@ -411,19 +402,19 @@ export class GameRenderer {
         for (let i = fromNote; i < prevMeasureNotes.length; i++) {
           const { note, tick } = prevMeasureNotes[i];
 
-          walkNote(fromMeasure, note, tick);
+          walkNote(note, tick);
         }
 
         for (let m = fromMeasure + 1; m < measureIdx; m++) {
           this.renderData[m]?.renderedNotes.forEach(({ note, tick }) =>
-            walkNote(m, note, tick),
+            walkNote(note, tick),
           );
         }
 
         for (let i = 0; i < endExclusive; i++) {
           const { note, tick } = curNotes[i];
 
-          walkNote(measureIdx, note, tick);
+          walkNote(note, tick);
         }
       }
     }
@@ -432,41 +423,29 @@ export class GameRenderer {
   }
 
   /**
-   * Keeps the whole-note vanish state and the persistent miss markers in
-   * sync with the Judge's current hit state for a single passed note, in
-   * both playback directions. Vanishing here (rather than only from
-   * `paintHit`) is what restores a note's visibility when the engine seeks
-   * backward past its hit tick (the Judge un-records the hit, so this note
-   * exits the "fully hit" state the next time it's walked).
+   * Keeps the whole-note vanish state in sync with the Judge's current hit
+   * state for a single passed note, in both playback directions. Vanishing
+   * here (rather than only from `paintHit`) is what restores a note's
+   * visibility when the engine seeks backward past its hit tick (the Judge
+   * un-records the hit, so this note exits the "fully hit" state the next
+   * time it's walked). The persistent MISSED_CLASS colouring applied by
+   * `colorNote` (see `applyColoring`) is what actually marks a miss now —
+   * there is no separate marker to keep in sync here.
    */
-  private syncNoteState(
-    measureIdx: number,
-    note: StaveNote,
-    tick: number,
-    isRest: boolean,
-  ): void {
+  private syncNoteState(note: StaveNote, tick: number, isRest: boolean): void {
     if (isRest) {
       return;
     }
 
-    const keys = note.getKeys();
-    const allHit = keys.every((key) => this.isHit(tick, keyPrefix(key)));
+    const allHit = note
+      .getKeys()
+      .every((key) => this.isHit(tick, keyPrefix(key)));
 
     if (allHit) {
       this.vanishNote(note);
     } else {
       this.unvanishNote(note);
     }
-
-    keys.forEach((key) => {
-      const prefix = keyPrefix(key);
-
-      if (this.isHit(tick, prefix)) {
-        this.clearMissMarker(tick, prefix);
-      } else {
-        this.showMissMarker(measureIdx, tick, prefix);
-      }
-    });
   }
 
   private vanishNote(note: StaveNote): void {
@@ -489,60 +468,6 @@ export class GameRenderer {
 
     els.forEach((el) => el.classList.remove(HIDDEN_CLASS));
     this.vanishedNotes.delete(note);
-  }
-
-  private missMarkerKey(tick: number, prefix: string): string {
-    return `${tick}:${prefix}`;
-  }
-
-  private showMissMarker(
-    measureIdx: number,
-    tick: number,
-    prefix: string,
-  ): void {
-    const key = this.missMarkerKey(tick, prefix);
-
-    if (this.missMarkers.has(key) || !this.overlayEl) {
-      return;
-    }
-
-    const measureData = this.renderData[measureIdx];
-
-    if (!measureData) {
-      return;
-    }
-
-    const element = KEY_TO_ELEMENT[prefix] as InputElement | undefined;
-    const meta = element ? KIT_ELEMENTS.get(element) : undefined;
-    const x = getXForTick(tick, measureData);
-    const y =
-      measureData.yOffset + measureData.stave.getY() - MISS_MARKER_Y_OFFSET;
-    const marker = document.createElement('div');
-
-    marker.className = MISS_MARKER_CLASS;
-    marker.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
-
-    if (meta) {
-      marker.style.backgroundColor = meta.color;
-      marker.title = `Missed: ${meta.displayName}`;
-    }
-
-    marker.textContent = (element && KIT_SHORT_LABEL[element]) ?? '?';
-
-    this.overlayEl.appendChild(marker);
-    this.missMarkers.set(key, marker);
-  }
-
-  private clearMissMarker(tick: number, prefix: string): void {
-    const key = this.missMarkerKey(tick, prefix);
-    const marker = this.missMarkers.get(key);
-
-    if (!marker) {
-      return;
-    }
-
-    marker.remove();
-    this.missMarkers.delete(key);
   }
 
   private pruneWrongHitMarkers(currentTick: number): void {
