@@ -1212,14 +1212,18 @@ export class AutoChartQueue {
 
       job.preview = undefined;
       job.song = song;
+      // Same ordering fix as fail()/cancelJob(): clean up the working
+      // directory before announcing the terminal 'imported' stage, so a
+      // listener never observes "done" while the temp dir cleanup is still
+      // in flight.
+      await this.dependencies.cleanup(job.tempDir);
+      job.tempDir = undefined;
+      job.preparedDir = undefined;
       this.transition(
         job,
         'imported',
         `Added "${song.name}" to the current library`,
       );
-      await this.dependencies.cleanup(job.tempDir);
-      job.tempDir = undefined;
-      job.preparedDir = undefined;
     } catch (error) {
       await this.fail(job, safeMessage(error));
     }
@@ -1670,10 +1674,14 @@ export class AutoChartQueue {
     job.errorCode = errorCode;
     job.message =
       errorCode === 'no-drums' ? 'No drums detected' : 'Chart creation failed';
-    this.notify(job);
+    // Clean up (and clear tempDir/preparedDir) before notifying: a listener
+    // reacting to the terminal 'failed' stage — including this queue's own
+    // tests — must be able to rely on the working directory already being
+    // gone, not racing the async fs cleanup below.
     await this.dependencies.cleanup(job.tempDir);
     job.tempDir = undefined;
     job.preparedDir = undefined;
+    this.notify(job);
   }
 
   private async cancelJob(job: AutoChartJob): Promise<void> {
@@ -1685,10 +1693,12 @@ export class AutoChartQueue {
     job.error = undefined;
     job.errorCode = undefined;
     job.message = 'Chart creation cancelled';
-    this.notify(job);
+    // Same ordering as fail(): cleanup completes before notify so the
+    // 'cancelled' stage is only ever observed once the temp dir is gone.
     await this.dependencies.cleanup(job.tempDir);
     job.tempDir = undefined;
     job.preparedDir = undefined;
+    this.notify(job);
   }
 
   // Every non-terminal job the queue currently knows about (queued or
