@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -47,6 +47,22 @@ class TempoMap:
             if t <= seg_end:
                 break
         return beats
+
+    def beats_to_time(self, beat: float) -> float:
+        """Convert a beat count since t=0 back to wall-clock seconds."""
+        beat = max(0.0, beat)
+        elapsed_beats = 0.0
+        for i, (seg_t, seg_bpm) in enumerate(self.tempo_segments):
+            seg_end = (
+                self.tempo_segments[i + 1][0]
+                if i + 1 < len(self.tempo_segments)
+                else float("inf")
+            )
+            seg_beats = (seg_end - seg_t) * seg_bpm / 60.0
+            if beat <= elapsed_beats + seg_beats:
+                return seg_t + (beat - elapsed_beats) * 60.0 / seg_bpm
+            elapsed_beats += seg_beats
+        return 0.0
 
     def time_to_ticks(self, t: float, ticks_per_beat: int) -> int:
         return int(round(self.time_to_beats(t) * ticks_per_beat))

@@ -7,9 +7,9 @@ A chart can be onset-accurate and still be unplayable ("не игрально") 
 chart. Each level below Expert is built by literal musical reduction
 (dropping lanes, thinning fills, downsampling hi-hats to a steady pulse),
 then every level — Expert included — passes through the same explicit caps:
-max sustained notes/sec, max simultaneous voices, and a minimum gap between
-repeats of the same lane. We would rather drop a genuine note than emit an
-unplayable cluster.
+max sustained event-clusters/sec, max simultaneous voices, and a minimum gap
+between repeats of the same lane. We would rather drop a genuine note than
+emit an unplayable cluster.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ GRID_SUBDIVISION = {"easy": 1, "medium": 2, "hard": 4, "expert": 4}
 
 @dataclass
 class DifficultyCaps:
-    max_nps: float  # max sustained notes/sec (min gap between kept event-clusters)
+    max_nps: float  # historical name: max event-clusters/sec; chords count once
     max_simultaneous: int  # max distinct lanes sounding in the same instant
     min_gap_same_lane: float  # seconds; minimum gap between two hits in the same lane
 
@@ -105,29 +105,25 @@ def _enforce_density_cap(events: list[DiffEvent], max_nps: float) -> list[DiffEv
             continue
         kept.extend(cluster)
         last_time = t
-    return kept
+    return sorted(kept, key=lambda e: e.time)
 
 
 def _enforce_min_gap_same_lane(
     events: list[DiffEvent], min_gap: float
 ) -> list[DiffEvent]:
     events = sorted(events, key=lambda e: e.time)
-    last_by_lane: dict[int, float] = {}
+    last_by_lane: dict[int, tuple[float, int]] = {}
     kept: list[DiffEvent] = []
     for e in events:
-        lt = last_by_lane.get(e.note_class)
-        if lt is not None and (e.time - lt) < min_gap:
-            if (
-                kept
-                and kept[-1].note_class == e.note_class
-                and e.velocity > kept[-1].velocity
-            ):
-                kept[-1] = e
-                last_by_lane[e.note_class] = e.time
+        prior = last_by_lane.get(e.note_class)
+        if prior is not None and (e.time - prior[0]) < min_gap:
+            if e.velocity > kept[prior[1]].velocity:
+                kept[prior[1]] = e
+                last_by_lane[e.note_class] = (e.time, prior[1])
             continue
-        last_by_lane[e.note_class] = e.time
+        last_by_lane[e.note_class] = (e.time, len(kept))
         kept.append(e)
-    return kept
+    return sorted(kept, key=lambda e: e.time)
 
 
 def _apply_caps(events: list[DiffEvent], caps: DifficultyCaps) -> list[DiffEvent]:
@@ -149,7 +145,12 @@ def _snap_to_grid(
         slot = round(beat * subdivision)
         key = (slot, e.note_class)
         if key not in slots or e.velocity > slots[key].velocity:
-            slots[key] = e
+            slots[key] = DiffEvent(
+                tempo_map.beats_to_time(slot / subdivision),
+                e.note_class,
+                e.is_tom,
+                e.velocity,
+            )
     return sorted(slots.values(), key=lambda e: e.time)
 
 
@@ -245,15 +246,37 @@ def build_note_class_events(
     return out
 
 
-def reduce_easy(events: list[DiffEvent]) -> list[DiffEvent]:
+def reduce_easy(
+    events: list[DiffEvent], tempo_map: TempoMap, beat_tolerance: float = 0.12
+) -> list[DiffEvent]:
     """Groove backbone only: kick + snare on the main beats, no cymbals,
     no toms, at most a 2-note (kick+one) chord."""
-    kept = [
-        DiffEvent(e.time, e.note_class, False, e.velocity)
-        for e in events
-        if e.note_class in (KICK, SNARE)
-    ]
-    return _apply_caps(kept, CAPS["easy"])
+    strong: list[DiffEvent] = []
+    weak: list[DiffEvent] = []
+    beats_per_bar = max(1, tempo_map.time_signature[0])
+    strong_positions = {0, 2} if beats_per_bar >= 3 else {0}
+    for e in events:
+        if e.note_class not in (KICK, SNARE):
+            continue
+        beat = tempo_map.time_to_beats(e.time)
+        beat_index = round(beat)
+        if abs(beat - beat_index) > beat_tolerance:
+            continue
+        snapped = DiffEvent(
+            tempo_map.beats_to_time(beat_index),
+            e.note_class,
+            False,
+            e.velocity,
+        )
+        target = strong if beat_index % beats_per_bar in strong_positions else weak
+        target.append(snapped)
+
+    kept = _apply_caps(strong, CAPS["easy"])
+    for e in sorted(weak, key=lambda item: item.time):
+        candidate = _apply_caps(kept + [e], CAPS["easy"])
+        if e in candidate and all(existing in candidate for existing in kept):
+            kept = candidate
+    return kept
 
 
 def reduce_medium(
@@ -266,7 +289,8 @@ def reduce_medium(
     hats = [e for e in events if e.note_class == YELLOW]
     hats = _snap_to_grid(hats, tempo_map, subdivision=2)
     hats = [DiffEvent(e.time, e.note_class, False, e.velocity) for e in hats]
-    crashes = _section_start_crashes(tempo_map, duration_seconds)
+    has_crash = any(e.note_class == GREEN and not e.is_tom for e in events)
+    crashes = _section_start_crashes(tempo_map, duration_seconds) if has_crash else []
     return _apply_caps(backbone + hats + crashes, CAPS["medium"])
 
 
@@ -291,7 +315,7 @@ def reduce_all(
 ) -> dict[str, list[DiffEvent]]:
     events = build_note_class_events(hits, pitch_map)
     return {
-        "easy": reduce_easy(events),
+        "easy": reduce_easy(events, tempo_map),
         "medium": reduce_medium(events, tempo_map, duration_seconds),
         "hard": reduce_hard(events),
         "expert": reduce_expert(events),
