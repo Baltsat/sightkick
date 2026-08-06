@@ -151,18 +151,21 @@ interface AutoChartDependencies {
 interface AutoChartJob extends IpcAutoChartJob {
   event: IpcMainEvent;
   audioPath?: string;
-  youtubeUrl?: string;
   tempDir?: string;
   preparedDir?: string;
   cancelled: boolean;
   worker?: WorkerHandle;
 }
 
+// `youtubeUrl` is deliberately kept (it's part of IpcAutoChartJob, safe to
+// expose to the renderer) — only the private, main-process-only fields are
+// stripped. `jobs` is never carried on the internal job object itself, so
+// there's nothing to strip there; notify() attaches it separately on the
+// outer envelope only.
 function toPublicJob(job: AutoChartJob): IpcAutoChartJob {
   const {
     event: _event,
     audioPath: _audioPath,
-    youtubeUrl: _youtubeUrl,
     tempDir: _tempDir,
     preparedDir: _preparedDir,
     cancelled: _cancelled,
@@ -1688,8 +1691,20 @@ export class AutoChartQueue {
     job.preparedDir = undefined;
   }
 
+  // Every non-terminal job the queue currently knows about (queued or
+  // active), as public DTOs — attached to every notify() so a listener can
+  // always reconcile the full queue, not just the one job that changed.
+  private queueSnapshot(): IpcAutoChartJob[] {
+    return [...this.jobs.values()]
+      .filter((candidate) => !isTerminal(candidate.stage))
+      .map((candidate) => toPublicJob(candidate));
+  }
+
   private notify(job: AutoChartJob): void {
-    job.event.reply('auto-chart-update', toPublicJob(job));
+    job.event.reply('auto-chart-update', {
+      ...toPublicJob(job),
+      jobs: this.queueSnapshot(),
+    });
   }
 }
 

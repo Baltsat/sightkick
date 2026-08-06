@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowRotateRight,
@@ -10,6 +11,11 @@ import appIcon from '../../../../assets/icon.png';
 import { formatTime } from '../../helpers';
 import { Tooltip } from '../Tooltip';
 import { useMyMusic } from '../../hooks/useMyMusic';
+import { useAutoChartBackends } from '../../hooks/useAutoChartBackends';
+import {
+  isTerminalAutoChartStage,
+  useAutoChartJobs,
+} from '../../hooks/useAutoChartJobs';
 import { IpcCreateAutoChartRequest } from '../../../types';
 import { isInLibrary, selectBulkAddable } from './helpers';
 import { LibrarySongRef, MyMusicSong } from './types';
@@ -38,17 +44,70 @@ function rowSubtitle(song: MyMusicSong): string {
 export function MyMusic({ librarySongs, disabled }: MyMusicProps) {
   const { notification } = App.useApp();
   const { songs, loading, error, hasFetched, refresh } = useMyMusic();
+  const { backends } = useAutoChartBackends();
+  // Optimistic, click-time guard against re-entrancy: a watch URL lands
+  // here the instant its Add is clicked (before any IPC round trip), and
+  // leaves the instant that job's own update reaches a terminal stage
+  // (imported/failed/cancelled) — so a double-click can never enqueue the
+  // same video twice, even in the brief window before the main process's
+  // first 'auto-chart-update' for it arrives.
+  const [inFlightUrls, setInFlightUrls] = useState<Set<string>>(new Set());
+  const jobs = useAutoChartJobs((nextJob) => {
+    if (!nextJob.youtubeUrl || !isTerminalAutoChartStage(nextJob.stage)) {
+      return;
+    }
+
+    setInFlightUrls((current) => {
+      if (!current.has(nextJob.youtubeUrl!)) {
+        return current;
+      }
+
+      const next = new Set(current);
+
+      next.delete(nextJob.youtubeUrl!);
+
+      return next;
+    });
+  });
+  // Reconciled with the live queue too — not just our own optimistic
+  // guard — so a video the *Create chart* modal (or a previous My Music
+  // session) already queued or is actively charting also shows as
+  // unavailable here, and AutoChart.tsx's pending-queue "Cancel" correctly
+  // re-enables the row once that job goes away.
+  const queuedUrls = new Set(
+    jobs
+      .map((queuedJob) => queuedJob.youtubeUrl)
+      .filter((url): url is string => Boolean(url)),
+  );
+  const isQueued = (watchUrl: string) =>
+    inFlightUrls.has(watchUrl) || queuedUrls.has(watchUrl);
+  const addableSongs = songs.filter((song) => !isQueued(song.watchUrl));
   const addableCount = selectBulkAddable(
-    songs,
+    addableSongs,
     librarySongs,
     BULK_ADD_COUNT,
   ).length;
+  const markInFlight = (watchUrls: string[]) => {
+    setInFlightUrls((current) => {
+      const next = new Set(current);
+
+      watchUrls.forEach((watchUrl) => next.add(watchUrl));
+
+      return next;
+    });
+  };
   const enqueue = (song: MyMusicSong) => {
     window.electron.ipcRenderer.sendMessage('create-auto-chart', {
       youtubeUrl: song.watchUrl,
+      backend: backends?.default,
     } satisfies IpcCreateAutoChartRequest);
   };
   const addOne = (song: MyMusicSong) => {
+    if (isQueued(song.watchUrl)) {
+      return;
+    }
+
+    markInFlight([song.watchUrl]);
     enqueue(song);
     notification.info({
       title: 'Creating a chart',
@@ -57,22 +116,26 @@ export function MyMusic({ librarySongs, disabled }: MyMusicProps) {
     });
   };
   const addTop10 = () => {
-    const toAdd = selectBulkAddable(songs, librarySongs, BULK_ADD_COUNT);
+    const toAdd = selectBulkAddable(addableSongs, librarySongs, BULK_ADD_COUNT);
+
+    if (toAdd.length === 0) {
+      return;
+    }
+
+    markInFlight(toAdd.map((song) => song.watchUrl));
 
     // Enqueued sequentially, in list order — the auto-chart queue is FIFO
     // with a single active job, so this simply hands it a batch to work
     // through one at a time.
     toAdd.forEach(enqueue);
 
-    if (toAdd.length > 0) {
-      notification.info({
-        title: 'Adding your top songs',
-        description: `Queued ${toAdd.length} song${
-          toAdd.length === 1 ? '' : 's'
-        } for charting…`,
-        placement: 'bottomRight',
-      });
-    }
+    notification.info({
+      title: 'Adding your top songs',
+      description: `Queued ${toAdd.length} song${
+        toAdd.length === 1 ? '' : 's'
+      } for charting…`,
+      placement: 'bottomRight',
+    });
   };
 
   return (
@@ -184,6 +247,7 @@ export function MyMusic({ librarySongs, disabled }: MyMusicProps) {
         <div className="flex flex-col gap-1" data-testid="my-music-results">
           {songs.map((song) => {
             const inLibrary = isInLibrary(song, librarySongs);
+            const queued = isQueued(song.watchUrl);
 
             return (
               <div
@@ -223,7 +287,8 @@ export function MyMusic({ librarySongs, disabled }: MyMusicProps) {
                     size="small"
                     icon={<FontAwesomeIcon icon={faPlus} />}
                     data-testid={`my-music-add-${song.videoId}`}
-                    disabled={disabled}
+                    disabled={disabled || queued}
+                    loading={queued}
                     onClick={() => addOne(song)}
                   >
                     Add

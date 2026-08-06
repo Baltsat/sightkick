@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -14,12 +14,16 @@ import {
 } from 'antd';
 import {
   AutoChartBackend,
-  IpcAutoChartBackendsResponse,
   IpcAutoChartJob,
   IpcAutoChartRemoteSettings,
   IpcAutoChartRemoteTestResponse,
   Song,
 } from '../../../types';
+import { useAutoChartBackends } from '../../hooks/useAutoChartBackends';
+import {
+  cancelAutoChartJob,
+  useAutoChartJobs,
+} from '../../hooks/useAutoChartJobs';
 import { SongImportReview } from '../SongImport/SongImport';
 
 interface Props {
@@ -109,8 +113,17 @@ export function AutoChart({ disabled, onImported }: Props) {
   const [job, setJob] = useState<IpcAutoChartJob>();
   const [jobStep, setJobStep] = useState(0);
   const [artworkUrl, setArtworkUrl] = useState('');
-  const [backends, setBackends] = useState<IpcAutoChartBackendsResponse>();
-  const [backend, setBackend] = useState<AutoChartBackend>();
+  const { backends, refresh: refreshBackends } = useAutoChartBackends();
+  // The user's explicit backend pick from the radio group, if any — the
+  // *effective* backend (below) falls back to the detected default while
+  // this is unset, without needing an effect to keep the two in sync.
+  const [selectedBackend, setSelectedBackend] = useState<AutoChartBackend>();
+  const backend = selectedBackend ?? backends?.default;
+  // The job currently shown in the floating progress panel below — kept in
+  // a ref alongside the `job` state so the 'auto-chart-update' handler can
+  // tell "is this update for the job I'm displaying" without a stale
+  // closure, without re-subscribing on every job change.
+  const displayedJobRef = useRef<IpcAutoChartJob | undefined>(undefined);
   const [remoteEndpoint, setRemoteEndpoint] = useState('');
   const [remoteToken, setRemoteToken] = useState('');
   const [remoteTokenConfigured, setRemoteTokenConfigured] = useState(false);
@@ -145,17 +158,8 @@ export function AutoChart({ disabled, onImported }: Props) {
   );
 
   useEffect(() => {
-    window.electron.ipcRenderer.sendMessage('check-auto-chart-backends');
     window.electron.ipcRenderer.sendMessage('get-auto-chart-remote-settings');
 
-    const removeBackends =
-      window.electron.ipcRenderer.on<IpcAutoChartBackendsResponse>(
-        'auto-chart-backends',
-        (response) => {
-          setBackends(response);
-          setBackend((current) => current ?? response.default);
-        },
-      );
     const removeSettings =
       window.electron.ipcRenderer.on<IpcAutoChartRemoteSettings>(
         'auto-chart-remote-settings',
@@ -173,48 +177,65 @@ export function AutoChart({ disabled, onImported }: Props) {
           if (response.ok) {
             setRemoteToken('');
             setRemoteTokenConfigured(true);
-            window.electron.ipcRenderer.sendMessage(
-              'check-auto-chart-backends',
-            );
+            refreshBackends();
           }
         },
       );
 
     return () => {
-      removeBackends();
       removeSettings();
       removeTest();
     };
-  }, []);
+  }, [refreshBackends]);
 
-  useEffect(() => {
-    return window.electron.ipcRenderer.on<IpcAutoChartJob>(
-      'auto-chart-update',
-      (nextJob) => {
-        setJob(nextJob);
+  // The queue can hold several non-terminal jobs at once (My Music's bulk
+  // add fires create-auto-chart for up to 10 songs back to back), but this
+  // panel only ever shows one job's progress at a time. Without a guard, an
+  // unrelated job's update — e.g. a queued My Music job merely getting its
+  // "queued" notify — would clobber whichever job the user is actually
+  // watching. Adopt a new job only once the slot is free: nothing is
+  // displayed yet, the update is for the job already being displayed, or
+  // the displayed job has finished importing (its own panel is hidden by
+  // then, so there's nothing left to steal).
+  const jobs = useAutoChartJobs((nextJob) => {
+    if (nextJob.stage === 'imported') {
+      if (nextJob.song) {
+        onImported(nextJob.song);
+      }
 
-        if (!['failed', 'cancelled'].includes(nextJob.stage)) {
-          setJobStep(activeStep(nextJob));
-        }
+      notification.success({
+        title: nextJob.message,
+        placement: 'bottomRight',
+      });
+    }
 
-        if (nextJob.stage === 'preview-ready') {
-          setArtworkUrl('');
-        }
+    const current = displayedJobRef.current;
+    const displayingAnotherLiveJob =
+      current !== undefined &&
+      current.id !== nextJob.id &&
+      current.stage !== 'imported';
 
-        if (nextJob.stage === 'imported') {
-          if (nextJob.song) {
-            onImported(nextJob.song);
-          }
+    if (displayingAnotherLiveJob) {
+      return;
+    }
 
-          notification.success({
-            title: nextJob.message,
-            placement: 'bottomRight',
-          });
-        }
-      },
-    );
-  }, [notification, onImported]);
+    displayedJobRef.current = nextJob;
+    setJob(nextJob);
 
+    if (!['failed', 'cancelled'].includes(nextJob.stage)) {
+      setJobStep(activeStep(nextJob));
+    }
+
+    if (nextJob.stage === 'preview-ready') {
+      setArtworkUrl('');
+    }
+  });
+  // Jobs still waiting behind the one shown above, so My Music's bulk add
+  // (or a second manual create while one is active) stays visible and
+  // cancellable instead of silently queuing out of sight.
+  const pendingJobs = jobs.filter(
+    (queuedJob) => queuedJob.stage === 'queued' && queuedJob.id !== job?.id,
+  );
   const createFromYoutube = () => {
     setCreateOpen(false);
     window.electron.ipcRenderer.sendMessage('create-auto-chart', {
@@ -245,9 +266,13 @@ export function AutoChart({ disabled, onImported }: Props) {
       );
     }
 
+    displayedJobRef.current = undefined;
     setJob(undefined);
     setJobStep(0);
     setArtworkUrl('');
+  };
+  const cancelAllPending = () => {
+    pendingJobs.forEach((pendingJob) => cancelAutoChartJob(pendingJob.id));
   };
 
   return (
@@ -333,7 +358,7 @@ export function AutoChart({ disabled, onImported }: Props) {
             <div data-testid="auto-chart-backend-select">
               <Radio.Group
                 value={backend}
-                onChange={(event) => setBackend(event.target.value)}
+                onChange={(event) => setSelectedBackend(event.target.value)}
                 optionType="button"
                 options={availableBackends}
               />
@@ -413,83 +438,127 @@ export function AutoChart({ disabled, onImported }: Props) {
         </div>
       </Modal>
 
-      {job && job.stage !== 'preview-ready' && job.stage !== 'imported' && (
-        <div
-          className="fixed bottom-5 right-5 z-50 w-112 rounded-2xl border border-border-soft bg-surface-raised p-5 shadow-frame"
-          data-testid="auto-chart-progress"
-          role={job.stage === 'failed' ? 'alert' : 'status'}
-          aria-live={job.stage === 'failed' ? 'assertive' : 'polite'}
-        >
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div className="font-semibold text-text-body">Create chart</div>
-            <div className="flex gap-2">
-              <Tag color="blue">{backendName(job.backend)}</Tag>
-              <Tag color={job.stage === 'failed' ? 'red' : 'purple'}>
-                {stageLabel(job)}
-              </Tag>
-            </div>
-          </div>
-          <div className="mb-3 text-sm text-text-muted">
-            {job.error ?? job.message}
-          </div>
-          {job.sourceName && (
+      {((job && job.stage !== 'preview-ready' && job.stage !== 'imported') ||
+        pendingJobs.length > 0) && (
+        <div className="fixed bottom-5 right-5 z-50 flex w-112 flex-col gap-3">
+          {job && job.stage !== 'preview-ready' && job.stage !== 'imported' && (
             <div
-              className="mb-4 truncate text-xs text-text-faint"
-              title={job.sourceName}
+              className="rounded-2xl border border-border-soft bg-surface-raised p-5 shadow-frame"
+              data-testid="auto-chart-progress"
+              role={job.stage === 'failed' ? 'alert' : 'status'}
+              aria-live={job.stage === 'failed' ? 'assertive' : 'polite'}
             >
-              {job.sourceName}
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="font-semibold text-text-body">Create chart</div>
+                <div className="flex gap-2">
+                  <Tag color="blue">{backendName(job.backend)}</Tag>
+                  <Tag color={job.stage === 'failed' ? 'red' : 'purple'}>
+                    {stageLabel(job)}
+                  </Tag>
+                </div>
+              </div>
+              <div className="mb-3 text-sm text-text-muted">
+                {job.error ?? job.message}
+              </div>
+              {job.sourceName && (
+                <div
+                  className="mb-4 truncate text-xs text-text-faint"
+                  title={job.sourceName}
+                >
+                  {job.sourceName}
+                </div>
+              )}
+              <Steps
+                className="mb-4"
+                data-testid="auto-chart-steps"
+                size="small"
+                current={jobStep}
+                status={job.stage === 'failed' ? 'error' : 'process'}
+                items={chartSteps}
+                responsive={false}
+              />
+              {typeof job.percent === 'number' && (
+                <Progress
+                  percent={job.percent}
+                  status={progressStatus(job.stage)}
+                  className="tabular-nums"
+                />
+              )}
+              <div className="mt-3 flex justify-end gap-2">
+                {['failed', 'cancelled'].includes(job.stage) &&
+                  job.sourceName && (
+                    <Button
+                      data-testid="auto-chart-retry"
+                      onClick={() =>
+                        window.electron.ipcRenderer.sendMessage(
+                          'retry-auto-chart',
+                          job.id,
+                        )
+                      }
+                    >
+                      Retry
+                    </Button>
+                  )}
+                {['failed', 'cancelled'].includes(job.stage) && (
+                  <Button data-testid="auto-chart-dismiss" onClick={dismiss}>
+                    Dismiss
+                  </Button>
+                )}
+                {!['failed', 'cancelled', 'importing'].includes(job.stage) && (
+                  <Button
+                    danger
+                    data-testid="auto-chart-cancel"
+                    onClick={() => cancelAutoChartJob(job.id)}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
             </div>
           )}
-          <Steps
-            className="mb-4"
-            data-testid="auto-chart-steps"
-            size="small"
-            current={jobStep}
-            status={job.stage === 'failed' ? 'error' : 'process'}
-            items={chartSteps}
-            responsive={false}
-          />
-          {typeof job.percent === 'number' && (
-            <Progress
-              percent={job.percent}
-              status={progressStatus(job.stage)}
-              className="tabular-nums"
-            />
+
+          {pendingJobs.length > 0 && (
+            <div
+              className="rounded-2xl border border-border-soft bg-surface-raised p-4 shadow-frame"
+              data-testid="auto-chart-pending-queue"
+            >
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-text-body">
+                  {pendingJobs.length} more chart
+                  {pendingJobs.length === 1 ? '' : 's'} queued
+                </div>
+                <Button
+                  size="small"
+                  danger
+                  data-testid="auto-chart-cancel-all"
+                  onClick={cancelAllPending}
+                >
+                  Cancel all
+                </Button>
+              </div>
+              <div className="flex flex-col gap-1">
+                {pendingJobs.map((pendingJob) => (
+                  <div
+                    key={pendingJob.id}
+                    data-testid={`auto-chart-pending-${pendingJob.id}`}
+                    className="flex items-center justify-between gap-2 text-xs text-text-muted"
+                  >
+                    <span className="truncate">
+                      {pendingJob.sourceName ?? 'Queued chart'}
+                    </span>
+                    <Button
+                      size="small"
+                      type="text"
+                      data-testid={`auto-chart-pending-cancel-${pendingJob.id}`}
+                      onClick={() => cancelAutoChartJob(pendingJob.id)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
-          <div className="mt-3 flex justify-end gap-2">
-            {['failed', 'cancelled'].includes(job.stage) && job.sourceName && (
-              <Button
-                data-testid="auto-chart-retry"
-                onClick={() =>
-                  window.electron.ipcRenderer.sendMessage(
-                    'retry-auto-chart',
-                    job.id,
-                  )
-                }
-              >
-                Retry
-              </Button>
-            )}
-            {['failed', 'cancelled'].includes(job.stage) && (
-              <Button data-testid="auto-chart-dismiss" onClick={dismiss}>
-                Dismiss
-              </Button>
-            )}
-            {!['failed', 'cancelled', 'importing'].includes(job.stage) && (
-              <Button
-                danger
-                data-testid="auto-chart-cancel"
-                onClick={() =>
-                  window.electron.ipcRenderer.sendMessage(
-                    'cancel-auto-chart',
-                    job.id,
-                  )
-                }
-              >
-                Cancel
-              </Button>
-            )}
-          </div>
         </div>
       )}
 

@@ -54,6 +54,56 @@ describe('isInLibrary', () => {
   it('returns false against an empty library', () => {
     expect(isInLibrary(song(), [])).toBe(false);
   });
+
+  it('matches titles/artists spelled with decomposed vs precomposed accents', () => {
+    // "é" as one precomposed codepoint (U+00E9) vs "e" + a combining acute
+    // accent (U+0065 U+0301) — visually identical, different byte sequence.
+    expect(
+      isInLibrary(song({ title: 'Café', artist: 'Café Tacvba' }), [
+        { artist: 'Café Tacvba', name: 'Café' },
+      ]),
+    ).toBe(true);
+  });
+
+  it('matches a title carrying a "(feat. X)" tag against the bare title', () => {
+    expect(
+      isInLibrary(song({ title: 'Song (feat. Travis Scott)' }), [
+        { artist: 'Some Artist', name: 'Song' },
+      ]),
+    ).toBe(true);
+  });
+
+  it('matches a title carrying an "ft." tag (no parens) against the bare title', () => {
+    expect(
+      isInLibrary(song({ title: 'Song ft. Travis Scott' }), [
+        { artist: 'Some Artist', name: 'Song' },
+      ]),
+    ).toBe(true);
+  });
+
+  it('matches when the liked song credits multiple artists and the library credits one of them', () => {
+    expect(
+      isInLibrary(song({ artist: 'Drake, Travis Scott' }), [
+        { artist: 'Drake', name: 'Some Song' },
+      ]),
+    ).toBe(true);
+  });
+
+  it('matches when the library credits multiple artists and the liked song credits one of them', () => {
+    expect(
+      isInLibrary(song({ artist: 'Travis Scott' }), [
+        { artist: 'Drake & Travis Scott', name: 'Some Song' },
+      ]),
+    ).toBe(true);
+  });
+
+  it('does not match artist credits with no shared name at all', () => {
+    expect(
+      isInLibrary(song({ artist: 'Drake, Travis Scott' }), [
+        { artist: 'Metro Boomin, 21 Savage', name: 'Some Song' },
+      ]),
+    ).toBe(false);
+  });
 });
 
 describe('selectBulkAddable', () => {

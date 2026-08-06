@@ -65,6 +65,8 @@ function latestJob(event: ReturnType<typeof makeEvent>) {
     percent?: number;
     error?: string;
     preview?: { sourceDir: string };
+    youtubeUrl?: string;
+    jobs?: { id: string; stage: string; youtubeUrl?: string }[];
   };
 }
 
@@ -918,6 +920,60 @@ describe('auto-chart queue — sightkick backend', () => {
     await harness.queue.cancel(latestJob(second).id);
     expect(latestJob(second)).toMatchObject({ stage: 'cancelled' });
     expect(harness.skRuns).toHaveLength(1);
+  });
+
+  it('exposes the full queue as a `jobs` snapshot on every update, so a listener can see and cancel a job it did not itself create', async () => {
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://youtu.be/abcdefghijk',
+    });
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://youtu.be/aaaaaaaaaaa',
+    });
+    await vi.waitFor(() => {
+      const jobs = latestJob(event).jobs ?? [];
+
+      expect(
+        jobs.filter((candidate) => candidate.stage === 'queued'),
+      ).toHaveLength(1);
+    });
+
+    const jobs = latestJob(event).jobs ?? [];
+    const activeJob = jobs.find(
+      (candidate) => candidate.stage === 'downloading',
+    );
+    const queuedJob = jobs.find((candidate) => candidate.stage === 'queued');
+
+    expect(activeJob?.youtubeUrl).toBe(
+      'https://www.youtube.com/watch?v=abcdefghijk',
+    );
+    expect(queuedJob?.youtubeUrl).toBe(
+      'https://www.youtube.com/watch?v=aaaaaaaaaaa',
+    );
+
+    // Cancel the queued job purely by the id surfaced in the snapshot — the
+    // queue already supports cancelling any job by id; this confirms that
+    // id is actually reachable through 'auto-chart-update' rather than only
+    // known to whichever create() call originally produced it.
+    await harness.queue.cancel(queuedJob!.id);
+
+    const jobsAfterCancel = latestJob(event).jobs ?? [];
+
+    expect(jobsAfterCancel.map((candidate) => candidate.id)).not.toContain(
+      queuedJob!.id,
+    );
+    expect(jobsAfterCancel.map((candidate) => candidate.id)).toContain(
+      activeJob!.id,
+    );
   });
 
   it('surfaces a sidecar error (e.g. an age-restricted or unavailable video) as a failed job with an honest message', async () => {

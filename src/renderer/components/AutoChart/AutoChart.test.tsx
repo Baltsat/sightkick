@@ -376,4 +376,139 @@ describe('AutoChart', () => {
       args: [{ youtubeUrl: 'https://youtu.be/abcdefghijk', backend: 'remote' }],
     });
   });
+
+  it('renders the pending queue behind the active job, with a per-job cancel and a cancel-all', () => {
+    renderAutoChart();
+    emitBackends({
+      sightkick: true,
+      remote: false,
+      octave: false,
+      default: 'sightkick',
+    });
+
+    const activeJob: IpcAutoChartJob = {
+      id: 'job-1',
+      attempt: 1,
+      stage: 'downloading',
+      backend: 'sightkick',
+      message: 'Downloading audio from YouTube',
+      sourceName: 'Active song',
+      percent: 10,
+    };
+    const queuedJob2: IpcAutoChartJob = {
+      id: 'job-2',
+      attempt: 1,
+      stage: 'queued',
+      backend: 'sightkick',
+      message: 'Chart queued for SightKick processing',
+      sourceName: 'Queued song 1',
+      youtubeUrl: 'https://www.youtube.com/watch?v=queuedqueue1',
+    };
+    const queuedJob3: IpcAutoChartJob = {
+      id: 'job-3',
+      attempt: 1,
+      stage: 'queued',
+      backend: 'sightkick',
+      message: 'Chart queued for SightKick processing',
+      sourceName: 'Queued song 2',
+      youtubeUrl: 'https://www.youtube.com/watch?v=queuedqueue2',
+    };
+
+    emitJob({ ...activeJob, jobs: [activeJob, queuedJob2, queuedJob3] });
+
+    expect(screen.getByTestId('auto-chart-progress')).toHaveTextContent(
+      'Active song',
+    );
+    expect(screen.getByTestId('auto-chart-pending-queue')).toHaveTextContent(
+      '2 more charts queued',
+    );
+    expect(screen.getByTestId('auto-chart-pending-job-2')).toHaveTextContent(
+      'Queued song 1',
+    );
+    expect(screen.getByTestId('auto-chart-pending-job-3')).toHaveTextContent(
+      'Queued song 2',
+    );
+
+    fireEvent.click(screen.getByTestId('auto-chart-pending-cancel-job-2'));
+    expect(ipc.sent).toContainEqual({
+      channel: 'cancel-auto-chart',
+      args: ['job-2'],
+    });
+
+    fireEvent.click(screen.getByTestId('auto-chart-cancel-all'));
+    expect(ipc.sent).toContainEqual({
+      channel: 'cancel-auto-chart',
+      args: ['job-3'],
+    });
+
+    // The backend confirms both cancellations by dropping them from the
+    // next snapshot — the queue panel should then disappear entirely.
+    emitJob({ ...activeJob, jobs: [activeJob] });
+    expect(
+      screen.queryByTestId('auto-chart-pending-queue'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not let an unrelated queued job steal the panel from the job being displayed', () => {
+    renderAutoChart();
+    emitBackends({
+      sightkick: true,
+      remote: false,
+      octave: false,
+      default: 'sightkick',
+    });
+
+    const activeJob: IpcAutoChartJob = {
+      id: 'job-1',
+      attempt: 1,
+      stage: 'downloading',
+      backend: 'sightkick',
+      message: 'Downloading audio from YouTube',
+      sourceName: 'Active song',
+      percent: 30,
+    };
+
+    emitJob(activeJob);
+    expect(screen.getByTestId('auto-chart-progress')).toHaveTextContent(
+      'Active song',
+    );
+
+    // A second job (e.g. from My Music's bulk add) is created and
+    // immediately notifies its own initial "queued" state — this must not
+    // replace the panel showing job-1's progress, only appear in the
+    // pending queue alongside it.
+    const otherJob: IpcAutoChartJob = {
+      id: 'job-2',
+      attempt: 1,
+      stage: 'queued',
+      backend: 'sightkick',
+      message: 'Chart queued for SightKick processing',
+      sourceName: 'Other song',
+    };
+
+    emitJob({ ...otherJob, jobs: [activeJob, otherJob] });
+
+    expect(screen.getByTestId('auto-chart-progress')).toHaveTextContent(
+      'Active song',
+    );
+    expect(screen.getByTestId('auto-chart-progress')).not.toHaveTextContent(
+      'Other song',
+    );
+    expect(screen.getByTestId('auto-chart-pending-queue')).toHaveTextContent(
+      'Other song',
+    );
+
+    // Once job-1 finishes, the panel frees up for the next job.
+    emitJob({
+      ...activeJob,
+      stage: 'imported',
+      song: undefined,
+      jobs: [otherJob],
+    });
+    emitJob({ ...otherJob, stage: 'downloading', jobs: [otherJob] });
+
+    expect(screen.getByTestId('auto-chart-progress')).toHaveTextContent(
+      'Other song',
+    );
+  });
 });

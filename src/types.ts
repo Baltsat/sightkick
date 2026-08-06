@@ -349,6 +349,18 @@ export interface IpcAutoChartJob {
   song?: Song;
   error?: string;
   errorCode?: string;
+  // The YouTube URL a job was created from (undefined for local-file jobs).
+  // Exposed so a surface that queues jobs itself (e.g. My Music's bulk add)
+  // can recognize its own in-flight jobs by watch URL without a separate
+  // lookup channel.
+  youtubeUrl?: string;
+  // A snapshot of every currently non-terminal job the queue knows about —
+  // not just this one — attached to every 'auto-chart-update' event so any
+  // listener can render the full pending/active queue and cancel any job by
+  // id, instead of only ever seeing the single job it happened to trigger.
+  // Only ever populated one level deep (entries in this array never carry
+  // their own nested `jobs`).
+  jobs?: IpcAutoChartJob[];
 }
 
 export interface IpcSearchYoutubeRequest {

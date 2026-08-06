@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { App as AntdApp } from 'antd';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { installIpcMock, IpcMock } from '../../hooks/test-support';
+import { IpcAutoChartBackendsResponse, IpcAutoChartJob } from '../../../types';
 import { MyMusic } from './MyMusic';
 import { LibrarySongRef, MyMusicSong } from './types';
 
@@ -24,6 +25,25 @@ function emitSongs(songs: MyMusicSong[]) {
 function emitError(error: string, code: string) {
   act(() => {
     ipc.emit('my-music-fetch', { error, code });
+  });
+}
+
+function emitAutoChartUpdate(job: Partial<IpcAutoChartJob> & { id: string }) {
+  act(() => {
+    ipc.emit('auto-chart-update', {
+      attempt: 1,
+      stage: 'queued',
+      message: 'Chart queued',
+      backend: 'sightkick',
+      jobs: [],
+      ...job,
+    });
+  });
+}
+
+function emitAutoChartBackends(response: IpcAutoChartBackendsResponse) {
+  act(() => {
+    ipc.emit('auto-chart-backends', response);
   });
 }
 
@@ -51,7 +71,13 @@ describe('MyMusic', () => {
     renderMyMusic();
 
     expect(screen.getByTestId('my-music-connect')).toBeInTheDocument();
-    expect(ipc.sent).toEqual([]);
+    // My Music does proactively ask for the detected default auto-chart
+    // backend on mount (so Add is ready to send it immediately — see the
+    // payload-parity tests below), it just never fetches liked songs until
+    // the user asks it to.
+    expect(
+      ipc.sent.filter((message) => message.channel === 'my-music-fetch'),
+    ).toEqual([]);
   });
 
   it('fetches liked songs when Connect is clicked and lists results', () => {
@@ -88,8 +114,16 @@ describe('MyMusic', () => {
     );
 
     fireEvent.click(screen.getByTestId('my-music-retry'));
-    expect(ipc.sent).toHaveLength(2);
-    expect(ipc.sent[1]).toEqual({ channel: 'my-music-fetch', args: [{}] });
+
+    const fetchMessages = ipc.sent.filter(
+      (message) => message.channel === 'my-music-fetch',
+    );
+
+    expect(fetchMessages).toHaveLength(2);
+    expect(fetchMessages[1]).toEqual({
+      channel: 'my-music-fetch',
+      args: [{}],
+    });
   });
 
   it('dispatches create-auto-chart with the watch URL when Add is clicked', () => {
@@ -167,5 +201,126 @@ describe('MyMusic', () => {
     expect(
       ipc.sent.filter((message) => message.channel === 'my-music-fetch'),
     ).toHaveLength(2);
+  });
+
+  it('includes the detected default auto-chart backend, matching what the Create Chart modal would send', () => {
+    renderMyMusic();
+    emitAutoChartBackends({
+      sightkick: false,
+      remote: true,
+      octave: true,
+      default: 'remote',
+    });
+    fireEvent.click(screen.getByTestId('my-music-connect-button'));
+    emitSongs([songA]);
+
+    fireEvent.click(screen.getByTestId('my-music-add-aaaaaaaaaaa'));
+
+    expect(ipc.sent).toContainEqual({
+      channel: 'create-auto-chart',
+      args: [{ youtubeUrl: songA.watchUrl, backend: 'remote' }],
+    });
+  });
+
+  it('double-clicking Add enqueues exactly one job and disables the button immediately', () => {
+    renderMyMusic();
+    fireEvent.click(screen.getByTestId('my-music-connect-button'));
+    emitSongs([songA]);
+
+    const addButton = screen.getByTestId('my-music-add-aaaaaaaaaaa');
+
+    fireEvent.click(addButton);
+    fireEvent.click(addButton);
+
+    expect(
+      ipc.sent.filter((message) => message.channel === 'create-auto-chart'),
+    ).toHaveLength(1);
+    expect(addButton).toBeDisabled();
+  });
+
+  it('disables a row once the queue reports a non-terminal job for its watch URL', () => {
+    renderMyMusic();
+    fireEvent.click(screen.getByTestId('my-music-connect-button'));
+    emitSongs([songA, songB]);
+
+    // Simulate the Create Chart modal (or a previous session) having
+    // already queued songA — My Music never sent this job itself, but must
+    // still recognize it via the shared queue snapshot and disable the row.
+    emitAutoChartUpdate({
+      id: 'other-job',
+      stage: 'queued',
+      youtubeUrl: songA.watchUrl,
+      jobs: [
+        {
+          id: 'other-job',
+          attempt: 1,
+          stage: 'queued',
+          message: 'Chart queued',
+          backend: 'sightkick',
+          youtubeUrl: songA.watchUrl,
+        },
+      ],
+    });
+
+    expect(screen.getByTestId('my-music-add-aaaaaaaaaaa')).toBeDisabled();
+    expect(screen.getByTestId('my-music-add-bbbbbbbbbbb')).toBeEnabled();
+  });
+
+  it('re-enables a row once its own job reaches a terminal stage', () => {
+    renderMyMusic();
+    fireEvent.click(screen.getByTestId('my-music-connect-button'));
+    emitSongs([songA]);
+
+    const addButton = screen.getByTestId('my-music-add-aaaaaaaaaaa');
+
+    fireEvent.click(addButton);
+    expect(addButton).toBeDisabled();
+
+    emitAutoChartUpdate({
+      id: 'job-1',
+      stage: 'failed',
+      error: 'This video is age-restricted and cannot be downloaded',
+      youtubeUrl: songA.watchUrl,
+      jobs: [],
+    });
+
+    expect(screen.getByTestId('my-music-add-aaaaaaaaaaa')).toBeEnabled();
+  });
+
+  it('excludes already-queued songs from Add top 10 and its count', () => {
+    const songC: MyMusicSong = {
+      videoId: 'ccccccccccc',
+      title: 'Song C',
+      artist: 'Artist C',
+      watchUrl: 'https://www.youtube.com/watch?v=ccccccccccc',
+    };
+
+    renderMyMusic();
+    fireEvent.click(screen.getByTestId('my-music-connect-button'));
+    emitSongs([songA, songB, songC]);
+
+    fireEvent.click(screen.getByTestId('my-music-add-aaaaaaaaaaa'));
+
+    const createChartMessages = ipc.sent.filter(
+      (message) => message.channel === 'create-auto-chart',
+    );
+
+    expect(createChartMessages).toHaveLength(1);
+
+    fireEvent.click(screen.getByTestId('my-music-add-top-10'));
+
+    const afterTop10 = ipc.sent.filter(
+      (message) => message.channel === 'create-auto-chart',
+    );
+
+    expect(afterTop10).toHaveLength(3);
+    expect(afterTop10[1]).toEqual({
+      channel: 'create-auto-chart',
+      args: [{ youtubeUrl: songB.watchUrl, backend: undefined }],
+    });
+    expect(afterTop10[2]).toEqual({
+      channel: 'create-auto-chart',
+      args: [{ youtubeUrl: songC.watchUrl, backend: undefined }],
+    });
   });
 });
