@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeAudioContext, installWebAudio, makeBuffer } from '../test-support';
 import { SpeedAudioTrack } from './track';
 
@@ -91,6 +91,46 @@ describe('SpeedAudioTrack', () => {
     track.stop();
 
     expect(second.stopped).toBe(true);
+  });
+
+  it('fires the passed onEnded callback when its source genuinely ends', () => {
+    const track = makeTrack();
+    const onEnded = vi.fn();
+
+    track.scheduleChunk(
+      0,
+      makeBuffer([[1]]) as unknown as AudioBuffer,
+      0,
+      onEnded,
+    );
+
+    const [source] = context.bufferSources;
+
+    source.emitEnded();
+
+    expect(onEnded).toHaveBeenCalledTimes(1);
+  });
+
+  it('detaches the onEnded callback on a manual stop, so a stop-triggered native ended event cannot masquerade as a genuine end', () => {
+    // Real AudioBufferSourceNode.stop() itself fires 'ended' - without this
+    // cleanup, an ordinary pause/seek/restart on the song's last scheduled
+    // chunk would look identical to actually reaching the end.
+    const track = makeTrack();
+    const onEnded = vi.fn();
+
+    track.scheduleChunk(
+      0,
+      makeBuffer([[1]]) as unknown as AudioBuffer,
+      0,
+      onEnded,
+    );
+
+    const [source] = context.bufferSources;
+
+    track.stop();
+    source.emitEnded();
+
+    expect(onEnded).not.toHaveBeenCalled();
   });
 
   it('disconnects gain nodes on destroy', () => {

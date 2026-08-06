@@ -720,6 +720,9 @@ describe('practice mode', () => {
     });
 
     await view.loadSong();
+    // Loop-locking a section only applies while looping is on - looping now
+    // defaults off, so opt in explicitly for this test.
+    view.clickTestId('loop-toggle');
 
     await view.pressKey('ArrowRight');
     await view.pressKey('Enter');
@@ -825,6 +828,7 @@ describe('practice loop selection', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.clickTestId('loop-toggle');
 
     const [a, b] = view.measureHighlights();
 
@@ -840,6 +844,7 @@ describe('practice loop selection', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.clickTestId('loop-toggle');
 
     const [a, b] = view.measureHighlights();
 
@@ -853,6 +858,7 @@ describe('practice loop selection', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.clickTestId('loop-toggle');
 
     const [a, b] = view.measureHighlights();
 
@@ -866,8 +872,8 @@ describe('practice loop selection', () => {
   it('does not select while looping is off', async () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
+    // Looping defaults off - nothing to toggle.
     await view.loadSong();
-    view.clickTestId('loop-toggle');
 
     fireEvent.mouseDown(view.measureHighlights()[0]);
 
@@ -878,6 +884,7 @@ describe('practice loop selection', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.clickTestId('loop-toggle');
 
     fireEvent.mouseDown(view.measureHighlights()[0]);
     expect(screen.getByText('Looping Section')).toBeInTheDocument();
@@ -893,8 +900,8 @@ describe('practice loop selection', () => {
       settings: { countIn: false },
     });
 
+    // Looping defaults off - nothing to toggle.
     await view.loadSong();
-    view.clickTestId('loop-toggle');
 
     fireEvent.click(view.measureHighlights()[1]);
 
@@ -907,6 +914,7 @@ describe('practice loop selection', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.clickTestId('loop-toggle');
 
     const [a] = view.measureHighlights();
     const container = a.closest('main') as HTMLElement;
@@ -947,6 +955,7 @@ describe('practice loop selection', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.clickTestId('loop-toggle');
 
     const [a] = view.measureHighlights();
     const container = a.closest('main') as HTMLElement;
@@ -976,6 +985,7 @@ describe('practice loop selection', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.clickTestId('loop-toggle');
 
     const [a] = view.measureHighlights();
     const container = a.closest('main') as HTMLElement;
@@ -1437,6 +1447,7 @@ describe('in-practice difficulty switching', () => {
       makeSong({ drumDifficulties: ['medium', 'expert'] }),
       MULTI_DIFFICULTY_CHART,
     );
+    view.clickTestId('loop-toggle');
 
     // Expert has 2 measures here; Medium's last note (tick 384) truncates
     // it to just 1. Select the second (Expert-only) measure.

@@ -60,7 +60,13 @@ export function usePracticeSession({
   const [loopAnchor, setLoopAnchor] = useState<number>();
   const [practiceRange, setPracticeRange] = useState<PracticeRange>();
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [isLooping, setIsLooping] = useState(true);
+  // Looping used to default to on, which (combined with no practice range
+  // selected looping the whole song) meant a practice run's onEnded never
+  // fired - no ScoreSummary, no saved analytics, just a silent infinite
+  // loop. Looping is opt-in now. This is plain useState, not usePersisted -
+  // there is no localStorage key backing it anywhere in the app, so there
+  // is no stale stored `true` from before this fix to migrate away from.
+  const [isLooping, setIsLooping] = useState(false);
 
   useEffect(() => {
     if (!policy.speedControl) {

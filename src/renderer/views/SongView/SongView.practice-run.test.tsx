@@ -82,10 +82,9 @@ describe('practice mode analytics', () => {
         }),
       );
 
-      // Practice defaults to looping the whole song, which never truly
-      // "ends" playback (Transport restarts the loop instead) - turn it
-      // off so this run can actually reach the end and fire onEnded.
-      view.clickTestId('loop-toggle');
+      // Looping now defaults off (a practice run must be able to reach
+      // onEnded without an explicit opt-in), so this run reaches the end
+      // and fires onEnded with no toggle needed.
       view.clickPlay();
 
       await act(async () => {
