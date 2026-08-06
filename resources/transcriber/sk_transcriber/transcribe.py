@@ -24,6 +24,7 @@ writer does not need to know which engine produced it.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import urllib.request
@@ -47,7 +48,11 @@ LANES = ("kick", "snare", "hihat", "tom", "cymbal")
 # not a transient network issue). This is a community HuggingFace mirror of
 # a different, MIT-licensed drum-substem model (4 stems instead of 6: no
 # separate ride/crash) that serves the same purpose in this pipeline.
-DRUMSEP_URL = "https://huggingface.co/vincewin/drumsep/resolve/main/49469ca8.th"
+DRUMSEP_REVISION = "18ebf41e59553e82e42cd92be2643671109c1e13"
+DRUMSEP_SHA256 = "aefaa8543c9b9c75e22f5f32b53ab86dfe416457849af1383ff1aef83401423f"
+DRUMSEP_URL = (
+    f"https://huggingface.co/vincewin/drumsep/resolve/{DRUMSEP_REVISION}/49469ca8.th"
+)
 DRUMSEP_MIN_BYTES = (
     150_000_000  # sanity floor so a truncated download isn't silently used
 )
@@ -158,18 +163,32 @@ def _dedupe_same_lane(hits: list[DrumHit], min_gap: float = 0.03) -> list[DrumHi
 
 
 def _get_drumsep_checkpoint(reporter: ProgressReporter, stage: str) -> Path:
-    if DRUMSEP_CACHE.exists() and DRUMSEP_CACHE.stat().st_size >= DRUMSEP_MIN_BYTES:
-        return DRUMSEP_CACHE
+    def verify(path: Path) -> bool:
+        if path.stat().st_size < DRUMSEP_MIN_BYTES:
+            return False
+        digest = hashlib.sha256()
+        with path.open("rb") as checkpoint:
+            for chunk in iter(lambda: checkpoint.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest() == DRUMSEP_SHA256
+
+    if DRUMSEP_CACHE.exists():
+        if verify(DRUMSEP_CACHE):
+            return DRUMSEP_CACHE
+        DRUMSEP_CACHE.unlink(missing_ok=True)
+        raise RuntimeError("cached DrumSep checkpoint failed SHA-256 verification")
     DRUMSEP_CACHE.parent.mkdir(parents=True, exist_ok=True)
     reporter.report(
         stage, 0.02, "Downloading DrumSep sub-stem model (one-time, ~160MB)"
     )
     tmp = DRUMSEP_CACHE.with_suffix(".tmp")
-    urllib.request.urlretrieve(DRUMSEP_URL, tmp)  # noqa: S310 — fixed, hardcoded HTTPS URL
+    urllib.request.urlretrieve(DRUMSEP_URL, tmp)
     size = tmp.stat().st_size
-    if size < DRUMSEP_MIN_BYTES:
+    if size < DRUMSEP_MIN_BYTES or not verify(tmp):
         tmp.unlink(missing_ok=True)
-        raise RuntimeError(f"DrumSep checkpoint download truncated ({size} bytes)")
+        raise RuntimeError(
+            f"DrumSep checkpoint download failed size/SHA-256 verification ({size} bytes)"
+        )
     tmp.rename(DRUMSEP_CACHE)
     return DRUMSEP_CACHE
 
