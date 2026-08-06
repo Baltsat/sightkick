@@ -198,21 +198,35 @@ export class Judge {
     controlId: string,
     timeSeconds: number,
   ): void {
-    if (
+    // Visual honesty vs. scoring lenience: a wrong hit is shown at the
+    // timing it was struck, unqualified — the player sees exactly what
+    // they did, silent region or not. Scoring stays lenient: a hit inside
+    // a silent (rest-only) region only counts against the score when it
+    // lands close enough to a real note to plausibly be a miss-hit, so a
+    // warm-up tap in a quiet stretch doesn't tank the score even though it
+    // still renders a marker. A hit with no containing measure at all
+    // (before the first measure / after the last) has nowhere to anchor a
+    // marker, so it's dropped entirely either way.
+    const scoreable =
       !this.isInSilentRegion(tick) ||
-      this.hasScoreableNoteNear(tick, toleranceTicks)
-    ) {
+      this.hasScoreableNoteNear(tick, toleranceTicks);
+
+    if (scoreable) {
       this.falseHitTicks.push(tick);
-
-      const record: FalseHitRecord = {
-        tick,
-        controlId,
-        element: this.resolveElement(controlId),
-        timeSeconds,
-      };
-
-      this.falseHitListeners.forEach((listener) => listener(record));
     }
+
+    if (!scoreable && !this.containingMeasure(tick)) {
+      return;
+    }
+
+    const record: FalseHitRecord = {
+      tick,
+      controlId,
+      element: this.resolveElement(controlId),
+      timeSeconds,
+    };
+
+    this.falseHitListeners.forEach((listener) => listener(record));
   }
 
   handleInput({ controlId, value }: InputEvent): void {

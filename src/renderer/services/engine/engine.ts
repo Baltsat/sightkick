@@ -53,7 +53,19 @@ export class Engine {
       },
       onEnded: () => this.handleEnded(),
       onError: options.onError,
-      onSeek: (tick) => this.judge.rewindTo(tick),
+      onSeek: (tick) => {
+        this.judge.rewindTo(tick);
+        // Transport updates its position (which synchronously drives a
+        // plain renderFrame() through the timeStore subscription) before
+        // invoking this callback, so that first pass can run against
+        // pre-rewind Judge state. Render again, forced, now that the
+        // Judge's hit state actually reflects the seek destination — the
+        // renderer needs this even when the seek lands on the same active
+        // note, since its vanished/missed/wrong-hit state may still be
+        // stale. Both passes happen synchronously within this call, before
+        // anything is painted, so nothing stale is ever visible.
+        this.renderFrame(true);
+      },
     });
     this.timeUnsub = this.transport.timeStore.subscribe(this.handleFrame);
     this.transportUnsub = this.transport.subscribe(this.handleTransportChange);
@@ -169,7 +181,7 @@ export class Engine {
     this.transport.setPlaybackSpeed(speed);
   }
 
-  renderFrame(): void {
+  renderFrame(isSeek = false): void {
     if (!this.chart) {
       return;
     }
@@ -182,7 +194,7 @@ export class Engine {
     );
 
     this.judge.setTick(tick);
-    this.renderer.render(chartTime, tick);
+    this.renderer.render(chartTime, tick, isSeek);
   }
 
   dispose(): void {

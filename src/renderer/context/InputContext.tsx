@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useState,
 } from 'react';
 import { App } from 'antd';
 import { clamp, mapValues, uniq, without } from 'es-toolkit';
@@ -133,10 +134,22 @@ function assignControlInto(
 }
 
 const InputContext = createContext<InputContextValue | null>(null);
+const SELECTED_DEVICE_KEY = 'settings.selectedDevice';
 
 export function InputProvider({ children }: { children: ReactNode }) {
+  // Captured once, synchronously, during the first render — before
+  // `usePersisted`'s own write-back effect below has a chance to run and
+  // persist its default. This is the only reliable way to tell "this
+  // profile has never recorded a device preference" apart from "the
+  // preference is currently null" (a stored explicit "- None -" choice, or
+  // a previously-selected device that later disappeared, both also read
+  // back as null). Only a genuinely never-stored profile is eligible for
+  // auto-selecting a lone MIDI device below.
+  const [hadStoredDevice] = useState(
+    () => localStorage.getItem(SELECTED_DEVICE_KEY) !== null,
+  );
   const [selectedDevice, setSelectedDevice] = usePersisted<InputDevice | null>(
-    'settings.selectedDevice',
+    SELECTED_DEVICE_KEY,
     null,
   );
   const [inputMappings, setInputMappings] = usePersisted<
@@ -256,11 +269,25 @@ export function InputProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     inputBus.listDevices().then((list) => {
-      setSelectedDevice((prev: InputDevice | null) =>
-        prev && list.some((d) => d.id === prev.id) ? prev : null,
-      );
+      setSelectedDevice((prev: InputDevice | null) => {
+        if (prev) {
+          return list.some((d) => d.id === prev.id) ? prev : null;
+        }
+
+        // Nothing selected yet. Auto-pick a sole MIDI device, but only for
+        // a profile with no recorded preference at all — an explicit
+        // "- None -" choice (or the aftermath of a device disconnecting)
+        // must stay respected even though it also reads back as null.
+        if (hadStoredDevice) {
+          return null;
+        }
+
+        const midiDevices = list.filter((d) => d.sourceId === 'midi');
+
+        return midiDevices.length === 1 ? midiDevices[0] : null;
+      });
     });
-  }, [setSelectedDevice]);
+  }, [setSelectedDevice, hadStoredDevice]);
 
   useEffect(() => {
     if (selectedDevice?.sourceId !== 'midi') {

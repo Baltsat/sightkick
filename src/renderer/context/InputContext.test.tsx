@@ -33,6 +33,22 @@ function stopCount() {
   return ipc.sent.filter((s) => s.channel === 'stop-listen-midi').length;
 }
 
+// inputBus.listDevices() chains through InputBus -> MidiSource's IPC
+// round-trip -> InputContext's own .then(); a single microtask tick isn't
+// enough to drain it, and a real device list only ever arrives async, so
+// wait a macrotask (draining every pending microtask first) rather than
+// pin an exact hop count.
+async function respondWithMidiDevices(
+  devices: { name: string; port: number }[],
+) {
+  await act(async () => {
+    ipc.emit('midi-device-list', devices);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  });
+}
+
 beforeEach(() => {
   installLocalStorage();
   ipc = installIpcMock();
@@ -447,6 +463,59 @@ describe('InputContext input latency', () => {
 
     act(() => result.current.setInputLatencyMs(-9999));
     expect(result.current.inputLatencyMs).toBe(-200);
+  });
+});
+
+describe('InputContext MIDI auto-select', () => {
+  it('auto-selects the sole MIDI device found on a fresh profile', async () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
+
+    expect(result.current.selectedDevice).toEqual(DEVICE_A);
+  });
+
+  it('does not auto-select when more than one MIDI device is found', async () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    await respondWithMidiDevices([
+      { name: 'Pad A', port: 2 },
+      { name: 'Pad B', port: 5 },
+    ]);
+
+    expect(result.current.selectedDevice).toBeNull();
+  });
+
+  it('does not count the always-present keyboard entry as a MIDI device', async () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    // No real MIDI hardware — the device list is just the synthetic
+    // keyboard entry every source list includes.
+    await respondWithMidiDevices([]);
+
+    expect(result.current.selectedDevice).toBeNull();
+  });
+
+  it('respects a previously stored explicit "- None -" choice instead of auto-selecting', async () => {
+    // Simulate a returning profile that has already recorded a choice —
+    // even though it currently reads back as null, it must not be treated
+    // as "never chosen".
+    localStorage.setItem('settings.selectedDevice', 'null');
+
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
+
+    expect(result.current.selectedDevice).toBeNull();
+  });
+
+  it('does not override an already-selected device that is still present', async () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(DEVICE_A));
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
+
+    expect(result.current.selectedDevice).toEqual(DEVICE_A);
   });
 });
 

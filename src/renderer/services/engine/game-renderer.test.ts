@@ -399,6 +399,40 @@ describe('GameRenderer whole-note vanish on hit', () => {
     expect(hasClass(n0, 'vf-note-hidden')).toBe(false);
   });
 
+  it('restores a vanished note on a backward seek that lands on the same active note', () => {
+    // Unlike the test above, the active note itself (n2) stays the same
+    // NotePos across both render calls — only an earlier, already-walked
+    // note's hit state changes. Without the `isSeek` flag forcing
+    // reconciliation, syncActiveNote would short-circuit on the unchanged
+    // NotePos and never re-walk n1, leaving it incorrectly vanished.
+    const n0 = staveNote(['c/5']);
+    const n1 = staveNote(['d/5']);
+    const n2 = staveNote(['e/5']);
+    const n3 = staveNote(['f/5']);
+    let n1Hit = true;
+    const isHit = (tick: number, prefix: string) =>
+      n1Hit && tick === 240 && prefix === 'd/5';
+    const view = setup(
+      [
+        measureData(0, 1920, [
+          rendered(0, n0),
+          rendered(240, n1),
+          rendered(480, n2),
+          rendered(960, n3),
+        ]),
+      ],
+      { isHit },
+    );
+
+    view.render(0, 700);
+    expect(hasClass(n1, 'vf-note-hidden')).toBe(true);
+
+    n1Hit = false;
+    view.render(0, 500, true);
+
+    expect(hasClass(n1, 'vf-note-hidden')).toBe(false);
+  });
+
   it('clears all vanish state on reset so it does not leak across songs', () => {
     const note = staveNote(['c/5']);
     const isHit = () => true;
@@ -507,6 +541,25 @@ describe('GameRenderer miss markers', () => {
     view.render(0, 0);
 
     expect(overlay.querySelectorAll('.vf-miss-marker').length).toBe(0);
+  });
+
+  it('marks the final note of a chart as missed once playback reaches the end', () => {
+    // A single-note chart: there is no "next" note whose activation would
+    // normally walk and resolve this one, so it needs the chart-ended
+    // path to ever receive its persistent miss treatment.
+    const n0 = staveNote(['c/5']);
+    const overlay = div();
+    const view = setup([measureData(0, 480, [rendered(0, n0)])], {
+      overlayEl: overlay,
+    });
+
+    view.render(0, 0);
+    expect(overlay.querySelector('.vf-miss-marker')).toBeNull();
+
+    view.render(0, 480);
+
+    expect(overlay.querySelector('.vf-miss-marker')).not.toBeNull();
+    expect(hasClass(n0, 'vf-note-missed')).toBe(true);
   });
 });
 

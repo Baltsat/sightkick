@@ -51,6 +51,7 @@ export class GameRenderer {
   private measureIdx = -1;
   private activePos: NotePos | undefined;
   private coloredPos: NotePos | undefined;
+  private endResolved = false;
   private activeEls: SVGElement[] = [];
   private filledEls = new Set<SVGElement>();
   private vanishedNotes = new Map<StaveNote, SVGElement[]>();
@@ -88,9 +89,9 @@ export class GameRenderer {
     this.reset();
   }
 
-  render(chartTime: number, tick: number): void {
+  render(chartTime: number, tick: number, isSeek = false): void {
     this.syncMeasure(tick);
-    this.syncActiveNote(tick);
+    this.syncActiveNote(tick, isSeek);
     this.updateCursor(chartTime);
   }
 
@@ -183,6 +184,7 @@ export class GameRenderer {
     this.measureIdx = -1;
     this.activePos = undefined;
     this.coloredPos = undefined;
+    this.endResolved = false;
     this.scrollContainer = undefined;
     this.cursorShown = false;
     this.cursorHeight = -1;
@@ -237,10 +239,20 @@ export class GameRenderer {
     return tick >= measure.startTick && tick < measure.endTick ? idx : -1;
   }
 
-  private syncActiveNote(tick: number): void {
+  private syncActiveNote(tick: number, isSeek: boolean): void {
     const pos = this.locateActiveNote(tick);
+    const atEnd = this.isChartEnded(tick);
+    // A seek must reconcile even when it lands on the same NotePos as
+    // before (the Judge's hit state may have been rewound underneath us —
+    // see engine.ts's onSeek). Reaching/passing the end of the chart needs
+    // the same one-time forced pass so the final note gets resolved, since
+    // there is no "next" note to trigger it normally; `endResolved` keeps
+    // that from re-running on every subsequent frame while parked there.
+    const forceSync = isSeek || (atEnd && !this.endResolved);
 
-    if (samePos(pos, this.activePos)) {
+    this.endResolved = atEnd;
+
+    if (!forceSync && samePos(pos, this.activePos)) {
       return;
     }
 
@@ -249,7 +261,13 @@ export class GameRenderer {
     const target = pos ? this.toActiveNote(pos) : undefined;
 
     this.applyActive(target);
-    this.applyColoring(target, tick);
+    this.applyColoring(target, tick, isSeek, atEnd);
+  }
+
+  private isChartEnded(tick: number): boolean {
+    const rd = this.renderData;
+
+    return rd.length > 0 && tick >= rd[rd.length - 1].measure.endTick;
   }
 
   private locateActiveNote(tick: number): NotePos | undefined {
@@ -296,6 +314,8 @@ export class GameRenderer {
   private applyColoring(
     target: ActiveNote | undefined,
     currentTick: number,
+    isSeek: boolean,
+    atEnd: boolean,
   ): void {
     const clearAll = () => {
       this.filledEls.forEach((el) => {
@@ -320,11 +340,22 @@ export class GameRenderer {
     const { measureIdx, noteIdx } = target;
     const curNotes = this.renderData[measureIdx].renderedNotes;
     const prev = this.coloredPos;
-    const isBackward =
+    const isPositionBackward =
       prev !== undefined &&
       (measureIdx < prev.measureIdx ||
         (measureIdx === prev.measureIdx && noteIdx < prev.noteIdx));
+    // A seek forces the same full clear-and-replay reconciliation as an
+    // actual backward jump in NotePos, even when the active note itself
+    // didn't move: the engine may have rewound the Judge's hit state past
+    // this point (engine.ts's onSeek -> judge.rewindTo), and that has to
+    // be reflected in the notes/markers we already walked.
+    const isBackward = isSeek || isPositionBackward;
     const flashMisses = !isBackward;
+    // At (or past) the end of the chart there's no "next" note whose
+    // activation would normally walk and resolve this one, so fold the
+    // active note itself into its own walk range to give it the same
+    // persistent miss/vanish treatment as any other passed note.
+    const endExclusive = atEnd ? noteIdx + 1 : noteIdx;
     const colorNote = (
       el: SVGElement,
       tick: number,
@@ -358,7 +389,7 @@ export class GameRenderer {
         );
       }
 
-      for (let i = 0; i < noteIdx; i++) {
+      for (let i = 0; i < endExclusive; i++) {
         const { note, tick } = curNotes[i];
 
         walkNote(measureIdx, note, tick);
@@ -368,7 +399,7 @@ export class GameRenderer {
       const fromNote = prev?.noteIdx ?? 0;
 
       if (fromMeasure === measureIdx) {
-        for (let i = fromNote; i < noteIdx; i++) {
+        for (let i = fromNote; i < endExclusive; i++) {
           const { note, tick } = curNotes[i];
 
           walkNote(measureIdx, note, tick);
@@ -389,7 +420,7 @@ export class GameRenderer {
           );
         }
 
-        for (let i = 0; i < noteIdx; i++) {
+        for (let i = 0; i < endExclusive; i++) {
           const { note, tick } = curNotes[i];
 
           walkNote(measureIdx, note, tick);

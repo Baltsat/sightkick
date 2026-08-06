@@ -407,7 +407,7 @@ describe('Judge', () => {
     expect(engine.falseHitCount).toBe(0);
   });
 
-  it('does not count a false hit inside a fully silent measure', () => {
+  it('does not count a false hit inside a fully silent measure toward the score', () => {
     const { engine } = setup(
       {
         measures: [
@@ -426,6 +426,28 @@ describe('Judge', () => {
     expect(engine.falseHitCount).toBe(0);
   });
 
+  it('still shows a false hit made inside a fully silent measure, since it was really struck', () => {
+    const onFalseHit = vi.fn();
+    const { engine } = setup(
+      {
+        measures: [
+          measure([note(['c/5'], 480, { isRest: true })], {
+            startTick: 0,
+            endTick: 1920,
+          }),
+        ],
+      },
+      { tick: 480 },
+    );
+
+    engine.onFalseHit(onFalseHit);
+    engine.handleInput(hit('midi:38'));
+
+    expect(onFalseHit).toHaveBeenCalledWith(
+      expect.objectContaining({ tick: 480, controlId: 'midi:38' }),
+    );
+  });
+
   it('still counts a false hit in a measure that contains notes', () => {
     const { engine } = setup(
       {
@@ -441,7 +463,8 @@ describe('Judge', () => {
     expect(engine.falseHitCount).toBe(1);
   });
 
-  it('does not count a false hit past the last measure', () => {
+  it('does not count or show a false hit past the last measure', () => {
+    const onFalseHit = vi.fn();
     const { engine } = setup(
       {
         measures: [
@@ -451,10 +474,14 @@ describe('Judge', () => {
       { tick: 5000 },
     );
 
+    engine.onFalseHit(onFalseHit);
     engine.handleInput(hit('midi:38'));
 
     expect(engine.hitCount).toBe(0);
     expect(engine.falseHitCount).toBe(0);
+    // Genuinely outside the chart's bounds (not just a silent region),
+    // there is nowhere to anchor a marker, so it isn't shown either.
+    expect(onFalseHit).not.toHaveBeenCalled();
   });
 
   it('still registers a late hit on the final note past the last measure', () => {
