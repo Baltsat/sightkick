@@ -25,6 +25,7 @@ import { calculateAccuracy } from '../../scoring';
 import { usePracticeSession } from '../../hooks/usePracticeSession';
 import { useSheetMusic } from '../../hooks/useSheetMusic';
 import { useInputControls } from '../../hooks/useInputControls';
+import { useTransportShortcuts } from '../../hooks/useTransportShortcuts';
 import { ScoreSummary } from '../../components/ScoreSummary';
 import { CountIn } from '../../components/CountIn';
 import { ScoreData } from '../../../types';
@@ -218,6 +219,7 @@ export function SongView() {
     practiceRange,
     playbackSpeed,
     setPlaybackSpeed,
+    stepSpeed,
     isLooping,
     setIsLooping,
     onPracticeRangeChange,
@@ -274,6 +276,15 @@ export function SongView() {
     !isLoading,
     isPlaying || isCounting ? kitControlIds : undefined,
   );
+
+  const transportIndicator = useTransportShortcuts({
+    enabled: !isLoading,
+    engine,
+    duration,
+    speedControl: policy.speedControl,
+    onStepSpeed: stepSpeed,
+    controlMapping,
+  });
 
   useEffect(() => {
     window.electron.ipcRenderer.sendMessage('prevent-sleep');
@@ -499,6 +510,16 @@ export function SongView() {
           </div>
         )}
         <CountIn count={countInBeat} beatMs={countInBeatMs} />
+        {transportIndicator && (
+          <div
+            data-testid="transport-indicator"
+            className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+          >
+            <div className="rounded-full bg-bg/85 px-6 py-3 font-ui text-xl font-semibold text-text shadow-paper-strong">
+              {transportIndicator.label}
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

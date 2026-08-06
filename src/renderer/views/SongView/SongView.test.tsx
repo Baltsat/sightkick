@@ -408,6 +408,224 @@ describe('transport controls', () => {
   });
 });
 
+describe('keyboard transport shortcuts', () => {
+  it('toggles pause and resume with Space, with zero configuration', async () => {
+    const view = setupSongView({ settings: { countIn: false } });
+
+    await view.loadSong();
+
+    await view.pressKey('Space');
+    expect(view.startedSources().length).toBeGreaterThan(0);
+
+    await view.pressKey('Space');
+    expect(view.audio.state).toBe('suspended');
+
+    await view.pressKey('Space');
+    expect(view.audio.state).toBe('running');
+  });
+
+  it('lets an explicit ControlMapping binding own Space entirely, instead of layering the default on top', async () => {
+    const view = setupSongView({
+      settings: { countIn: false },
+      keyboard: {
+        controls: { confirm: ['keyboard:Enter'], pause: ['keyboard:Space'] },
+      },
+    });
+
+    await view.loadSong();
+
+    await view.pressKey('Enter');
+    await view.pressKey('Space');
+    expect(view.audio.state).toBe('suspended');
+
+    // The mapped 'pause' control only pauses - it never toggles back to
+    // play. If the new keyboard default were also layered on this key it
+    // would resume here; it must not, since the user explicitly claimed
+    // Space via ControlMapping.
+    await view.pressKey('Space');
+    expect(view.audio.state).toBe('suspended');
+  });
+
+  it('seeks forward and backward by 15 seconds and shows a transient indicator', async () => {
+    // Fake timers keep this deterministic under system load: the
+    // indicator auto-hides itself after ~900ms of real time, which a slow
+    // test run could otherwise blow through before the assertion runs.
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView();
+
+      await view.loadSong();
+
+      await view.pressKey('ArrowRight');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+15s',
+      );
+
+      await view.pressKey('ArrowLeft');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '-15s',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('accelerates repeated same-direction presses within the idle window, capping at 60s', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView();
+
+      await view.loadSong();
+
+      await view.pressKey('ArrowRight');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+15s',
+      );
+
+      await view.pressKey('ArrowRight');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+30s',
+      );
+
+      await view.pressKey('ArrowRight');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+60s',
+      );
+
+      await view.pressKey('ArrowRight');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+60s',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('resets the seek interval once the idle window elapses', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView();
+
+      await view.loadSong();
+
+      await view.pressKey('ArrowRight');
+      await view.pressKey('ArrowRight');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+30s',
+      );
+
+      await act(async () => {
+        vi.advanceTimersByTime(2000);
+      });
+      await view.pressKey('ArrowRight');
+
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+15s',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('resets the seek interval when the direction changes', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView();
+
+      await view.loadSong();
+
+      await view.pressKey('ArrowRight');
+      await view.pressKey('ArrowRight');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+30s',
+      );
+
+      await view.pressKey('ArrowLeft');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '-15s',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clamps a backward seek at the start of the song', async () => {
+    const view = setupSongView();
+
+    await view.loadSong();
+
+    await view.pressKey('ArrowLeft');
+
+    await waitFor(() => {
+      expect(view.currentTimeText()).toBe('00:00');
+    });
+  });
+
+  it('steps the practice speed with the arrow keys, within the existing bounds', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong();
+
+    const speed = () =>
+      (screen.getByRole('spinbutton') as HTMLInputElement).value;
+
+    expect(speed()).toBe('1.0');
+
+    await view.pressKey('ArrowUp');
+    expect(speed()).toBe('1.1');
+
+    await view.pressKey('ArrowDown');
+    await view.pressKey('ArrowDown');
+    expect(speed()).toBe('0.9');
+  });
+
+  it('shows a locked hint instead of changing speed in Perform mode', async () => {
+    const view = setupSongView();
+
+    await view.loadSong();
+
+    await view.pressKey('ArrowUp');
+
+    expect(screen.getByText('Speed locked in Perform')).toBeInTheDocument();
+  });
+
+  it('ignores the shortcuts while a text input has focus', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong();
+
+    const spinbutton = screen.getByRole('spinbutton');
+
+    await act(async () => {
+      fireEvent.keyDown(spinbutton, { code: 'Space' });
+    });
+
+    expect(view.startedSources()).toHaveLength(0);
+  });
+
+  it('ignores the shortcuts while the score modal has focus', async () => {
+    const view = setupSongView({ settings: { countIn: false } });
+
+    await view.loadSong();
+
+    view.clickPlay();
+    await view.finishSong();
+
+    const modal = screen.getByTestId('score-modal');
+    const accuracyText = within(modal).getByText(/accuracy|Perfect/);
+
+    await act(async () => {
+      fireEvent.keyDown(accuracyText, { code: 'ArrowRight' });
+    });
+
+    expect(screen.queryByTestId('transport-indicator')).toBeNull();
+  });
+});
+
 describe('exporting a PDF', () => {
   it('sends the rendered sheet to main and reports success', async () => {
     const view = setupSongView();
@@ -567,6 +785,41 @@ describe('practice mode', () => {
   });
 });
 
+// jsdom applies no real CSS (see vitest.config.ts's css module mock), so
+// the `<main class="... overflow-auto ...">` scroll container SheetMusic's
+// getScrollParent walks up to never actually resolves as scrollable unless
+// its scroll geometry is stubbed directly, the same way
+// services/engine/helpers.test.ts stubs it for getScrollParent's own tests.
+function makeScrollable(
+  el: HTMLElement,
+  {
+    scrollHeight,
+    clientHeight,
+  }: { scrollHeight: number; clientHeight: number },
+) {
+  el.style.overflowY = 'auto';
+  Object.defineProperty(el, 'scrollHeight', {
+    value: scrollHeight,
+    configurable: true,
+  });
+  Object.defineProperty(el, 'clientHeight', {
+    value: clientHeight,
+    configurable: true,
+  });
+  el.getBoundingClientRect = () =>
+    ({
+      top: 0,
+      bottom: clientHeight,
+      left: 0,
+      right: 800,
+      width: 800,
+      height: clientHeight,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    }) as DOMRect;
+}
+
 describe('practice loop selection', () => {
   it('selects a loop range by dragging across measures', async () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
@@ -648,6 +901,110 @@ describe('practice loop selection', () => {
     await waitFor(() => {
       expect(view.startedSources().length).toBeGreaterThan(0);
     });
+  });
+
+  it('scrolls the sheet by wheel while a selection drag is in progress', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong();
+
+    const [a] = view.measureHighlights();
+    const container = a.closest('main') as HTMLElement;
+
+    makeScrollable(container, { scrollHeight: 2000, clientHeight: 500 });
+    container.scrollTop = 100;
+
+    fireEvent.mouseDown(a);
+
+    await act(async () => {
+      fireEvent.wheel(window, { deltaY: 120, deltaX: 0 });
+    });
+
+    expect(container.scrollTop).toBe(220);
+  });
+
+  it('leaves plain (non-drag) wheel scrolling untouched', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong();
+
+    const [a] = view.measureHighlights();
+    const container = a.closest('main') as HTMLElement;
+
+    makeScrollable(container, { scrollHeight: 2000, clientHeight: 500 });
+    container.scrollTop = 100;
+
+    // No mousedown/drag in progress - the wheel listener must back off and
+    // leave the browser's own native scroll handling alone.
+    await act(async () => {
+      fireEvent.wheel(window, { deltaY: 120, deltaX: 0 });
+    });
+
+    expect(container.scrollTop).toBe(100);
+  });
+
+  it('auto-scrolls the sheet when a selection drag nears the top edge of the viewport', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong();
+
+    const [a] = view.measureHighlights();
+    const container = a.closest('main') as HTMLElement;
+
+    makeScrollable(container, { scrollHeight: 2000, clientHeight: 500 });
+    container.scrollTop = 300;
+
+    fireEvent.mouseDown(a);
+
+    await act(async () => {
+      // Right at the container's own top edge - the fastest auto-scroll
+      // speed, scrolling up (revealing earlier measures).
+      fireEvent.mouseMove(window, { clientY: 0 });
+    });
+
+    await waitFor(
+      () => {
+        expect(container.scrollTop).toBeLessThan(300);
+      },
+      { timeout: 5000 },
+    );
+
+    fireEvent.mouseUp(document.body);
+  });
+
+  it('stops auto-scrolling once the drag ends', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong();
+
+    const [a] = view.measureHighlights();
+    const container = a.closest('main') as HTMLElement;
+
+    makeScrollable(container, { scrollHeight: 2000, clientHeight: 500 });
+    container.scrollTop = 300;
+
+    fireEvent.mouseDown(a);
+
+    await act(async () => {
+      fireEvent.mouseMove(window, { clientY: 0 });
+    });
+
+    await waitFor(
+      () => {
+        expect(container.scrollTop).toBeLessThan(300);
+      },
+      { timeout: 5000 },
+    );
+
+    fireEvent.mouseUp(document.body);
+
+    const afterDragEnds = container.scrollTop;
+
+    // Give any still-running auto-scroll loop a real chance to keep
+    // ticking; the position must not keep moving once the drag has ended.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(container.scrollTop).toBe(afterDragEnds);
   });
 });
 
