@@ -14,6 +14,7 @@ import {
   fetchOfficialYoutubeMetadata,
   parseSkEventLine,
   parseWorkerLine,
+  validateSightkickRuntime,
   validateLocalAudioFile,
 } from './autoChart';
 import { lastReply, makeEvent } from './test-support';
@@ -157,6 +158,12 @@ function createHarness(options: HarnessOptions = {}) {
           'The bundled SightKick transcriber is missing; reinstall SightKick or switch to the OCTAVE backend',
         );
       }
+
+      return {
+        runnerPath: '/transcriber/run.sh',
+        ffmpegPath: '/ffmpeg',
+        dataDir: '/transcriber-data',
+      };
     },
     octaveRunner,
     sightkickRunner,
@@ -318,6 +325,49 @@ describe('auto-chart source and worker protocol', () => {
     expect(() => validateLocalAudioFile(writeAudio(root, 'track.txt'))).toThrow(
       'WAV, MP3, OGG, OPUS, or FLAC',
     );
+  });
+
+  it('reports distinct sidecar preflight failures', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auto-chart-runtime-'));
+
+    cleanup.push(root);
+
+    const runnerPath = path.join(root, 'run.sh');
+    const ffmpegPath = path.join(root, 'ffmpeg');
+    const uvPath = path.join(root, 'uv');
+
+    for (const filePath of [runnerPath, ffmpegPath, uvPath]) {
+      fs.writeFileSync(filePath, '');
+      fs.chmodSync(filePath, 0o700);
+    }
+
+    expect(() =>
+      validateSightkickRuntime({
+        runnerPath: path.join(root, 'missing-run.sh'),
+        ffmpegPath,
+        uvPath,
+        dataDir: root,
+      }),
+    ).toThrow('transcriber is missing');
+    expect(() =>
+      validateSightkickRuntime({
+        runnerPath,
+        ffmpegPath: path.join(root, 'missing-ffmpeg'),
+        uvPath,
+        dataDir: root,
+      }),
+    ).toThrow('ffmpeg runtime is missing');
+    expect(() =>
+      validateSightkickRuntime({ runnerPath, ffmpegPath, dataDir: root }),
+    ).toThrow('uv or Python 3.12+');
+    expect(
+      validateSightkickRuntime({
+        runnerPath,
+        ffmpegPath,
+        uvPath,
+        dataDir: root,
+      }),
+    ).toMatchObject({ runnerPath, ffmpegPath, uvPath, dataDir: root });
   });
 
   it('parses only structured OCTAVE worker events', () => {

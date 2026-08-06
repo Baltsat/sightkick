@@ -88,6 +88,15 @@ interface SightkickRunInput {
   youtubeUrl?: string;
   audioPath?: string;
   difficulty?: string;
+  runtime: SightkickRuntime;
+}
+
+export interface SightkickRuntime {
+  runnerPath: string;
+  ffmpegPath: string;
+  dataDir: string;
+  uvPath?: string;
+  pythonPath?: string;
 }
 
 export interface AutoChartRunner {
@@ -113,7 +122,7 @@ interface AutoChartDependencies {
   createTempDir: (id: string) => Promise<string>;
   detectBackends: () => AutoChartBackends;
   preflightOctave: () => OctaveRuntime;
-  preflightSightkick: () => void;
+  preflightSightkick: () => SightkickRuntime;
   octaveRunner: AutoChartRunner;
   sightkickRunner: SightkickRunner;
   preview: (
@@ -597,9 +606,120 @@ function resolveSightkickRunnerPath(): string {
     : path.join(__dirname, '../../resources/transcriber', 'run.sh');
 }
 
+function executableFile(filePath: string | undefined): string | undefined {
+  if (!filePath) {
+    return undefined;
+  }
+
+  try {
+    fs.accessSync(filePath, fs.constants.X_OK);
+
+    return fs.statSync(filePath).isFile() ? filePath : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function executableOnPath(name: string): string | undefined {
+  for (const directory of (process.env.PATH ?? '').split(path.delimiter)) {
+    const candidate = executableFile(path.join(directory, name));
+
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+export function validateSightkickRuntime(
+  runtime: Partial<SightkickRuntime>,
+): SightkickRuntime {
+  const runnerPath = executableFile(runtime.runnerPath);
+
+  if (!runnerPath) {
+    throw new Error(
+      'The bundled SightKick transcriber is missing or is not executable; reinstall SightKick or switch to the OCTAVE backend',
+    );
+  }
+
+  const ffmpegPath = executableFile(runtime.ffmpegPath);
+
+  if (!ffmpegPath) {
+    throw new Error(
+      'The SightKick ffmpeg runtime is missing; reinstall SightKick before creating a chart',
+    );
+  }
+
+  const uvPath = executableFile(runtime.uvPath);
+  const pythonPath = executableFile(runtime.pythonPath);
+
+  if (!uvPath && !pythonPath) {
+    throw new Error(
+      'SightKick auto-chart requires bundled uv or Python 3.12+; reinstall SightKick or install Python 3.12',
+    );
+  }
+
+  if (!runtime.dataDir) {
+    throw new Error('SightKick transcriber data directory is unavailable');
+  }
+
+  return {
+    runnerPath,
+    ffmpegPath,
+    dataDir: runtime.dataDir,
+    uvPath,
+    pythonPath,
+  };
+}
+
+function preflightSightkickRuntime(): SightkickRuntime {
+  const ffmpegName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+  const packagedFfmpeg = [
+    path.join(process.resourcesPath, 'ffmpeg-static', ffmpegName),
+    path.join(
+      process.resourcesPath,
+      'node_modules',
+      'ffmpeg-static',
+      ffmpegName,
+    ),
+    path.join(
+      process.resourcesPath,
+      'app.asar.unpacked',
+      'node_modules',
+      'ffmpeg-static',
+      ffmpegName,
+    ),
+  ];
+  const developmentFfmpeg = path.join(
+    app.getAppPath(),
+    'node_modules',
+    'ffmpeg-static',
+    ffmpegName,
+  );
+  const ffmpegPath = [
+    process.env.SK_FFMPEG,
+    ...(app.isPackaged ? packagedFfmpeg : [developmentFfmpeg]),
+    executableOnPath(ffmpegName),
+  ].find(executableFile);
+  const uvPath = executableFile(process.env.SK_UV) ?? executableOnPath('uv');
+  const pythonName = process.platform === 'win32' ? 'python.exe' : 'python3';
+  const pythonPath = executableOnPath(pythonName);
+
+  return validateSightkickRuntime({
+    runnerPath: resolveSightkickRunnerPath(),
+    ffmpegPath,
+    dataDir: path.join(app.getPath('userData'), 'transcriber'),
+    uvPath,
+    pythonPath,
+  });
+}
+
 function isSightkickRunnerAvailable(): boolean {
   try {
-    return fs.statSync(resolveSightkickRunnerPath()).isFile();
+    preflightSightkickRuntime();
+
+    return true;
   } catch {
     return false;
   }
@@ -677,9 +797,26 @@ export function createSkEventReader(
 function createSightkickRunner(): SightkickRunner {
   return {
     run(input, onEvent) {
-      const child = spawn(resolveSightkickRunnerPath(), sightkickArgs(input), {
+      const runtimePath = [
+        path.dirname(input.runtime.ffmpegPath),
+        input.runtime.uvPath ? path.dirname(input.runtime.uvPath) : undefined,
+        input.runtime.pythonPath
+          ? path.dirname(input.runtime.pythonPath)
+          : undefined,
+        process.env.PATH,
+      ]
+        .filter(Boolean)
+        .join(path.delimiter);
+      const child = spawn(input.runtime.runnerPath, sightkickArgs(input), {
         cwd: input.tempDir,
-        env: { ...process.env, ...caCertEnv() },
+        env: {
+          ...process.env,
+          ...caCertEnv(),
+          PATH: runtimePath,
+          SK_FFMPEG: input.runtime.ffmpegPath,
+          SK_TRANSCRIBER_DATA: input.runtime.dataDir,
+          ...(input.runtime.uvPath ? { SK_UV: input.runtime.uvPath } : {}),
+        },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
       const reader = createSkEventReader(onEvent);
@@ -825,13 +962,7 @@ function defaultDependencies(): AutoChartDependencies {
     createTempDir,
     detectBackends,
     preflightOctave: preflightOctaveRuntime,
-    preflightSightkick: () => {
-      if (!isSightkickRunnerAvailable()) {
-        throw new Error(
-          'The bundled SightKick transcriber is missing; reinstall SightKick or switch to the OCTAVE backend',
-        );
-      }
-    },
+    preflightSightkick: preflightSightkickRuntime,
     octaveRunner: createChildRunner(),
     sightkickRunner: createSightkickRunner(),
     preview: (sourceDir, thumbnailUrl) =>
@@ -1207,8 +1338,7 @@ export class AutoChartQueue {
       throw new Error('Auto-chart job has no working directory');
     }
 
-    this.dependencies.preflightSightkick();
-
+    const runtime = this.dependencies.preflightSightkick();
     const downloading = !job.audioPath;
 
     this.transition(
@@ -1227,6 +1357,7 @@ export class AutoChartQueue {
         tempDir: job.tempDir,
         youtubeUrl: job.youtubeUrl,
         audioPath: job.audioPath,
+        runtime,
       },
       (event) => {
         workerEvents = workerEvents

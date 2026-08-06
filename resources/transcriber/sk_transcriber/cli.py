@@ -11,17 +11,21 @@ non-zero on failure.
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import shutil
-import subprocess
 import sys
 import tempfile
 import traceback
 from pathlib import Path
 
 from sk_transcriber import events
-from sk_transcriber.audio_utils import probe_duration_seconds, to_jpg, to_ogg, to_wav
+from sk_transcriber.audio_utils import (
+    probe_duration_seconds,
+    probe_tags,
+    to_jpg,
+    to_ogg,
+    to_wav,
+)
 from sk_transcriber.beats import estimate_tempo_map
 from sk_transcriber.download import download_audio
 from sk_transcriber.events import ProgressReporter
@@ -66,37 +70,10 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _ffprobe_tags(path: Path) -> dict[str, str]:
-    ffprobe = shutil.which("ffprobe")
-    if not ffprobe:
-        return {}
-    cmd = [
-        ffprobe,
-        "-v",
-        "error",
-        "-show_entries",
-        "format_tags",
-        "-of",
-        "json",
-        str(path),
-    ]
-    proc = subprocess.run(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-    )
-    if proc.returncode != 0 or not proc.stdout.strip():
-        return {}
-    try:
-        data = json.loads(proc.stdout)
-        tags = data.get("format", {}).get("tags", {}) or {}
-        return {str(k).lower(): str(v) for k, v in tags.items()}
-    except Exception:
-        return {}
-
-
 def _derive_local_metadata(path: Path) -> tuple[str, str, str, str, str]:
     """(artist, title, album, year, genre) for a local audio file, from tags
     when present, else parsed from the filename."""
-    tags = _ffprobe_tags(path)
+    tags = probe_tags(path)
     raw_artist = tags.get("artist")
     raw_title = tags.get("title") or path.stem
     raw_album = tags.get("album") or "Unknown Album"

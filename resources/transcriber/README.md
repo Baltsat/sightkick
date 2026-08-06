@@ -91,16 +91,16 @@ always emitted first).
 All dependencies are pinned in `pyproject.toml` / `uv.lock` (Python 3.12,
 Apple Silicon macOS only — see `[tool.uv].environments`).
 
-| Stage                     | Engine actually used                                                                                      | Version                              | License      |
-| ------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------ | ------------ |
-| Download                  | `yt-dlp`                                                                                                  | 2026.7.4                             | Unlicense    |
-| Separation (preferred)    | SightKick `demucs-split` binary (`--stems-bin`)                                                           | pre-installed, htdemucs weights      | MIT (demucs) |
-| Separation (fallback)     | `demucs` (htdemucs), this tool's venv                                                                     | 4.1.0, `torch` 2.13.0 (MPS)          | MIT          |
-| Beats/tempo (preferred)   | **Beat This!** (CP-JKU, ISMIR 2024)                                                                       | `beat-this` 1.1.0                    | **MIT**      |
-| Beats/tempo (fallback)    | `librosa.beat.beat_track`                                                                                 | librosa 0.11.0                       | ISC          |
-| Transcription (preferred) | **DrumSep** (inagoy/drumsep, Hybrid-Demucs) + trivial per-substem onset detection — see "Why DrumSep"     | mirror checkpoint `49469ca8.th`      | **MIT**      |
-| Transcription (fallback)  | classical (spectral-flux onsets + rule-based band-energy/centroid/decay classifier) — see "Why not ADTOF" | this repo, `librosa`/`numpy`/`scipy` | —            |
-| MIDI writing              | `mido`                                                                                                    | 1.3.3                                | MIT          |
+| Stage                     | Engine actually used                                                                                      | Version                                                               | License      |
+| ------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------ |
+| Download                  | `yt-dlp`                                                                                                  | 2026.7.4                                                              | Unlicense    |
+| Separation (preferred)    | SightKick `demucs-split` binary (`--stems-bin`)                                                           | pre-installed, htdemucs weights                                       | MIT (demucs) |
+| Separation (fallback)     | `demucs` (htdemucs), this tool's venv                                                                     | 4.1.0, `torch` 2.13.0 (MPS)                                           | MIT          |
+| Beats/tempo (preferred)   | **Beat This!** (CP-JKU, ISMIR 2024)                                                                       | `beat-this` 1.1.0                                                     | **MIT**      |
+| Beats/tempo (fallback)    | `librosa.beat.beat_track`                                                                                 | librosa 0.11.0                                                        | ISC          |
+| Transcription (preferred) | **DrumSep** (inagoy/drumsep, Hybrid-Demucs) + trivial per-substem onset detection — see "Why DrumSep"     | `49469ca8.th`, HF revision `18ebf41e59553e82e42cd92be2643671109c1e13` | **MIT**      |
+| Transcription (fallback)  | classical (spectral-flux onsets + rule-based band-energy/centroid/decay classifier) — see "Why not ADTOF" | this repo, `librosa`/`numpy`/`scipy`                                  | —            |
+| MIDI writing              | `mido`                                                                                                    | 1.3.3                                                                 | MIT          |
 
 **No non-commercial-licensed model is actually shipped or invoked by this
 tool as built.** ADTOF's pretrained weights are CC BY-NC-SA 4.0, but ADTOF
@@ -149,6 +149,11 @@ differs. It is downloaded once, on first use, to
 `~/.cache/sk_transcriber/drumsep_49469ca8.th`
 (`sk_transcriber/transcribe.py::_get_drumsep_checkpoint`), the same
 lazy-download pattern Beat This! already uses for its own weights.
+The download URL is pinned to immutable HuggingFace revision
+`18ebf41e59553e82e42cd92be2643671109c1e13`; every cached or newly downloaded
+checkpoint must match SHA-256
+`aefaa8543c9b9c75e22f5f32b53ab86dfe416457849af1383ff1aef83401423f`.
+A mismatch deletes the suspect file and stops that run instead of loading it.
 
 With DrumSep active, classification is nearly free: each sub-stem is
 already single-instrument, so onset detection can run with a much more
@@ -227,26 +232,26 @@ lower note offset — each is a musical reduction (`sk_transcriber/difficulty.py
 because an accurate chart that nobody can physically play ("не игрально")
 is not a usable chart:
 
-| Difficulty | Lanes                               | Quantize grid | How it's built                                                                                                                                                                                                                                                                                                               |
-| ---------- | ----------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Easy       | kick, snare only                    | 1/4 note      | Backbone only: kick+snare filtered from the Expert transcription, heavily thinned.                                                                                                                                                                                                                                           |
-| Medium     | kick, snare, yellow (hi-hat), crash | 1/8 note      | Backbone kept; hi-hat downsampled to a steady 1/8-note pulse (grid-snap-and-collapse, not random dropping); simple crash hits synthesized at approximate section starts (song start + each tempo-segment boundary, snapped to the nearest downbeat — a stand-in for real structure detection, which this tool doesn't have). |
-| Hard       | all 5 lanes                         | 1/16 note     | Full Expert lane set, with dense fill bursts (4+ hits, <150ms apart, any lane) thinned to their first and last hit only — "keep first/last fill notes, drop inner sixteenths."                                                                                                                                               |
-| Expert     | all 5 lanes                         | 1/16 note     | The full detected transcription.                                                                                                                                                                                                                                                                                             |
+| Difficulty | Lanes                               | Quantize grid | How it's built                                                                                                                                                                                                                              |
+| ---------- | ----------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Easy       | kick, snare only                    | 1/4 note      | Beat-aware backbone: only kick/snare hits within 0.12 beat of an integer beat survive and are snapped to that beat. At dense tempos the 2-cluster/sec cap naturally keeps beats 1/3 before 2/4; slower passages can retain all four beats.  |
+| Medium     | kick, snare, yellow (hi-hat), crash | 1/8 note      | Backbone kept; hi-hat downsampled and moved onto a steady 1/8-note pulse. Approximate section-start crashes are added only after the Expert transcription contains a real crash; an empty or crash-free transcription never fabricates one. |
+| Hard       | all 5 lanes                         | 1/16 note     | Full Expert lane set, with dense fill bursts (4+ hits, <150ms apart, any lane) thinned to their first and last hit only — "keep first/last fill notes, drop inner sixteenths."                                                              |
+| Expert     | all 5 lanes                         | 1/16 note     | The full detected transcription.                                                                                                                                                                                                            |
 
 Every difficulty — Expert included — is then passed through an explicit
-**playability gate** (`difficulty.CAPS`): a max sustained notes/sec (as a
-minimum time gap between kept event-clusters), a max number of
+**playability gate** (`difficulty.CAPS`): a max sustained event-cluster rate
+(the historical `max_nps` field counts a simultaneous chord once), a max number of
 simultaneous lanes (kick/snare prioritized over cymbals/toms when a chord
 would exceed it), and a minimum gap between two hits in the _same_ lane.
 We would rather drop a genuine note than emit an unplayable cluster:
 
-| Difficulty | max notes/sec | max simultaneous lanes | min same-lane gap |
-| ---------- | ------------- | ---------------------- | ----------------- |
-| Easy       | 2.0           | 2                      | 200ms             |
-| Medium     | 4.0           | 2                      | 120ms             |
-| Hard       | 7.5           | 3                      | 80ms              |
-| Expert     | 14.0          | 4                      | 30ms              |
+| Difficulty | max event-clusters/sec | max simultaneous lanes | min same-lane gap |
+| ---------- | ---------------------- | ---------------------- | ----------------- |
+| Easy       | 2.0                    | 2                      | 200ms             |
+| Medium     | 4.0                    | 2                      | 120ms             |
+| Hard       | 7.5                    | 3                      | 80ms              |
+| Expert     | 14.0                   | 4                      | 30ms              |
 
 Tom markers (110/111/112) are emitted once, driven by the Expert-level
 kick/tom classification — they are difficulty-independent, since a
@@ -255,21 +260,15 @@ note range is reading it.
 
 ## Venv bootstrap
 
-`run.sh` execs `uv run --directory <this dir> python -m sk_transcriber
-"$@"`. `uv run` creates/reuses `.venv/` next to `pyproject.toml`/`uv.lock`
-and syncs it automatically — idempotent, and near-instant once already in
-sync (`Resolved N packages ... Audited N packages`, no re-download). No
-Python knowledge is required from the caller: `run.sh` only assumes `uv`
-(checked first at `/Users/konstantinbaltsat/.local/bin/uv`, then `PATH`)
-and `ffmpeg`/`ffprobe` on `PATH`. `.venv/` is gitignored — never commit it;
-`uv.lock` **is** committed for reproducibility.
-
-`run.sh` also sets `NUMBA_DISABLE_JIT=1`: librosa's numba-JIT peak-picking
-path throws (and noisily retries) a `TypingError` against this
-numba/NumPy-2 combination on Apple Silicon; the pure-Python fallback it
-lands on either way is correct and plenty fast for onset arrays this
-small, so we skip the noisy JIT attempt entirely rather than spam stderr
-with ~130 tracebacks per run.
+`run.sh` keeps the source directory read-only and creates its environment at
+`${SK_TRANSCRIBER_DATA:-$HOME/Library/Application Support/sight-kick/transcriber}/.venv`.
+With `uv`, `UV_PROJECT_ENVIRONMENT` points there while `--project` reads the
+bundled `pyproject.toml` and `uv.lock`. Without `uv`, Python 3.12+ creates the
+same external venv and pip installs the pinned project dependencies. The
+Electron caller supplies `SK_FFMPEG` for its packaged ffmpeg binary; direct
+CLI callers may instead put ffmpeg on `PATH`. ffprobe is optional: the Python
+wrapper uses a sibling/system ffprobe when present and otherwise reads duration
+and best-effort local tags from `ffmpeg -i` output.
 
 ## Measured accuracy (step 4 of VERIFY, extended in an accuracy sprint)
 

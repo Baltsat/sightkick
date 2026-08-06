@@ -1,45 +1,67 @@
 #!/usr/bin/env bash
-# SightKick Transcriber entry point.
-#
-#   run.sh --url <youtube-url> --out <dir> [--stems-bin <path>] [--keep-stems] [--difficulty expert]
-#   run.sh --audio <path>      --out <dir> [--stems-bin <path>] [--keep-stems] [--difficulty expert]
-#
-# Bootstraps (or reuses) its own Python venv via `uv` and execs the CLI —
-# the caller needs no Python knowledge or pre-installed dependencies beyond
-# `uv`, `ffmpeg`/`ffprobe`, and (for --url) network access.
-#
-# Progress/result are reported on stdout as `__SK_EVENT__ {json}` lines.
-# All logs/diagnostics go to stderr. Exit code 0 on success, non-zero on
-# failure — see README.md for the full contract.
 
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DATA_DIR="${SK_TRANSCRIBER_DATA:-${HOME:?}/Library/Application Support/sight-kick/transcriber}"
+VENV_DIR="$DATA_DIR/.venv"
 
-# Resolve uv: prefer the known install location, then PATH.
-if [ -x "/Users/konstantinbaltsat/.local/bin/uv" ]; then
-    UV_BIN="/Users/konstantinbaltsat/.local/bin/uv"
+mkdir -p "$DATA_DIR"
+
+if [ -n "${SK_FFMPEG:-}" ]; then
+    if [ ! -x "$SK_FFMPEG" ]; then
+        echo "sk-transcriber: SK_FFMPEG does not point to an executable ffmpeg binary: $SK_FFMPEG" >&2
+        exit 1
+    fi
+elif command -v ffmpeg >/dev/null 2>&1; then
+    SK_FFMPEG="$(command -v ffmpeg)"
+    export SK_FFMPEG
+else
+    echo "sk-transcriber: ffmpeg is required; set SK_FFMPEG or add ffmpeg to PATH" >&2
+    exit 1
+fi
+
+export PYTHONPATH="$DIR${PYTHONPATH:+:$PYTHONPATH}"
+
+if [ -n "${SK_UV:-}" ]; then
+    if [ ! -x "$SK_UV" ]; then
+        echo "sk-transcriber: SK_UV does not point to an executable uv binary: $SK_UV" >&2
+        exit 1
+    fi
+    UV_BIN="$SK_UV"
 elif command -v uv >/dev/null 2>&1; then
     UV_BIN="$(command -v uv)"
 else
-    echo "sk-transcriber: 'uv' is required but was not found (checked /Users/konstantinbaltsat/.local/bin/uv and PATH)" >&2
+    UV_BIN=""
+fi
+
+if [ -n "$UV_BIN" ]; then
+    export UV_PROJECT_ENVIRONMENT="$VENV_DIR"
+    exec "$UV_BIN" run --locked --project "$DIR" --directory "$DATA_DIR" python -m sk_transcriber "$@"
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "sk-transcriber: uv or Python 3.12+ is required, but neither was found" >&2
     exit 1
 fi
 
-if ! command -v ffmpeg >/dev/null 2>&1; then
-    echo "sk-transcriber: 'ffmpeg' is required but was not found on PATH" >&2
+PYTHON_BIN="$(command -v python3)"
+if ! "$PYTHON_BIN" -c 'import sys; raise SystemExit(sys.version_info < (3, 12))'; then
+    echo "sk-transcriber: Python 3.12+ is required by the pinned audio dependencies" >&2
     exit 1
 fi
 
-# librosa's numba-JIT peak-picking path throws (and internally retries/
-# logs) a TypingError against this numba/numpy combination on Apple
-# Silicon; the pure-Python fallback it lands on is correct and plenty fast
-# for onset arrays of this size, so we skip the noisy JIT attempt entirely.
-export NUMBA_DISABLE_JIT=1
+if [ ! -x "$VENV_DIR/bin/python" ]; then
+    "$PYTHON_BIN" -m venv "$VENV_DIR"
+fi
 
-# `uv run` creates/reuses $DIR/.venv and syncs it against pyproject.toml /
-# uv.lock automatically — idempotent and fast when already in sync. All of
-# uv's own setup chatter goes to stderr (via 2>&1 redirection below is NOT
-# used — uv already writes its progress to stderr by default), keeping
-# stdout clean for the __SK_EVENT__ protocol.
-exec "$UV_BIN" run --directory "$DIR" python -m sk_transcriber "$@"
+VENV_PYTHON="$VENV_DIR/bin/python"
+STAMP="$DATA_DIR/pyproject.toml"
+if [ ! -f "$STAMP" ] || ! cmp -s "$DIR/pyproject.toml" "$STAMP"; then
+    REQUIREMENTS="$DATA_DIR/requirements.txt"
+    "$PYTHON_BIN" -c 'import pathlib, sys, tomllib; data = tomllib.loads(pathlib.Path(sys.argv[1]).read_text()); pathlib.Path(sys.argv[2]).write_text("\n".join(data["project"]["dependencies"]) + "\n")' "$DIR/pyproject.toml" "$REQUIREMENTS"
+    "$VENV_PYTHON" -m pip install --disable-pip-version-check --requirement "$REQUIREMENTS"
+    cp "$DIR/pyproject.toml" "$STAMP"
+fi
+
+exec "$VENV_PYTHON" -m sk_transcriber "$@"

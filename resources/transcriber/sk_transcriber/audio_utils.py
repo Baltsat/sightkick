@@ -7,6 +7,8 @@ process's own stdout, which is reserved for the ``__SK_EVENT__`` protocol.
 
 from __future__ import annotations
 
+import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -15,6 +17,16 @@ import numpy as np
 
 
 def _find_tool(name: str) -> str:
+    explicit = os.environ.get(f"SK_{name.upper()}")
+    if explicit:
+        path = Path(explicit).expanduser()
+        if path.is_file() and os.access(path, os.X_OK):
+            return str(path)
+        raise RuntimeError(f"SK_{name.upper()} is not an executable file: {path}")
+    if name == "ffprobe" and os.environ.get("SK_FFMPEG"):
+        sibling = Path(os.environ["SK_FFMPEG"]).with_name("ffprobe")
+        if sibling.is_file() and os.access(sibling, os.X_OK):
+            return str(sibling)
     path = shutil.which(name)
     if not path:
         raise RuntimeError(f"required tool '{name}' not found on PATH")
@@ -23,9 +35,7 @@ def _find_tool(name: str) -> str:
 
 def run_ffmpeg(args: list[str], desc: str) -> None:
     cmd = [_find_tool("ffmpeg"), "-y", "-hide_banner", "-loglevel", "error", *args]
-    proc = subprocess.run(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-    )
+    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
         raise RuntimeError(f"ffmpeg failed ({desc}): {proc.stderr.strip()[-4000:]}")
 
@@ -33,21 +43,20 @@ def run_ffmpeg(args: list[str], desc: str) -> None:
 def to_ogg(src: Path, dst: Path, quality: str = "5") -> None:
     """Encode any input audio to Ogg Vorbis."""
     dst.parent.mkdir(parents=True, exist_ok=True)
-    run_ffmpeg(
-        [
-            "-i",
-            str(src),
-            "-vn",
-            "-map_metadata",
-            "-1",
-            "-c:a",
-            "libvorbis",
-            "-q:a",
-            quality,
-            str(dst),
-        ],
-        f"encode {dst.name}",
-    )
+    args = ["-i", str(src), "-vn", "-map_metadata", "-1", "-ac", "2"]
+    try:
+        run_ffmpeg(
+            args + ["-c:a", "libvorbis", "-q:a", quality, str(dst)],
+            f"encode {dst.name}",
+        )
+    except RuntimeError as exc:
+        if "Unknown encoder 'libvorbis'" not in str(exc):
+            raise
+        run_ffmpeg(
+            args
+            + ["-c:a", "vorbis", "-strict", "experimental", "-q:a", quality, str(dst)],
+            f"encode {dst.name}",
+        )
 
 
 def to_wav(src: Path, dst: Path, sr: int | None = None, mono: bool = False) -> None:
@@ -82,22 +91,83 @@ def to_jpg(src: Path, dst: Path, max_dim: int = 720) -> None:
 
 
 def probe_duration_seconds(path: Path) -> float:
-    cmd = [
-        _find_tool("ffprobe"),
-        "-v",
-        "error",
-        "-show_entries",
-        "format=duration",
-        "-of",
-        "csv=p=0",
-        str(path),
-    ]
+    try:
+        ffprobe = _find_tool("ffprobe")
+    except RuntimeError:
+        ffprobe = None
+    if ffprobe:
+        cmd = [
+            ffprobe,
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "csv=p=0",
+            str(path),
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if proc.returncode == 0 and proc.stdout.strip():
+            return float(proc.stdout.strip())
+
     proc = subprocess.run(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        [_find_tool("ffmpeg"), "-hide_banner", "-i", str(path)],
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    if proc.returncode != 0 or not proc.stdout.strip():
-        raise RuntimeError(f"ffprobe failed on {path}: {proc.stderr.strip()}")
-    return float(proc.stdout.strip())
+    match = re.search(r"Duration: (\d+):(\d+):(\d+(?:\.\d+)?)", proc.stderr)
+    if not match:
+        raise RuntimeError(f"ffmpeg could not determine duration for {path}")
+    hours, minutes, seconds = match.groups()
+    return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+
+
+def probe_tags(path: Path) -> dict[str, str]:
+    try:
+        ffprobe = _find_tool("ffprobe")
+    except RuntimeError:
+        ffprobe = None
+    if ffprobe:
+        proc = subprocess.run(
+            [
+                ffprobe,
+                "-v",
+                "error",
+                "-show_entries",
+                "format_tags",
+                "-of",
+                "json",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            try:
+                import json
+
+                data = json.loads(proc.stdout)
+                tags = data.get("format", {}).get("tags", {}) or {}
+                return {str(k).lower(): str(v) for k, v in tags.items()}
+            except (TypeError, ValueError):
+                pass
+
+    proc = subprocess.run(
+        [_find_tool("ffmpeg"), "-hide_banner", "-i", str(path)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    tags: dict[str, str] = {}
+    for key, value in re.findall(
+        r"^\s+(artist|title|album|date|year|genre)\s*:\s*(.+)$",
+        proc.stderr,
+        flags=re.IGNORECASE | re.MULTILINE,
+    ):
+        tags.setdefault(key.lower(), value.strip())
+    return tags
 
 
 def load_mono(path: Path, sr: int) -> tuple[np.ndarray, int]:
