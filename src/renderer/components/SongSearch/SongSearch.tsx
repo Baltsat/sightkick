@@ -176,35 +176,45 @@ export function SongSearch({ disabled }: Props) {
     </div>
   );
   const input = (
-    <Input
-      data-testid="song-search-input"
-      aria-label="Find any song"
-      placeholder="Find any song…"
-      prefix={
-        <FontAwesomeIcon
-          icon={faMagnifyingGlass}
-          color="var(--color-text-dim)"
-        />
-      }
-      value={query}
-      disabled={disabled}
-      role="combobox"
-      aria-autocomplete="list"
-      aria-expanded={showPanel}
-      aria-controls="song-search-listbox"
-      aria-activedescendant={
-        activeIndex >= 0 ? `song-search-option-${activeIndex}` : undefined
-      }
-      onChange={(event) => {
-        setQuery(event.target.value);
-        setOpen(true);
-      }}
-      onFocus={() => setOpen(true)}
-      onBlur={() => {
-        setTimeout(() => setOpen(false), 150);
-      }}
-      onKeyDown={onKeyDown}
-    />
+    // The header row (SongListView.tsx) is a fixed-max-width flex row shared
+    // with several other items (filter, import, My Music, auto-chart, sort,
+    // settings). Plain flex children default to shrinking below their
+    // content size once the row is tight, and unlike the buttons around it
+    // (whose text label gives them a natural floor) this Input has nothing
+    // stopping it from shrinking all the way to 0 — shrink-0 plus a fixed
+    // width keeps it clickable no matter how many siblings are in the row.
+    <div className="w-52 shrink-0">
+      <Input
+        data-testid="song-search-input"
+        aria-label="Find any song"
+        placeholder="Find any song…"
+        className="w-full"
+        prefix={
+          <FontAwesomeIcon
+            icon={faMagnifyingGlass}
+            color="var(--color-text-dim)"
+          />
+        }
+        value={query}
+        disabled={disabled}
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={showPanel}
+        aria-controls="song-search-listbox"
+        aria-activedescendant={
+          activeIndex >= 0 ? `song-search-option-${activeIndex}` : undefined
+        }
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => {
+          setTimeout(() => setOpen(false), 150);
+        }}
+        onKeyDown={onKeyDown}
+      />
+    </div>
   );
 
   if (disabled) {
