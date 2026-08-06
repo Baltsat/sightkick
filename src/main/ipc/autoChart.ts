@@ -63,6 +63,7 @@ export interface SkWorkerEvent {
   percent?: number;
   success?: boolean;
   songDir?: string;
+  code?: string;
 }
 
 interface WorkerHandle {
@@ -1442,6 +1443,7 @@ export class AutoChartQueue {
       await this.fail(
         job,
         event.message || 'SightKick could not prepare a chart',
+        event.code,
       );
 
       return;
@@ -1561,17 +1563,24 @@ export class AutoChartQueue {
     job.message = message;
     job.percent = percent;
     job.error = undefined;
+    job.errorCode = undefined;
     this.notify(job);
   }
 
-  private async fail(job: AutoChartJob, error: string): Promise<void> {
+  private async fail(
+    job: AutoChartJob,
+    error: string,
+    errorCode?: string,
+  ): Promise<void> {
     if (isTerminal(job.stage)) {
       return;
     }
 
     job.stage = 'failed';
     job.error = error;
-    job.message = 'Chart creation failed';
+    job.errorCode = errorCode;
+    job.message =
+      errorCode === 'no-drums' ? 'No drums detected' : 'Chart creation failed';
     this.notify(job);
     await this.dependencies.cleanup(job.tempDir);
     job.tempDir = undefined;
@@ -1585,6 +1594,7 @@ export class AutoChartQueue {
 
     job.stage = 'cancelled';
     job.error = undefined;
+    job.errorCode = undefined;
     job.message = 'Chart creation cancelled';
     this.notify(job);
     await this.dependencies.cleanup(job.tempDir);

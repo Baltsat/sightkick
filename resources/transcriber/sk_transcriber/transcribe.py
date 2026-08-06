@@ -73,6 +73,65 @@ class DrumHit:
     lane: str  # one of LANES
     velocity: int  # 1..127
     centroid: float  # Hz, spectral centroid of the onset window (used for tom/cymbal sub-typing)
+    confidence: float = 1.0
+
+
+@dataclass(frozen=True)
+class DrumPresenceEvidence:
+    drum_rms_ratio: float
+    onsets_per_minute: float
+    mean_confidence: float
+    present: bool
+
+
+class NoDrumsDetectedError(RuntimeError):
+    code = "no-drums"
+
+    def __init__(self) -> None:
+        super().__init__("No drums detected in this audio")
+
+
+def _audio_rms(audio_path: str) -> float:
+    import soundfile as sf
+
+    square_sum = 0.0
+    sample_count = 0
+    with sf.SoundFile(audio_path) as audio:
+        while True:
+            block = audio.read(65_536, dtype="float32", always_2d=True)
+            if len(block) == 0:
+                break
+            square_sum += float(np.sum(np.square(block, dtype=np.float64)))
+            sample_count += int(block.size)
+    return float(np.sqrt(square_sum / sample_count)) if sample_count else 0.0
+
+
+def assess_drum_presence(
+    mix_audio_path: str,
+    drums_audio_path: str,
+    hits: list[DrumHit],
+    duration_seconds: float,
+) -> DrumPresenceEvidence:
+    mix_rms = _audio_rms(mix_audio_path)
+    drums_rms = _audio_rms(drums_audio_path)
+    drum_rms_ratio = drums_rms / mix_rms if mix_rms > 1e-6 else 0.0
+    onsets_per_minute = (
+        len(hits) * 60.0 / duration_seconds if duration_seconds > 0 else 0.0
+    )
+    mean_confidence = (
+        float(np.mean([max(0.0, min(1.0, hit.confidence)) for hit in hits]))
+        if hits
+        else 0.0
+    )
+    present = (
+        drum_rms_ratio >= 0.035 and onsets_per_minute >= 8.0 and mean_confidence >= 0.45
+    )
+    return DrumPresenceEvidence(
+        drum_rms_ratio=drum_rms_ratio,
+        onsets_per_minute=onsets_per_minute,
+        mean_confidence=mean_confidence,
+        present=present,
+    )
 
 
 def _band_energy(
@@ -84,7 +143,9 @@ def _band_energy(
     return float(np.sum(spec[mask]) / total)
 
 
-def _classify_hit(seg: np.ndarray, decay_seg: np.ndarray, sr: int) -> tuple[str, float]:
+def _classify_hit(
+    seg: np.ndarray, decay_seg: np.ndarray, sr: int
+) -> tuple[str, float, float]:
     windowed = seg * np.hanning(len(seg))
     spec = np.abs(np.fft.rfft(windowed))
     freqs = np.fft.rfftfreq(len(seg), 1.0 / sr)
@@ -123,17 +184,20 @@ def _classify_hit(seg: np.ndarray, decay_seg: np.ndarray, sr: int) -> tuple[str,
         # Almost all energy is above 2kHz with no real body: hi-hat or
         # cymbal. A cymbal rings out; a closed/pedal hi-hat decays fast.
         lane = "cymbal" if decay_ratio > 0.28 else "hihat"
+        confidence = min(1.0, 0.55 + (purity_high - 0.88) * 2.5)
     elif zcr < 0.18 and bass > 0.12:
         # Has real low-frequency body and a clean (non-noisy) attack:
         # kick or tom. A kick's energy concentrates below 120Hz; a tom's
         # fundamental (even a low floor tom) sits noticeably higher, in
         # the 120-250Hz band, so sub-vs-low tells them apart.
         lane = "kick" if sub >= low else "tom"
+        confidence = min(1.0, 0.55 + abs(sub - low) * 2.0 + bass * 0.25)
     else:
         # Broadband + noisy attack with real body: snare.
         lane = "snare"
+        confidence = min(0.9, max(0.45, 1.0 - purity_high))
 
-    return lane, centroid
+    return lane, centroid, confidence
 
 
 def _amp_to_velocity(amp: float, lo: float, hi: float) -> int:
@@ -342,11 +406,19 @@ def _transcribe_with_drumsep(
             if lane_base == "cymbal":
                 decay_ratio = _cymbal_decay_ratio(y, ANALYSIS_SR, float(t))
                 lane = "cymbal" if decay_ratio > 0.28 else "hihat"
+                confidence = 0.75
             else:
                 lane = lane_base
+                confidence = 0.9
             vel = _amp_to_velocity(float(amp), lo, hi)
             hits.append(
-                DrumHit(time=float(t), lane=lane, velocity=vel, centroid=centroid)
+                DrumHit(
+                    time=float(t),
+                    lane=lane,
+                    velocity=vel,
+                    centroid=centroid,
+                    confidence=confidence,
+                )
             )
 
         reporter.report(
@@ -422,9 +494,17 @@ def _transcribe_classical(
         if len(seg) < 32:
             continue
         decay_seg = y[i0 : i0 + decay_win]
-        lane, centroid = _classify_hit(seg, decay_seg, sr)
+        lane, centroid, confidence = _classify_hit(seg, decay_seg, sr)
         vel = _amp_to_velocity(peak_amps[idx], lo, hi)
-        hits.append(DrumHit(time=float(t), lane=lane, velocity=vel, centroid=centroid))
+        hits.append(
+            DrumHit(
+                time=float(t),
+                lane=lane,
+                velocity=vel,
+                centroid=centroid,
+                confidence=confidence,
+            )
+        )
         if idx % 25 == 0:
             reporter.report(stage, 0.3 + 0.6 * (idx / max(1, n)), "Classifying onsets")
 

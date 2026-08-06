@@ -34,7 +34,12 @@ from sk_transcriber.midi_writer import write_notes_mid
 from sk_transcriber.naming import parse_artist_title, sanitize_folder_name
 from sk_transcriber.separate import separate_stems
 from sk_transcriber.songini import estimate_diff_drums, write_song_ini
-from sk_transcriber.transcribe import ANALYSIS_SR, transcribe_drums
+from sk_transcriber.transcribe import (
+    ANALYSIS_SR,
+    NoDrumsDetectedError,
+    assess_drum_presence,
+    transcribe_drums,
+)
 
 log = logging.getLogger("sk_transcriber.cli")
 
@@ -169,6 +174,18 @@ def _run(args: argparse.Namespace) -> str:
         to_wav(separation.stems["drums"], drums_wav, sr=ANALYSIS_SR, mono=True)
         hits, transcribe_engine = transcribe_drums(str(drums_wav), reporter)
         log.info("transcribe engine: %s, hits: %d", transcribe_engine, len(hits))
+        drum_evidence = assess_drum_presence(
+            str(mix_wav), str(drums_wav), hits, duration_seconds
+        )
+        log.info(
+            "drum presence: rms_ratio=%.4f onsets_per_minute=%.1f confidence=%.3f present=%s",
+            drum_evidence.drum_rms_ratio,
+            drum_evidence.onsets_per_minute,
+            drum_evidence.mean_confidence,
+            drum_evidence.present,
+        )
+        if not drum_evidence.present:
+            raise NoDrumsDetectedError()
 
         reporter.report("write", 0.05, "Encoding audio outputs")
         to_ogg(mix_wav, song_dir / "song.ogg")
@@ -238,7 +255,7 @@ def main(argv: list[str] | None = None) -> None:
     except Exception as exc:  # noqa: BLE001 — top-level boundary: always emit an error event
         log.error("fatal: %s", exc)
         log.debug("%s", traceback.format_exc())
-        events.error(str(exc))
+        events.error(str(exc), getattr(exc, "code", None))
         sys.exit(1)
     else:
         events.complete(song_dir)

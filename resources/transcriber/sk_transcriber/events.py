@@ -41,8 +41,11 @@ def complete(song_dir: str) -> None:
     _emit({"kind": "complete", "success": True, "songDir": song_dir})
 
 
-def error(message: str) -> None:
-    _emit({"kind": "error", "message": message})
+def error(message: str, code: str | None = None) -> None:
+    payload = {"kind": "error", "message": message}
+    if code:
+        payload["code"] = code
+    _emit(payload)
 
 
 class ProgressReporter:

@@ -420,6 +420,15 @@ describe('sightkick sidecar __SK_EVENT__ parser', () => {
     expect(
       parseSkEventLine('__SK_EVENT__ {"kind":"error","message":"boom"}'),
     ).toEqual({ kind: 'error', message: 'boom' });
+    expect(
+      parseSkEventLine(
+        '__SK_EVENT__ {"kind":"error","message":"No drums detected in this audio","code":"no-drums"}',
+      ),
+    ).toEqual({
+      kind: 'error',
+      message: 'No drums detected in this audio',
+      code: 'no-drums',
+    });
   });
 
   it('ignores stray sidecar output, missing the required space, malformed JSON, and unknown kinds', () => {
@@ -912,6 +921,36 @@ describe('auto-chart queue — sightkick backend', () => {
       expect(latestJob(event)).toMatchObject({
         stage: 'failed',
         error: 'This video is age-restricted and cannot be downloaded',
+      }),
+    );
+  });
+
+  it('surfaces the no-drums gate as a distinct honest failure', async () => {
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://youtu.be/abcdefghijk',
+    });
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+
+    harness.skRuns[0].emit({
+      kind: 'error',
+      message: 'No drums detected in this audio',
+      code: 'no-drums',
+    });
+    harness.skRuns[0].finish();
+    await vi.waitFor(() =>
+      expect(latestJob(event)).toMatchObject({
+        stage: 'failed',
+        message: 'No drums detected',
+        error: 'No drums detected in this audio',
+        errorCode: 'no-drums',
       }),
     );
   });

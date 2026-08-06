@@ -332,6 +332,7 @@ export interface IpcAutoChartJob {
   preview?: IpcImportSongPreview;
   song?: Song;
   error?: string;
+  errorCode?: string;
 }
 
 export interface StorageSchema {
