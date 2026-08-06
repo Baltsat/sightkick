@@ -33,6 +33,24 @@ export function isLessonSong(song: Song): boolean {
 }
 
 /**
+ * True when the library contains songs that look like part of the
+ * SightKick Method curriculum (folder/name prefix match) but don't carry
+ * parsed lesson data. This is the stale-schema signature: the store's
+ * `toSong()` snapshot for these songs was captured by an older build whose
+ * parser didn't extract the `sk_lesson_*` ini fields, so `song.lesson` is
+ * missing even though the song clearly belongs to the curriculum. A fresh
+ * rescan re-parses `song.ini` and fixes it — see `useLessonAutoRescan`.
+ */
+export function hasUnparsedLessonSongs(songList: Song[]): boolean {
+  return songList.some(
+    (song) =>
+      !song.lesson &&
+      (song.name.startsWith(LESSON_NAME_PREFIX) ||
+        basename(song.dir).startsWith(LESSON_NAME_PREFIX)),
+  );
+}
+
+/**
  * Lesson charts ship only an Expert drum track. Opening a lesson must use
  * whatever difficulty is actually charted for it — not the app's globally
  * selected difficulty tab, which may be Easy/Medium/Hard and would land on

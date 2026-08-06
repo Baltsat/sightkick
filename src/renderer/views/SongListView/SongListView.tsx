@@ -33,6 +33,7 @@ import {
   highestAvailableDifficulty,
   isLessonSong,
   LessonEntry,
+  useLessonAutoRescan,
   useLessons,
 } from '../../hooks/useLessons';
 import { calculateAccuracy, getStarRating } from '../../scoring';
@@ -102,6 +103,18 @@ export function SongListView() {
   // carry an Expert drum track, so filtering by difficulty here would hide
   // the whole curriculum whenever the tab isn't set to Expert.
   const lessonProgress = useLessons(songList);
+  const rescanLibrary = useCallback(() => {
+    window.electron.ipcRenderer.sendMessage('rescan-songs', false);
+  }, []);
+
+  useLessonAutoRescan({
+    songList,
+    isLessonsTabActive: view === 'lessons',
+    totalLessons: lessonProgress.totalLessons,
+    isScanning: scanProgress !== undefined,
+    rescan: rescanLibrary,
+  });
+
   const librarySongs = useMemo(
     () => songList.filter((song) => !isLessonSong(song)),
     [songList],
@@ -419,7 +432,12 @@ export function SongListView() {
           className="relative grow overflow-hidden w-full flex"
         >
           {view === 'lessons' ? (
-            <LessonsView progress={lessonProgress} onPlay={playLesson} />
+            <LessonsView
+              progress={lessonProgress}
+              onPlay={playLesson}
+              scanPercent={scanPercent}
+              onRescan={rescanLibrary}
+            />
           ) : (
             <div className="relative w-full max-w-250 grow overflow-hidden mx-auto bg-bg flex flex-col">
               {filteredSongList.length > 0 ||

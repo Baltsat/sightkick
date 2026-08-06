@@ -1,8 +1,11 @@
 export { useLessons } from './useLessons';
 
+export { useLessonAutoRescan } from './useLessonAutoRescan';
+
 export {
   bestStarsForSong,
   computeLessonProgress,
+  hasUnparsedLessonSongs,
   highestAvailableDifficulty,
   isLessonSong,
   LESSON_MASTERED_STARS,
@@ -11,3 +14,5 @@ export {
 } from './helpers';
 
 export type { LessonEntry, LessonProgress, LessonUnitGroup } from './helpers';
+
+export type { UseLessonAutoRescanOptions } from './useLessonAutoRescan';

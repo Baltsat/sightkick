@@ -1000,3 +1000,100 @@ describe('SongListView — Lessons surface', () => {
     });
   });
 });
+
+describe('SongListView — Lessons self-heal', () => {
+  function rescanCallCount(view: ReturnType<typeof setupSongListView>) {
+    return view.ipc.sent.filter((s) => s.channel === 'rescan-songs').length;
+  }
+
+  it('auto-rescans exactly once when the Lessons tab finds SightKick Method songs that failed to parse (stale schema)', () => {
+    const view = setupSongListView();
+
+    view.loadSongs(
+      [
+        makeListSong('stale-1', {
+          name: 'Second-Ending Turnaround',
+          dir: '/music/SightKick Method - Lesson 07.04 - Second-Ending Turnaround',
+        }),
+      ],
+      '/music',
+    );
+
+    view.selectView('lessons');
+
+    expect(rescanCallCount(view)).toBe(1);
+    expect(view.ipc.sent).toContainEqual({
+      channel: 'rescan-songs',
+      args: [false],
+    });
+
+    // Leaving and re-entering the Lessons tab must never re-trigger it —
+    // the app-session guard only allows one attempt, ever.
+    view.selectView('songs');
+    view.selectView('lessons');
+    view.selectView('songs');
+    view.selectView('lessons');
+
+    expect(rescanCallCount(view)).toBe(1);
+  });
+
+  it('never auto-rescans once lessons parse correctly', () => {
+    const view = setupSongListView();
+
+    view.loadSongs(
+      [makeLessonSong('lesson-1', { id: '01.01', title: 'Warm-Up Groove' })],
+      '/music',
+    );
+
+    view.selectView('lessons');
+
+    expect(screen.getByTestId('lesson-item-01.01')).toBeInTheDocument();
+    expect(rescanCallCount(view)).toBe(0);
+  });
+
+  it('never auto-rescans when the library has no SightKick Method songs at all', () => {
+    const view = setupSongListView();
+
+    view.loadSongs(
+      [makeListSong('a', { name: 'Master of Puppets' })],
+      '/music',
+    );
+
+    view.selectView('lessons');
+
+    expect(screen.getByTestId('lessons-rescan')).toBeInTheDocument();
+    expect(rescanCallCount(view)).toBe(0);
+  });
+
+  it('shows scan progress instead of the dead-end message while a rescan is in flight', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([], '/music');
+    view.selectView('lessons');
+    view.rescanProgress(3, 6);
+
+    expect(screen.getByTestId('lessons-scan-progress')).toBeInTheDocument();
+    expect(screen.queryByText('No lessons found')).not.toBeInTheDocument();
+
+    view.rescanDone([], '/music');
+
+    expect(screen.getByTestId('lessons-rescan')).toBeInTheDocument();
+  });
+
+  it('fires the rescan-songs IPC when the empty-state button is clicked', () => {
+    const view = setupSongListView();
+
+    view.loadSongs(
+      [makeListSong('a', { name: 'Master of Puppets' })],
+      '/music',
+    );
+    view.selectView('lessons');
+
+    fireEvent.click(screen.getByTestId('lessons-rescan'));
+
+    expect(view.ipc.sent).toContainEqual({
+      channel: 'rescan-songs',
+      args: [false],
+    });
+  });
+});

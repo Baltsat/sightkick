@@ -3,6 +3,7 @@ import { ScoreData, Song, SongLessonInfo } from '../../../types';
 import {
   bestStarsForSong,
   computeLessonProgress,
+  hasUnparsedLessonSongs,
   highestAvailableDifficulty,
   isLessonSong,
   lockedHint,
@@ -261,6 +262,29 @@ describe('computeLessonProgress', () => {
 
     expect(progress.continueEntry).toBeUndefined();
     expect(progress.nextLockedEntry?.lesson.id).toBe('01.02');
+  });
+});
+
+describe('hasUnparsedLessonSongs', () => {
+  it('is true for a SightKick Method folder whose song.lesson failed to parse (stale schema)', () => {
+    const stale = makeSong({
+      name: 'Second-Ending Turnaround',
+      dir: '/music/SightKick Method - Lesson 07.04 - Second-Ending Turnaround',
+    });
+
+    expect(hasUnparsedLessonSongs([stale])).toBe(true);
+  });
+
+  it('is false once the lesson song carries parsed lesson data', () => {
+    expect(hasUnparsedLessonSongs([makeLessonSong('a')])).toBe(false);
+  });
+
+  it('is false when the library has no SightKick Method songs at all', () => {
+    expect(hasUnparsedLessonSongs([makeSong()])).toBe(false);
+  });
+
+  it('is false for an empty library', () => {
+    expect(hasUnparsedLessonSongs([])).toBe(false);
   });
 });
 

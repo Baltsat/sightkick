@@ -1,6 +1,6 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlay } from '@fortawesome/free-solid-svg-icons';
-import { App, Button } from 'antd';
+import { faArrowsRotate, faPlay } from '@fortawesome/free-solid-svg-icons';
+import { App, Button, Progress } from 'antd';
 import { Stars } from '../Stars';
 import {
   LessonEntry,
@@ -12,9 +12,18 @@ import { LessonListItem } from './LessonListItem';
 export interface LessonsViewProps {
   progress: LessonProgress;
   onPlay: (entry: LessonEntry) => void;
+  /** Rescan progress percent (0-100), or undefined when not scanning. */
+  scanPercent?: number;
+  /** Fires the same 'rescan-songs' IPC as the settings rescan button. */
+  onRescan: () => void;
 }
 
-export function LessonsView({ progress, onPlay }: LessonsViewProps) {
+export function LessonsView({
+  progress,
+  onPlay,
+  scanPercent,
+  onRescan,
+}: LessonsViewProps) {
   const { notification } = App.useApp();
   const {
     groups,
@@ -24,6 +33,7 @@ export function LessonsView({ progress, onPlay }: LessonsViewProps) {
     continueEntry,
     nextLockedEntry,
   } = progress;
+  const isScanning = scanPercent !== undefined;
   const handleLockedClick = (entry: LessonEntry) => {
     notification.info({
       title: 'This lesson is locked',
@@ -35,6 +45,23 @@ export function LessonsView({ progress, onPlay }: LessonsViewProps) {
   };
 
   if (totalLessons === 0) {
+    if (isScanning) {
+      return (
+        <section
+          className="m-auto flex w-full max-w-md flex-col items-center gap-3 px-6 text-center"
+          data-testid="lessons-scan-progress"
+        >
+          <h2 className="font-display text-2xl font-semibold text-text-body">
+            Scanning your library
+          </h2>
+          <p className="text-sm leading-relaxed text-text-muted">
+            Looking for the SightKick Method curriculum in your songs folder…
+          </p>
+          <Progress percent={scanPercent} className="w-full" />
+        </section>
+      );
+    }
+
     return (
       <section className="m-auto flex max-w-md flex-col items-center gap-3 px-6 text-center">
         <h2 className="font-display text-2xl font-semibold text-text-body">
@@ -44,6 +71,14 @@ export function LessonsView({ progress, onPlay }: LessonsViewProps) {
           The SightKick Method curriculum wasn&apos;t found in your library.
           Rescan your library folder to pick it up.
         </p>
+        <Button
+          type="primary"
+          icon={<FontAwesomeIcon icon={faArrowsRotate} />}
+          data-testid="lessons-rescan"
+          onClick={onRescan}
+        >
+          Rescan library
+        </Button>
       </section>
     );
   }
