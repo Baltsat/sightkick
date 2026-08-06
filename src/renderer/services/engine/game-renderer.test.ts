@@ -544,7 +544,7 @@ describe('GameRenderer missed note treatment', () => {
 });
 
 describe('GameRenderer paintWrongHit', () => {
-  it('creates a marker in the overlay at the tick position, labelled with the drum actually struck', () => {
+  it('creates an × marker in the overlay at the tick position, with no text content', () => {
     const overlay = div();
     const view = setup(
       [
@@ -564,8 +564,11 @@ describe('GameRenderer paintWrongHit', () => {
 
     const marker = overlay.querySelector('.vf-wronghit-marker');
 
+    // The × itself is drawn with CSS (::before/::after crossed bars, see
+    // sheet-music.css) rather than a character, so there is no glyph or
+    // drum-abbreviation letter (e.g. the old "CR"/"HH") in the DOM text.
     expect(marker).not.toBeNull();
-    expect(marker?.textContent).toBe('CR');
+    expect(marker?.textContent).toBe('');
   });
 
   it('is visually distinct from the persistent missed-note treatment', () => {
@@ -660,5 +663,108 @@ describe('GameRenderer paintWrongHit', () => {
     view.render(0, 0);
 
     expect(overlay.querySelectorAll('.vf-wronghit-marker').length).toBe(0);
+  });
+
+  function markerY(el: Element): number {
+    const match = /translate3d\([^,]+,\s*([\d.-]+)px/.exec(
+      (el as HTMLElement).style.transform,
+    );
+
+    return match ? Number(match[1]) : NaN;
+  }
+
+  it('stacks × markers vertically instead of merging when they land close together', () => {
+    const overlay = div();
+    const view = setup(
+      [
+        measureData(0, 1920, [
+          rendered(0, staveNote(['c/5'], { isRest: true })),
+        ]),
+      ],
+      { overlayEl: overlay },
+    );
+
+    // Two wrong hits a few ticks apart land at (almost) the same x - the
+    // scenario that used to render as a single merged "THH"-style blob.
+    view.paintWrongHit({
+      tick: 480,
+      controlId: 'midi:49',
+      element: 'crash',
+      timeSeconds: 0.5,
+    });
+    view.paintWrongHit({
+      tick: 500,
+      controlId: 'midi:38',
+      element: 'snare',
+      timeSeconds: 0.52,
+    });
+
+    const markers = Array.from(overlay.querySelectorAll('.vf-wronghit-marker'));
+
+    expect(markers.length).toBe(2);
+    // Each marker is still its own separate element (no merged text node)
+    // and the second is pushed to a different y than the first.
+    expect(markers[0].textContent).toBe('');
+    expect(markers[1].textContent).toBe('');
+    expect(markerY(markers[1])).not.toBe(markerY(markers[0]));
+  });
+
+  it('does not offset × markers that land far apart on the x axis', () => {
+    const overlay = div();
+    const view = setup(
+      [
+        measureData(0, 1920, [
+          rendered(0, staveNote(['c/5'], { isRest: true })),
+        ]),
+      ],
+      { overlayEl: overlay },
+    );
+
+    view.paintWrongHit({
+      tick: 0,
+      controlId: 'midi:49',
+      element: 'crash',
+      timeSeconds: 0,
+    });
+    view.paintWrongHit({
+      tick: 1900,
+      controlId: 'midi:38',
+      element: 'snare',
+      timeSeconds: 4,
+    });
+
+    const markers = Array.from(overlay.querySelectorAll('.vf-wronghit-marker'));
+
+    expect(markerY(markers[0])).toBe(markerY(markers[1]));
+  });
+
+  it('never renders letter text in the overlay, for wrong hits or missed notes', () => {
+    const n0 = staveNote(['c/5']);
+    const overlay = div();
+    const view = setup(
+      [
+        measureData(0, 1920, [
+          rendered(0, n0),
+          rendered(480, staveNote(['d/5'], { isRest: true })),
+        ]),
+      ],
+      { overlayEl: overlay },
+    );
+
+    view.render(0, 480); // n0 passes un-hit -> persistent missed colouring, no chip
+    view.paintWrongHit({
+      tick: 480,
+      controlId: 'midi:49',
+      element: 'crash',
+      timeSeconds: 0.5,
+    });
+    view.paintWrongHit({
+      tick: 490,
+      controlId: 'midi:38',
+      element: 'snare',
+      timeSeconds: 0.51,
+    });
+
+    expect(overlay.textContent).toBe('');
   });
 });

@@ -189,22 +189,38 @@
   }
 }
 
+/*
+ * Wrong-hit marker: a plain red × at the struck tick, no badge/label. Drawn
+ * as two crossed bars (::before/::after) rather than an "x" character so
+ * there is no text content to read as a letter and no font-rendering
+ * variance across platforms.
+ */
 .vf-wronghit-marker {
   position: absolute;
   top: 0;
   left: 0;
-  width: 15px;
-  height: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 8px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--color-paper, #fff);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  width: 13px;
+  height: 13px;
   pointer-events: none;
-  border-radius: 50%;
-  background-color: var(--color-red-dark, #b91c1c);
-  border: 1.5px solid var(--color-red, #ef4444);
+}
+
+.vf-wronghit-marker::before,
+.vf-wronghit-marker::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 13px;
+  height: 2.5px;
+  border-radius: 1.25px;
+  background-color: var(--color-red, #ef4444);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.4);
+}
+
+.vf-wronghit-marker::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.vf-wronghit-marker::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }

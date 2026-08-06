@@ -20,7 +20,6 @@ import {
   ACTIVE_CLASS,
   HIDDEN_CLASS,
   HIT_CLASS,
-  KIT_SHORT_LABEL,
   MISS_CLASS,
   MISSED_CLASS,
   POP_CLASS,
@@ -33,6 +32,14 @@ import {
   keyPrefix,
   samePos,
 } from './helpers';
+
+// Wrong-hit markers land close together (e.g. two mis-hits a few ticks
+// apart) draw a stack of separate × glyphs rather than letting them
+// overlap into an unreadable blob. STACK_THRESHOLD_PX decides when two
+// markers count as "close"; STACK_OFFSET_PX is the vertical step used to
+// fan them out, alternating above/below the strike line as more land.
+const WRONG_HIT_STACK_THRESHOLD_PX = 12;
+const WRONG_HIT_STACK_OFFSET_PX = 10;
 
 export class GameRenderer {
   private chart: ParsedChart | undefined;
@@ -51,7 +58,7 @@ export class GameRenderer {
   private activeEls: SVGElement[] = [];
   private filledEls = new Set<SVGElement>();
   private vanishedNotes = new Map<StaveNote, SVGElement[]>();
-  private wrongHitMarkers: { tick: number; el: HTMLElement }[] = [];
+  private wrongHitMarkers: { tick: number; x: number; el: HTMLElement }[] = [];
 
   constructor(private isHit: IsHit) {}
 
@@ -158,21 +165,43 @@ export class GameRenderer {
     const marker = document.createElement('div');
 
     marker.className = WRONG_HIT_MARKER_CLASS;
-    marker.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
 
-    const label = record.element ? KIT_SHORT_LABEL[record.element] : undefined;
+    const stackY = y + this.wrongHitStackOffset(x);
+
+    marker.style.transform = `translate3d(${x}px, ${stackY}px, 0) translate(-50%, -50%)`;
+
     const displayName = record.element
       ? KIT_ELEMENTS.get(record.element)?.displayName
       : undefined;
-
-    marker.textContent = label ?? '?';
 
     if (displayName) {
       marker.title = `Wrong hit: ${displayName}`;
     }
 
     overlay.appendChild(marker);
-    this.wrongHitMarkers.push({ tick: record.tick, el: marker });
+    this.wrongHitMarkers.push({ tick: record.tick, x, el: marker });
+  }
+
+  /**
+   * Vertical offset (in px) for a new wrong-hit × landing at `x`, so that
+   * markers struck close together fan out above/below the strike line
+   * instead of drawing on top of each other. Markers already at the same
+   * x (within WRONG_HIT_STACK_THRESHOLD_PX) push the new one out one more
+   * step, alternating sides: 0, +1, -1, +2, -2, ...
+   */
+  private wrongHitStackOffset(x: number): number {
+    const nearby = this.wrongHitMarkers.filter(
+      (marker) => Math.abs(marker.x - x) < WRONG_HIT_STACK_THRESHOLD_PX,
+    ).length;
+
+    if (nearby === 0) {
+      return 0;
+    }
+
+    const magnitude = Math.ceil(nearby / 2) * WRONG_HIT_STACK_OFFSET_PX;
+    const sign = nearby % 2 === 1 ? 1 : -1;
+
+    return sign * magnitude;
   }
 
   reset(): void {
