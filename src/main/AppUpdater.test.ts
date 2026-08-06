@@ -70,8 +70,7 @@ vi.mock('electron', () => ({
 }));
 
 const { AppUpdater } = await import('./AppUpdater');
-const RELEASES_URL =
-  'https://github.com/tonygoldcrest/sightkick/releases/latest';
+const RELEASES_URL = 'https://github.com/Baltsat/sightkick/releases/latest';
 
 function build() {
   const send = vi.fn();

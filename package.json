@@ -11,7 +11,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tonygoldcrest/sightkick.git"
+    "url": "git+https://github.com/Baltsat/sightkick.git"
   },
   "license": "MIT",
   "author": {
@@ -72,6 +72,7 @@
     "electron-store": "^8.1.0",
     "electron-updater": "^6.8.9",
     "es-toolkit": "^1.47.1",
+    "ffmpeg-static": "^5.3.0",
     "fuse.js": "^7.0.0",
     "ini": "^4.1.1",
     "music-metadata": "^11.14.0",
@@ -193,12 +194,30 @@
       "./assets/**",
       {
         "from": "resources/transcriber",
-        "to": "transcriber"
+        "to": "transcriber",
+        "filter": [
+          "**/*",
+          "!.venv/**",
+          "!.uvtmp/**",
+          "!verify_out/**",
+          "!**/__pycache__/**",
+          "!**/*.pyc",
+          "!*.log"
+        ]
+      },
+      {
+        "from": "node_modules/ffmpeg-static",
+        "to": "ffmpeg-static",
+        "filter": [
+          "ffmpeg",
+          "ffmpeg.exe",
+          "package.json"
+        ]
       }
     ],
     "publish": {
       "provider": "github",
-      "owner": "tonygoldcrest",
+      "owner": "Baltsat",
       "repo": "sightkick"
     }
   },

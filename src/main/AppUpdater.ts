@@ -8,8 +8,7 @@ import log from 'electron-log';
 import { BrowserWindow, ipcMain, IpcMainEvent } from 'electron';
 import { IpcUpdateAvailable, IpcUpdateStatus } from '../types';
 
-const RELEASES_URL =
-  'https://github.com/tonygoldcrest/sightkick/releases/latest';
+const RELEASES_URL = 'https://github.com/Baltsat/sightkick/releases/latest';
 
 function normalizeReleaseNotes(
   releaseNotes: UpdateInfo['releaseNotes'],
