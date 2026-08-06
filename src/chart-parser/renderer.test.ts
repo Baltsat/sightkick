@@ -1,9 +1,14 @@
 import React from 'react';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { Stave } from 'vexflow';
-import { packRows, renderMusic, TARGET_ROW_WIDTH } from './renderer';
+import {
+  dedupedTempoLabels,
+  packRows,
+  renderMusic,
+  TARGET_ROW_WIDTH,
+} from './renderer';
 import { ChartParser } from './parser';
-import { Measure, Note, ParsedChart } from './types';
+import { Measure, Note, ParsedChart, TempoMark } from './types';
 
 beforeAll(() => {
   (
@@ -40,6 +45,10 @@ function measure(notes: Note[], overrides: Partial<Measure> = {}): Measure {
 
 function song(measures: Measure[]): ChartParser {
   return { measures } as ChartParser;
+}
+
+function tempo(bpm: number): TempoMark {
+  return { bpm, duration: 'q', dots: 0 };
 }
 
 function ref(element: HTMLDivElement | null) {
@@ -409,6 +418,44 @@ describe('renderMusic', () => {
     expect(div.querySelector('svg')).not.toBeNull();
   });
 
+  it('prints a tempo label only for the first tempo and after a >= 2 BPM drift from the last shown one', () => {
+    const div = container();
+    const measures = [
+      measure(quarters, { tempo: tempo(83.03) }),
+      measure(quarters, {
+        tempo: tempo(83.71),
+        hasClef: false,
+        sigChange: false,
+      }),
+      measure(quarters, {
+        tempo: tempo(90),
+        hasClef: false,
+        sigChange: false,
+      }),
+    ];
+
+    render(ref(div), song(measures), true, false, true);
+
+    const tempoTexts = Array.from(div.querySelectorAll('svg text'))
+      .map((el) => el.textContent)
+      .filter((text): text is string => Boolean(text?.includes('=')));
+
+    expect(tempoTexts).toEqual([' = 83', ' = 90']);
+  });
+
+  it('prints nothing when tempo display is switched off', () => {
+    const div = container();
+    const measures = [measure(quarters, { tempo: tempo(83.03) })];
+
+    render(ref(div), song(measures), true, false, false);
+
+    const tempoTexts = Array.from(div.querySelectorAll('svg text')).filter(
+      (el) => el.textContent?.includes('='),
+    );
+
+    expect(tempoTexts).toHaveLength(0);
+  });
+
   it('renders real parser output end to end', () => {
     const div = container();
     const chart = {
@@ -456,5 +503,97 @@ describe('packRows', () => {
 
   it('breaks on the two-measure cap before the width limit', () => {
     expect(packRows([100, 100, 100])).toEqual([[0, 1], [2]]);
+  });
+});
+
+describe('dedupedTempoLabels', () => {
+  it('shows the first tempo the chart carries', () => {
+    const measures = [measure(quarters, { tempo: tempo(100) })];
+
+    expect(dedupedTempoLabels(measures, true)).toEqual([tempo(100)]);
+  });
+
+  it('suppresses near-duplicate tempos that drift less than 2 BPM from the last one shown', () => {
+    const measures = [
+      measure(quarters, { tempo: tempo(83.03) }),
+      measure(quarters, { tempo: tempo(83.71) }),
+      measure(quarters, { tempo: tempo(83.5) }),
+    ];
+
+    expect(dedupedTempoLabels(measures, true)).toEqual([
+      tempo(83),
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it('shows a tempo again once it drifts at least 2 BPM from the last one shown', () => {
+    const measures = [
+      measure(quarters, { tempo: tempo(83.03) }),
+      measure(quarters, { tempo: tempo(83.71) }),
+      measure(quarters, { tempo: tempo(90) }),
+    ];
+
+    expect(dedupedTempoLabels(measures, true)).toEqual([
+      tempo(83),
+      undefined,
+      tempo(90),
+    ]);
+  });
+
+  it('treats the last SHOWN tempo as the comparison baseline, not the last measure', () => {
+    const measures = [
+      measure(quarters, { tempo: tempo(100) }),
+      // Exactly 2 BPM up from the shown baseline (100) - meets the >= 2
+      // threshold, so this one shows and becomes the new baseline.
+      measure(quarters, { tempo: tempo(102) }),
+      // Only 1.9 BPM up from the new baseline (102), even though it is
+      // 3.9 up from the very first tempo - stays suppressed.
+      measure(quarters, { tempo: tempo(103.9) }),
+    ];
+
+    expect(dedupedTempoLabels(measures, true)).toEqual([
+      tempo(100),
+      tempo(102),
+      undefined,
+    ]);
+  });
+
+  it('rounds the displayed BPM to the nearest integer in both directions', () => {
+    const measures = [measure(quarters, { tempo: tempo(119.4) })];
+
+    expect(dedupedTempoLabels(measures, true)[0]?.bpm).toBe(119);
+
+    const measuresUp = [measure(quarters, { tempo: tempo(119.6) })];
+
+    expect(dedupedTempoLabels(measuresUp, true)[0]?.bpm).toBe(120);
+  });
+
+  it('leaves a measure with no tempo change as undefined', () => {
+    const measures = [
+      measure(quarters, { tempo: tempo(100) }),
+      measure(quarters),
+    ];
+
+    expect(dedupedTempoLabels(measures, true)).toEqual([tempo(100), undefined]);
+  });
+
+  it('shows nothing when tempo display is switched off', () => {
+    const measures = [
+      measure(quarters, { tempo: tempo(100) }),
+      measure(quarters, { tempo: tempo(140) }),
+    ];
+
+    expect(dedupedTempoLabels(measures, false)).toEqual([undefined, undefined]);
+  });
+
+  it('never mutates the chart data it reads from', () => {
+    const original = tempo(83.03);
+    const measures = [measure(quarters, { tempo: original })];
+
+    dedupedTempoLabels(measures, true);
+
+    expect(original.bpm).toBe(83.03);
+    expect(measures[0].tempo).toBe(original);
   });
 });
