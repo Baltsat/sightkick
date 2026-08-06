@@ -23,6 +23,7 @@ export type Channels =
   | 'auto-chart-remote-settings'
   | 'save-test-auto-chart-remote'
   | 'auto-chart-remote-test'
+  | 'search-youtube'
   | 'check-stem-tools'
   | 'check-stem-tools-update'
   | 'download-stem-tools'

@@ -13,6 +13,7 @@ import { SplittingQueue } from '../../components/SplittingQueue';
 import { EmptySongState } from '../../components/EmptySongState';
 import { AutoChart } from '../../components/AutoChart';
 import { SongImport } from '../../components/SongImport';
+import { SongSearch } from '../../components/SongSearch';
 import { LessonsView } from '../../components/LessonsView';
 import { useApp } from '../../context/AppContext';
 import { useInput } from '../../context/InputContext';
@@ -350,6 +351,7 @@ export function SongListView() {
                   libraryMode={libraryMode}
                   onChangeLibraryMode={setLibraryMode}
                 />
+                <SongSearch disabled={currentPath === null} />
                 <SongImport
                   disabled={currentPath === null}
                   onImported={handleSongImported}

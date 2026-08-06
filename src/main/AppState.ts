@@ -39,6 +39,7 @@ import {
   getRemoteAutoChartSettings,
   saveAndTestRemoteAutoChart,
 } from './ipc/remoteAutoChart';
+import { searchYoutube } from './ipc/searchYoutube';
 
 class AppState {
   private static instance: AppState;
@@ -127,6 +128,7 @@ class AppState {
     ipcMain.on('import-auto-chart', importAutoChart);
     ipcMain.on('get-auto-chart-remote-settings', getRemoteAutoChartSettings);
     ipcMain.on('save-test-auto-chart-remote', saveAndTestRemoteAutoChart);
+    ipcMain.on('search-youtube', searchYoutube);
 
     ipcMain.on('check-stem-tools', checkStemTools);
     ipcMain.on('check-stem-tools-update', checkStemToolsUpdate);

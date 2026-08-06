@@ -351,6 +351,24 @@ export interface IpcAutoChartJob {
   errorCode?: string;
 }
 
+export interface IpcSearchYoutubeRequest {
+  query: string;
+  limit?: number;
+}
+
+export interface IpcYoutubeSearchResult {
+  videoId: string;
+  title: string;
+  uploader?: string;
+  durationSeconds?: number;
+  thumbnailUrl?: string;
+  watchUrl: string;
+}
+
+export interface IpcSearchYoutubeResponse {
+  results: IpcYoutubeSearchResult[];
+}
+
 export interface StorageSchema {
   songs: {
     [key: string]: SongData;

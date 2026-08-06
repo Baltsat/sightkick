@@ -1,0 +1,225 @@
+import { KeyboardEvent, useState } from 'react';
+import { App, Empty, Input, Popover, Spin } from 'antd';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
+import appIcon from '../../../../assets/icon.png';
+import { IpcYoutubeSearchResult } from '../../../types';
+import { formatTime } from '../../helpers';
+import { cn } from '../../cn';
+import { popoverStyles } from '../../overlayStyles';
+import { Tooltip } from '../Tooltip';
+import { useYoutubeSearch } from '../../hooks/useYoutubeSearch';
+
+interface Props {
+  disabled?: boolean;
+}
+
+function resultSubtitle(result: IpcYoutubeSearchResult): string {
+  const parts: string[] = [];
+
+  if (result.uploader) {
+    parts.push(result.uploader);
+  }
+
+  if (typeof result.durationSeconds === 'number') {
+    parts.push(formatTime(result.durationSeconds));
+  }
+
+  return parts.join(' · ');
+}
+
+export function SongSearch({ disabled }: Props) {
+  const { notification } = App.useApp();
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const trimmed = query.trim();
+  const { results, loading, error } = useYoutubeSearch(query);
+  const [prevResults, setPrevResults] = useState(results);
+
+  if (results !== prevResults) {
+    setPrevResults(results);
+    setActiveIndex(-1);
+  }
+
+  const select = (result: IpcYoutubeSearchResult) => {
+    window.electron.ipcRenderer.sendMessage('create-auto-chart', {
+      youtubeUrl: result.watchUrl,
+    });
+    notification.info({
+      title: 'Creating a chart',
+      description: `Finding drums for "${result.title}"…`,
+      placement: 'bottomRight',
+    });
+    setQuery('');
+    setOpen(false);
+    setActiveIndex(-1);
+  };
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape') {
+      setOpen(false);
+
+      return;
+    }
+
+    if (!open || results.length === 0) {
+      return;
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setActiveIndex((index) => (index + 1) % results.length);
+
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActiveIndex((index) => (index <= 0 ? results.length - 1 : index - 1));
+
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      select(results[activeIndex >= 0 ? activeIndex : 0]);
+    }
+  };
+  const showPanel = open && Boolean(trimmed);
+  const content = (
+    <div className="flex w-88 flex-col gap-1" data-testid="song-search-panel">
+      {loading && (
+        <div
+          className="flex items-center gap-2 p-3 text-sm text-text-muted"
+          data-testid="song-search-loading"
+        >
+          <Spin size="small" /> Searching YouTube…
+        </div>
+      )}
+
+      {!loading && error && (
+        <div
+          className="p-3 text-sm text-red"
+          role="alert"
+          data-testid="song-search-error"
+        >
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && results.length === 0 && (
+        <div className="p-3" data-testid="song-search-empty">
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={`No YouTube results for "${trimmed}"`}
+          />
+        </div>
+      )}
+
+      {!loading && !error && results.length > 0 && (
+        <div
+          role="listbox"
+          id="song-search-listbox"
+          aria-label="YouTube search results"
+          data-testid="song-search-results"
+          className="flex max-h-96 flex-col gap-1 overflow-y-auto"
+        >
+          {results.map((result, index) => (
+            <button
+              key={result.videoId}
+              type="button"
+              id={`song-search-option-${index}`}
+              role="option"
+              aria-selected={index === activeIndex}
+              data-testid={`song-search-result-${result.videoId}`}
+              className={cn(
+                'flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors',
+                index === activeIndex
+                  ? 'bg-accent-soft-bg'
+                  : 'hover:bg-accent-soft-bg',
+              )}
+              onMouseEnter={() => setActiveIndex(index)}
+              onClick={() => select(result)}
+            >
+              <img
+                src={result.thumbnailUrl ?? appIcon}
+                alt=""
+                onError={(event) => {
+                  event.currentTarget.src = appIcon;
+                }}
+                className="size-12 shrink-0 rounded-md object-cover outline outline-1 -outline-offset-1 outline-white/10"
+              />
+              <div className="min-w-0 grow">
+                <div
+                  className="truncate text-sm font-semibold text-text-body"
+                  title={result.title}
+                >
+                  {result.title}
+                </div>
+                <div className="truncate text-xs text-text-muted">
+                  {resultSubtitle(result)}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!loading && results.length > 0 && (
+        <div
+          className="border-t border-border-soft px-3 py-2 text-xs text-text-faint"
+          data-testid="song-search-provenance"
+        >
+          Results from YouTube search
+        </div>
+      )}
+    </div>
+  );
+  const input = (
+    <Input
+      data-testid="song-search-input"
+      aria-label="Find any song"
+      placeholder="Find any song…"
+      prefix={
+        <FontAwesomeIcon
+          icon={faMagnifyingGlass}
+          color="var(--color-text-dim)"
+        />
+      }
+      value={query}
+      disabled={disabled}
+      role="combobox"
+      aria-autocomplete="list"
+      aria-expanded={showPanel}
+      aria-controls="song-search-listbox"
+      aria-activedescendant={
+        activeIndex >= 0 ? `song-search-option-${activeIndex}` : undefined
+      }
+      onChange={(event) => {
+        setQuery(event.target.value);
+        setOpen(true);
+      }}
+      onFocus={() => setOpen(true)}
+      onBlur={() => {
+        setTimeout(() => setOpen(false), 150);
+      }}
+      onKeyDown={onKeyDown}
+    />
+  );
+
+  if (disabled) {
+    return <Tooltip title="Select a library folder first">{input}</Tooltip>;
+  }
+
+  return (
+    <Popover
+      open={showPanel}
+      trigger={[]}
+      placement="bottomLeft"
+      styles={popoverStyles}
+      content={content}
+    >
+      {input}
+    </Popover>
+  );
+}
