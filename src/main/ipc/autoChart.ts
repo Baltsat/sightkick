@@ -217,10 +217,16 @@ export function canonicalizeYoutubeUrl(value: string): string {
     if (parsed.pathname === '/watch') {
       videoId = parsed.searchParams.get('v');
     } else {
-      const match = parsed.pathname.match(/^\/shorts\/([^/]+)$/);
+      const match = parsed.pathname.match(/^\/(?:shorts|live|embed)\/([^/]+)$/);
 
       videoId = match?.[1] ?? null;
     }
+  } else if (
+    ['youtube-nocookie.com', 'www.youtube-nocookie.com'].includes(host)
+  ) {
+    const match = parsed.pathname.match(/^\/embed\/([^/]+)$/);
+
+    videoId = match?.[1] ?? null;
   }
 
   if (!videoId || !/^[A-Za-z0-9_-]{11}$/.test(videoId)) {
@@ -307,21 +313,23 @@ export async function fetchOfficialYoutubeMetadata(
       { signal: AbortSignal.timeout(15_000) },
     );
   } catch {
-    throw new Error(
-      'YouTube metadata request failed; check your connection or omit the URL',
-    );
+    return undefined;
   }
 
   if (!response.ok) {
-    throw new Error(
-      'YouTube could not provide official metadata for this video',
-    );
+    return undefined;
   }
 
-  const value: unknown = await response.json();
+  let value: unknown;
+
+  try {
+    value = await response.json();
+  } catch {
+    return undefined;
+  }
 
   if (!value || typeof value !== 'object') {
-    throw new Error('YouTube returned invalid official metadata');
+    return undefined;
   }
 
   const record = value as Record<string, unknown>;
@@ -332,7 +340,7 @@ export async function fetchOfficialYoutubeMetadata(
     typeof record.thumbnail_url === 'string' ? record.thumbnail_url : undefined;
 
   if (!title || !authorName) {
-    throw new Error('YouTube returned incomplete official metadata');
+    return undefined;
   }
 
   if (thumbnailUrl) {
@@ -341,14 +349,22 @@ export async function fetchOfficialYoutubeMetadata(
     try {
       thumbnail = new URL(thumbnailUrl);
     } catch {
-      throw new Error('YouTube returned an invalid thumbnail URL');
+      return {
+        title,
+        authorName,
+        ...inferTrackIdentity(title, authorName),
+      };
     }
 
     if (
       thumbnail.protocol !== 'https:' ||
       thumbnail.hostname !== 'i.ytimg.com'
     ) {
-      throw new Error('YouTube returned a non-official thumbnail URL');
+      return {
+        title,
+        authorName,
+        ...inferTrackIdentity(title, authorName),
+      };
     }
   }
 

@@ -77,6 +77,7 @@ function writeAudio(root: string, name: string): string {
 interface HarnessOptions {
   audioPaths?: string[];
   backends?: { sightkick: boolean; octave: boolean };
+  resolveMetadata?: typeof fetchOfficialYoutubeMetadata;
 }
 
 function createHarness(options: HarnessOptions = {}) {
@@ -139,7 +140,7 @@ function createHarness(options: HarnessOptions = {}) {
 
       return audioPaths[audioIndex++];
     },
-    resolveMetadata: async () => undefined,
+    resolveMetadata: options.resolveMetadata ?? (async () => undefined),
     validateAudio: validateLocalAudioFile,
     createTempDir: async (id: string) =>
       fs.promises.mkdtemp(path.join(root, `${id}-`)),
@@ -229,6 +230,24 @@ describe('auto-chart source and worker protocol', () => {
     expect(
       canonicalizeYoutubeUrl(
         'https://music.youtube.com/watch?v=abcdefghijk&list=album',
+      ),
+    ).toBe('https://www.youtube.com/watch?v=abcdefghijk');
+    expect(
+      canonicalizeYoutubeUrl(
+        'https://www.youtube.com/live/abcdefghijk?feature=share',
+      ),
+    ).toBe('https://www.youtube.com/watch?v=abcdefghijk');
+    expect(
+      canonicalizeYoutubeUrl('https://www.youtube.com/embed/abcdefghijk'),
+    ).toBe('https://www.youtube.com/watch?v=abcdefghijk');
+    expect(
+      canonicalizeYoutubeUrl(
+        'https://www.youtube-nocookie.com/embed/abcdefghijk?start=4',
+      ),
+    ).toBe('https://www.youtube.com/watch?v=abcdefghijk');
+    expect(
+      canonicalizeYoutubeUrl(
+        'https://www.youtube.com/watch?feature=share&t=10&v=abcdefghijk',
       ),
     ).toBe('https://www.youtube.com/watch?v=abcdefghijk');
     expect(() =>
@@ -675,9 +694,37 @@ describe('auto-chart queue — sightkick backend', () => {
   const cleanup: string[] = [];
 
   afterEach(() => {
+    vi.unstubAllGlobals();
+
     for (const root of cleanup.splice(0)) {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('continues to the sidecar when optional oEmbed metadata is unavailable', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Promise.reject(new Error('offline'))),
+    );
+
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+      resolveMetadata: fetchOfficialYoutubeMetadata,
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://youtu.be/abcdefghijk',
+    });
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+
+    expect(harness.skRuns[0].input.youtubeUrl).toBe(
+      'https://www.youtube.com/watch?v=abcdefghijk',
+    );
+    expect(latestJob(event)).toMatchObject({ stage: 'downloading' });
   });
 
   it('downloads audio automatically from a pasted YouTube URL without prompting for a local file', async () => {
