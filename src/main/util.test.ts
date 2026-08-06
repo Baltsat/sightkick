@@ -1,6 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { execFileSync } from 'child_process';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   assetUrlToFilePath,
@@ -131,6 +132,47 @@ describe('buildSongFromDir guards', () => {
 });
 
 describe('buildSongFromDir metadata', () => {
+  it('round-trips Unicode from the sidecar writer through the app parser', () => {
+    const transcriberDir = path.resolve(
+      __dirname,
+      '../../resources/transcriber',
+    );
+    const script = [
+      'import sys',
+      'from pathlib import Path',
+      'from sk_transcriber.naming import sanitize_folder_name',
+      'from sk_transcriber.songini import write_song_ini',
+      'root = Path(sys.argv[1])',
+      "folder = sanitize_folder_name('Тестовый/артист', '夜のドラム: 🥁')",
+      'song_dir = root / folder',
+      'song_dir.mkdir()',
+      "write_song_ini(song_dir / 'song.ini', name='夜のドラム 🥁', artist='Тестовый артист', album='東京', year='2026', genre='ロック', diff_drums=4, song_length_ms=120000, charter='SightKick')",
+      'print(song_dir)',
+    ].join('; ');
+    const songDir = execFileSync(
+      'uv',
+      ['run', '--no-project', '--python', '3.12', 'python', '-c', script, dir],
+      {
+        cwd: transcriberDir,
+        encoding: 'utf8',
+        env: { ...process.env, PYTHONPATH: transcriberDir },
+      },
+    ).trim();
+
+    fs.writeFileSync(
+      path.join(songDir, 'notes.chart'),
+      CHART_WITH_HARD_AND_EXPERT,
+    );
+
+    const song = buildSongFromDir(songDir);
+
+    expect(path.basename(songDir)).toBe('Тестовыйартист - 夜のドラム 🥁');
+    expect(song?.artist).toBe('Тестовый артист');
+    expect(song?.name).toBe('夜のドラム 🥁');
+    expect(song?.album).toBe('東京');
+    expect(song?.genre).toBe('ロック');
+  });
+
   it('keeps crowd stems and skips preview tracks in any format', () => {
     writeSong(CHART_WITH_HARD_AND_EXPERT);
     fs.writeFileSync(path.join(dir, 'drums.ogg'), '');
