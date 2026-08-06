@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Measure, Note, ParsedChart } from '../../../chart-parser/types';
 import { InputEvent } from '../../input/types';
+import { ticksToSeconds } from '../../../chart-parser/timing';
 import { Judge } from './judge';
 import { JudgeContext, JudgeHitHandler } from './types';
 
@@ -68,7 +69,13 @@ describe('Judge', () => {
 
     expect(engine.isHit(480, 'c/5')).toBe(true);
     expect(engine.falseHitCount).toBe(0);
-    expect(onHit).toHaveBeenCalledWith({ measureIdx: 0, noteIdx: 0 }, ['c/5']);
+    expect(onHit).toHaveBeenCalledWith({ measureIdx: 0, noteIdx: 0 }, ['c/5'], {
+      tick: 480,
+      timeSeconds: ticksToSeconds(480, CHART.resolution, CHART.tempos),
+      deltaMs: 0,
+      element: 'snare',
+      velocity: 100,
+    });
   });
 
   it('registers a hit using the remapped control after a remap', () => {

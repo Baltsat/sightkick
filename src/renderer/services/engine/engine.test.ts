@@ -297,11 +297,14 @@ describe('Engine', () => {
 
     player.onEnded();
 
-    expect(onEnded).toHaveBeenCalledWith({
-      hitNotes: 0,
-      falseHits: 0,
-      totalNotes: 3,
-    });
+    expect(onEnded).toHaveBeenCalledWith(
+      {
+        hitNotes: 0,
+        falseHits: 0,
+        totalNotes: 3,
+      },
+      expect.any(Object),
+    );
   });
 
   it('positions the cursor element from the current time', async () => {
@@ -413,6 +416,7 @@ describe('Engine', () => {
     player.onEnded();
     expect(onEnded).toHaveBeenCalledWith(
       expect.objectContaining({ hitNotes: 1, falseHits: 0 }),
+      expect.any(Object),
     );
   });
 
@@ -446,6 +450,7 @@ describe('Engine', () => {
     player.onEnded();
     expect(onEnded).toHaveBeenCalledWith(
       expect.objectContaining({ hitNotes: 1, falseHits: 0 }),
+      expect.any(Object),
     );
   });
 
@@ -500,6 +505,7 @@ describe('Engine', () => {
     player.onEnded();
     expect(onEnded).toHaveBeenCalledWith(
       expect.objectContaining({ falseHits: 0 }),
+      expect.any(Object),
     );
   });
 

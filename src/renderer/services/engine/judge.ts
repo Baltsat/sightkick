@@ -328,6 +328,21 @@ export class Judge {
     }
 
     newPrefixes.forEach((p) => this.recordHit(hit.tick, p));
-    this.hitListeners.forEach((listener) => listener(pos, newPrefixes));
+
+    const expectedTimeS = ticksToSeconds(
+      hit.tick,
+      chart.resolution,
+      chart.tempos,
+    );
+
+    this.hitListeners.forEach((listener) =>
+      listener(pos, newPrefixes, {
+        tick: hit.tick,
+        timeSeconds: currentTimeS,
+        deltaMs: (currentTimeS - expectedTimeS) * 1000,
+        element: this.resolveElement(controlId),
+        velocity: value,
+      }),
+    );
   }
 }

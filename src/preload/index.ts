@@ -41,6 +41,8 @@ export type Channels =
   | 'download-update'
   | 'install-update'
   | 'update-song'
+  | 'save-practice-run'
+  | 'load-practice-runs'
   | 'export-pdf';
 
 const electronHandler = {

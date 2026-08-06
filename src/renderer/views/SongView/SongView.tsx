@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { App, Button, Divider, InputNumber, Layout, Spin, Switch } from 'antd';
+import {
+  App,
+  Button,
+  Divider,
+  Drawer,
+  InputNumber,
+  Layout,
+  Spin,
+  Switch,
+} from 'antd';
 import { Content } from 'antd/es/layout/layout';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Playback } from '../../components/Playback';
@@ -8,6 +17,7 @@ import { SheetMusic } from '../../components/SheetMusic';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowLeft,
+  faChartLine,
   faPause,
   faPlay,
 } from '@fortawesome/free-solid-svg-icons';
@@ -29,6 +39,8 @@ import { useTransportShortcuts } from '../../hooks/useTransportShortcuts';
 import { ScoreSummary } from '../../components/ScoreSummary';
 import { CountIn } from '../../components/CountIn';
 import { ScoreData } from '../../../types';
+import { computeRunsTrend, RunSummary } from '../../services/practice-stats';
+import { PracticeStats } from '../../components/PracticeStats';
 import { buildSheetPdfHtml } from '../../services/pdf-export';
 import { serializeMeasureToDsl } from '../../components/SheetMusic';
 import { AudioVolume } from '../../components/AudioVolume';
@@ -49,9 +61,13 @@ export function SongView() {
   } = useSongViewSettings();
   const { notification, message } = App.useApp();
   const [scoreData, setScoreData] = useState<ScoreData>();
+  const [practiceSummary, setPracticeSummary] = useState<RunSummary>();
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [songRuns, setSongRuns] = useState<RunSummary[]>();
   const exportPdfOffRef = useRef<(() => void) | undefined>(undefined);
+  const loadRunsOffRef = useRef<(() => void) | undefined>(undefined);
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const gameMode = useMemo<GameMode | undefined>(() => {
@@ -118,12 +134,13 @@ export function SongView() {
     player: policy.player,
     playheadStyle: policy.playheadOverride ?? playheadStyle,
     mapping: inputMapping,
-    onEnded: (score) => {
+    onEnded: (score, summary) => {
       if (!policy.scoring) {
         return;
       }
 
       setScoreData(score);
+      setPracticeSummary(summary);
       setIsScoreModalOpen(true);
 
       const previousScore = songData?.scoreData?.[difficulty];
@@ -136,6 +153,13 @@ export function SongView() {
         window.electron.ipcRenderer.sendMessage('update-song', {
           id,
           scoreData: { [difficulty]: score },
+        });
+      }
+
+      if (id && isAttempt) {
+        window.electron.ipcRenderer.sendMessage('save-practice-run', {
+          songId: id,
+          summary,
         });
       }
     },
@@ -166,6 +190,25 @@ export function SongView() {
     setIsScoreModalOpen(false);
     playFromTick(0);
   };
+  const onOpenStats = useCallback(() => {
+    setIsStatsOpen(true);
+
+    if (!id) {
+      return;
+    }
+
+    loadRunsOffRef.current?.();
+    loadRunsOffRef.current = window.electron.ipcRenderer.once<
+      { songId: string; runs: RunSummary[] } | { error: string }
+    >('load-practice-runs', (result) => {
+      loadRunsOffRef.current = undefined;
+
+      if ('runs' in result) {
+        setSongRuns(result.runs);
+      }
+    });
+    window.electron.ipcRenderer.sendMessage('load-practice-runs', id);
+  }, [id]);
   const onExportPdf = useCallback(() => {
     if (!vexflowContainerRef.current || !songData) {
       return;
@@ -296,6 +339,8 @@ export function SongView() {
 
   useEffect(() => () => exportPdfOffRef.current?.(), []);
 
+  useEffect(() => () => loadRunsOffRef.current?.(), []);
+
   useEffect(() => {
     engine?.setClickSettings(clickVolume / 100, clickTone / 100);
   }, [engine, clickVolume, clickTone]);
@@ -315,7 +360,20 @@ export function SongView() {
         songData={songData}
         difficulty={difficulty}
         scoreData={scoreData}
+        practiceSummary={practiceSummary}
       />
+      <Drawer
+        title="Practice stats"
+        open={isStatsOpen}
+        onClose={() => setIsStatsOpen(false)}
+        destroyOnClose
+      >
+        <PracticeStats
+          variant="panel"
+          summary={songRuns?.[songRuns.length - 1]}
+          trend={songRuns ? computeRunsTrend(songRuns) : []}
+        />
+      </Drawer>
       <header
         className="flex min-h-20 items-center gap-4 border-b border-divider px-5 py-3"
         style={{ background: 'var(--gradient-header)' }}
@@ -466,6 +524,14 @@ export function SongView() {
           }
           onExportPdf={onExportPdf}
           isExporting={isExporting}
+        />
+        <Button
+          icon={<FontAwesomeIcon icon={faChartLine} />}
+          data-testid="practice-stats-button"
+          aria-label="Practice stats"
+          onClick={onOpenStats}
+          size="large"
+          className="shrink-0"
         />
       </header>
 

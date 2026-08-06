@@ -7,6 +7,8 @@ import { faRepeat } from '@fortawesome/free-solid-svg-icons';
 import { calculateAccuracy, getStarRating } from '../../scoring';
 import { MODAL_ABOVE_POPOVER_Z_INDEX, modalStyles } from '../../overlayStyles';
 import { Stars } from '../Stars';
+import { RunSummary } from '../../services/practice-stats';
+import { PracticeStats } from '../PracticeStats';
 
 interface Props {
   isOpen: boolean;
@@ -15,6 +17,7 @@ interface Props {
   songData: Song | undefined;
   difficulty: Difficulty;
   scoreData?: ScoreData;
+  practiceSummary?: RunSummary;
 }
 
 function noteCountLabel(count: number, verb: string): string {
@@ -28,6 +31,7 @@ export function ScoreSummary({
   songData,
   difficulty,
   scoreData,
+  practiceSummary,
 }: Props) {
   const starRating = useMemo(() => {
     if (!scoreData) {
@@ -136,6 +140,11 @@ export function ScoreSummary({
             {`${scoreData?.falseHits ?? 0} false hits`}
           </div>
         </div>
+        <PracticeStats
+          summary={practiceSummary}
+          variant="inline"
+          className="w-full"
+        />
       </div>
     </Modal>
   );

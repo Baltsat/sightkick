@@ -40,6 +40,7 @@ import {
   saveAndTestRemoteAutoChart,
 } from './ipc/remoteAutoChart';
 import { searchYoutube } from './ipc/searchYoutube';
+import { savePracticeRun, loadPracticeRuns } from './ipc/practiceStats';
 
 class AppState {
   private static instance: AppState;
@@ -140,6 +141,8 @@ class AppState {
     ipcMain.on('cancel-split', cancelSplit);
 
     ipcMain.on('update-song', updateSong);
+    ipcMain.on('save-practice-run', savePracticeRun);
+    ipcMain.on('load-practice-runs', loadPracticeRuns);
     ipcMain.on('export-pdf', exportPdf);
     ipcMain.on('midi-device-list', loadMidiDeviceList);
     ipcMain.on('listen-midi', listenMidi);
