@@ -85,7 +85,7 @@ export function LessonsView({
 
   return (
     <div className="h-full w-full overflow-y-auto">
-      <div className="mx-auto flex max-w-250 flex-col gap-4 px-4 py-4">
+      <div className="mx-auto flex w-full max-w-360 flex-col gap-4 px-5 py-4">
         <div>
           <div className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
             SightKick Method
