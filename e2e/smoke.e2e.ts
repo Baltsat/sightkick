@@ -207,6 +207,13 @@ test.describe('seeded library', () => {
       env: {
         SIGHTKICK_TRANSCRIBER_PATH: transcriberPath,
         SIGHTKICK_DISABLE_YOUTUBE_METADATA: '1',
+        SK_FFMPEG: path.join(
+          __dirname,
+          '..',
+          'node_modules',
+          'ffmpeg-static',
+          process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
+        ),
       },
     });
     await harness.app.evaluate(({ dialog }) => {
