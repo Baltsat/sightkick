@@ -12,7 +12,9 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-if (process.platform !== 'darwin') process.exit(0);
+if (process.platform !== 'darwin') {
+  process.exit(0);
+}
 
 const binding = path.join(
   __dirname,
@@ -25,7 +27,9 @@ const binding = path.join(
   'midi.node',
 );
 
-if (!fs.existsSync(binding)) process.exit(0);
+if (!fs.existsSync(binding)) {
+  process.exit(0);
+}
 
 let fileArch = '';
 
@@ -39,7 +43,9 @@ const wantArm = process.arch === 'arm64';
 const isArm = fileArch.includes('arm64');
 const isX64 = fileArch.includes('x86_64');
 
-if ((wantArm && isArm) || (!wantArm && isX64)) process.exit(0);
+if ((wantArm && isArm) || (!wantArm && isX64)) {
+  process.exit(0);
+}
 
 console.warn(
   `[ensure-native-arch] midi.node is the wrong architecture for ${process.arch}; running electron-rebuild...`,
