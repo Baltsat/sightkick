@@ -100,8 +100,15 @@
   fill: #00000000;
 }
 
+/*
+ * Missed notes stay in the notation (rather than a separate marker) so the
+ * player reads the miss at its actual position in the bar. The colour has
+ * to read as unmistakably "wrong" at a glance: distinct from a hit note
+ * (which vanishes entirely, see vf-note-hidden) and from an untouched note
+ * still waiting to be played.
+ */
 .vf-note-missed {
-  fill: #a09890;
+  fill: var(--color-red-dark, #8b1c1c);
 }
 
 .vf-note-rest path,
@@ -111,6 +118,10 @@
 .vf-note-hit path,
 .vf-note-missed path {
   stroke: none;
+}
+
+.vf-note-hidden {
+  display: none;
 }
 
 .vf-note-active {
@@ -176,4 +187,40 @@
   80% {
     transform: translateX(-1.5px);
   }
+}
+
+/*
+ * Wrong-hit marker: a plain red × at the struck tick, no badge/label. Drawn
+ * as two crossed bars (::before/::after) rather than an "x" character so
+ * there is no text content to read as a letter and no font-rendering
+ * variance across platforms.
+ */
+.vf-wronghit-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 13px;
+  height: 13px;
+  pointer-events: none;
+}
+
+.vf-wronghit-marker::before,
+.vf-wronghit-marker::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 13px;
+  height: 2.5px;
+  border-radius: 1.25px;
+  background-color: var(--color-red, #ef4444);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.4);
+}
+
+.vf-wronghit-marker::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.vf-wronghit-marker::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }

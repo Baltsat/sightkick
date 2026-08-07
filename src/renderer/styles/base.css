@@ -19,15 +19,13 @@ body {
   padding: 0;
   margin: 0;
   font-family: 'Space Grotesk', system-ui, sans-serif;
-  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-input,
-textarea,
-[contenteditable='true'],
-.ant-notification,
-.ant-message {
-  user-select: text;
+button,
+[role='button'] {
+  user-select: none;
 }
 
 * {
@@ -41,13 +39,9 @@ textarea,
   outline: none;
 }
 
-.ant-modal-wrap .ant-modal .ant-modal-close,
-.ant-modal-wrap .ant-modal .ant-modal-close:hover,
-.ant-modal-wrap .ant-modal .ant-modal-close:focus,
 .ant-modal-wrap .ant-modal .ant-modal-close:focus-visible {
-  outline: none;
-  border: none;
-  box-shadow: none;
+  outline: 2px solid var(--color-accent-hover);
+  outline-offset: 2px;
 }
 
 ::-webkit-scrollbar {
@@ -72,4 +66,15 @@ textarea,
 
 ::-webkit-scrollbar-corner {
   background: #141517;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

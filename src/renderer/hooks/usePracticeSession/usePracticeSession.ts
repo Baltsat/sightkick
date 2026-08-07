@@ -18,8 +18,11 @@ import {
   neighborIndex,
 } from './helpers';
 
-const MIN_SPEED = 0.3;
-const MAX_SPEED = 2;
+export const MIN_SPEED = 0.3;
+
+export const MAX_SPEED = 2;
+
+const SPEED_STEP = 0.1;
 
 interface UsePracticeSessionParams {
   engine: Engine | undefined;
@@ -37,6 +40,7 @@ interface UsePracticeSessionResult {
   practiceRange: PracticeRange | undefined;
   playbackSpeed: number;
   setPlaybackSpeed: Dispatch<SetStateAction<number>>;
+  stepSpeed: (direction: 1 | -1) => void;
   isLooping: boolean;
   setIsLooping: Dispatch<SetStateAction<boolean>>;
   onPracticeRangeChange: (range?: PracticeRange) => void;
@@ -56,7 +60,13 @@ export function usePracticeSession({
   const [loopAnchor, setLoopAnchor] = useState<number>();
   const [practiceRange, setPracticeRange] = useState<PracticeRange>();
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [isLooping, setIsLooping] = useState(true);
+  // Looping used to default to on, which (combined with no practice range
+  // selected looping the whole song) meant a practice run's onEnded never
+  // fired - no ScoreSummary, no saved analytics, just a silent infinite
+  // loop. Looping is opt-in now. This is plain useState, not usePersisted -
+  // there is no localStorage key backing it anywhere in the app, so there
+  // is no stale stored `true` from before this fix to migrate away from.
+  const [isLooping, setIsLooping] = useState(false);
 
   useEffect(() => {
     if (!policy.speedControl) {
@@ -191,11 +201,15 @@ export function usePracticeSession({
       engine?.pause();
     }
   };
-  const changeSpeed = (delta: number) => {
+  const stepSpeed = useCallback((direction: 1 | -1) => {
     setPlaybackSpeed((speed) =>
-      clamp(Math.round((speed + delta) * 10) / 10, MIN_SPEED, MAX_SPEED),
+      clamp(
+        Math.round((speed + direction * SPEED_STEP) * 10) / 10,
+        MIN_SPEED,
+        MAX_SPEED,
+      ),
     );
-  };
+  }, []);
   const controlHandlers: InputControlHandlers = {
     up: () => moveFocus('up'),
     down: () => moveFocus('down'),
@@ -204,8 +218,8 @@ export function usePracticeSession({
     confirm,
     back,
     pause: togglePause,
-    faster: () => changeSpeed(0.1),
-    slower: () => changeSpeed(-0.1),
+    faster: () => stepSpeed(1),
+    slower: () => stepSpeed(-1),
   };
   const onPracticeRangeChange = useCallback((range?: PracticeRange) => {
     setPracticeRange(range);
@@ -219,6 +233,7 @@ export function usePracticeSession({
     practiceRange,
     playbackSpeed,
     setPlaybackSpeed,
+    stepSpeed,
     isLooping,
     setIsLooping,
     onPracticeRangeChange,

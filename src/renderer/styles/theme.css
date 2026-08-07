@@ -14,8 +14,8 @@
   --color-text-body: #e6e0d3;
   --color-text-muted: #9c9484;
   --color-text-faint: #8a8474;
-  --color-text-dim: #615c50;
-  --color-text-dimmer: #5f5a4e;
+  --color-text-dim: #857f70;
+  --color-text-dimmer: #847e6f;
 
   --color-accent: #d54b30;
   --color-accent-bright: #ff5a3c;
@@ -45,13 +45,13 @@
   );
 
   --color-red: #c62828;
-  --color-orange: #E8641A;
+  --color-orange: #e8641a;
   --color-yellow: #c8930f;
   --color-blue: #1b6fc0;
   --color-green: #1f8a4c;
 
   --color-red-dark: #8b1c1c;
-  --color-orange-dark: #9E430E;
+  --color-orange-dark: #9e430e;
   --color-yellow-dark: #8b660a;
   --color-green-dark: #166234;
   --color-blue-dark: #134d87;
@@ -64,23 +64,24 @@
   --font-display: 'Newsreader', Georgia, serif;
   --font-ui: 'Space Grotesk', system-ui, sans-serif;
 
-  --shadow-frame: 0 40px 90px -30px rgba(40, 30, 10, 0.55),
+  --shadow-frame:
+    0 40px 90px -30px rgba(40, 30, 10, 0.55),
     0 0 0 1px rgba(255, 255, 255, 0.04);
-  --shadow-panel: 0 40px 90px -30px rgba(40, 30, 10, 0.55),
+  --shadow-panel:
+    0 40px 90px -30px rgba(40, 30, 10, 0.55),
     0 0 0 1px rgba(255, 255, 255, 0.05);
-  --shadow-accent-button: 0 12px 32px -6px color-mix(in srgb, var(
-            --color-accent
-          )
-          60%, transparent),
+  --shadow-accent-button:
+    0 12px 32px -6px color-mix(in srgb, var(--color-accent) 60%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  --shadow-accent-chip: 0 6px 16px -4px color-mix(in srgb, var(--color-accent)
-        50%, transparent);
-  --shadow-accent-soft: 0 6px 6px -6px color-mix(in srgb, var(--color-accent)
-        50%, transparent);
-  --shadow-paper: inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    0 18px 40px -20px rgba(0, 0, 0, 0.6);
+  --shadow-accent-chip: 0 6px 16px -4px
+    color-mix(in srgb, var(--color-accent) 50%, transparent);
+  --shadow-accent-soft: 0 6px 6px -6px
+    color-mix(in srgb, var(--color-accent) 50%, transparent);
+  --shadow-paper:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 18px 40px -20px rgba(0, 0, 0, 0.6);
   --shadow-float-label: 0 8px 20px rgba(0, 0, 0, 0.4);
-  --shadow-paper-strong: 0 14px 34px -8px rgba(20, 14, 4, 0.78),
+  --shadow-paper-strong:
+    0 14px 34px -8px rgba(20, 14, 4, 0.78),
     0 4px 12px -4px rgba(20, 14, 4, 0.55);
 }
 

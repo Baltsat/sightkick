@@ -39,6 +39,18 @@ vi.mock('electron', () => ({
   app: { getPath: () => os.tmpdir() },
 }));
 
+vi.mock('../stemTools', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../stemTools')>();
+
+  return {
+    ...actual,
+    caCertEnv: () => ({
+      SSL_CERT_FILE: '/fake/ca-bundle/cert.pem',
+      REQUESTS_CA_BUNDLE: '/fake/ca-bundle/cert.pem',
+    }),
+  };
+});
+
 vi.mock('child_process', () => {
   const makeEmitter = (): FakeEmitter => {
     const listeners: Record<string, ((...args: unknown[]) => void)[]> = {};
@@ -208,6 +220,37 @@ describe('splitSong', () => {
     const stored = storeHolder.current.get('songs.song-1') as { id: string };
 
     expect(stored.id).toBe('song-1');
+  });
+
+  it('spawns demucs-split with CA certificate env vars so its first-run model download does not fail SSL verification', async () => {
+    const dir = makeSongDir(library);
+
+    makeStemOutput(dir);
+    storeHolder.current = makeStore({ songs: { 'song-1': songEntry(dir) } });
+
+    const event = makeEvent();
+
+    splitSong(event as never, 'song-1');
+
+    await waitForProc(0);
+
+    const proc = spawnHolder.procs[0];
+    const spawnOptions = spawnHolder.mock!.mock.calls[0][2] as {
+      env?: NodeJS.ProcessEnv;
+    };
+
+    expect(spawnOptions.env).toMatchObject({
+      SSL_CERT_FILE: '/fake/ca-bundle/cert.pem',
+      REQUESTS_CA_BUNDLE: '/fake/ca-bundle/cert.pem',
+    });
+    // The rest of the inherited environment (PATH, etc.) must still be
+    // passed through; the CA fix must not replace it.
+    expect(spawnOptions.env).toMatchObject({ PATH: process.env.PATH });
+
+    proc.emit('close', 0, null);
+    await vi.waitFor(() =>
+      expect(lastReply(event, 'split-song')).toBeDefined(),
+    );
   });
 
   it('runs a full split rather than isolating only drums', async () => {

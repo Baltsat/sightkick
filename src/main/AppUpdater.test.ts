@@ -48,6 +48,7 @@ vi.mock('electron-updater', () => ({
   autoUpdater: {
     logger: undefined,
     autoDownload: true,
+    allowPrerelease: false,
     on: updater.on,
     removeListener: updater.removeListener,
     removeAllListeners: updater.removeAllListeners,
@@ -70,8 +71,7 @@ vi.mock('electron', () => ({
 }));
 
 const { AppUpdater } = await import('./AppUpdater');
-const RELEASES_URL =
-  'https://github.com/tonygoldcrest/sightkick/releases/latest';
+const RELEASES_URL = 'https://github.com/Baltsat/sightkick/releases/latest';
 
 function build() {
   const send = vi.fn();
@@ -94,7 +94,7 @@ beforeEach(() => {
 });
 
 describe('AppUpdater', () => {
-  it('checks for updates on construction without auto-downloading', async () => {
+  it('checks for fork prereleases on construction without auto-downloading', async () => {
     build();
 
     expect(updater.checkForUpdates).toHaveBeenCalledTimes(1);
@@ -102,6 +102,7 @@ describe('AppUpdater', () => {
     const { autoUpdater } = await import('electron-updater');
 
     expect(autoUpdater.autoDownload).toBe(false);
+    expect(autoUpdater.allowPrerelease).toBe(true);
   });
 
   it('registers listeners once across window recreation and targets the latest window', () => {

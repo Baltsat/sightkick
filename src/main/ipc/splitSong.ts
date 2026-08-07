@@ -4,7 +4,7 @@ import fs from 'fs';
 import { StorageSchema } from '../../types';
 import { appState } from '../AppState';
 import { assetUrlToFilePath, buildSongFromDir, toSong } from '../util';
-import { getBinaryPath } from '../stemTools';
+import { caCertEnv, getBinaryPath } from '../stemTools';
 
 class CancelledError extends Error {}
 
@@ -71,6 +71,7 @@ async function doSplit(event: Electron.IpcMainEvent, id: string) {
     await new Promise<void>((resolve, reject) => {
       const proc = spawn(getBinaryPath(), ['-o', './stems', audioFilename], {
         cwd: songData.dir,
+        env: { ...process.env, ...caCertEnv() },
       });
 
       activeProc = proc;

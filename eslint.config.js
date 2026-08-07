@@ -75,6 +75,9 @@ module.exports = [
       '**/.DS_Store',
       '**/out',
       '**/storybook-static',
+      // Python sidecar project (its own uv-managed venv, vendored JS deps
+      // and lockfile) — not part of this Node/Electron workspace's lint.
+      'resources/transcriber/**',
       'release/app/dist',
       'release/build',
       '.erb/dll',

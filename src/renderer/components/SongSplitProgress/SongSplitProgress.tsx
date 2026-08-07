@@ -15,17 +15,17 @@ export function SongSplitProgress({
   onCancel,
 }: Props) {
   return (
-    <div className="border-2 rounded-md border-border-soft flex flex-col overflow-hidden">
-      <div className="flex items-center gap-2 p-2 pb-1">
+    <div className="flex flex-col overflow-hidden rounded-xl border border-border-soft bg-surface">
+      <div className="flex items-center gap-2 p-2">
         <img
           src={albumCover ?? appIcon}
           onError={(e) => {
             e.currentTarget.src = appIcon;
           }}
-          className="h-7 w-auto object-contain aspect-square rounded-xs shadow-frame"
+          className="size-7 shrink-0 rounded-md object-cover outline outline-1 -outline-offset-1 outline-white/10"
         />
 
-        <div className="text-[13px] font-bold text-text-muted font-ui">
+        <div className="min-w-0 grow truncate text-[13px] font-semibold text-text-body">
           {name}
         </div>
 

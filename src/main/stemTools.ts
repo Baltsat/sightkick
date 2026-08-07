@@ -71,3 +71,40 @@ export function isInstalled(): boolean {
 export function normalizeVersion(version: string): string {
   return version.replace(/^v/, '');
 }
+
+function defaultCaCertCandidates(): string[] {
+  return [
+    process.env.SSL_CERT_FILE,
+    process.env.NODE_EXTRA_CA_CERTS,
+    process.env.REQUESTS_CA_BUNDLE,
+    '/etc/ssl/cert.pem',
+    '/etc/ssl/certs/ca-certificates.crt',
+    '/etc/pki/tls/certs/ca-bundle.crt',
+  ].filter((value): value is string => Boolean(value));
+}
+
+// demucs-split's first run downloads model weights over HTTPS via Python's
+// requests/urllib. Spawned without CA certificates in its env, that
+// download fails with SSL: CERTIFICATE_VERIFY_FAILED because the child
+// process cannot discover the system trust store on its own. Resolve a CA
+// bundle robustly (respecting any CA env vars already set) and fall back to
+// macOS's default bundle at /etc/ssl/cert.pem.
+export function resolveCaCertPath(
+  candidates: string[] = defaultCaCertCandidates(),
+): string | undefined {
+  return candidates.find((candidate) => {
+    try {
+      return fs.statSync(candidate).isFile();
+    } catch {
+      return false;
+    }
+  });
+}
+
+export function caCertEnv(): NodeJS.ProcessEnv {
+  const caCertPath = resolveCaCertPath();
+
+  return caCertPath
+    ? { SSL_CERT_FILE: caCertPath, REQUESTS_CA_BUNDLE: caCertPath }
+    : {};
+}

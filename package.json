@@ -1,7 +1,7 @@
 {
   "name": "sight-kick",
   "description": "Play your favorite Clone Hero drum tracks",
-  "version": "0.1.0",
+  "version": "1.2.0-kb.1",
   "keywords": [
     "clonehero",
     "drums",
@@ -11,7 +11,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tonygoldcrest/sightkick.git"
+    "url": "git+https://github.com/Baltsat/sightkick.git"
   },
   "license": "MIT",
   "author": {
@@ -24,6 +24,7 @@
     "postinstall": "node scripts/postinstall.js",
     "lint": "cross-env NODE_ENV=development eslint . --cache --cache-strategy content",
     "lint:fix": "cross-env NODE_ENV=development eslint . --cache --cache-strategy content --fix",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "package": "yarn build && electron-builder build --mac --publish never",
     "package:win": "yarn build && electron-builder build -w --x64 --publish never",
     "package:linux": "yarn build && electron-builder build -l --x64 --publish never",
@@ -34,8 +35,9 @@
     "preview:clean": "node scripts/clean-userdata.js && cross-env SK_USER_DATA_DIR=./.userdata/clean electron-vite preview",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "pretest": "node scripts/ensure-native-arch.js",
+    "test": "node scripts/ensure-native-arch.js && vitest run",
+    "test:coverage": "node scripts/ensure-native-arch.js && vitest run --coverage",
     "test:e2e": "yarn build && playwright test",
     "test:e2e:only": "playwright test"
   },
@@ -71,8 +73,10 @@
     "electron-store": "^8.1.0",
     "electron-updater": "^6.8.9",
     "es-toolkit": "^1.47.1",
+    "ffmpeg-static": "^5.3.0",
     "fuse.js": "^7.0.0",
     "ini": "^4.1.1",
+    "music-metadata": "^11.14.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.18.1",
@@ -134,7 +138,7 @@
   },
   "build": {
     "productName": "SightKick",
-    "buildVersion": "0.1.0",
+    "buildVersion": "1.2.1",
     "appId": "org.sk.SightKick",
     "asar": true,
     "asarUnpack": "**\\*.{node,dll}",
@@ -188,11 +192,33 @@
       "output": "release/build"
     },
     "extraResources": [
-      "./assets/**"
+      "./assets/**",
+      {
+        "from": "resources/transcriber",
+        "to": "transcriber",
+        "filter": [
+          "**/*",
+          "!.venv/**",
+          "!.uvtmp/**",
+          "!verify_out/**",
+          "!**/__pycache__/**",
+          "!**/*.pyc",
+          "!*.log"
+        ]
+      },
+      {
+        "from": "node_modules/ffmpeg-static",
+        "to": "ffmpeg-static",
+        "filter": [
+          "ffmpeg",
+          "ffmpeg.exe",
+          "package.json"
+        ]
+      }
     ],
     "publish": {
       "provider": "github",
-      "owner": "tonygoldcrest",
+      "owner": "Baltsat",
       "repo": "sightkick"
     }
   },

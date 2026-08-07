@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { App, Button, Divider, InputNumber, Layout, Spin, Switch } from 'antd';
+import {
+  App,
+  Button,
+  Divider,
+  Drawer,
+  InputNumber,
+  Layout,
+  Select,
+  Spin,
+  Switch,
+} from 'antd';
 import { Content } from 'antd/es/layout/layout';
+import { Difficulty } from 'scan-chart';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Playback } from '../../components/Playback';
 import { SettingsButton } from '../../components/SettingsButton';
@@ -8,6 +19,7 @@ import { SheetMusic } from '../../components/SheetMusic';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowLeft,
+  faChartLine,
   faPause,
   faPlay,
 } from '@fortawesome/free-solid-svg-icons';
@@ -25,17 +37,21 @@ import { calculateAccuracy } from '../../scoring';
 import { usePracticeSession } from '../../hooks/usePracticeSession';
 import { useSheetMusic } from '../../hooks/useSheetMusic';
 import { useInputControls } from '../../hooks/useInputControls';
+import { useTransportShortcuts } from '../../hooks/useTransportShortcuts';
 import { ScoreSummary } from '../../components/ScoreSummary';
 import { CountIn } from '../../components/CountIn';
 import { ScoreData } from '../../../types';
+import { computeRunsTrend, RunSummary } from '../../services/practice-stats';
+import { PracticeStats } from '../../components/PracticeStats';
 import { buildSheetPdfHtml } from '../../services/pdf-export';
 import { serializeMeasureToDsl } from '../../components/SheetMusic';
 import { AudioVolume } from '../../components/AudioVolume';
-import { GameMode } from '../../types';
+import { GameMode, PracticeRange } from '../../types';
 import { resolveModePolicy } from '../../modes';
+import { RenderData } from '../../../chart-parser/types';
 
 export function SongView() {
-  const { difficulty, isDev } = useApp();
+  const { difficulty, setDifficulty, isDev } = useApp();
   const { inputMapping, controlMapping, kitControlIds } = useInput();
   const {
     playheadStyle,
@@ -48,17 +64,37 @@ export function SongView() {
   } = useSongViewSettings();
   const { notification, message } = App.useApp();
   const [scoreData, setScoreData] = useState<ScoreData>();
+  const [practiceSummary, setPracticeSummary] = useState<RunSummary>();
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [songRuns, setSongRuns] = useState<RunSummary[]>();
   const exportPdfOffRef = useRef<(() => void) | undefined>(undefined);
+  const loadRunsOffRef = useRef<(() => void) | undefined>(undefined);
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const gameMode = useMemo<GameMode | undefined>(() => {
     return (searchParams.get('gameMode') as GameMode) ?? undefined;
   }, [searchParams]);
   const policy = useMemo(() => resolveModePolicy(gameMode), [gameMode]);
+  // usePracticeSession (below) owns playbackSpeed, but it needs `engine`
+  // from useEngine (below that), and useEngine's onEnded (right here) needs
+  // the speed to stamp onto the saved run summary. Mirror the ref-sync
+  // pattern useEngine itself already uses for onEnded/isDev/player: this
+  // ref is kept current by an effect once playbackSpeed exists, and by the
+  // time a run actually ends (a later event, never the same tick as render)
+  // it always holds this render's value.
+  const playbackSpeedRef = useRef(1);
   const navigate = useNavigate();
   const { fileData, format, songData, trackData } = useSongLoader(id);
+  // The difficulties this specific chart actually carries - auto-charted
+  // songs usually have all four, lesson charts often only Expert. Falls
+  // back to just the currently-loaded difficulty (rather than every
+  // possible value) when a song predates drumDifficulties being recorded,
+  // so the selector never lists an option the chart can't parse.
+  const availableDifficulties: Difficulty[] = songData?.drumDifficulties?.length
+    ? songData.drumDifficulties
+    : [difficulty];
   const { chart, parsedMidi, renderData, vexflowContainerRef } = useSheetMusic({
     fileData,
     format,
@@ -117,24 +153,46 @@ export function SongView() {
     player: policy.player,
     playheadStyle: policy.playheadOverride ?? playheadStyle,
     mapping: inputMapping,
-    onEnded: (score) => {
-      if (!policy.scoring) {
-        return;
-      }
-
-      setScoreData(score);
-      setIsScoreModalOpen(true);
-
-      const previousScore = songData?.scoreData?.[difficulty];
-      const isHighScore =
-        !previousScore ||
-        calculateAccuracy(score) > calculateAccuracy(previousScore);
+    onEnded: (score, summary) => {
+      // Star rating / high-score submission stay Perform-only (see
+      // ModePolicy.scoring's doc comment), but per-hit analytics capture,
+      // save-practice-run, and showing the stats summary are NOT
+      // Perform-only — a Practice run with looping/speed dialed in is still
+      // real evidence of progression, so it earns the same analytics as a
+      // Perform run even though it never earns stars. `mode`/`playbackSpeed`
+      // are stamped on here (not in the pure summarizeRun) so stored runs
+      // can tell a Practice rep at 0.7x apart from a full-speed Perform
+      // pass.
+      const runSummary: RunSummary = {
+        ...summary,
+        mode: gameMode ?? 'perform',
+        playbackSpeed: playbackSpeedRef.current,
+      };
       const isAttempt = (score.hitNotes ?? 0) > 0;
 
-      if (id && isHighScore && isAttempt) {
-        window.electron.ipcRenderer.sendMessage('update-song', {
-          id,
-          scoreData: { [difficulty]: score },
+      setPracticeSummary(runSummary);
+      setIsScoreModalOpen(true);
+
+      if (policy.scoring) {
+        setScoreData(score);
+
+        const previousScore = songData?.scoreData?.[difficulty];
+        const isHighScore =
+          !previousScore ||
+          calculateAccuracy(score) > calculateAccuracy(previousScore);
+
+        if (id && isHighScore && isAttempt) {
+          window.electron.ipcRenderer.sendMessage('update-song', {
+            id,
+            scoreData: { [difficulty]: score },
+          });
+        }
+      }
+
+      if (id && isAttempt) {
+        window.electron.ipcRenderer.sendMessage('save-practice-run', {
+          songId: id,
+          summary: runSummary,
         });
       }
     },
@@ -165,6 +223,25 @@ export function SongView() {
     setIsScoreModalOpen(false);
     playFromTick(0);
   };
+  const onOpenStats = useCallback(() => {
+    setIsStatsOpen(true);
+
+    if (!id) {
+      return;
+    }
+
+    loadRunsOffRef.current?.();
+    loadRunsOffRef.current = window.electron.ipcRenderer.once<
+      { songId: string; runs: RunSummary[] } | { error: string }
+    >('load-practice-runs', (result) => {
+      loadRunsOffRef.current = undefined;
+
+      if ('runs' in result) {
+        setSongRuns(result.runs);
+      }
+    });
+    window.electron.ipcRenderer.sendMessage('load-practice-runs', id);
+  }, [id]);
   const onExportPdf = useCallback(() => {
     if (!vexflowContainerRef.current || !songData) {
       return;
@@ -218,6 +295,7 @@ export function SongView() {
     practiceRange,
     playbackSpeed,
     setPlaybackSpeed,
+    stepSpeed,
     isLooping,
     setIsLooping,
     onPracticeRangeChange,
@@ -231,6 +309,88 @@ export function SongView() {
     isEnded,
     onExit: () => navigate('/'),
   });
+
+  useEffect(() => {
+    playbackSpeedRef.current = playbackSpeed;
+  }, [playbackSpeed]);
+
+  // Snapshot taken at the moment the user picks a new difficulty, consumed
+  // once the reparsed chart's renderData actually lands (useSheetMusic
+  // re-parses asynchronously - see its parsedMidi/renderData effect).
+  const pendingDifficultySwitchRef = useRef<{
+    time: number;
+    range: PracticeRange | undefined;
+    renderData: RenderData[];
+  } | null>(null);
+  const handleDifficultyChange = useCallback(
+    (next: Difficulty) => {
+      if (next === difficulty) {
+        return;
+      }
+
+      pause();
+      pendingDifficultySwitchRef.current = {
+        time: timeStore.get(),
+        range: practiceRange,
+        renderData,
+      };
+      // App-global, same setter the library header tabs use - the choice
+      // sticks, and it's also what keys scoreData on song end (below), so
+      // a mid-run switch can never misattribute the run's score.
+      setDifficulty(next);
+    },
+    [difficulty, pause, timeStore, practiceRange, renderData, setDifficulty],
+  );
+
+  useEffect(() => {
+    const pending = pendingDifficultySwitchRef.current;
+
+    if (!pending || !engine) {
+      return;
+    }
+
+    pendingDifficultySwitchRef.current = null;
+
+    // A difficulty switch reparses the chart at a different note density,
+    // so a partial run's hits no longer line up with real notes. Seeking
+    // to 0 first drives Engine's existing onSeek -> Judge.rewindTo(0) path
+    // (the same one every other seek already goes through) to wipe every
+    // hit/false-hit, then the second seek restores the on-screen position
+    // without resurrecting any of the discarded judge state.
+    seekSeconds(0);
+    seekSeconds(pending.time);
+
+    // A stale focus/loop-anchor index from the old renderData can point
+    // past the end of a shorter new one - always clear it here, same as
+    // toggling looping off already does.
+    clearSelection();
+
+    if (!pending.range) {
+      return;
+    }
+
+    const startTick =
+      pending.renderData[pending.range.start]?.measure.startTick;
+    const endTick = pending.renderData[pending.range.end]?.measure.startTick;
+    const newStart = renderData.findIndex(
+      (rd) => rd.measure.startTick === startTick,
+    );
+    const newEnd = renderData.findIndex(
+      (rd) => rd.measure.startTick === endTick,
+    );
+    const stillExists =
+      startTick !== undefined &&
+      endTick !== undefined &&
+      newStart !== -1 &&
+      newEnd !== -1;
+
+    // Preserve the practice selection only if both its boundary measures
+    // still exist at the new difficulty - otherwise clear it honestly
+    // rather than keep a range that no longer means the same thing.
+    onPracticeRangeChange(
+      stillExists ? { start: newStart, end: newEnd } : undefined,
+    );
+  }, [renderData, engine, seekSeconds, onPracticeRangeChange, clearSelection]);
 
   useInputControls(
     controlMapping,
@@ -275,6 +435,15 @@ export function SongView() {
     isPlaying || isCounting ? kitControlIds : undefined,
   );
 
+  const transportIndicator = useTransportShortcuts({
+    enabled: !isLoading,
+    engine,
+    duration,
+    speedControl: policy.speedControl,
+    onStepSpeed: stepSpeed,
+    controlMapping,
+  });
+
   useEffect(() => {
     window.electron.ipcRenderer.sendMessage('prevent-sleep');
 
@@ -284,6 +453,8 @@ export function SongView() {
   }, []);
 
   useEffect(() => () => exportPdfOffRef.current?.(), []);
+
+  useEffect(() => () => loadRunsOffRef.current?.(), []);
 
   useEffect(() => {
     engine?.setClickSettings(clickVolume / 100, clickTone / 100);
@@ -304,20 +475,35 @@ export function SongView() {
         songData={songData}
         difficulty={difficulty}
         scoreData={scoreData}
+        practiceSummary={practiceSummary}
       />
-      <div
-        className="flex items-center p-4 gap-5"
+      <Drawer
+        title="Practice stats"
+        open={isStatsOpen}
+        onClose={() => setIsStatsOpen(false)}
+        destroyOnClose
+      >
+        <PracticeStats
+          variant="panel"
+          summary={songRuns?.[songRuns.length - 1]}
+          trend={songRuns ? computeRunsTrend(songRuns) : []}
+        />
+      </Drawer>
+      <header
+        className="flex min-h-20 items-center gap-4 border-b border-divider px-5 py-3"
         style={{ background: 'var(--gradient-header)' }}
       >
         <Button
           icon={<FontAwesomeIcon icon={faArrowLeft} />}
           data-testid="back-button"
+          aria-label="Back to library"
           onClick={() => {
             cancel();
             pause();
             navigate('/');
           }}
           size="large"
+          className="min-h-11 min-w-11 shrink-0"
         />
 
         <Button
@@ -325,6 +511,9 @@ export function SongView() {
           icon={<FontAwesomeIcon icon={isPlaying ? faPause : faPlay} />}
           loading={audioLoading}
           data-testid="play-toggle"
+          aria-label={
+            isCounting ? 'Cancel count-in' : isPlaying ? 'Pause' : 'Play'
+          }
           onClick={() => {
             if (isCounting) {
               cancel();
@@ -342,17 +531,39 @@ export function SongView() {
           }}
           shape="circle"
           size="large"
-          style={{ width: 50, height: 50 }}
+          style={{ width: 52, height: 52 }}
+          className="shrink-0"
         />
 
-        <div>
-          <div className="text-text-body font-ui text-[18px]">
-            {songData?.name}
+        <div className="min-w-0 max-w-72">
+          <div className="mb-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-accent-text">
+            {gameMode === 'practice' ? 'Practice mode' : 'Perform mode'}
           </div>
-          <div className="text-text-faint flex items-center gap-1">
-            <div>{songData?.artist}</div>
-            <div>·</div>
-            <div className="capitalize">{difficulty}</div>
+          <h1
+            className="truncate font-display text-xl font-semibold leading-tight text-text-body"
+            title={songData?.name}
+          >
+            {songData?.name}
+          </h1>
+          <div className="flex items-center gap-1 truncate text-sm text-text-faint">
+            <span className="truncate" title={songData?.artist}>
+              {songData?.artist}
+            </span>
+            <span aria-hidden="true">·</span>
+            <Select
+              size="small"
+              className="capitalize shrink-0"
+              popupMatchSelectWidth={false}
+              value={difficulty}
+              data-testid="song-difficulty-select"
+              aria-label="Difficulty"
+              disabled={availableDifficulties.length <= 1}
+              onChange={(value) => handleDifficultyChange(value as Difficulty)}
+              options={availableDifficulties.map((d) => ({
+                value: d,
+                label: d,
+              }))}
+            />
           </div>
         </div>
 
@@ -370,7 +581,7 @@ export function SongView() {
           }}
         />
         {(policy.speedControl || policy.looping) && (
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 rounded-xl bg-fill px-3 py-2">
             {policy.speedControl && (
               <div className="flex gap-2 items-center">
                 <div className="text-text-faint">Speed:</div>
@@ -442,7 +653,15 @@ export function SongView() {
           onExportPdf={onExportPdf}
           isExporting={isExporting}
         />
-      </div>
+        <Button
+          icon={<FontAwesomeIcon icon={faChartLine} />}
+          data-testid="practice-stats-button"
+          aria-label="Practice stats"
+          onClick={onOpenStats}
+          size="large"
+          className="shrink-0"
+        />
+      </header>
 
       <div className="relative grow flex min-h-0">
         <Content className="grow p-6 m-0 overflow-auto flex flex-col items-center font-display text-ink">
@@ -485,6 +704,16 @@ export function SongView() {
           </div>
         )}
         <CountIn count={countInBeat} beatMs={countInBeatMs} />
+        {transportIndicator && (
+          <div
+            data-testid="transport-indicator"
+            className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+          >
+            <div className="rounded-full bg-bg/85 px-6 py-3 font-ui text-xl font-semibold text-text shadow-paper-strong">
+              {transportIndicator.label}
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

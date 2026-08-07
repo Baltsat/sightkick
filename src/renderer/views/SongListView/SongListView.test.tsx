@@ -2,19 +2,20 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   makeEnchorChart,
+  makeLessonSong,
   makeListSong,
   setupSongListView,
 } from '../test-support';
 
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: ({ count }: { count: number }) => ({
-    getTotalSize: () => count * 85,
+    getTotalSize: () => count * 76,
     getVirtualItems: () =>
       Array.from({ length: count }, (_, index) => ({
         index,
         key: index,
-        start: index * 85,
-        size: 85,
+        start: index * 76,
+        size: 76,
       })),
     measureElement: () => {},
     scrollToIndex: () => {},
@@ -42,6 +43,47 @@ describe('SongListView — loading the library', () => {
     expect(screen.getByText('Name a')).toBeInTheDocument();
     expect(screen.getByText('Name b')).toBeInTheDocument();
     expect(screen.getByText('2 results')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Your drum library' }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps filters and add-music controls on a wrapping toolbar with width floors', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([makeListSong('a')]);
+
+    expect(screen.getByTestId('library-toolbar')).toHaveClass('flex-col');
+    expect(screen.getByTestId('library-song-controls')).toHaveClass(
+      'flex-wrap',
+    );
+    expect(screen.getByTestId('library-filters')).toHaveClass('flex-wrap');
+    expect(screen.getByTestId('library-name-filter')).toHaveClass('min-w-64');
+    expect(screen.getByTestId('add-music-actions')).toHaveClass('flex-wrap');
+  });
+
+  it('surfaces existing progress as a continue-practicing moment', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('played', {
+        name: 'Raging',
+        artist: 'Kygo',
+        scoreData: {
+          expert: { hitNotes: 92, totalNotes: 100, falseHits: 0 },
+        },
+      }),
+      makeListSong('unplayed'),
+    ]);
+
+    const hero = screen.getByTestId('continue-practicing');
+
+    expect(within(hero).getByText('Continue practicing')).toBeInTheDocument();
+    expect(within(hero).getByText('Raging')).toBeInTheDocument();
+    expect(within(hero).getByText('92% best')).toBeInTheDocument();
+    expect(
+      within(hero).getByRole('button', { name: 'Play Raging' }),
+    ).toBeEnabled();
   });
 
   it('guides to select a folder when none is chosen', () => {
@@ -57,8 +99,8 @@ describe('SongListView — loading the library', () => {
 
     view.loadSongs([], '/music');
 
-    expect(screen.getByText('No songs in this folder.')).toBeInTheDocument();
-    expect(screen.getByText('Download some')).toBeInTheDocument();
+    expect(screen.getByText('Build your practice library')).toBeInTheDocument();
+    expect(screen.getByText('Browse online songs')).toBeInTheDocument();
     expect(screen.queryByText('Select folder')).not.toBeInTheDocument();
   });
 
@@ -71,7 +113,10 @@ describe('SongListView — loading the library', () => {
     ]);
     view.search('nonexistent song');
 
-    expect(screen.getByText('No songs match your filter.')).toBeInTheDocument();
+    expect(
+      screen.getByText('No matches for “nonexistent song”'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear search' })).toBeEnabled();
     expect(screen.queryByText('Select folder')).not.toBeInTheDocument();
   });
 
@@ -85,6 +130,70 @@ describe('SongListView — loading the library', () => {
 
     expect(screen.queryByText('Name a')).not.toBeInTheDocument();
     expect(screen.getByText('Name c')).toBeInTheDocument();
+  });
+
+  it('validates, previews and imports a prepared local chart folder', async () => {
+    const view = setupSongListView();
+
+    view.loadSongs([], '/music');
+    fireEvent.click(screen.getByTestId('import-song-trigger'));
+
+    expect(view.sentChannels()).toContain('select-import-song');
+
+    view.emit('select-import-song', {
+      preview: {
+        sourceDir: '/incoming/Raging',
+        name: 'Raging',
+        artist: 'Kygo feat. Kodaline',
+        album: 'Cloud Nine',
+        charter: '',
+        autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
+        chartFormat: 'mid',
+        audioCount: 7,
+        drumDifficulties: ['easy', 'medium', 'hard', 'expert'],
+        albumCoverDataUrl: 'data:image/jpeg;base64,cHJldmlldw==',
+        coverSource: 'embedded',
+      },
+    });
+
+    expect(screen.getByText('Review song import')).toBeInTheDocument();
+    expect(screen.getByText('Raging')).toBeInTheDocument();
+    expect(screen.getByText('Auto-charted with STRUM')).toBeInTheDocument();
+    expect(screen.getByText(/Embedded artwork found/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('import-artwork-url'), {
+      target: { value: 'https://example.com/permitted-cover.jpg' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add to library' }));
+
+    expect(view.ipc.sent).toContainEqual({
+      channel: 'import-song',
+      args: [
+        {
+          sourceDir: '/incoming/Raging',
+          artworkUrl: 'https://example.com/permitted-cover.jpg',
+        },
+      ],
+    });
+
+    view.emit('import-song', {
+      success: true,
+      song: makeListSong('raging', {
+        name: 'Raging',
+        charter: '',
+        autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
+      }),
+    });
+
+    expect(screen.getByTestId('song-item-raging')).toBeInTheDocument();
+  });
+
+  it('disables local import until a library folder is selected', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([], null);
+
+    expect(screen.getByTestId('import-song-trigger')).toBeDisabled();
   });
 });
 
@@ -113,6 +222,28 @@ describe('SongListView — filtering and sorting', () => {
 
     expect(screen.getByText('One')).toBeInTheDocument();
     expect(screen.queryByText('Two')).not.toBeInTheDocument();
+  });
+
+  it('searches local album, charter provenance and folded diacritics', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('raging', {
+        name: 'Raging',
+        artist: 'Kygo feat. Kodaliné',
+        album: 'Cloud Nine',
+        charter: '',
+        autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
+      }),
+      makeListSong('other', { name: 'Other' }),
+    ]);
+
+    for (const query of ['kodaline', 'cloud nine', 'strum']) {
+      view.search(query);
+
+      expect(screen.getByText('Raging')).toBeInTheDocument();
+      expect(screen.queryByText('Other')).not.toBeInTheDocument();
+    }
   });
 
   it('reorders the list when a sort option is chosen', () => {
@@ -167,6 +298,40 @@ describe('SongListView — difficulty', () => {
     view.selectDifficulty('hard');
 
     expect(view.filledStars('a')).toBe(2);
+  });
+
+  it('explains unplayed and scored star states accessibly', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('unplayed'),
+      makeListSong('played', {
+        scoreData: {
+          expert: { hitNotes: 92, totalNotes: 100, falseHits: 0 },
+        },
+      }),
+    ]);
+
+    expect(
+      view.row('unplayed').getByLabelText(/play once to earn stars/i),
+    ).toBeInTheDocument();
+    expect(
+      view.row('played').getByLabelText(/best score: 92% accuracy/i),
+    ).toBeInTheDocument();
+  });
+
+  it('labels the auto-chart tool separately from a human charter', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('raging', {
+        charter: '',
+        autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
+      }),
+    ]);
+
+    expect(screen.getByText('Auto-charted with STRUM')).toBeInTheDocument();
+    expect(screen.queryByText('charter')).not.toBeInTheDocument();
   });
 });
 
@@ -281,6 +446,52 @@ describe('SongListView — online mode', () => {
 
     expect(await screen.findByText('Name x')).toBeInTheDocument();
     expect(screen.getByText('Name y')).toBeInTheDocument();
+  });
+
+  it('ranks exact normalized metadata matches before fuzzy results', async () => {
+    const view = setupSongListView({
+      online: [
+        makeEnchorChart('fuzzy', {
+          name: 'Kyoukai',
+          artist: 'Ho-kago Tea Time',
+        }),
+        makeEnchorChart('exact', {
+          name: 'Stop and Stare',
+          artist: 'OneRépublic',
+        }),
+      ],
+    });
+
+    view.loadSongs([]);
+    view.selectMode('online');
+    view.search('ONEREPUBLIC');
+
+    await screen.findByText('Stop and Stare');
+
+    const names = screen
+      .getAllByText(/Stop and Stare|Kyoukai/)
+      .map((element) => element.textContent);
+
+    expect(names).toEqual(['Stop and Stare', 'Kyoukai']);
+    expect(screen.queryByText(/No exact matches/)).not.toBeInTheDocument();
+  });
+
+  it('says when online results are fuzzy-only', async () => {
+    const view = setupSongListView({
+      online: [
+        makeEnchorChart('fuzzy', {
+          name: 'Kyoukai',
+          artist: 'Ho-kago Tea Time',
+        }),
+      ],
+    });
+
+    view.loadSongs([]);
+    view.selectMode('online');
+    view.search('Kygo');
+
+    expect(await screen.findByText('Kyoukai')).toBeInTheDocument();
+    expect(screen.getByText(/No exact matches for “Kygo”/)).toBeInTheDocument();
   });
 
   it('downloads an online song and marks it downloaded', async () => {
@@ -625,6 +836,278 @@ describe('SongListView — library folder', () => {
     expect(view.ipc.sent).toContainEqual({
       channel: 'rescan-songs',
       args: [],
+    });
+  });
+});
+
+describe('SongListView — lessons filter split', () => {
+  it('hides lesson songs from the default Songs view', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('a', { name: 'Master of Puppets' }),
+      makeLessonSong('lesson-1', { id: '01.01', title: 'Warm-Up Groove' }),
+    ]);
+
+    expect(screen.getByText('Master of Puppets')).toBeInTheDocument();
+    expect(screen.queryByText('Warm-Up Groove')).not.toBeInTheDocument();
+  });
+
+  it('still finds a lesson song when the user searches for it', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('a', { name: 'Master of Puppets' }),
+      makeLessonSong('lesson-1', { id: '01.01', title: 'Warm-Up Groove' }),
+    ]);
+    view.search('Warm-Up Groove');
+
+    expect(screen.getByText('Warm-Up Groove')).toBeInTheDocument();
+  });
+});
+
+describe('SongListView — Lessons surface', () => {
+  it('switches to a Lessons view showing only lessons, grouped and ordered by unit', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('a', { name: 'Master of Puppets' }),
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Warm-Up Groove',
+        unit: 'Unit 1 — Foundations',
+        starsToUnlock: 0,
+      }),
+      makeLessonSong('lesson-2', {
+        id: '02.01',
+        title: 'Second Unit Groove',
+        unit: 'Unit 2 — Reading',
+        starsToUnlock: 3,
+      }),
+    ]);
+
+    view.selectView('lessons');
+
+    expect(screen.getByTestId('lesson-item-01.01')).toBeInTheDocument();
+    expect(screen.getByTestId('lesson-item-02.01')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('lesson-group-Unit 1 — Foundations'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('lesson-group-Unit 2 — Reading'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Master of Puppets')).not.toBeInTheDocument();
+  });
+
+  it('shows chain progress and a continue card for the furthest unmastered unlocked lesson', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeLessonSong(
+        'lesson-1',
+        { id: '01.01', title: 'Warm-Up Groove', starsToUnlock: 0 },
+        {
+          scoreData: {
+            expert: { hitNotes: 50, totalNotes: 100, falseHits: 0 },
+          },
+        }, // 2 stars — unlocked, not mastered
+      ),
+    ]);
+
+    view.selectView('lessons');
+
+    expect(screen.getByTestId('lesson-progress-summary')).toHaveTextContent(
+      '1 of 1 unlocked · 2⭐ earned',
+    );
+
+    const card = screen.getByTestId('lesson-continue-card');
+
+    expect(within(card).getByText('Warm-Up Groove')).toBeInTheDocument();
+  });
+
+  it('greys out a locked lesson with an "Earn N more" hint', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Warm-Up Groove',
+        starsToUnlock: 0,
+      }),
+      makeLessonSong('lesson-2', {
+        id: '01.02',
+        title: 'Locked Groove',
+        starsToUnlock: 12,
+      }),
+    ]);
+
+    view.selectView('lessons');
+
+    const locked = screen.getByTestId('lesson-item-01.02');
+
+    expect(locked).toHaveAttribute('data-locked', 'true');
+    expect(within(locked).getByText('Earn 12 more ⭐')).toBeInTheDocument();
+  });
+
+  it('shows an honest message instead of a dead click on a locked lesson', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Warm-Up Groove',
+        starsToUnlock: 0,
+      }),
+      makeLessonSong('lesson-2', {
+        id: '01.02',
+        title: 'Locked Groove',
+        starsToUnlock: 12,
+      }),
+    ]);
+
+    view.selectView('lessons');
+    view.clickLesson('01.02');
+
+    expect(screen.getByText('This lesson is locked')).toBeInTheDocument();
+    expect(screen.queryByTestId('song-view-stub')).not.toBeInTheDocument();
+  });
+
+  it('keeps lessons visible in the Lessons tab regardless of the selected difficulty', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Warm-Up Groove',
+        starsToUnlock: 0,
+      }),
+    ]);
+    // Lesson charts only carry an Expert track — pick a difficulty the
+    // lesson was never charted for while still in the Songs view.
+    view.selectDifficulty('easy');
+
+    view.selectView('lessons');
+
+    expect(screen.getByTestId('lesson-item-01.01')).toBeInTheDocument();
+  });
+
+  it('opens an unlocked lesson at its charted difficulty, ignoring the selected difficulty tab', async () => {
+    const view = setupSongListView({ settings: { difficulty: 'hard' } });
+
+    view.loadSongs([
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Warm-Up Groove',
+        starsToUnlock: 0,
+      }),
+    ]);
+
+    view.selectView('lessons');
+    view.clickLesson('01.01');
+    view.chooseGameMode('perform');
+
+    expect(await screen.findByTestId('song-view-stub')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(window.localStorage.getItem('settings.difficulty')).toBe(
+        '"expert"',
+      );
+    });
+  });
+});
+
+describe('SongListView — Lessons self-heal', () => {
+  function rescanCallCount(view: ReturnType<typeof setupSongListView>) {
+    return view.ipc.sent.filter((s) => s.channel === 'rescan-songs').length;
+  }
+
+  it('auto-rescans exactly once when the Lessons tab finds SightKick Method songs that failed to parse (stale schema)', () => {
+    const view = setupSongListView();
+
+    view.loadSongs(
+      [
+        makeListSong('stale-1', {
+          name: 'Second-Ending Turnaround',
+          dir: '/music/SightKick Method - Lesson 07.04 - Second-Ending Turnaround',
+        }),
+      ],
+      '/music',
+    );
+
+    view.selectView('lessons');
+
+    expect(rescanCallCount(view)).toBe(1);
+    expect(view.ipc.sent).toContainEqual({
+      channel: 'rescan-songs',
+      args: [false],
+    });
+
+    // Leaving and re-entering the Lessons tab must never re-trigger it —
+    // the app-session guard only allows one attempt, ever.
+    view.selectView('songs');
+    view.selectView('lessons');
+    view.selectView('songs');
+    view.selectView('lessons');
+
+    expect(rescanCallCount(view)).toBe(1);
+  });
+
+  it('never auto-rescans once lessons parse correctly', () => {
+    const view = setupSongListView();
+
+    view.loadSongs(
+      [makeLessonSong('lesson-1', { id: '01.01', title: 'Warm-Up Groove' })],
+      '/music',
+    );
+
+    view.selectView('lessons');
+
+    expect(screen.getByTestId('lesson-item-01.01')).toBeInTheDocument();
+    expect(rescanCallCount(view)).toBe(0);
+  });
+
+  it('never auto-rescans when the library has no SightKick Method songs at all', () => {
+    const view = setupSongListView();
+
+    view.loadSongs(
+      [makeListSong('a', { name: 'Master of Puppets' })],
+      '/music',
+    );
+
+    view.selectView('lessons');
+
+    expect(screen.getByTestId('lessons-rescan')).toBeInTheDocument();
+    expect(rescanCallCount(view)).toBe(0);
+  });
+
+  it('shows scan progress instead of the dead-end message while a rescan is in flight', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([], '/music');
+    view.selectView('lessons');
+    view.rescanProgress(3, 6);
+
+    expect(screen.getByTestId('lessons-scan-progress')).toBeInTheDocument();
+    expect(screen.queryByText('No lessons found')).not.toBeInTheDocument();
+
+    view.rescanDone([], '/music');
+
+    expect(screen.getByTestId('lessons-rescan')).toBeInTheDocument();
+  });
+
+  it('fires the rescan-songs IPC when the empty-state button is clicked', () => {
+    const view = setupSongListView();
+
+    view.loadSongs(
+      [makeListSong('a', { name: 'Master of Puppets' })],
+      '/music',
+    );
+    view.selectView('lessons');
+
+    fireEvent.click(screen.getByTestId('lessons-rescan'));
+
+    expect(view.ipc.sent).toContainEqual({
+      channel: 'rescan-songs',
+      args: [false],
     });
   });
 });

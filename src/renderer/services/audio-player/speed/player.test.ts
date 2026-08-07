@@ -198,4 +198,52 @@ describe('SpeedAudioPlayer', () => {
     expect(onEnded).toHaveBeenCalledTimes(1);
     expect(player.isInitialised).toBe(false);
   });
+
+  // Regression coverage for a real, observed failure mode: `pump`'s own
+  // currentTime/scheduledUntil poll only runs once its `stream.produce()`
+  // worker round-trip resolves, and that poll is what used to be the ONLY
+  // way onEnded ever fired. A slow/stalled produce() response (ordinary
+  // under real CPU contention - GC pause, a busy machine) blocked that poll
+  // indefinitely even though the already-scheduled audio kept playing and
+  // genuinely finished on the real audio clock - the practice run just
+  // never got a ScoreSummary. The last scheduled chunk's native
+  // AudioBufferSourceNode 'ended' event is a second, independent path to
+  // onEnded that doesn't depend on `pump` ever running again, so it isn't
+  // affected by that stall. These two tests never advance fake timers /
+  // never let `pump`'s own poll run at all - only the native event does.
+  it('fires onEnded from the final chunk native ended event alone, without pump ever polling', async () => {
+    installFetchByByteLength(() => 1);
+
+    const onEnded = vi.fn();
+    const { player } = await makePlayer(onEnded);
+
+    player.setPlaybackSpeed(2);
+    await flush();
+    await player.start(0);
+
+    const finalChunkSource = context.bufferSources.at(-1);
+
+    finalChunkSource?.emitEnded();
+
+    expect(onEnded).toHaveBeenCalledTimes(1);
+    expect(player.isInitialised).toBe(false);
+  });
+
+  it('does not fire onEnded from a stale final-chunk ended event once that chunk has been manually stopped', async () => {
+    installFetchByByteLength(() => 1);
+
+    const onEnded = vi.fn();
+    const { player } = await makePlayer(onEnded);
+
+    player.setPlaybackSpeed(2);
+    await flush();
+    await player.start(0);
+
+    const finalChunkSource = context.bufferSources.at(-1);
+
+    player.stop();
+    finalChunkSource?.emitEnded();
+
+    expect(onEnded).not.toHaveBeenCalled();
+  });
 });

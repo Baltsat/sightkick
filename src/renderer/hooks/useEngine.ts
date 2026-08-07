@@ -14,6 +14,8 @@ import { PlayheadStyle } from '../types';
 import { PlayerMode } from '../services/audio-player';
 import { Engine, PlaybackSnapshot, PlaybackState } from '../services/engine';
 import { inputBus } from '../input';
+import { useInput } from '../context/InputContext';
+import { RunSummary } from '../services/practice-stats';
 
 interface UseEngineParams {
   trackData: TrackConfig[];
@@ -27,7 +29,7 @@ interface UseEngineParams {
   playheadStyle: PlayheadStyle;
   mapping: InputMapping;
   player: PlayerMode;
-  onEnded: (score: ScoreData) => void;
+  onEnded: (score: ScoreData, practiceSummary: RunSummary) => void;
 }
 
 interface UseEngineResult {
@@ -79,6 +81,7 @@ export function useEngine({
   onEnded,
 }: UseEngineParams): UseEngineResult {
   const { notification } = App.useApp();
+  const { inputLatencyMs } = useInput();
   const onEndedRef = useRef(onEnded);
   const isDevRef = useRef(isDev);
   const playerRef = useRef(player);
@@ -104,7 +107,8 @@ export function useEngine({
       isDev: isDevRef.current,
       player: playerRef.current,
       subscribeInput: inputBus.subscribe,
-      onEnded: (score) => onEndedRef.current(score),
+      onEnded: (score, practiceSummary) =>
+        onEndedRef.current(score, practiceSummary),
       onError: () =>
         notification.error({
           title: 'Audio failed to load',
@@ -146,6 +150,10 @@ export function useEngine({
   useEffect(() => {
     engine?.setSettings({ playheadStyle });
   }, [engine, playheadStyle]);
+
+  useEffect(() => {
+    engine?.setLatencyMs(inputLatencyMs);
+  }, [engine, inputLatencyMs]);
 
   const subscribe = useCallback(
     (listener: () => void) => engine?.subscribe(listener) ?? (() => {}),

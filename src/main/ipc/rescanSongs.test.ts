@@ -148,6 +148,40 @@ describe('rescanSongs', () => {
     expect(songs.existing.liked).toBe(true);
   });
 
+  it('drops a stale entry whose folder was renamed and picks up the new folder', async () => {
+    // Reproduces the "renamed lesson folder" scenario: 07.04 gets renamed
+    // and its song.ini content changes with it (a real re-chart, not just
+    // a `mv`), and a brand-new 08.10 folder is added. A rescan must drop
+    // the stale 07.04 snapshot — it must not survive under its old name
+    // alongside the renamed folder's fresh entry.
+    const staleDir = writeSong(
+      library,
+      'Lesson 07.04 - Second-Ending Turnaround',
+    );
+
+    storeHolder.current = makeStore({ songs: {} });
+
+    const first = makeEvent();
+
+    await rescanSongs(first as never, true);
+
+    fs.rmSync(staleDir, { recursive: true, force: true });
+    writeSong(library, 'Lesson 07.04 - Renamed Title');
+    writeSong(library, 'Lesson 08.10 - New Lesson');
+
+    const second = makeEvent();
+
+    await rescanSongs(second as never, false);
+
+    const names = Object.values(
+      storeHolder.current.get('songs') as Record<string, { name: string }>,
+    ).map((s) => s.name);
+
+    expect(names).not.toContain('Lesson 07.04 - Second-Ending Turnaround');
+    expect(names).toContain('Lesson 07.04 - Renamed Title');
+    expect(names).toContain('Lesson 08.10 - New Lesson');
+  });
+
   it('replies with an error when the scan throws', async () => {
     const base = makeStore({});
 

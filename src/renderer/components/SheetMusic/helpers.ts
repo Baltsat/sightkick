@@ -1,7 +1,51 @@
 import { noteFlags } from 'scan-chart';
+import { clamp } from 'es-toolkit';
 import { ParsedChart, Measure } from '../../../chart-parser/types';
 import { Cell, DslBlock, Lane, NoteEvent } from './types';
 import { CYMBAL_LANES, LANE_BY_TYPE, TYPE_BY_LANE } from './constants';
+
+// How close to a scroll container's top/bottom edge (in px) a drag needs to
+// get before it starts auto-scrolling, and the fastest it'll scroll (in
+// px/frame) once the pointer is right at or past that edge.
+export const AUTO_SCROLL_EDGE_MARGIN = 56;
+
+export const AUTO_SCROLL_MAX_SPEED = 18;
+
+export interface ScrollEdge {
+  top: number;
+  bottom: number;
+}
+
+function edgeSpeed(distanceFromEdge: number): number {
+  const depth = clamp(
+    AUTO_SCROLL_EDGE_MARGIN - distanceFromEdge,
+    0,
+    AUTO_SCROLL_EDGE_MARGIN,
+  );
+
+  return (depth / AUTO_SCROLL_EDGE_MARGIN) * AUTO_SCROLL_MAX_SPEED;
+}
+
+/**
+ * How fast (px/frame) and which way to auto-scroll a container while
+ * dragging a practice-section selection past its top/bottom edge. Ramps up
+ * linearly from 0 right at the margin boundary to AUTO_SCROLL_MAX_SPEED at
+ * the container's own edge (and beyond, once the pointer has left the
+ * container entirely) - negative scrolls up, positive scrolls down, 0 means
+ * the pointer is comfortably inside the container and nothing should
+ * auto-scroll.
+ */
+export function autoScrollSpeed(clientY: number, edge: ScrollEdge): number {
+  const up = edgeSpeed(clientY - edge.top);
+
+  if (up > 0) {
+    return -up;
+  }
+
+  const down = edgeSpeed(edge.bottom - clientY);
+
+  return down > 0 ? down : 0;
+}
 
 function gcd(a: number, b: number): number {
   return b === 0 ? a : gcd(b, a % b);

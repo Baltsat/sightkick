@@ -17,6 +17,8 @@ export function useInputConfig(isOpen: boolean) {
     controlMapping,
     assignControl,
     removeControl,
+    inputLatencyMs,
+    setInputLatencyMs,
   } = useInput();
   const [devices, setDevices] = useState<InputDevice[]>([]);
   const [listeningTo, setListeningTo] = useState<InputElement>();
@@ -122,5 +124,7 @@ export function useInputConfig(isOpen: boolean) {
     onStopLearn: () => setListeningTo(undefined),
     onRemoveControl: removeControl,
     onRefreshDevices: refreshDevices,
+    inputLatencyMs,
+    onInputLatencyChange: setInputLatencyMs,
   };
 }

@@ -51,7 +51,7 @@ export function SongList({
   const rowVirtualizer = useVirtualizer({
     count: songList.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 85,
+    estimateSize: () => 76,
   });
 
   useEffect(() => {

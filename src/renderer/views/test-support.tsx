@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { App as AntdApp, ConfigProvider } from 'antd';
 import { vi } from 'vitest';
-import { IpcLoadSongResponse, Song } from '../../types';
+import { IpcLoadSongResponse, Song, SongLessonInfo } from '../../types';
 import { antdTheme } from '../antdTheme';
 import { AppProvider } from '../context/AppContext';
 import { InputProvider } from '../context/InputContext';
@@ -369,6 +369,31 @@ export function makeListSong(id: string, extra: Partial<Song> = {}): Song {
   };
 }
 
+export function makeLessonSong(
+  id: string,
+  lesson: Partial<SongLessonInfo> = {},
+  extra: Partial<Song> = {},
+): Song {
+  const lessonId = lesson.id ?? '01.01';
+  const title = lesson.title ?? `Lesson ${lessonId} title`;
+
+  return makeListSong(id, {
+    dir: `/music/SightKick Method - Lesson ${lessonId}`,
+    // Mirrors the lesson title, same as a real lesson song.ini's `name`.
+    name: title,
+    artist: 'SightKick Method',
+    drumDifficulties: ['expert'],
+    lesson: {
+      id: lessonId,
+      starsToUnlock: 0,
+      unit: 'Unit 1 — Foundations',
+      title,
+      ...lesson,
+    },
+    ...extra,
+  });
+}
+
 export interface EnchorChart {
   md5: string;
   name: string;
@@ -457,6 +482,8 @@ export interface SongListHarness {
   clickSong(id: string): void;
   chooseGameMode(mode: 'perform' | 'practice'): void;
   openSongMenu(id: string): void;
+  selectView(view: 'songs' | 'lessons'): void;
+  clickLesson(lessonId: string): void;
   press(control: keyof typeof NAV_CONTROLS): void;
   typeKey(code: string): void;
   openInputConfig(): void;
@@ -602,6 +629,14 @@ export function setupSongListView({
 
     openSongMenu(id: string) {
       fireEvent.click(row(id).getByTestId('song-menu-trigger'));
+    },
+
+    selectView(view) {
+      fireEvent.click(screen.getByTestId(`view-${view}`));
+    },
+
+    clickLesson(lessonId: string) {
+      fireEvent.click(screen.getByTestId(`lesson-item-${lessonId}`));
     },
 
     press(control) {

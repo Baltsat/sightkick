@@ -1,8 +1,16 @@
+import { StaveNote } from 'vexflow';
 import { ParsedChart, RenderData } from '../../../chart-parser/types';
 import { PlayheadStyle } from '../../types';
-import { getCursorX, getNoteSvg } from './cursor-geometry';
+import { KIT_ELEMENTS } from '../../constants';
+import {
+  getCursorX,
+  getNoteGlyphElements,
+  getNoteSvg,
+  getXForTick,
+} from './cursor-geometry';
 import {
   ActiveNote,
+  FalseHitRecord,
   GameRendererContext,
   GameRendererRefs,
   IsHit,
@@ -10,10 +18,12 @@ import {
 } from './types';
 import {
   ACTIVE_CLASS,
+  HIDDEN_CLASS,
   HIT_CLASS,
   MISS_CLASS,
   MISSED_CLASS,
   POP_CLASS,
+  WRONG_HIT_MARKER_CLASS,
 } from './constants';
 import {
   flashClass,
@@ -23,6 +33,14 @@ import {
   samePos,
 } from './helpers';
 
+// Wrong-hit markers land close together (e.g. two mis-hits a few ticks
+// apart) draw a stack of separate × glyphs rather than letting them
+// overlap into an unreadable blob. STACK_THRESHOLD_PX decides when two
+// markers count as "close"; STACK_OFFSET_PX is the vertical step used to
+// fan them out, alternating above/below the strike line as more land.
+const WRONG_HIT_STACK_THRESHOLD_PX = 12;
+const WRONG_HIT_STACK_OFFSET_PX = 10;
+
 export class GameRenderer {
   private chart: ParsedChart | undefined;
   private renderData: RenderData[] = [];
@@ -31,12 +49,16 @@ export class GameRenderer {
   private cursorShown = false;
   private cursorHeight = -1;
   private highlightEls: (HTMLElement | undefined)[] = [];
+  private overlayEl: HTMLElement | undefined;
   private scrollContainer: HTMLElement | undefined;
   private measureIdx = -1;
   private activePos: NotePos | undefined;
   private coloredPos: NotePos | undefined;
+  private endResolved = false;
   private activeEls: SVGElement[] = [];
   private filledEls = new Set<SVGElement>();
+  private vanishedNotes = new Map<StaveNote, SVGElement[]>();
+  private wrongHitMarkers: { tick: number; x: number; el: HTMLElement }[] = [];
 
   constructor(private isHit: IsHit) {}
 
@@ -64,23 +86,26 @@ export class GameRenderer {
   setRefs(refs: GameRendererRefs): void {
     this.cursorEl = refs.cursorEl;
     this.highlightEls = refs.highlightEls;
+    this.overlayEl = refs.overlayEl;
     this.scrollContainer = undefined;
     this.reset();
   }
 
-  render(chartTime: number, tick: number): void {
+  render(chartTime: number, tick: number, isSeek = false): void {
     this.syncMeasure(tick);
-    this.syncActiveNote(tick);
+    this.syncActiveNote(tick, isSeek);
     this.updateCursor(chartTime);
   }
 
   paintHit(pos: NotePos, prefixes: string[]): void {
-    const note =
-      this.renderData[pos.measureIdx]?.renderedNotes[pos.noteIdx]?.note;
+    const entry = this.renderData[pos.measureIdx]?.renderedNotes[pos.noteIdx];
+    const note = entry?.note;
 
     if (!note) {
       return;
     }
+
+    let lastFlashedEl: SVGElement | undefined;
 
     note.getKeys().forEach((key, i) => {
       if (!prefixes.includes(keyPrefix(key))) {
@@ -97,13 +122,93 @@ export class GameRenderer {
       el.classList.add(HIT_CLASS);
       this.filledEls.add(el);
       flashClass(el, POP_CLASS);
+      lastFlashedEl = el;
     });
+
+    const tick = entry.tick;
+    const allHit = note
+      .getKeys()
+      .every((key) => this.isHit(tick, keyPrefix(key)));
+
+    if (!allHit) {
+      return;
+    }
+
+    if (!lastFlashedEl) {
+      this.vanishNote(note);
+
+      return;
+    }
+
+    lastFlashedEl.addEventListener(
+      'animationend',
+      () => this.vanishNote(note),
+      { once: true },
+    );
+  }
+
+  paintWrongHit(record: FalseHitRecord): void {
+    const overlay = this.overlayEl;
+    const measureIdx = this.measureIndexForTick(record.tick);
+    const measureData =
+      measureIdx >= 0 ? this.renderData[measureIdx] : undefined;
+
+    if (!overlay || !measureData) {
+      return;
+    }
+
+    const x = getXForTick(record.tick, measureData);
+    const y =
+      measureData.yOffset +
+      measureData.stave.getY() +
+      measureData.stave.getHeight() / 2;
+    const marker = document.createElement('div');
+
+    marker.className = WRONG_HIT_MARKER_CLASS;
+
+    const stackY = y + this.wrongHitStackOffset(x);
+
+    marker.style.transform = `translate3d(${x}px, ${stackY}px, 0) translate(-50%, -50%)`;
+
+    const displayName = record.element
+      ? KIT_ELEMENTS.get(record.element)?.displayName
+      : undefined;
+
+    if (displayName) {
+      marker.title = `Wrong hit: ${displayName}`;
+    }
+
+    overlay.appendChild(marker);
+    this.wrongHitMarkers.push({ tick: record.tick, x, el: marker });
+  }
+
+  /**
+   * Vertical offset (in px) for a new wrong-hit × landing at `x`, so that
+   * markers struck close together fan out above/below the strike line
+   * instead of drawing on top of each other. Markers already at the same
+   * x (within WRONG_HIT_STACK_THRESHOLD_PX) push the new one out one more
+   * step, alternating sides: 0, +1, -1, +2, -2, ...
+   */
+  private wrongHitStackOffset(x: number): number {
+    const nearby = this.wrongHitMarkers.filter(
+      (marker) => Math.abs(marker.x - x) < WRONG_HIT_STACK_THRESHOLD_PX,
+    ).length;
+
+    if (nearby === 0) {
+      return 0;
+    }
+
+    const magnitude = Math.ceil(nearby / 2) * WRONG_HIT_STACK_OFFSET_PX;
+    const sign = nearby % 2 === 1 ? 1 : -1;
+
+    return sign * magnitude;
   }
 
   reset(): void {
     this.measureIdx = -1;
     this.activePos = undefined;
     this.coloredPos = undefined;
+    this.endResolved = false;
     this.scrollContainer = undefined;
     this.cursorShown = false;
     this.cursorHeight = -1;
@@ -113,6 +218,12 @@ export class GameRenderer {
       el.classList.remove(HIT_CLASS, MISSED_CLASS),
     );
     this.filledEls.clear();
+    this.vanishedNotes.forEach((els) =>
+      els.forEach((el) => el.classList.remove(HIDDEN_CLASS)),
+    );
+    this.vanishedNotes.clear();
+    this.wrongHitMarkers.forEach(({ el }) => el.remove());
+    this.wrongHitMarkers = [];
   }
 
   private syncMeasure(tick: number): void {
@@ -150,10 +261,20 @@ export class GameRenderer {
     return tick >= measure.startTick && tick < measure.endTick ? idx : -1;
   }
 
-  private syncActiveNote(tick: number): void {
+  private syncActiveNote(tick: number, isSeek: boolean): void {
     const pos = this.locateActiveNote(tick);
+    const atEnd = this.isChartEnded(tick);
+    // A seek must reconcile even when it lands on the same NotePos as
+    // before (the Judge's hit state may have been rewound underneath us —
+    // see engine.ts's onSeek). Reaching/passing the end of the chart needs
+    // the same one-time forced pass so the final note gets resolved, since
+    // there is no "next" note to trigger it normally; `endResolved` keeps
+    // that from re-running on every subsequent frame while parked there.
+    const forceSync = isSeek || (atEnd && !this.endResolved);
 
-    if (samePos(pos, this.activePos)) {
+    this.endResolved = atEnd;
+
+    if (!forceSync && samePos(pos, this.activePos)) {
       return;
     }
 
@@ -162,7 +283,13 @@ export class GameRenderer {
     const target = pos ? this.toActiveNote(pos) : undefined;
 
     this.applyActive(target);
-    this.applyColoring(target);
+    this.applyColoring(target, tick, isSeek, atEnd);
+  }
+
+  private isChartEnded(tick: number): boolean {
+    const rd = this.renderData;
+
+    return rd.length > 0 && tick >= rd[rd.length - 1].measure.endTick;
   }
 
   private locateActiveNote(tick: number): NotePos | undefined {
@@ -206,12 +333,21 @@ export class GameRenderer {
     this.activeEls.forEach((el) => el.classList.add(ACTIVE_CLASS));
   }
 
-  private applyColoring(target: ActiveNote | undefined): void {
+  private applyColoring(
+    target: ActiveNote | undefined,
+    currentTick: number,
+    isSeek: boolean,
+    atEnd: boolean,
+  ): void {
     const clearAll = () => {
       this.filledEls.forEach((el) => {
         el.classList.remove(HIT_CLASS, MISSED_CLASS);
       });
       this.filledEls.clear();
+      this.vanishedNotes.forEach((els) =>
+        els.forEach((el) => el.classList.remove(HIDDEN_CLASS)),
+      );
+      this.vanishedNotes.clear();
     };
 
     if (!target) {
@@ -224,11 +360,22 @@ export class GameRenderer {
     const { measureIdx, noteIdx } = target;
     const curNotes = this.renderData[measureIdx].renderedNotes;
     const prev = this.coloredPos;
-    const isBackward =
+    const isPositionBackward =
       prev !== undefined &&
       (measureIdx < prev.measureIdx ||
         (measureIdx === prev.measureIdx && noteIdx < prev.noteIdx));
+    // A seek forces the same full clear-and-replay reconciliation as an
+    // actual backward jump in NotePos, even when the active note itself
+    // didn't move: the engine may have rewound the Judge's hit state past
+    // this point (engine.ts's onSeek -> judge.rewindTo), and that has to
+    // be reflected in the notes/markers we already walked.
+    const isBackward = isSeek || isPositionBackward;
     const flashMisses = !isBackward;
+    // At (or past) the end of the chart there's no "next" note whose
+    // activation would normally walk and resolve this one, so fold the
+    // active note itself into its own walk range to give it the same
+    // persistent miss/vanish treatment as any other passed note.
+    const endExclusive = atEnd ? noteIdx + 1 : noteIdx;
     const colorNote = (
       el: SVGElement,
       tick: number,
@@ -245,36 +392,37 @@ export class GameRenderer {
         flashClass(el, MISS_CLASS);
       }
     };
+    const walkNote = (note: StaveNote, tick: number) => {
+      const isRest = note.isRest();
+
+      forEachNoteHead(note, (el, key) => colorNote(el, tick, key, isRest));
+      this.syncNoteState(note, tick, isRest);
+    };
 
     if (isBackward) {
+      this.pruneWrongHitMarkers(currentTick);
       clearAll();
 
       for (let m = 0; m < measureIdx; m++) {
         this.renderData[m]?.renderedNotes.forEach(({ note, tick }) =>
-          forEachNoteHead(note, (el, key) =>
-            colorNote(el, tick, key, note.isRest()),
-          ),
+          walkNote(note, tick),
         );
       }
 
-      for (let i = 0; i < noteIdx; i++) {
+      for (let i = 0; i < endExclusive; i++) {
         const { note, tick } = curNotes[i];
 
-        forEachNoteHead(note, (el, key) =>
-          colorNote(el, tick, key, note.isRest()),
-        );
+        walkNote(note, tick);
       }
     } else {
       const fromMeasure = prev?.measureIdx ?? 0;
       const fromNote = prev?.noteIdx ?? 0;
 
       if (fromMeasure === measureIdx) {
-        for (let i = fromNote; i < noteIdx; i++) {
+        for (let i = fromNote; i < endExclusive; i++) {
           const { note, tick } = curNotes[i];
 
-          forEachNoteHead(note, (el, key) =>
-            colorNote(el, tick, key, note.isRest()),
-          );
+          walkNote(note, tick);
         }
       } else {
         const prevMeasureNotes =
@@ -283,30 +431,90 @@ export class GameRenderer {
         for (let i = fromNote; i < prevMeasureNotes.length; i++) {
           const { note, tick } = prevMeasureNotes[i];
 
-          forEachNoteHead(note, (el, key) =>
-            colorNote(el, tick, key, note.isRest()),
-          );
+          walkNote(note, tick);
         }
 
         for (let m = fromMeasure + 1; m < measureIdx; m++) {
           this.renderData[m]?.renderedNotes.forEach(({ note, tick }) =>
-            forEachNoteHead(note, (el, key) =>
-              colorNote(el, tick, key, note.isRest()),
-            ),
+            walkNote(note, tick),
           );
         }
 
-        for (let i = 0; i < noteIdx; i++) {
+        for (let i = 0; i < endExclusive; i++) {
           const { note, tick } = curNotes[i];
 
-          forEachNoteHead(note, (el, key) =>
-            colorNote(el, tick, key, note.isRest()),
-          );
+          walkNote(note, tick);
         }
       }
     }
 
     this.coloredPos = { measureIdx, noteIdx };
+  }
+
+  /**
+   * Keeps the whole-note vanish state in sync with the Judge's current hit
+   * state for a single passed note, in both playback directions. Vanishing
+   * here (rather than only from `paintHit`) is what restores a note's
+   * visibility when the engine seeks backward past its hit tick (the Judge
+   * un-records the hit, so this note exits the "fully hit" state the next
+   * time it's walked). The persistent MISSED_CLASS colouring applied by
+   * `colorNote` (see `applyColoring`) is what actually marks a miss now —
+   * there is no separate marker to keep in sync here.
+   */
+  private syncNoteState(note: StaveNote, tick: number, isRest: boolean): void {
+    if (isRest) {
+      return;
+    }
+
+    const allHit = note
+      .getKeys()
+      .every((key) => this.isHit(tick, keyPrefix(key)));
+
+    if (allHit) {
+      this.vanishNote(note);
+    } else {
+      this.unvanishNote(note);
+    }
+  }
+
+  private vanishNote(note: StaveNote): void {
+    if (this.vanishedNotes.has(note)) {
+      return;
+    }
+
+    const els = getNoteGlyphElements(note);
+
+    els.forEach((el) => el.classList.add(HIDDEN_CLASS));
+    this.vanishedNotes.set(note, els);
+  }
+
+  private unvanishNote(note: StaveNote): void {
+    const els = this.vanishedNotes.get(note);
+
+    if (!els) {
+      return;
+    }
+
+    els.forEach((el) => el.classList.remove(HIDDEN_CLASS));
+    this.vanishedNotes.delete(note);
+  }
+
+  private pruneWrongHitMarkers(currentTick: number): void {
+    this.wrongHitMarkers = this.wrongHitMarkers.filter(({ tick, el }) => {
+      if (tick >= currentTick) {
+        el.remove();
+
+        return false;
+      }
+
+      return true;
+    });
+  }
+
+  private measureIndexForTick(tick: number): number {
+    return this.renderData.findIndex(
+      ({ measure }) => tick >= measure.startTick && tick < measure.endTick,
+    );
   }
 
   private updateHighlight(index: number): void {

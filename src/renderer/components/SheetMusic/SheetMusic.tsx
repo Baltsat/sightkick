@@ -17,6 +17,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRepeat, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { IconButton } from '../IconButton';
 import { getScrollParent } from '../../services/engine/helpers';
+import { autoScrollSpeed } from './helpers';
 
 export interface SheetMusicProps {
   engine: Engine | undefined;
@@ -52,12 +53,20 @@ export function SheetMusic({
   zoom,
 }: SheetMusicProps) {
   const cursorRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const highlightsRef = useMemo(
     () => renderData.map(() => createRef<HTMLDivElement>()),
     [renderData],
   );
   const isSelectable = gameMode === 'practice';
   const dragAnchorRef = useRef<number | undefined>(undefined);
+  // The scroll container a selection drag is happening over, cached for
+  // the lifetime of the drag (resolved once on mousedown rather than on
+  // every mousemove/wheel event) - see the wheel/auto-scroll effect below.
+  const scrollContainerRef = useRef<HTMLElement | undefined>(undefined);
+  const autoScrollSpeedRef = useRef(0);
+  const autoScrollFrameRef = useRef<number | undefined>(undefined);
   const handleMeasureMouseDown = useCallback(
     (index: number) => {
       if (!isSelectable || !isLooping) {
@@ -65,6 +74,9 @@ export function SheetMusic({
       }
 
       dragAnchorRef.current = index;
+      scrollContainerRef.current = getScrollParent(
+        wrapperRef.current ?? undefined,
+      );
       onPracticeRangeChange?.({ start: index, end: index });
     },
     [isSelectable, onPracticeRangeChange, isLooping],
@@ -85,20 +97,94 @@ export function SheetMusic({
     [onPracticeRangeChange],
   );
 
+  // Keeps the sheet scrollable by mouse wheel / trackpad, and auto-scrolls
+  // it, for the whole lifetime of a practice-section drag-select - even
+  // when the pointer is held over a measure overlay far from any native
+  // scroll affordance. Plain (non-drag) scrolling is untouched; these
+  // listeners are no-ops whenever dragAnchorRef isn't set.
   useEffect(() => {
+    const stopAutoScroll = () => {
+      if (autoScrollFrameRef.current !== undefined) {
+        cancelAnimationFrame(autoScrollFrameRef.current);
+        autoScrollFrameRef.current = undefined;
+      }
+    };
+    const runAutoScroll = () => {
+      const container = scrollContainerRef.current;
+
+      if (
+        !container ||
+        autoScrollSpeedRef.current === 0 ||
+        dragAnchorRef.current === undefined
+      ) {
+        autoScrollFrameRef.current = undefined;
+
+        return;
+      }
+
+      container.scrollTop += autoScrollSpeedRef.current;
+      autoScrollFrameRef.current = requestAnimationFrame(runAutoScroll);
+    };
     const endDrag = () => {
       dragAnchorRef.current = undefined;
+      scrollContainerRef.current = undefined;
+      autoScrollSpeedRef.current = 0;
+      stopAutoScroll();
+    };
+    const handleMouseMove = (event: globalThis.MouseEvent) => {
+      const container = scrollContainerRef.current;
+
+      if (dragAnchorRef.current === undefined || !container) {
+        return;
+      }
+
+      const rect = container.getBoundingClientRect();
+
+      autoScrollSpeedRef.current = autoScrollSpeed(event.clientY, {
+        top: rect.top,
+        bottom: rect.bottom,
+      });
+
+      if (
+        autoScrollSpeedRef.current !== 0 &&
+        autoScrollFrameRef.current === undefined
+      ) {
+        autoScrollFrameRef.current = requestAnimationFrame(runAutoScroll);
+      }
+    };
+    // Forwards wheel/trackpad scroll to the scroll container directly
+    // while a drag-select is in progress, rather than relying on the
+    // pointer-down state not interfering with the browser's own wheel
+    // handling of the same ancestor.
+    const handleWheel = (event: WheelEvent) => {
+      const container = scrollContainerRef.current;
+
+      if (dragAnchorRef.current === undefined || !container) {
+        return;
+      }
+
+      event.preventDefault();
+      container.scrollTop += event.deltaY;
+      container.scrollLeft += event.deltaX;
     };
 
     window.addEventListener('mouseup', endDrag);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('wheel', handleWheel, { passive: false });
 
-    return () => window.removeEventListener('mouseup', endDrag);
+    return () => {
+      window.removeEventListener('mouseup', endDrag);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('wheel', handleWheel);
+      stopAutoScroll();
+    };
   }, []);
 
   useEffect(() => {
     engine?.setRendererRefs({
       cursorEl: cursorRef.current ?? undefined,
       highlightEls: highlightsRef.map((ref) => ref.current ?? undefined),
+      overlayEl: overlayRef.current ?? undefined,
     });
   }, [engine, renderData, highlightsRef]);
 
@@ -201,7 +287,7 @@ export function SheetMusic({
   ]);
 
   return (
-    <div className="min-w-max" style={{ zoom }}>
+    <div ref={wrapperRef} className="min-w-max" style={{ zoom }}>
       {gameMode === 'practice' && isLooping && practiceRange && (
         <div className="fixed top-35 ml-10 bg-bg rounded-md z-100 px-4 py-3 flex items-center gap-2">
           <div className="text-accent bg-accent-soft-bg p-2 border border-accent-soft-border rounded-md w-10 h-10 flex items-center justify-center">
@@ -249,6 +335,11 @@ export function SheetMusic({
             />
             <div className="absolute w-0.75 bg-accent-bright h-full rounded-[3px] left-1/2 -translate-x-1/2" />
           </div>
+          <div
+            ref={overlayRef}
+            data-testid="sheet-music-overlay"
+            className="absolute top-0 left-0 z-2 pointer-events-none"
+          />
         </div>
       </div>
 

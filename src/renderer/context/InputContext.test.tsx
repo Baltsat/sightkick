@@ -33,6 +33,22 @@ function stopCount() {
   return ipc.sent.filter((s) => s.channel === 'stop-listen-midi').length;
 }
 
+// inputBus.listDevices() chains through InputBus -> MidiSource's IPC
+// round-trip -> InputContext's own .then(); a single microtask tick isn't
+// enough to drain it, and a real device list only ever arrives async, so
+// wait a macrotask (draining every pending microtask first) rather than
+// pin an exact hop count.
+async function respondWithMidiDevices(
+  devices: { name: string; port: number }[],
+) {
+  await act(async () => {
+    ipc.emit('midi-device-list', devices);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  });
+}
+
 beforeEach(() => {
   installLocalStorage();
   ipc = installIpcMock();
@@ -172,9 +188,18 @@ describe('InputContext input mapping', () => {
 
     act(() => result.current.setSelectedDevice(DEVICE_A));
     act(() => result.current.assignControl('snare', 'midi:38'));
+
+    expect(result.current.inputMapping.snare).toEqual(['midi:38']);
+
     act(() => result.current.setSelectedDevice(DEVICE_B));
 
-    expect(result.current.inputMapping.snare).toEqual([]);
+    // DEVICE_B was never configured, so it falls back to its own DTX
+    // default rather than inheriting DEVICE_A's manual override.
+    expect(result.current.inputMapping.snare).toEqual([
+      'midi:38',
+      'midi:40',
+      'midi:37',
+    ]);
   });
 });
 
@@ -351,6 +376,146 @@ describe('InputContext keyboard default suppression', () => {
     act(() => result.current.setSelectedDevice(DEVICE_A));
 
     expect(dispatchKey('Space').defaultPrevented).toBe(false);
+  });
+});
+
+describe('InputContext DTX default mapping', () => {
+  it('seeds a freshly-selected MIDI device with the DTX/General-MIDI default map', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(DEVICE_A));
+
+    expect(result.current.inputMapping.snare).toEqual([
+      'midi:38',
+      'midi:40',
+      'midi:37',
+    ]);
+    expect(result.current.inputMapping.kick).toEqual(['midi:35', 'midi:36']);
+  });
+
+  it('does not seed defaults for a keyboard device', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(KEYBOARD));
+
+    expect(result.current.inputMapping.snare).toEqual([]);
+  });
+
+  it('lets a manual assignment override the default for just that lane, leaving other lanes on their default', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(DEVICE_A));
+    act(() => result.current.assignControl('snare', 'midi:99'));
+
+    expect(result.current.inputMapping.snare).toEqual(['midi:99']);
+    expect(result.current.inputMapping.kick).toEqual(['midi:35', 'midi:36']);
+    expect(result.current.inputMapping.hihat).toEqual([
+      'midi:42',
+      'midi:44',
+      'midi:46',
+      'midi:22',
+      'midi:26',
+    ]);
+  });
+
+  it('keeps an explicitly-cleared lane empty instead of refilling it with the default', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(DEVICE_A));
+    act(() => result.current.removeControl('snare', 'midi:38'));
+    act(() => result.current.removeControl('snare', 'midi:40'));
+    act(() => result.current.removeControl('snare', 'midi:37'));
+
+    expect(result.current.inputMapping.snare).toEqual([]);
+    expect(result.current.inputMapping.kick).toEqual(['midi:35', 'midi:36']);
+  });
+
+  it('scores a hit on the default snare note with no manual configuration', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(DEVICE_A));
+
+    expect(result.current.inputMapping.snare).toContain('midi:38');
+    expect(result.current.kitControlIds.has('midi:38')).toBe(true);
+  });
+});
+
+describe('InputContext input latency', () => {
+  it('defaults input latency to zero', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    expect(result.current.inputLatencyMs).toBe(0);
+  });
+
+  it('persists an updated input latency', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setInputLatencyMs(45));
+
+    expect(result.current.inputLatencyMs).toBe(45);
+  });
+
+  it('clamps input latency to the -200..200ms range', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setInputLatencyMs(9999));
+    expect(result.current.inputLatencyMs).toBe(200);
+
+    act(() => result.current.setInputLatencyMs(-9999));
+    expect(result.current.inputLatencyMs).toBe(-200);
+  });
+});
+
+describe('InputContext MIDI auto-select', () => {
+  it('auto-selects the sole MIDI device found on a fresh profile', async () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
+
+    expect(result.current.selectedDevice).toEqual(DEVICE_A);
+  });
+
+  it('does not auto-select when more than one MIDI device is found', async () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    await respondWithMidiDevices([
+      { name: 'Pad A', port: 2 },
+      { name: 'Pad B', port: 5 },
+    ]);
+
+    expect(result.current.selectedDevice).toBeNull();
+  });
+
+  it('does not count the always-present keyboard entry as a MIDI device', async () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    // No real MIDI hardware — the device list is just the synthetic
+    // keyboard entry every source list includes.
+    await respondWithMidiDevices([]);
+
+    expect(result.current.selectedDevice).toBeNull();
+  });
+
+  it('respects a previously stored explicit "- None -" choice instead of auto-selecting', async () => {
+    // Simulate a returning profile that has already recorded a choice —
+    // even though it currently reads back as null, it must not be treated
+    // as "never chosen".
+    localStorage.setItem('settings.selectedDevice', 'null');
+
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
+
+    expect(result.current.selectedDevice).toBeNull();
+  });
+
+  it('does not override an already-selected device that is still present', async () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(DEVICE_A));
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
+
+    expect(result.current.selectedDevice).toEqual(DEVICE_A);
   });
 });
 

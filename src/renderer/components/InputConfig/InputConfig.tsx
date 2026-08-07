@@ -1,4 +1,4 @@
-import { Button, Modal, Select, Tabs } from 'antd';
+import { Button, InputNumber, Modal, Select, Tabs } from 'antd';
 import { ElementMapping, InputElement } from '../../../types';
 import { controlLabel, InputDevice } from '../../input';
 import { modalStyles, MODAL_ABOVE_POPOVER_Z_INDEX } from '../../overlayStyles';
@@ -10,7 +10,12 @@ import {
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 import { MappingElement } from '../../types';
-import { GROUPED_CONTROL_ELEMENTS, KIT_ELEMENTS } from '../../constants';
+import {
+  GROUPED_CONTROL_ELEMENTS,
+  KIT_ELEMENTS,
+  MAX_LATENCY_MS,
+  MIN_LATENCY_MS,
+} from '../../constants';
 import { Tooltip } from '../Tooltip';
 
 interface Props {
@@ -25,6 +30,8 @@ interface Props {
   onStopLearn: () => void;
   onRemoveControl: (element: InputElement, control: string) => void;
   onRefreshDevices: () => void;
+  inputLatencyMs: number;
+  onInputLatencyChange: (ms: number) => void;
 }
 
 export function InputConfig({
@@ -39,6 +46,8 @@ export function InputConfig({
   onStopLearn,
   onRemoveControl,
   onRefreshDevices,
+  inputLatencyMs,
+  onInputLatencyChange,
 }: Props) {
   const renderElement = (element: MappingElement) => (
     <div
@@ -157,6 +166,32 @@ export function InputConfig({
                 onClick={onRefreshDevices}
                 aria-label="Refresh device list"
               />
+            </Tooltip>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1 shrink-0">
+          <div className="text-text-faint text-[12px] font-semibold uppercase">
+            Input Latency
+          </div>
+          <div className="flex items-center gap-2">
+            <InputNumber
+              className="grow"
+              value={inputLatencyMs}
+              min={MIN_LATENCY_MS}
+              max={MAX_LATENCY_MS}
+              step={1}
+              addonAfter="ms"
+              aria-label="Input latency in milliseconds"
+              onChange={(value) => onInputLatencyChange(value ?? 0)}
+            />
+            <Tooltip
+              title="Compensate for a laggy pad or interface: positive values shift your hits earlier before judging them."
+              placement="top"
+            >
+              <div className="text-text-muted text-xs italic max-w-50">
+                Positive if your kit hits register late.
+              </div>
             </Tooltip>
           </div>
         </div>

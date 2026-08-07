@@ -5,9 +5,10 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useState,
 } from 'react';
 import { App } from 'antd';
-import { mapValues, uniq, without } from 'es-toolkit';
+import { clamp, mapValues, uniq, without } from 'es-toolkit';
 import {
   ControlMapping,
   InputElement,
@@ -20,9 +21,15 @@ import {
   inputBus,
   InputDevice,
   isTypingTarget,
+  makeControlId,
 } from '../input';
 import { usePersisted } from '../hooks/usePersisted';
-import { CATEGORY_CONFLICTS, CONTROL_CATEGORIES } from '../constants';
+import {
+  CATEGORY_CONFLICTS,
+  CONTROL_CATEGORIES,
+  MAX_LATENCY_MS,
+  MIN_LATENCY_MS,
+} from '../constants';
 
 interface InputContextValue {
   selectedDevice: InputDevice | null;
@@ -32,6 +39,8 @@ interface InputContextValue {
   kitControlIds: Set<string>;
   assignControl: (element: InputElement, controlId: string) => void;
   removeControl: (element: InputElement, controlId: string) => void;
+  inputLatencyMs: number;
+  setInputLatencyMs: (ms: number) => void;
 }
 
 const EMPTY_INPUT_MAPPING: Record<keyof InputMapping, string[]> = {
@@ -43,6 +52,23 @@ const EMPTY_INPUT_MAPPING: Record<keyof InputMapping, string[]> = {
   tom1: [],
   tom2: [],
   tom3: [],
+};
+// A freshly-connected MIDI e-kit sends General MIDI / Yamaha DTX drum notes.
+// Seeding these as the default (for MIDI devices only) means a kit works the
+// moment it's selected, instead of doing nothing until every lane is
+// manually "Learned". A lane only falls back to this default while it has
+// never been configured for this device — see `inputMapping` below, which
+// distinguishes an absent key (never configured) from a stored empty array
+// (explicitly cleared by the user).
+const DEFAULT_MIDI_INPUT_MAPPING: Record<keyof InputMapping, string[]> = {
+  kick: [35, 36].map((note) => makeControlId('midi', note)),
+  snare: [38, 40, 37].map((note) => makeControlId('midi', note)),
+  hihat: [42, 44, 46, 22, 26].map((note) => makeControlId('midi', note)),
+  tom1: [48, 50].map((note) => makeControlId('midi', note)),
+  tom2: [45, 47].map((note) => makeControlId('midi', note)),
+  tom3: [41, 43].map((note) => makeControlId('midi', note)),
+  ride: [51, 53, 59].map((note) => makeControlId('midi', note)),
+  crash: [49, 57, 52, 55].map((note) => makeControlId('midi', note)),
 };
 const EMPTY_CONTROL_MAPPING: Record<keyof ControlMapping, string[]> = {
   up: [],
@@ -68,15 +94,25 @@ function isControlElement(
   return (CONTROL_KEYS as string[]).includes(element);
 }
 
-function assignInto<K extends string>(
-  empty: Record<K, string[]>,
-  current: Partial<Record<K, string[]>> | undefined,
-  element: K,
+// Only touches the assigned element and any *other* elements that already
+// have a stored entry (to dedupe the controlId across lanes). Elements that
+// have never been configured for this device are deliberately left absent
+// from the result, rather than seeded with an empty array — otherwise a
+// single "Learn" on one lane would mark every other, untouched lane as
+// "explicitly configured to empty" and silently blank out its DTX default.
+function assignInto(
+  current: Partial<Record<keyof InputMapping, string[]>> | undefined,
+  element: keyof InputMapping,
   controlId: string,
-): Record<K, string[]> {
-  return mapValues({ ...empty, ...current }, (list, key) =>
-    key === element ? uniq([...list, controlId]) : without(list, controlId),
+): Partial<Record<keyof InputMapping, string[]>> {
+  const deduped = mapValues(current ?? {}, (list) =>
+    list ? without(list, controlId) : list,
   );
+
+  return {
+    ...deduped,
+    [element]: uniq([...(deduped[element] ?? []), controlId]),
+  };
 }
 
 function assignControlInto(
@@ -98,10 +134,22 @@ function assignControlInto(
 }
 
 const InputContext = createContext<InputContextValue | null>(null);
+const SELECTED_DEVICE_KEY = 'settings.selectedDevice';
 
 export function InputProvider({ children }: { children: ReactNode }) {
+  // Captured once, synchronously, during the first render — before
+  // `usePersisted`'s own write-back effect below has a chance to run and
+  // persist its default. This is the only reliable way to tell "this
+  // profile has never recorded a device preference" apart from "the
+  // preference is currently null" (a stored explicit "- None -" choice, or
+  // a previously-selected device that later disappeared, both also read
+  // back as null). Only a genuinely never-stored profile is eligible for
+  // auto-selecting a lone MIDI device below.
+  const [hadStoredDevice] = useState(
+    () => localStorage.getItem(SELECTED_DEVICE_KEY) !== null,
+  );
   const [selectedDevice, setSelectedDevice] = usePersisted<InputDevice | null>(
-    'settings.selectedDevice',
+    SELECTED_DEVICE_KEY,
     null,
   );
   const [inputMappings, setInputMappings] = usePersisted<
@@ -110,14 +158,27 @@ export function InputProvider({ children }: { children: ReactNode }) {
   const [controlMappings, setControlMappings] = usePersisted<
     Record<string, ControlMapping>
   >('settings.controlMappings', {});
-  const { notification } = App.useApp();
-  const inputMapping = useMemo(
-    () => ({
-      ...EMPTY_INPUT_MAPPING,
-      ...(selectedDevice ? inputMappings[selectedDevice.id] : undefined),
-    }),
-    [selectedDevice, inputMappings],
+  const [inputLatencyMsRaw, setInputLatencyMsRaw] = usePersisted<number>(
+    'settings.inputLatencyMs',
+    0,
   );
+  const { notification } = App.useApp();
+  const inputMapping = useMemo(() => {
+    const stored = selectedDevice
+      ? inputMappings[selectedDevice.id]
+      : undefined;
+    const useDefaults = selectedDevice?.sourceId === 'midi';
+
+    return mapValues(EMPTY_INPUT_MAPPING, (fallback, key) => {
+      const storedList = stored?.[key];
+
+      if (storedList !== undefined) {
+        return storedList;
+      }
+
+      return useDefaults ? DEFAULT_MIDI_INPUT_MAPPING[key] : fallback;
+    });
+  }, [selectedDevice, inputMappings]);
   const controlMapping = useMemo(
     () => ({
       ...EMPTY_CONTROL_MAPPING,
@@ -151,7 +212,6 @@ export function InputProvider({ children }: { children: ReactNode }) {
       setInputMappings((prev) => ({
         ...prev,
         [selectedDevice.id]: assignInto(
-          EMPTY_INPUT_MAPPING,
           prev[selectedDevice.id],
           element,
           controlId,
@@ -194,6 +254,12 @@ export function InputProvider({ children }: { children: ReactNode }) {
     },
     [selectedDevice, setControlMappings, setInputMappings],
   );
+  const setInputLatencyMs = useCallback(
+    (ms: number) => {
+      setInputLatencyMsRaw(clamp(ms, MIN_LATENCY_MS, MAX_LATENCY_MS));
+    },
+    [setInputLatencyMsRaw],
+  );
 
   useEffect(() => {
     inputBus.start();
@@ -203,11 +269,25 @@ export function InputProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     inputBus.listDevices().then((list) => {
-      setSelectedDevice((prev: InputDevice | null) =>
-        prev && list.some((d) => d.id === prev.id) ? prev : null,
-      );
+      setSelectedDevice((prev: InputDevice | null) => {
+        if (prev) {
+          return list.some((d) => d.id === prev.id) ? prev : null;
+        }
+
+        // Nothing selected yet. Auto-pick a sole MIDI device, but only for
+        // a profile with no recorded preference at all — an explicit
+        // "- None -" choice (or the aftermath of a device disconnecting)
+        // must stay respected even though it also reads back as null.
+        if (hadStoredDevice) {
+          return null;
+        }
+
+        const midiDevices = list.filter((d) => d.sourceId === 'midi');
+
+        return midiDevices.length === 1 ? midiDevices[0] : null;
+      });
     });
-  }, [setSelectedDevice]);
+  }, [setSelectedDevice, hadStoredDevice]);
 
   useEffect(() => {
     if (selectedDevice?.sourceId !== 'midi') {
@@ -278,6 +358,8 @@ export function InputProvider({ children }: { children: ReactNode }) {
       kitControlIds,
       assignControl,
       removeControl,
+      inputLatencyMs: inputLatencyMsRaw,
+      setInputLatencyMs,
     }),
     [
       selectedDevice,
@@ -287,6 +369,8 @@ export function InputProvider({ children }: { children: ReactNode }) {
       kitControlIds,
       assignControl,
       removeControl,
+      inputLatencyMsRaw,
+      setInputLatencyMs,
     ],
   );
 

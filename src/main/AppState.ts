@@ -24,6 +24,24 @@ import { listenMidi, loadMidiDeviceList, stopListenMidi } from './ipc/midi';
 import { updateSong } from './ipc/updateSong';
 import { rescanSongs } from './ipc/rescanSongs';
 import { exportPdf } from './ipc/exportPdf';
+import { importSong, selectImportSong } from './ipc/importSong';
+import {
+  autoChartQueue,
+  cancelAutoChart,
+  checkAutoChartBackends,
+  createAutoChart,
+  discardAutoChartPreview,
+  importAutoChart,
+  retryAutoChart,
+} from './ipc/autoChart';
+import {
+  configureRemoteAutoChartStore,
+  getRemoteAutoChartSettings,
+  saveAndTestRemoteAutoChart,
+} from './ipc/remoteAutoChart';
+import { searchYoutube } from './ipc/searchYoutube';
+import { fetchMyMusic } from './ipc/myMusic';
+import { savePracticeRun, loadPracticeRuns } from './ipc/practiceStats';
 
 class AppState {
   private static instance: AppState;
@@ -96,10 +114,24 @@ class AppState {
       process.env.NODE_ENV === 'development' ||
       process.env.DEBUG_PROD === 'true';
 
+    configureRemoteAutoChartStore(this.store);
+
     ipcMain.on('load-song', loadSong);
     ipcMain.on('load-song-list', loadSongList);
     ipcMain.on('rescan-songs', rescanSongs);
     ipcMain.on('download-song', downloadSong);
+    ipcMain.on('select-import-song', selectImportSong);
+    ipcMain.on('import-song', importSong);
+    ipcMain.on('check-auto-chart-backends', checkAutoChartBackends);
+    ipcMain.on('create-auto-chart', createAutoChart);
+    ipcMain.on('cancel-auto-chart', cancelAutoChart);
+    ipcMain.on('retry-auto-chart', retryAutoChart);
+    ipcMain.on('discard-auto-chart-preview', discardAutoChartPreview);
+    ipcMain.on('import-auto-chart', importAutoChart);
+    ipcMain.on('get-auto-chart-remote-settings', getRemoteAutoChartSettings);
+    ipcMain.on('save-test-auto-chart-remote', saveAndTestRemoteAutoChart);
+    ipcMain.on('search-youtube', searchYoutube);
+    ipcMain.on('my-music-fetch', fetchMyMusic);
 
     ipcMain.on('check-stem-tools', checkStemTools);
     ipcMain.on('check-stem-tools-update', checkStemToolsUpdate);
@@ -111,6 +143,8 @@ class AppState {
     ipcMain.on('cancel-split', cancelSplit);
 
     ipcMain.on('update-song', updateSong);
+    ipcMain.on('save-practice-run', savePracticeRun);
+    ipcMain.on('load-practice-runs', loadPracticeRuns);
     ipcMain.on('export-pdf', exportPdf);
     ipcMain.on('midi-device-list', loadMidiDeviceList);
     ipcMain.on('listen-midi', listenMidi);
@@ -200,6 +234,7 @@ class AppState {
     stopListenMidi();
     killActiveSplit();
     cancelStemTools();
+    void autoChartQueue.shutdown();
   }
 }
 

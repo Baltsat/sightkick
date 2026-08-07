@@ -408,6 +408,224 @@ describe('transport controls', () => {
   });
 });
 
+describe('keyboard transport shortcuts', () => {
+  it('toggles pause and resume with Space, with zero configuration', async () => {
+    const view = setupSongView({ settings: { countIn: false } });
+
+    await view.loadSong();
+
+    await view.pressKey('Space');
+    expect(view.startedSources().length).toBeGreaterThan(0);
+
+    await view.pressKey('Space');
+    expect(view.audio.state).toBe('suspended');
+
+    await view.pressKey('Space');
+    expect(view.audio.state).toBe('running');
+  });
+
+  it('lets an explicit ControlMapping binding own Space entirely, instead of layering the default on top', async () => {
+    const view = setupSongView({
+      settings: { countIn: false },
+      keyboard: {
+        controls: { confirm: ['keyboard:Enter'], pause: ['keyboard:Space'] },
+      },
+    });
+
+    await view.loadSong();
+
+    await view.pressKey('Enter');
+    await view.pressKey('Space');
+    expect(view.audio.state).toBe('suspended');
+
+    // The mapped 'pause' control only pauses - it never toggles back to
+    // play. If the new keyboard default were also layered on this key it
+    // would resume here; it must not, since the user explicitly claimed
+    // Space via ControlMapping.
+    await view.pressKey('Space');
+    expect(view.audio.state).toBe('suspended');
+  });
+
+  it('seeks forward and backward by 15 seconds and shows a transient indicator', async () => {
+    // Fake timers keep this deterministic under system load: the
+    // indicator auto-hides itself after ~900ms of real time, which a slow
+    // test run could otherwise blow through before the assertion runs.
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView();
+
+      await view.loadSong();
+
+      await view.pressKey('ArrowRight');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+15s',
+      );
+
+      await view.pressKey('ArrowLeft');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '-15s',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('accelerates repeated same-direction presses within the idle window, capping at 60s', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView();
+
+      await view.loadSong();
+
+      await view.pressKey('ArrowRight');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+15s',
+      );
+
+      await view.pressKey('ArrowRight');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+30s',
+      );
+
+      await view.pressKey('ArrowRight');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+60s',
+      );
+
+      await view.pressKey('ArrowRight');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+60s',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('resets the seek interval once the idle window elapses', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView();
+
+      await view.loadSong();
+
+      await view.pressKey('ArrowRight');
+      await view.pressKey('ArrowRight');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+30s',
+      );
+
+      await act(async () => {
+        vi.advanceTimersByTime(2000);
+      });
+      await view.pressKey('ArrowRight');
+
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+15s',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('resets the seek interval when the direction changes', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView();
+
+      await view.loadSong();
+
+      await view.pressKey('ArrowRight');
+      await view.pressKey('ArrowRight');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '+30s',
+      );
+
+      await view.pressKey('ArrowLeft');
+      expect(screen.getByTestId('transport-indicator')).toHaveTextContent(
+        '-15s',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clamps a backward seek at the start of the song', async () => {
+    const view = setupSongView();
+
+    await view.loadSong();
+
+    await view.pressKey('ArrowLeft');
+
+    await waitFor(() => {
+      expect(view.currentTimeText()).toBe('00:00');
+    });
+  });
+
+  it('steps the practice speed with the arrow keys, within the existing bounds', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong();
+
+    const speed = () =>
+      (screen.getByRole('spinbutton') as HTMLInputElement).value;
+
+    expect(speed()).toBe('1.0');
+
+    await view.pressKey('ArrowUp');
+    expect(speed()).toBe('1.1');
+
+    await view.pressKey('ArrowDown');
+    await view.pressKey('ArrowDown');
+    expect(speed()).toBe('0.9');
+  });
+
+  it('shows a locked hint instead of changing speed in Perform mode', async () => {
+    const view = setupSongView();
+
+    await view.loadSong();
+
+    await view.pressKey('ArrowUp');
+
+    expect(screen.getByText('Speed locked in Perform')).toBeInTheDocument();
+  });
+
+  it('ignores the shortcuts while a text input has focus', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong();
+
+    const spinbutton = screen.getByRole('spinbutton');
+
+    await act(async () => {
+      fireEvent.keyDown(spinbutton, { code: 'Space' });
+    });
+
+    expect(view.startedSources()).toHaveLength(0);
+  });
+
+  it('ignores the shortcuts while the score modal has focus', async () => {
+    const view = setupSongView({ settings: { countIn: false } });
+
+    await view.loadSong();
+
+    view.clickPlay();
+    await view.finishSong();
+
+    const modal = screen.getByTestId('score-modal');
+    const accuracyText = within(modal).getByText(/accuracy|Perfect/);
+
+    await act(async () => {
+      fireEvent.keyDown(accuracyText, { code: 'ArrowRight' });
+    });
+
+    expect(screen.queryByTestId('transport-indicator')).toBeNull();
+  });
+});
+
 describe('exporting a PDF', () => {
   it('sends the rendered sheet to main and reports success', async () => {
     const view = setupSongView();
@@ -502,6 +720,9 @@ describe('practice mode', () => {
     });
 
     await view.loadSong();
+    // Loop-locking a section only applies while looping is on - looping now
+    // defaults off, so opt in explicitly for this test.
+    view.clickTestId('loop-toggle');
 
     await view.pressKey('ArrowRight');
     await view.pressKey('Enter');
@@ -567,11 +788,47 @@ describe('practice mode', () => {
   });
 });
 
+// jsdom applies no real CSS (see vitest.config.ts's css module mock), so
+// the `<main class="... overflow-auto ...">` scroll container SheetMusic's
+// getScrollParent walks up to never actually resolves as scrollable unless
+// its scroll geometry is stubbed directly, the same way
+// services/engine/helpers.test.ts stubs it for getScrollParent's own tests.
+function makeScrollable(
+  el: HTMLElement,
+  {
+    scrollHeight,
+    clientHeight,
+  }: { scrollHeight: number; clientHeight: number },
+) {
+  el.style.overflowY = 'auto';
+  Object.defineProperty(el, 'scrollHeight', {
+    value: scrollHeight,
+    configurable: true,
+  });
+  Object.defineProperty(el, 'clientHeight', {
+    value: clientHeight,
+    configurable: true,
+  });
+  el.getBoundingClientRect = () =>
+    ({
+      top: 0,
+      bottom: clientHeight,
+      left: 0,
+      right: 800,
+      width: 800,
+      height: clientHeight,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    }) as DOMRect;
+}
+
 describe('practice loop selection', () => {
   it('selects a loop range by dragging across measures', async () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.clickTestId('loop-toggle');
 
     const [a, b] = view.measureHighlights();
 
@@ -587,6 +844,7 @@ describe('practice loop selection', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.clickTestId('loop-toggle');
 
     const [a, b] = view.measureHighlights();
 
@@ -600,6 +858,7 @@ describe('practice loop selection', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.clickTestId('loop-toggle');
 
     const [a, b] = view.measureHighlights();
 
@@ -613,8 +872,8 @@ describe('practice loop selection', () => {
   it('does not select while looping is off', async () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
+    // Looping defaults off - nothing to toggle.
     await view.loadSong();
-    view.clickTestId('loop-toggle');
 
     fireEvent.mouseDown(view.measureHighlights()[0]);
 
@@ -625,6 +884,7 @@ describe('practice loop selection', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.clickTestId('loop-toggle');
 
     fireEvent.mouseDown(view.measureHighlights()[0]);
     expect(screen.getByText('Looping Section')).toBeInTheDocument();
@@ -640,14 +900,121 @@ describe('practice loop selection', () => {
       settings: { countIn: false },
     });
 
+    // Looping defaults off - nothing to toggle.
     await view.loadSong();
-    view.clickTestId('loop-toggle');
 
     fireEvent.click(view.measureHighlights()[1]);
 
     await waitFor(() => {
       expect(view.startedSources().length).toBeGreaterThan(0);
     });
+  });
+
+  it('scrolls the sheet by wheel while a selection drag is in progress', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong();
+    view.clickTestId('loop-toggle');
+
+    const [a] = view.measureHighlights();
+    const container = a.closest('main') as HTMLElement;
+
+    makeScrollable(container, { scrollHeight: 2000, clientHeight: 500 });
+    container.scrollTop = 100;
+
+    fireEvent.mouseDown(a);
+
+    await act(async () => {
+      fireEvent.wheel(window, { deltaY: 120, deltaX: 0 });
+    });
+
+    expect(container.scrollTop).toBe(220);
+  });
+
+  it('leaves plain (non-drag) wheel scrolling untouched', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong();
+
+    const [a] = view.measureHighlights();
+    const container = a.closest('main') as HTMLElement;
+
+    makeScrollable(container, { scrollHeight: 2000, clientHeight: 500 });
+    container.scrollTop = 100;
+
+    // No mousedown/drag in progress - the wheel listener must back off and
+    // leave the browser's own native scroll handling alone.
+    await act(async () => {
+      fireEvent.wheel(window, { deltaY: 120, deltaX: 0 });
+    });
+
+    expect(container.scrollTop).toBe(100);
+  });
+
+  it('auto-scrolls the sheet when a selection drag nears the top edge of the viewport', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong();
+    view.clickTestId('loop-toggle');
+
+    const [a] = view.measureHighlights();
+    const container = a.closest('main') as HTMLElement;
+
+    makeScrollable(container, { scrollHeight: 2000, clientHeight: 500 });
+    container.scrollTop = 300;
+
+    fireEvent.mouseDown(a);
+
+    await act(async () => {
+      // Right at the container's own top edge - the fastest auto-scroll
+      // speed, scrolling up (revealing earlier measures).
+      fireEvent.mouseMove(window, { clientY: 0 });
+    });
+
+    await waitFor(
+      () => {
+        expect(container.scrollTop).toBeLessThan(300);
+      },
+      { timeout: 5000 },
+    );
+
+    fireEvent.mouseUp(document.body);
+  });
+
+  it('stops auto-scrolling once the drag ends', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong();
+    view.clickTestId('loop-toggle');
+
+    const [a] = view.measureHighlights();
+    const container = a.closest('main') as HTMLElement;
+
+    makeScrollable(container, { scrollHeight: 2000, clientHeight: 500 });
+    container.scrollTop = 300;
+
+    fireEvent.mouseDown(a);
+
+    await act(async () => {
+      fireEvent.mouseMove(window, { clientY: 0 });
+    });
+
+    await waitFor(
+      () => {
+        expect(container.scrollTop).toBeLessThan(300);
+      },
+      { timeout: 5000 },
+    );
+
+    fireEvent.mouseUp(document.body);
+
+    const afterDragEnds = container.scrollTop;
+
+    // Give any still-running auto-scroll loop a real chance to keep
+    // ticking; the position must not keep moving once the drag has ended.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(container.scrollTop).toBe(afterDragEnds);
   });
 });
 
@@ -750,7 +1117,8 @@ describe('the score summary', () => {
     const modal = screen.getByTestId('score-modal');
 
     expect(within(modal).getByText('13% accuracy')).toBeInTheDocument();
-    expect(within(modal).getByText('8 notes hit')).toBeInTheDocument();
+    expect(within(modal).getByText('1 note hit')).toBeInTheDocument();
+    expect(within(modal).getByText('7 notes missed')).toBeInTheDocument();
     expect(within(modal).getByText('0 false hits')).toBeInTheDocument();
   });
 
@@ -770,6 +1138,38 @@ describe('the score summary', () => {
 
     expect(within(modal).getByText('Perfect')).toBeInTheDocument();
     expect(modal.querySelectorAll('[data-filled]')).toHaveLength(5);
+  });
+
+  it('also saves a practice-run analytics record, stamped Perform at 1x, alongside the score', async () => {
+    const view = setupSongView({
+      settings: { countIn: false },
+      keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+    });
+
+    await view.loadSong();
+
+    view.clickPlay();
+    await view.pressKey('KeyJ');
+    await view.finishSong();
+
+    const practiceRunPayloads = view.ipc.sent
+      .filter((s) => s.channel === 'save-practice-run')
+      .map((s) => s.args[0]);
+
+    expect(practiceRunPayloads).toEqual([
+      {
+        songId: 'song-1',
+        summary: expect.objectContaining({
+          mode: 'perform',
+          playbackSpeed: 1,
+          totalHits: 1,
+        }),
+      },
+    ]);
+
+    const modal = screen.getByTestId('score-modal');
+
+    expect(within(modal).getByTestId('practice-stats')).toBeInTheDocument();
   });
 });
 
@@ -804,6 +1204,264 @@ describe('the reference legend', () => {
 
     await waitFor(() => {
       expect(screen.queryByText('Snare')).not.toBeInTheDocument();
+    });
+  });
+});
+
+// Carries a real note track for two difficulties, with Medium truncated to
+// far fewer measures than Expert - lets tests prove a switch actually
+// re-parses the chart (different note/measure counts per difficulty)
+// rather than just relabeling the same data.
+const MULTI_DIFFICULTY_CHART = `[Song]
+{
+  Name = "Fixture"
+  Resolution = 192
+}
+[SyncTrack]
+{
+  0 = TS 4
+  0 = B 120000
+}
+[Events]
+{
+}
+[ExpertDrums]
+{
+  0 = N 1 0
+  192 = N 1 0
+  384 = N 1 0
+  576 = N 1 0
+  768 = N 1 0
+  960 = N 1 0
+  1152 = N 1 0
+  1344 = N 1 0
+}
+[MediumDrums]
+{
+  0 = N 1 0
+  384 = N 1 0
+}
+`;
+
+function openDifficultySelect() {
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Difficulty' }));
+}
+
+function pickDifficulty(value: string) {
+  openDifficultySelect();
+  fireEvent.click(screen.getByRole('option', { name: value }));
+}
+
+describe('in-practice difficulty switching', () => {
+  it('lists only the difficulties this chart actually has', async () => {
+    const view = setupSongView();
+
+    await view.loadSong(
+      makeSong({ drumDifficulties: ['medium', 'hard', 'expert'] }),
+    );
+
+    openDifficultySelect();
+
+    expect(screen.getByRole('option', { name: 'medium' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'hard' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'expert' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('option', { name: 'easy' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('disables the selector when the chart only has one difficulty', async () => {
+    const view = setupSongView();
+
+    await view.loadSong(makeSong({ drumDifficulties: ['expert'] }));
+
+    expect(screen.getByRole('combobox', { name: 'Difficulty' })).toBeDisabled();
+  });
+
+  it('reloads the parsed chart at the new difficulty', async () => {
+    const view = setupSongView({ settings: { countIn: false } });
+
+    await view.loadSong(
+      makeSong({ drumDifficulties: ['medium', 'expert'] }),
+      MULTI_DIFFICULTY_CHART,
+    );
+
+    pickDifficulty('medium');
+
+    view.clickPlay();
+    await view.finishSong();
+
+    const modal = screen.getByTestId('score-modal');
+
+    // Medium only carries 2 notes in the fixture (vs Expert's 8) - a
+    // run with zero hits missing exactly 2 proves the medium track, not
+    // the expert one, was actually parsed and scored against.
+    expect(within(modal).getByText('2 notes missed')).toBeInTheDocument();
+  });
+
+  it('preserves the playback position across a switch', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong(
+      makeSong({ drumDifficulties: ['medium', 'expert'] }),
+      MULTI_DIFFICULTY_CHART,
+    );
+
+    view.seekToEnd();
+    await waitFor(() => expect(view.currentTimeText()).toBe('00:04'));
+
+    pickDifficulty('medium');
+
+    await waitFor(() => expect(view.currentTimeText()).toBe('00:04'));
+  });
+
+  it('pauses playback on switch', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      settings: { countIn: false },
+    });
+
+    await view.loadSong(makeSong({ drumDifficulties: ['medium', 'expert'] }));
+
+    view.clickPlay();
+    // Practice mode's playback goes through the speed-controllable player
+    // (a chunked, async-scheduled implementation - see
+    // services/audio-player/speed/player.ts), so the buffer-source-level
+    // startedSources() harness (built around the default player's
+    // synchronous createBufferSource().start()) doesn't apply here.
+    // Transport's own play/pause state is player-agnostic and flips
+    // synchronously, so assert on that via the header toggle instead.
+    expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+      'aria-label',
+      'Pause',
+    );
+
+    pickDifficulty('medium');
+
+    expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+      'aria-label',
+      'Play',
+    );
+  });
+
+  it("resets the run's judge/score state on a mid-run switch", async () => {
+    const view = setupSongView({
+      settings: { countIn: false },
+      keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+    });
+
+    await view.loadSong(
+      makeSong({ drumDifficulties: ['medium', 'expert'] }),
+      MULTI_DIFFICULTY_CHART,
+    );
+
+    view.clickPlay();
+    await view.pressKey('KeyJ'); // pre-switch hit
+
+    pickDifficulty('medium'); // pauses the run - see the switch's requirement (a)
+
+    // Real usage: a switch only pauses, it never auto-resumes - the
+    // player has to press Play again to keep going (and to let it reach
+    // a natural end for finishSong() to simulate below). Pausing suspends
+    // the (fake) AudioContext, so resuming genuinely awaits
+    // ctx.resume() inside Transport/beginPlayback - wait for that to
+    // actually land rather than asserting immediately after the click.
+    view.clickPlay();
+    await waitFor(() => {
+      expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+        'aria-label',
+        'Pause',
+      );
+    });
+
+    await view.finishSong();
+
+    const modal = screen.getByTestId('score-modal');
+
+    expect(within(modal).getByText('0 notes hit')).toBeInTheDocument();
+    // Medium only carries 2 notes in the fixture - confirms the reset
+    // reparsed at the new difficulty rather than just clearing hits
+    // against the stale Expert note count.
+    expect(within(modal).getByText('2 notes missed')).toBeInTheDocument();
+  });
+
+  it('persists the switch as the app-global difficulty setting', async () => {
+    const view = setupSongView();
+
+    await view.loadSong(makeSong({ drumDifficulties: ['medium', 'expert'] }));
+
+    pickDifficulty('medium');
+
+    expect(
+      JSON.parse(window.localStorage.getItem('settings.difficulty') ?? '""'),
+    ).toBe('medium');
+  });
+
+  it('keys the score under the new difficulty after a mid-run switch, with only the post-switch hit counted', async () => {
+    const view = setupSongView({
+      settings: { countIn: false },
+      keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+    });
+
+    await view.loadSong(
+      makeSong({ drumDifficulties: ['medium', 'expert'] }),
+      MULTI_DIFFICULTY_CHART,
+    );
+
+    view.clickPlay();
+    await view.pressKey('KeyJ'); // would-be Expert hit, discarded by the switch
+
+    pickDifficulty('medium'); // pauses the run
+
+    // Real usage: resume after the switch (the engine only judges hits
+    // while actively playing) before landing the one hit that should
+    // survive. Pausing suspends the (fake) AudioContext, so wait for the
+    // resume's genuine ctx.resume() await to actually land.
+    view.clickPlay();
+    await waitFor(() => {
+      expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+        'aria-label',
+        'Pause',
+      );
+    });
+
+    await view.pressKey('KeyJ'); // the only hit that should count
+
+    await view.finishSong();
+
+    expect(view.updateSongPayloads()).toEqual([
+      {
+        id: 'song-1',
+        // Medium's 2-note track (not Expert's 8) proves the score was
+        // computed against the newly-parsed chart, and hitNotes: 1 (not
+        // 2) proves the pre-switch Expert hit was actually discarded.
+        scoreData: { medium: { hitNotes: 1, totalNotes: 2, falseHits: 0 } },
+      },
+    ]);
+  });
+
+  it('clears a practice section selection whose measures no longer exist at the new difficulty', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong(
+      makeSong({ drumDifficulties: ['medium', 'expert'] }),
+      MULTI_DIFFICULTY_CHART,
+    );
+    view.clickTestId('loop-toggle');
+
+    // Expert has 2 measures here; Medium's last note (tick 384) truncates
+    // it to just 1. Select the second (Expert-only) measure.
+    const highlights = view.measureHighlights();
+
+    fireEvent.mouseDown(highlights[1]);
+    fireEvent.mouseUp(document.body);
+
+    expect(screen.getByText('Looping Section')).toBeInTheDocument();
+
+    pickDifficulty('medium');
+
+    await waitFor(() => {
+      expect(screen.queryByText('Looping Section')).not.toBeInTheDocument();
     });
   });
 });

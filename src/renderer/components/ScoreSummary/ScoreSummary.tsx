@@ -7,6 +7,8 @@ import { faRepeat } from '@fortawesome/free-solid-svg-icons';
 import { calculateAccuracy, getStarRating } from '../../scoring';
 import { MODAL_ABOVE_POPOVER_Z_INDEX, modalStyles } from '../../overlayStyles';
 import { Stars } from '../Stars';
+import { RunSummary } from '../../services/practice-stats';
+import { PracticeStats } from '../PracticeStats';
 
 interface Props {
   isOpen: boolean;
@@ -15,6 +17,11 @@ interface Props {
   songData: Song | undefined;
   difficulty: Difficulty;
   scoreData?: ScoreData;
+  practiceSummary?: RunSummary;
+}
+
+function noteCountLabel(count: number, verb: string): string {
+  return `${count} note${count === 1 ? '' : 's'} ${verb}`;
 }
 
 export function ScoreSummary({
@@ -24,6 +31,7 @@ export function ScoreSummary({
   songData,
   difficulty,
   scoreData,
+  practiceSummary,
 }: Props) {
   const starRating = useMemo(() => {
     if (!scoreData) {
@@ -39,15 +47,18 @@ export function ScoreSummary({
 
     return calculateAccuracy(scoreData) === 1;
   }, [scoreData]);
+  const accuracy = scoreData ? calculateAccuracy(scoreData) : 0;
+  const hitNotes = scoreData?.hitNotes ?? 0;
+  const missedNotes = Math.max(0, (scoreData?.totalNotes ?? 0) - hitNotes);
   const header = (
     <>
-      <div className="text-accent-text font-semibold text-xs uppercase">
-        Song Complete
+      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
+        Run complete
       </div>
       <div>
-        <div className="text-text-body text-2xl font-bold">
+        <h2 className="text-balance font-display text-3xl font-semibold leading-tight text-text-body">
           {songData?.name}
-        </div>
+        </h2>
         <div className="text-text-faint flex items-center gap-1 text-sm">
           <div>{songData?.artist}</div>
           <div>·</div>
@@ -65,7 +76,7 @@ export function ScoreSummary({
         icon={<FontAwesomeIcon icon={faRepeat} />}
         size="large"
       >
-        Retry
+        Play again
       </Button>
       <Button
         data-testid="score-next"
@@ -74,7 +85,7 @@ export function ScoreSummary({
         onClick={() => onNextSong()}
         size="large"
       >
-        Next song
+        Back to library
       </Button>
     </div>
   );
@@ -94,34 +105,66 @@ export function ScoreSummary({
       wrapProps={{ 'data-testid': 'score-modal' }}
       zIndex={MODAL_ABOVE_POPOVER_Z_INDEX}
     >
-      <div className="flex flex-col gap-5 items-center">
-        <Stars
-          rating={starRating}
-          perfect={isPerfect}
-          glow
-          size="3x"
-          className="gap-3"
-        />
-        {isPerfect ? (
-          <div className="text-text-muted text-[18px]">Perfect</div>
-        ) : (
-          <div className="text-text-muted text-[18px]">
-            {Math.round((scoreData ? calculateAccuracy(scoreData) : 0) * 100)}%
-            accuracy
-          </div>
-        )}
-        <div className="flex flex-col gap-1 items-center">
-          <div className="flex items-center text-text-muted text-[18px] gap-2">
-            <div className="text-text-body font-bold text-4xl">
-              {scoreData?.hitNotes ?? 0}
+      <div className="flex flex-col items-center gap-6 py-2">
+        {scoreData ? (
+          // Star rating, accuracy headline and the hit/missed/false-hit grid
+          // are all derived from `scoreData` — Perform-only (see
+          // ModePolicy.scoring's doc comment). A Practice run never sets
+          // scoreData, so this block simply doesn't render for one; its
+          // PracticeStats below still does.
+          <>
+            <Stars
+              rating={starRating}
+              perfect={isPerfect}
+              glow
+              size="3x"
+              className="gap-3"
+            />
+            <div className="text-center">
+              {isPerfect ? (
+                <div className="font-display text-5xl font-semibold leading-none text-text">
+                  Perfect
+                </div>
+              ) : (
+                <div className="font-display text-5xl font-semibold leading-none text-text tabular-nums">
+                  {Math.round(accuracy * 100)}% accuracy
+                </div>
+              )}
+              <div className="mt-2 text-sm text-text-muted">
+                {isPerfect
+                  ? 'Every note landed.'
+                  : `${starRating} of 5 stars on this run`}
+              </div>
             </div>
-            <div>/</div>
-            <div>{scoreData?.totalNotes} notes hit</div>
-          </div>
-          <div className="flex items-center text-text-dim text-[14px] gap-2">
-            {scoreData?.falseHits} false hits
-          </div>
-        </div>
+            <div className="grid w-full grid-cols-3 gap-2 text-center tabular-nums">
+              <div className="rounded-xl bg-fill p-3 text-sm text-text-muted">
+                {noteCountLabel(hitNotes, 'hit')}
+              </div>
+              <div className="rounded-xl bg-fill p-3 text-sm text-text-muted">
+                {noteCountLabel(missedNotes, 'missed')}
+              </div>
+              <div className="rounded-xl bg-fill p-3 text-sm text-text-muted">
+                {`${scoreData?.falseHits ?? 0} false hits`}
+              </div>
+            </div>
+          </>
+        ) : (
+          practiceSummary && (
+            <div className="text-center">
+              <div className="font-display text-3xl font-semibold leading-tight text-text">
+                Nice reps
+              </div>
+              <div className="mt-2 text-sm text-text-muted">
+                Here&apos;s how this practice run went.
+              </div>
+            </div>
+          )
+        )}
+        <PracticeStats
+          summary={practiceSummary}
+          variant="inline"
+          className="w-full"
+        />
       </div>
     </Modal>
   );

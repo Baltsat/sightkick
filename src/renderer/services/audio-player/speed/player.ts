@@ -182,9 +182,15 @@ export class SpeedAudioPlayer
     this.isInitialised = true;
 
     if (firstBlocks.length > 0) {
-      this.scheduleBlocks(firstBlocks, this.scheduledUntil);
-
       const chunkDuration = firstBlocks[0].length / sampleRate;
+      const isFinalChunk =
+        this.outputProducedSeconds + chunkDuration >= this.totalOutputSeconds;
+
+      this.scheduleBlocks(
+        firstBlocks,
+        this.scheduledUntil,
+        isFinalChunk ? epoch : undefined,
+      );
 
       this.scheduledUntil += chunkDuration;
       this.outputProducedSeconds += chunkDuration;
@@ -193,7 +199,30 @@ export class SpeedAudioPlayer
     this.timer = setInterval(this.pump, SCHEDULER_INTERVAL_MS);
   }
 
-  private scheduleBlocks(blocks: SampleBlock[], at: number) {
+  /**
+   * Schedules one chunk of already-time-stretched audio per track/file.
+   * `endEpoch`, when passed, marks this as the LAST chunk the song will
+   * ever need (the one that pushes `outputProducedSeconds` up to
+   * `totalOutputSeconds`) - once every track's native AudioBufferSourceNode
+   * for that chunk has genuinely finished playing (the browser's own
+   * hardware-clocked 'ended' event, not anything polled from JS),
+   * `handleFinalChunkEnded` fires. That's a deliberate second, independent
+   * path to onEnded alongside pump()'s own currentTime/scheduledUntil poll
+   * below - see the comment on `pump` for why the poll alone isn't enough.
+   */
+  private scheduleBlocks(blocks: SampleBlock[], at: number, endEpoch?: number) {
+    let remaining = this.targets.length;
+    const onChunkEnded =
+      endEpoch === undefined
+        ? undefined
+        : () => {
+            remaining -= 1;
+
+            if (remaining <= 0) {
+              this.handleFinalChunkEnded(endEpoch);
+            }
+          };
+
     this.targets.forEach((target) => {
       const length = blocks[target.voiceStart].length;
       const buffer = this.context.createBuffer(
@@ -206,10 +235,51 @@ export class SpeedAudioPlayer
         buffer.copyToChannel(blocks[target.voiceStart + channel], channel);
       }
 
-      target.track.scheduleChunk(target.fileIndex, buffer, at);
+      target.track.scheduleChunk(target.fileIndex, buffer, at, onChunkEnded);
     });
   }
 
+  /**
+   * Fires once the actual, already-scheduled audio for the song's last
+   * chunk has finished playing on every track - confirmed by the browser's
+   * native 'ended' event, not by anything this class computed. `stop()`
+   * detaches this listener on every OTHER stop/seek/restart path (see
+   * SpeedAudioTrack.stopSource), so this only ever runs for a genuine,
+   * un-interrupted run to the end. `endEpoch` guards against a chunk
+   * scheduled by a since-superseded `start()` call still firing late.
+   */
+  private handleFinalChunkEnded(endEpoch: number): void {
+    if (endEpoch !== this.epoch || !this.isInitialised) {
+      return;
+    }
+
+    this.stop();
+    this.onEnded?.();
+  }
+
+  /**
+   * Keeps the stretched-audio buffer topped up to `LOOKAHEAD_SECONDS` and,
+   * as a FALLBACK, detects the end of the song by polling
+   * `context.currentTime` against the last chunk's scheduled end. This poll
+   * is not the only way onEnded fires - `handleFinalChunkEnded` (wired in
+   * `scheduleBlocks`) is the primary path, driven by the browser's own
+   * native 'ended' event on the last scheduled AudioBufferSourceNode
+   * instead of anything computed here.
+   *
+   * That split matters: `stream.produce()` is a worker round-trip, and this
+   * whole function is guarded by the `pumping` flag against re-entrancy.
+   * One slow/delayed worker response (GC pause, CPU contention from other
+   * processes, a busy machine - all ordinary, not exotic) stalls this
+   * function for as long as that response takes, and every 100ms timer
+   * tick in between is a no-op (`if (this.pumping) return`). The actual
+   * audio keeps playing and audibly finishes on schedule regardless - it
+   * was already scheduled on the real audio clock - but nothing in this
+   * function runs again to notice until the stalled produce() call
+   * resolves. In practice that has been observed to take upwards of ten
+   * seconds under load, which reads as "the run doesn't end" even though
+   * the recording is done. The native 'ended' listener doesn't depend on
+   * this function ever running again, so it isn't affected by that stall.
+   */
   private pump = async () => {
     if (this.pumping || !this.isInitialised) {
       return;
@@ -236,9 +306,15 @@ export class SpeedAudioPlayer
           break;
         }
 
-        this.scheduleBlocks(blocks, this.scheduledUntil);
-
         const chunkDuration = blocks[0].length / this.context.sampleRate;
+        const isFinalChunk =
+          this.outputProducedSeconds + chunkDuration >= this.totalOutputSeconds;
+
+        this.scheduleBlocks(
+          blocks,
+          this.scheduledUntil,
+          isFinalChunk ? epoch : undefined,
+        );
 
         this.scheduledUntil += chunkDuration;
         this.outputProducedSeconds += chunkDuration;

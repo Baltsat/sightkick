@@ -1,6 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { execFileSync } from 'child_process';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   assetUrlToFilePath,
@@ -131,6 +132,47 @@ describe('buildSongFromDir guards', () => {
 });
 
 describe('buildSongFromDir metadata', () => {
+  it('round-trips Unicode from the sidecar writer through the app parser', () => {
+    const transcriberDir = path.resolve(
+      __dirname,
+      '../../resources/transcriber',
+    );
+    const script = [
+      'import sys',
+      'from pathlib import Path',
+      'from sk_transcriber.naming import sanitize_folder_name',
+      'from sk_transcriber.songini import write_song_ini',
+      'root = Path(sys.argv[1])',
+      "folder = sanitize_folder_name('Тестовый/артист', '夜のドラム: 🥁')",
+      'song_dir = root / folder',
+      'song_dir.mkdir()',
+      "write_song_ini(song_dir / 'song.ini', name='夜のドラム 🥁', artist='Тестовый артист', album='東京', year='2026', genre='ロック', diff_drums=4, song_length_ms=120000, charter='SightKick')",
+      'print(song_dir)',
+    ].join('; ');
+    const songDir = execFileSync(
+      'uv',
+      ['run', '--no-project', '--python', '3.12', 'python', '-c', script, dir],
+      {
+        cwd: transcriberDir,
+        encoding: 'utf8',
+        env: { ...process.env, PYTHONPATH: transcriberDir },
+      },
+    ).trim();
+
+    fs.writeFileSync(
+      path.join(songDir, 'notes.chart'),
+      CHART_WITH_HARD_AND_EXPERT,
+    );
+
+    const song = buildSongFromDir(songDir);
+
+    expect(path.basename(songDir)).toBe('Тестовыйартист - 夜のドラム 🥁');
+    expect(song?.artist).toBe('Тестовый артист');
+    expect(song?.name).toBe('夜のドラム 🥁');
+    expect(song?.album).toBe('東京');
+    expect(song?.genre).toBe('ロック');
+  });
+
   it('keeps crowd stems and skips preview tracks in any format', () => {
     writeSong(CHART_WITH_HARD_AND_EXPERT);
     fs.writeFileSync(path.join(dir, 'drums.ogg'), '');
@@ -276,6 +318,101 @@ describe('toSong', () => {
     expect(song.updatedAt).toBe('2024-01-01T00:00:00.000Z');
     expect(song.drumDifficulties).toEqual(['hard', 'expert']);
     expect(song.scoreData).toEqual(scoreData);
+  });
+
+  it('keeps auto-chart provenance separate from a human charter', () => {
+    const song = toSong(
+      stored({
+        auto_chart: 'True',
+        auto_chart_tool: 'STRUM (OCTAVE AI auto-charter)',
+        charter: 'Jane Doe',
+      }),
+    );
+
+    expect(song.charter).toBe('Jane Doe');
+    expect(song.autoChartTool).toBe('STRUM (OCTAVE AI auto-charter)');
+  });
+
+  it('hides a duplicated AI engine from the human charter field', () => {
+    const song = toSong(
+      stored({
+        auto_chart: 'True',
+        auto_chart_tool: 'STRUM (OCTAVE AI auto-charter)',
+        charter: 'STRUM',
+      }),
+    );
+
+    expect(song.charter).toBe('');
+    expect(song.autoChartTool).toBe('STRUM (OCTAVE AI auto-charter)');
+  });
+
+  it('hides a parenthetical AI label from the human charter field', () => {
+    const song = toSong(
+      stored({
+        auto_chart: 'True',
+        auto_chart_tool: 'STRUM (OCTAVE AI auto-charter)',
+        charter: 'STRUM (AI auto-charted)',
+      }),
+    );
+
+    expect(song.charter).toBe('');
+    expect(song.autoChartTool).toBe('STRUM (OCTAVE AI auto-charter)');
+  });
+
+  describe('lesson fields', () => {
+    it('leaves lesson undefined for a regular song', () => {
+      expect(toSong(stored()).lesson).toBeUndefined();
+    });
+
+    it('parses the sk_ fields into a lesson object', () => {
+      const song = toSong(
+        stored({
+          sk_lesson_id: '04.02',
+          sk_stars_to_unlock: '37',
+          sk_next: '04.03',
+          sk_unit: 'Unit 4 — Sticking',
+          sk_lesson_title: 'Right Hand Steady, Left Hand Answers',
+        }),
+      );
+
+      expect(song.lesson).toEqual({
+        id: '04.02',
+        starsToUnlock: 37,
+        next: '04.03',
+        unit: 'Unit 4 — Sticking',
+        title: 'Right Hand Steady, Left Hand Answers',
+      });
+    });
+
+    it('treats the first lesson (stars 0) as a valid chain position', () => {
+      const song = toSong(
+        stored({
+          sk_lesson_id: '01.01',
+          sk_stars_to_unlock: '0',
+          sk_unit: 'Unit 1',
+          sk_lesson_title: 'Alternating Singles Warm-Up',
+        }),
+      );
+
+      expect(song.lesson?.starsToUnlock).toBe(0);
+    });
+
+    it('defaults starsToUnlock to 0 when missing or unparseable', () => {
+      expect(
+        toSong(stored({ sk_lesson_id: '01.01', sk_stars_to_unlock: undefined }))
+          .lesson?.starsToUnlock,
+      ).toBe(0);
+      expect(
+        toSong(stored({ sk_lesson_id: '01.01', sk_stars_to_unlock: 'nope' }))
+          .lesson?.starsToUnlock,
+      ).toBe(0);
+    });
+
+    it('omits an empty sk_next as undefined', () => {
+      expect(
+        toSong(stored({ sk_lesson_id: '18.02', sk_next: '' })).lesson?.next,
+      ).toBeUndefined();
+    });
   });
 });
 

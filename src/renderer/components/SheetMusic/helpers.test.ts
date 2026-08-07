@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { ChartParser } from '../../../chart-parser/parser';
 import {
+  AUTO_SCROLL_EDGE_MARGIN,
+  AUTO_SCROLL_MAX_SPEED,
+  autoScrollSpeed,
   parseDsl,
   buildParsedChartFromDsl,
   serializeMeasureToDsl,
@@ -74,6 +77,44 @@ res=480 ts=4/4
 
     expect(keysOf(cymbal)).toContain('g/5/x2');
     expect(keysOf(tomHit)).toContain('e/5');
+  });
+});
+
+describe('autoScrollSpeed', () => {
+  const edge = { top: 100, bottom: 500 };
+
+  it('is zero comfortably inside the container', () => {
+    expect(autoScrollSpeed(300, edge)).toBe(0);
+  });
+
+  it('is zero exactly at the margin boundary', () => {
+    expect(autoScrollSpeed(edge.top + AUTO_SCROLL_EDGE_MARGIN, edge)).toBe(0);
+    expect(autoScrollSpeed(edge.bottom - AUTO_SCROLL_EDGE_MARGIN, edge)).toBe(
+      0,
+    );
+  });
+
+  it('scrolls up (negative) at max speed right at the top edge', () => {
+    expect(autoScrollSpeed(edge.top, edge)).toBe(-AUTO_SCROLL_MAX_SPEED);
+  });
+
+  it('scrolls down (positive) at max speed right at the bottom edge', () => {
+    expect(autoScrollSpeed(edge.bottom, edge)).toBe(AUTO_SCROLL_MAX_SPEED);
+  });
+
+  it('stays at max speed once the pointer has left the container above or below', () => {
+    expect(autoScrollSpeed(edge.top - 200, edge)).toBe(-AUTO_SCROLL_MAX_SPEED);
+    expect(autoScrollSpeed(edge.bottom + 200, edge)).toBe(
+      AUTO_SCROLL_MAX_SPEED,
+    );
+  });
+
+  it('ramps up linearly between the margin boundary and the edge', () => {
+    const halfway = edge.top + AUTO_SCROLL_EDGE_MARGIN / 2;
+
+    expect(autoScrollSpeed(halfway, edge)).toBeCloseTo(
+      -AUTO_SCROLL_MAX_SPEED / 2,
+    );
   });
 });
 

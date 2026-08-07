@@ -63,8 +63,8 @@ export const themedark = {
     textBody: '#e6e0d3',
     textMuted: '#9c9484',
     textFaint: '#8a8474',
-    textDim: '#615c50',
-    textDimmer: '#5f5a4e',
+    textDim: '#857f70',
+    textDimmer: '#847e6f',
 
     star: 'rgb(232, 183, 58)',
     starPerfect: '#d8dde6',

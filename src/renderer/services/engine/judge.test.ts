@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Measure, Note, ParsedChart } from '../../../chart-parser/types';
 import { InputEvent } from '../../input/types';
+import { ticksToSeconds } from '../../../chart-parser/timing';
 import { Judge } from './judge';
 import { JudgeContext, JudgeHitHandler } from './types';
 
@@ -68,7 +69,13 @@ describe('Judge', () => {
 
     expect(engine.isHit(480, 'c/5')).toBe(true);
     expect(engine.falseHitCount).toBe(0);
-    expect(onHit).toHaveBeenCalledWith({ measureIdx: 0, noteIdx: 0 }, ['c/5']);
+    expect(onHit).toHaveBeenCalledWith({ measureIdx: 0, noteIdx: 0 }, ['c/5'], {
+      tick: 480,
+      timeSeconds: ticksToSeconds(480, CHART.resolution, CHART.tempos),
+      deltaMs: 0,
+      element: 'snare',
+      velocity: 100,
+    });
   });
 
   it('registers a hit using the remapped control after a remap', () => {
@@ -407,7 +414,7 @@ describe('Judge', () => {
     expect(engine.falseHitCount).toBe(0);
   });
 
-  it('does not count a false hit inside a fully silent measure', () => {
+  it('does not count a false hit inside a fully silent measure toward the score', () => {
     const { engine } = setup(
       {
         measures: [
@@ -426,6 +433,28 @@ describe('Judge', () => {
     expect(engine.falseHitCount).toBe(0);
   });
 
+  it('still shows a false hit made inside a fully silent measure, since it was really struck', () => {
+    const onFalseHit = vi.fn();
+    const { engine } = setup(
+      {
+        measures: [
+          measure([note(['c/5'], 480, { isRest: true })], {
+            startTick: 0,
+            endTick: 1920,
+          }),
+        ],
+      },
+      { tick: 480 },
+    );
+
+    engine.onFalseHit(onFalseHit);
+    engine.handleInput(hit('midi:38'));
+
+    expect(onFalseHit).toHaveBeenCalledWith(
+      expect.objectContaining({ tick: 480, controlId: 'midi:38' }),
+    );
+  });
+
   it('still counts a false hit in a measure that contains notes', () => {
     const { engine } = setup(
       {
@@ -441,7 +470,8 @@ describe('Judge', () => {
     expect(engine.falseHitCount).toBe(1);
   });
 
-  it('does not count a false hit past the last measure', () => {
+  it('does not count or show a false hit past the last measure', () => {
+    const onFalseHit = vi.fn();
     const { engine } = setup(
       {
         measures: [
@@ -451,10 +481,14 @@ describe('Judge', () => {
       { tick: 5000 },
     );
 
+    engine.onFalseHit(onFalseHit);
     engine.handleInput(hit('midi:38'));
 
     expect(engine.hitCount).toBe(0);
     expect(engine.falseHitCount).toBe(0);
+    // Genuinely outside the chart's bounds (not just a silent region),
+    // there is nowhere to anchor a marker, so it isn't shown either.
+    expect(onFalseHit).not.toHaveBeenCalled();
   });
 
   it('still registers a late hit on the final note past the last measure', () => {
@@ -513,6 +547,114 @@ describe('Judge', () => {
 
     expect(engine.isHit(1950, 'c/5')).toBe(true);
     expect(engine.falseHitCount).toBe(0);
+  });
+
+  it('judges a hit arriving late by exactly the latency offset as on-time', () => {
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 480)])] },
+      { tick: 720 },
+    );
+
+    engine.setLatencyMs(250);
+    engine.handleInput(hit('midi:38'));
+
+    expect(engine.isHit(480, 'c/5')).toBe(true);
+    expect(engine.falseHitCount).toBe(0);
+  });
+
+  it('misses the same late hit when latency compensation is left at zero', () => {
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 480)])] },
+      { tick: 720 },
+    );
+
+    engine.handleInput(hit('midi:38'));
+
+    expect(engine.hitCount).toBe(0);
+    expect(engine.falseHitCount).toBe(1);
+  });
+
+  it('resets latency compensation back to none when set to zero', () => {
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 480)])] },
+      { tick: 720 },
+    );
+
+    engine.setLatencyMs(250);
+    engine.setLatencyMs(0);
+    engine.handleInput(hit('midi:38'));
+
+    expect(engine.hitCount).toBe(0);
+    expect(engine.falseHitCount).toBe(1);
+  });
+
+  it('notifies an onFalseHit listener with the tick, controlId, resolved element and time of a wrong hit', () => {
+    const onFalseHit = vi.fn();
+    const { engine } = setup(
+      {
+        measures: [measure([note(['f/4'], 480)])],
+        mapping: { snare: ['midi:38'], kick: ['midi:36'] },
+      },
+      { tick: 480 },
+    );
+
+    engine.onFalseHit(onFalseHit);
+    engine.handleInput(hit('midi:38'));
+
+    expect(onFalseHit).toHaveBeenCalledWith({
+      tick: 480,
+      controlId: 'midi:38',
+      element: 'snare',
+      timeSeconds: expect.any(Number),
+    });
+  });
+
+  it('notifies an onFalseHit listener for a repeat hit on an already-hit note', () => {
+    const onFalseHit = vi.fn();
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 480)])] },
+      { tick: 480 },
+    );
+
+    engine.handleInput(hit('midi:38'));
+    engine.onFalseHit(onFalseHit);
+    engine.handleInput(hit('midi:38'));
+
+    expect(onFalseHit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tick: 480,
+        controlId: 'midi:38',
+        element: 'snare',
+      }),
+    );
+  });
+
+  it('does not notify onFalseHit for an unmapped controlId', () => {
+    const onFalseHit = vi.fn();
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 480)])] },
+      { tick: 480 },
+    );
+
+    engine.onFalseHit(onFalseHit);
+    engine.handleInput(hit('midi:99'));
+
+    expect(onFalseHit).not.toHaveBeenCalled();
+  });
+
+  it('stops notifying a removed false-hit listener', () => {
+    const onFalseHit = vi.fn();
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 5000)])] },
+      { tick: 480 },
+    );
+    const unsubscribe = engine.onFalseHit(onFalseHit);
+
+    unsubscribe();
+    engine.handleInput(hit('midi:38'));
+
+    expect(onFalseHit).not.toHaveBeenCalled();
+    expect(engine.falseHitCount).toBe(1);
   });
 
   it('stops notifying a removed hit listener', () => {

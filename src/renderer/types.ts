@@ -25,6 +25,9 @@ export type MappingElement = {
 
 export type LibraryMode = 'local' | 'online';
 
+/** Which top-level surface of the library the user is looking at. */
+export type LibraryView = 'songs' | 'lessons';
+
 export interface OnlineSong {
   source: 'online';
   id: string;

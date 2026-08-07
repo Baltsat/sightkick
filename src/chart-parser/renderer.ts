@@ -19,7 +19,7 @@ import {
   Flow,
 } from 'vexflow';
 import { ChartParser } from './parser';
-import { Measure, RenderData } from './types';
+import { Measure, RenderData, TempoMark } from './types';
 import { KEY_TO_ELEMENT } from './constants';
 
 export interface SheetMusicColors {
@@ -32,6 +32,11 @@ export const TARGET_ROW_WIDTH = 1200;
 const MAX_MEASURES_PER_ROW = 2;
 const MIN_MEASURE_WIDTH = 300;
 const MEASURE_TRAILING_PAD = 20;
+// Auto-charted songs carry a tempo map with per-measure micro-fluctuations
+// (83.03 / 83.71 / 83.5 ...), which would otherwise print a new label on
+// nearly every measure. Only the first tempo and any tempo that has drifted
+// at least this many BPM from the last one actually shown get a label.
+const TEMPO_LABEL_MIN_DELTA_BPM = 2;
 const UNCOLORED_NOTE_CLASS = 'vf-note-uncolored';
 const UNCOLORED_ACCENT_CLASS = 'vf-accent-uncolored';
 const REST_NOTE_CLASS = 'vf-note-rest';
@@ -56,8 +61,9 @@ export function renderMusic(
 
   const lineHeight = showBarNumbers ? 180 : 130;
   const renderData: RenderData[] = [];
-  const widths = song.measures.map((measure) =>
-    requiredMeasureWidth(measure, showTempo),
+  const tempoLabels = dedupedTempoLabels(song.measures, showTempo);
+  const widths = song.measures.map((measure, index) =>
+    requiredMeasureWidth(measure, tempoLabels[index]),
   );
   const rows = packRows(widths);
 
@@ -102,7 +108,7 @@ export function renderMusic(
         index === song.measures.length - 1,
         showBarNumbers,
         enableColors,
-        showTempo,
+        tempoLabels[index],
         colors,
       );
 
@@ -141,10 +147,50 @@ export function packRows(widths: number[]): number[][] {
   return rows;
 }
 
+/**
+ * Decides, in measure order, which measures actually get a printed tempo
+ * label: the first tempo the chart carries, and after that only a tempo
+ * that has drifted at least `TEMPO_LABEL_MIN_DELTA_BPM` from the last one
+ * shown — suppressing the near-duplicate labels an auto-charted tempo map's
+ * per-measure micro-fluctuations would otherwise print on nearly every
+ * measure. The comparison uses the raw BPM; only the returned label's BPM
+ * is rounded, for display. Purely a rendering decision — `measure.tempo`
+ * itself (chart data/timing) is never modified.
+ */
+export function dedupedTempoLabels(
+  measures: Measure[],
+  showTempo: boolean,
+): (TempoMark | undefined)[] {
+  if (!showTempo) {
+    return measures.map(() => undefined);
+  }
+
+  let lastShownBpm: number | undefined;
+
+  return measures.map((measure) => {
+    const tempo = measure.tempo;
+
+    if (!tempo) {
+      return undefined;
+    }
+
+    if (
+      lastShownBpm !== undefined &&
+      Math.abs(tempo.bpm - lastShownBpm) < TEMPO_LABEL_MIN_DELTA_BPM
+    ) {
+      return undefined;
+    }
+
+    lastShownBpm = tempo.bpm;
+
+    return { ...tempo, bpm: Math.round(tempo.bpm) };
+  });
+}
+
 function staveHeaderOffset(
   stave: Stave,
   measure: Measure,
-  showTempo: boolean,
+  tempoToShow: TempoMark | undefined,
 ): number {
   if (measure.hasClef) {
     stave.addClef('percussion');
@@ -154,8 +200,8 @@ function staveHeaderOffset(
     stave.addTimeSignature(`${measure.timeSig[0]}/${measure.timeSig[1]}`);
   }
 
-  if (showTempo && measure.tempo) {
-    stave.setTempo(measure.tempo, 0);
+  if (tempoToShow) {
+    stave.setTempo(tempoToShow, 0);
   }
 
   stave.format();
@@ -163,11 +209,14 @@ function staveHeaderOffset(
   return stave.getNoteStartX() - stave.getX();
 }
 
-function requiredMeasureWidth(measure: Measure, showTempo: boolean): number {
+function requiredMeasureWidth(
+  measure: Measure,
+  tempoToShow: TempoMark | undefined,
+): number {
   const headerOffset = staveHeaderOffset(
     new Stave(0, 0, TARGET_ROW_WIDTH),
     measure,
-    showTempo,
+    tempoToShow,
   );
   const { voice } = buildVoice(measure);
   const formatter = new Formatter().joinVoices([voice]);
@@ -418,7 +467,7 @@ function renderMeasure(
   endMeasure: boolean,
   showBarNumbers: boolean,
   enableColors: boolean,
-  showTempo: boolean,
+  tempoToShow: TempoMark | undefined,
   colors: SheetMusicColors,
 ) {
   const stave = new Stave(xOffset, yOffset, width);
@@ -435,8 +484,8 @@ function renderMeasure(
     stave.addTimeSignature(`${measure.timeSig[0]}/${measure.timeSig[1]}`);
   }
 
-  if (showTempo && measure.tempo) {
-    stave.setTempo(measure.tempo, 0);
+  if (tempoToShow) {
+    stave.setTempo(tempoToShow, 0);
   }
 
   if (showBarNumbers) {

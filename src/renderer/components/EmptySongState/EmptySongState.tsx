@@ -1,60 +1,93 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faArrowRight,
-  faCog,
-  faFolder,
-  faGlobe,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCog, faFolder, faGlobe } from '@fortawesome/free-solid-svg-icons';
+import { Button } from 'antd';
 import { LibraryMode } from '../../types';
 
 interface Props {
   libraryMode: LibraryMode;
   hasFolder: boolean;
   hasSongs: boolean;
+  query: string;
+  onClearFilter: () => void;
+  onBrowseOnline: () => void;
 }
 
-export function EmptySongState({ libraryMode, hasFolder, hasSongs }: Props) {
+export function EmptySongState({
+  libraryMode,
+  hasFolder,
+  hasSongs,
+  query,
+  onClearFilter,
+  onBrowseOnline,
+}: Props) {
   if (libraryMode === 'online' || hasSongs) {
+    const trimmedQuery = query.trim();
+
     return (
-      <div className="m-auto text-text-faint flex items-center gap-1 flex-col">
-        <div>No songs match your filter.</div>
-      </div>
+      <section className="m-auto flex max-w-md flex-col items-center gap-3 px-6 text-center">
+        <div className="flex size-12 items-center justify-center rounded-full bg-fill text-text-muted">
+          <FontAwesomeIcon icon={faGlobe} />
+        </div>
+        <h2 className="font-display text-2xl font-semibold text-text-body">
+          {trimmedQuery ? `No matches for “${trimmedQuery}”` : 'No songs found'}
+        </h2>
+        <p className="text-sm leading-relaxed text-text-muted">
+          Try another title or artist, or clear the search to return to your
+          library.
+        </p>
+        {trimmedQuery && (
+          <Button size="large" className="min-h-11" onClick={onClearFilter}>
+            Clear search
+          </Button>
+        )}
+      </section>
     );
   }
 
   if (hasFolder) {
     return (
-      <div className="m-auto text-text-faint flex items-center gap-1 flex-col">
-        <div>No songs in this folder.</div>
-        <div className="flex items-center gap-2">
-          <div>Download some</div>
-          <div className="border-2 border-border py-1 px-2 rounded-md">
-            <FontAwesomeIcon icon={faGlobe} />
-          </div>
+      <section className="m-auto flex max-w-md flex-col items-center gap-3 px-6 text-center">
+        <div className="flex size-12 items-center justify-center rounded-full bg-fill text-accent-text">
+          <FontAwesomeIcon icon={faGlobe} />
         </div>
-      </div>
+        <h2 className="font-display text-2xl font-semibold text-text-body">
+          Build your practice library
+        </h2>
+        <p className="text-sm leading-relaxed text-text-muted">
+          Find a song online or create a drum chart from a YouTube video.
+        </p>
+        <Button
+          type="primary"
+          size="large"
+          className="min-h-11"
+          onClick={onBrowseOnline}
+          icon={<FontAwesomeIcon icon={faGlobe} />}
+        >
+          Browse online songs
+        </Button>
+      </section>
     );
   }
 
   return (
-    <div className="m-auto text-text-faint flex items-center gap-3 flex-col max-w-md text-center">
-      <div className="flex flex-col gap-1">
-        <div>Pick a folder for your songs.</div>
-        <div className="text-xs text-text-dimmer italic">
-          (Clone Hero players - you can point to your existing library)
-        </div>
+    <section className="m-auto flex max-w-md flex-col items-center gap-3 px-6 text-center">
+      <div className="flex size-12 items-center justify-center rounded-full bg-fill text-accent-text">
+        <FontAwesomeIcon icon={faFolder} />
       </div>
-      <div className="flex items-center gap-2">
-        <div>Open settings</div>
-        <div className="border-2 border-border py-1 px-2 rounded-md">
-          <FontAwesomeIcon icon={faCog} />
-        </div>
-        <FontAwesomeIcon icon={faArrowRight} />
-        <div className="flex items-center border-2 border-border py-1 px-2 rounded-md gap-1">
-          <FontAwesomeIcon icon={faFolder} />
-          <div>Select folder</div>
-        </div>
+      <h2 className="font-display text-2xl font-semibold text-text-body">
+        Choose your library folder
+      </h2>
+      <p className="text-sm leading-relaxed text-text-muted">
+        Open Settings, then select the folder where SightKick will keep your
+        songs and progress.
+      </p>
+      <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface-raised px-4 text-sm text-text-body">
+        <FontAwesomeIcon icon={faCog} />
+        <span>Settings</span>
+        <span aria-hidden="true">→</span>
+        <FontAwesomeIcon icon={faFolder} />
+        <span>Select folder</span>
       </div>
-    </div>
+    </section>
   );
 }
