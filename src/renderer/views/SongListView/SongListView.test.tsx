@@ -48,6 +48,20 @@ describe('SongListView — loading the library', () => {
     ).toBeInTheDocument();
   });
 
+  it('keeps filters and add-music controls on a wrapping toolbar with width floors', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([makeListSong('a')]);
+
+    expect(screen.getByTestId('library-toolbar')).toHaveClass('flex-col');
+    expect(screen.getByTestId('library-song-controls')).toHaveClass(
+      'flex-wrap',
+    );
+    expect(screen.getByTestId('library-filters')).toHaveClass('flex-wrap');
+    expect(screen.getByTestId('library-name-filter')).toHaveClass('min-w-64');
+    expect(screen.getByTestId('add-music-actions')).toHaveClass('flex-wrap');
+  });
+
   it('surfaces existing progress as a continue-practicing moment', () => {
     const view = setupSongListView();
 

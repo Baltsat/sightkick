@@ -176,13 +176,6 @@ export function SongSearch({ disabled }: Props) {
     </div>
   );
   const input = (
-    // The header row (SongListView.tsx) is a fixed-max-width flex row shared
-    // with several other items (filter, import, My Music, auto-chart, sort,
-    // settings). Plain flex children default to shrinking below their
-    // content size once the row is tight, and unlike the buttons around it
-    // (whose text label gives them a natural floor) this Input has nothing
-    // stopping it from shrinking all the way to 0 — shrink-0 plus a fixed
-    // width keeps it clickable no matter how many siblings are in the row.
     <div className="w-52 shrink-0">
       <Input
         data-testid="song-search-input"

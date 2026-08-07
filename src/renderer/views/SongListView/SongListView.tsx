@@ -257,7 +257,7 @@ export function SongListView() {
           className="border-b border-divider px-5 py-4 z-10 flex flex-col gap-4"
           style={{ background: 'var(--gradient-header)' }}
         >
-          <div className="mx-auto flex w-full max-w-250 items-center justify-between gap-6">
+          <div className="mx-auto flex w-full max-w-360 items-center justify-between gap-6">
             <div className="min-w-0">
               <div className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
                 Practice space
@@ -326,38 +326,48 @@ export function SongListView() {
               )}
           </div>
 
-          <div className="mx-auto flex w-full max-w-250 items-center gap-2">
-            <div
-              className="flex shrink-0 items-center gap-1 rounded-xl border border-border-soft bg-surface p-1"
-              role="tablist"
-              aria-label="Library view"
-            >
-              <Button
-                type={view === 'songs' ? 'primary' : 'default'}
-                data-testid="view-songs"
-                role="tab"
-                aria-selected={view === 'songs'}
-                onClick={() => setView('songs')}
+          <div
+            className="mx-auto flex w-full max-w-360 flex-col gap-3"
+            data-testid="library-toolbar"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div
+                className="flex shrink-0 items-center gap-1 rounded-xl border border-border-soft bg-surface p-1"
+                role="tablist"
+                aria-label="Library view"
               >
-                Songs
-              </Button>
-              <Button
-                type={view === 'lessons' ? 'primary' : 'default'}
-                data-testid="view-lessons"
-                role="tab"
-                aria-selected={view === 'lessons'}
-                icon={<FontAwesomeIcon icon={faGraduationCap} />}
-                onClick={() => setView('lessons')}
-              >
-                Lessons
-                {lessonProgress.totalLessons > 0 &&
-                  ` · ${lessonProgress.unlockedCount}/${lessonProgress.totalLessons}`}
-              </Button>
+                <Button
+                  type={view === 'songs' ? 'primary' : 'default'}
+                  data-testid="view-songs"
+                  role="tab"
+                  aria-selected={view === 'songs'}
+                  onClick={() => setView('songs')}
+                >
+                  Songs
+                </Button>
+                <Button
+                  type={view === 'lessons' ? 'primary' : 'default'}
+                  data-testid="view-lessons"
+                  role="tab"
+                  aria-selected={view === 'lessons'}
+                  icon={<FontAwesomeIcon icon={faGraduationCap} />}
+                  onClick={() => setView('lessons')}
+                >
+                  Lessons
+                  {lessonProgress.totalLessons > 0 &&
+                    ` · ${lessonProgress.unlockedCount}/${lessonProgress.totalLessons}`}
+                </Button>
+              </div>
+              <SettingsButton page="song-list" scanPercent={scanPercent} />
             </div>
 
             {view === 'songs' && (
-              <>
+              <div
+                className="flex min-w-0 flex-wrap items-center gap-3"
+                data-testid="library-song-controls"
+              >
                 <SongFilter
+                  className="w-full"
                   nameFilter={nameFilter}
                   onChangeFilter={setNameFilter}
                   difficulty={difficulty}
@@ -370,32 +380,41 @@ export function SongListView() {
                   libraryMode={libraryMode}
                   onChangeLibraryMode={setLibraryMode}
                 />
-                <SongSearch disabled={currentPath === null} />
-                <SongImport
-                  disabled={currentPath === null}
-                  onImported={handleSongImported}
-                />
-                <Tooltip
-                  title={
-                    currentPath === null
-                      ? 'Select a library folder first'
-                      : 'Add songs from your YouTube Music Liked playlist'
-                  }
+                <div
+                  className="flex min-w-fit shrink-0 flex-wrap items-center gap-2 rounded-2xl bg-fill p-1.5 *:shrink-0"
+                  data-testid="add-music-actions"
+                  aria-label="Add music"
                 >
-                  <Button
-                    icon={<FontAwesomeIcon icon={faMusic} />}
-                    size="large"
-                    data-testid="my-music-trigger"
+                  <span className="px-2 text-xs font-semibold uppercase tracking-[0.12em] text-text-faint">
+                    Add music
+                  </span>
+                  <SongSearch disabled={currentPath === null} />
+                  <SongImport
                     disabled={currentPath === null}
-                    onClick={() => setMyMusicOpen(true)}
+                    onImported={handleSongImported}
+                  />
+                  <Tooltip
+                    title={
+                      currentPath === null
+                        ? 'Select a library folder first'
+                        : 'Add songs from your YouTube Music Liked playlist'
+                    }
                   >
-                    My Music
-                  </Button>
-                </Tooltip>
-                <AutoChart
-                  disabled={currentPath === null}
-                  onImported={handleSongImported}
-                />
+                    <Button
+                      icon={<FontAwesomeIcon icon={faMusic} />}
+                      size="large"
+                      data-testid="my-music-trigger"
+                      disabled={currentPath === null}
+                      onClick={() => setMyMusicOpen(true)}
+                    >
+                      My Music
+                    </Button>
+                  </Tooltip>
+                  <AutoChart
+                    disabled={currentPath === null}
+                    onImported={handleSongImported}
+                  />
+                </div>
                 <SortButton
                   sort={sort}
                   disabled={!sortAvailable}
@@ -404,9 +423,8 @@ export function SongListView() {
                   onOpenChange={setIsSortOpen}
                   focusedIndex={isSortOpen ? focusedSortIndex : undefined}
                 />
-              </>
+              </div>
             )}
-            <SettingsButton page="song-list" scanPercent={scanPercent} />
           </div>
           <SplittingQueue
             splittingIds={splittingIds}
@@ -439,7 +457,7 @@ export function SongListView() {
               onRescan={rescanLibrary}
             />
           ) : (
-            <div className="relative w-full max-w-250 grow overflow-hidden mx-auto bg-bg flex flex-col">
+            <div className="relative mx-auto flex w-full max-w-360 grow flex-col overflow-hidden bg-bg">
               {filteredSongList.length > 0 ||
               (libraryMode === 'online' && onlineLoading) ? (
                 <>
