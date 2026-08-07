@@ -36,8 +36,8 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "pretest": "node scripts/ensure-native-arch.js",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test": "node scripts/ensure-native-arch.js && vitest run",
+    "test:coverage": "node scripts/ensure-native-arch.js && vitest run --coverage",
     "test:e2e": "yarn build && playwright test",
     "test:e2e:only": "playwright test"
   },
