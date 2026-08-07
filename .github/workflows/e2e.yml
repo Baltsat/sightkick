@@ -55,6 +55,9 @@ jobs:
           echo "Electron binary install failed after 5 attempts"
           exit 1
 
+      - name: Install ffmpeg binary
+        run: node node_modules/ffmpeg-static/install.js
+
       - name: Run Playwright e2e
         if: runner.os != 'Linux'
         run: yarn test:e2e
