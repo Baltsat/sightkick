@@ -219,7 +219,8 @@
     "publish": {
       "provider": "github",
       "owner": "Baltsat",
-      "repo": "sightkick"
+      "repo": "sightkick",
+      "releaseType": "prerelease"
     }
   },
   "engines": {
