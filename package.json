@@ -1,7 +1,7 @@
 {
   "name": "sight-kick",
   "description": "Play your favorite Clone Hero drum tracks",
-  "version": "0.1.0",
+  "version": "1.2.0-kb.1",
   "keywords": [
     "clonehero",
     "drums",
@@ -138,7 +138,7 @@
   },
   "build": {
     "productName": "SightKick",
-    "buildVersion": "0.1.0",
+    "buildVersion": "1.2.1",
     "appId": "org.sk.SightKick",
     "asar": true,
     "asarUnpack": "**\\*.{node,dll}",

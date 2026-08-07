@@ -57,6 +57,7 @@ export class AppUpdater {
     log.transports.file.level = 'info';
     autoUpdater.logger = log;
     autoUpdater.autoDownload = false;
+    autoUpdater.allowPrerelease = true;
 
     this.registerListeners();
   }
