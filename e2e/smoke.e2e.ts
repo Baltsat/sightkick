@@ -193,6 +193,7 @@ test.describe('seeded library', () => {
   });
 
   test('creates a URL-only chart through the SightKick sidecar protocol', async () => {
+    test.skip(process.platform === 'win32', 'POSIX sidecar fixture');
     test.setTimeout(180_000);
 
     const transcriberPath = path.join(

@@ -115,7 +115,7 @@ export async function launchApp(
     options.seedLibrary ? { lastOpenedPath: libraryDir } : {},
   );
   const app = await electron.launch({
-    args: [MAIN_ENTRY, `--user-data-dir=${userDataDir}`],
+    args: [MAIN_ENTRY, `--user-data-dir=${userDataDir}`, '--mute-audio'],
     env: {
       ...process.env,
       NODE_ENV: 'production',
