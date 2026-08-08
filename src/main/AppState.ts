@@ -42,6 +42,11 @@ import {
 import { searchYoutube } from './ipc/searchYoutube';
 import { fetchMyMusic } from './ipc/myMusic';
 import { savePracticeRun, loadPracticeRuns } from './ipc/practiceStats';
+import {
+  loadAllPracticeRuns,
+  loadPracticeDays,
+  recordPracticeDay,
+} from './ipc/gamification';
 
 class AppState {
   private static instance: AppState;
@@ -145,6 +150,9 @@ class AppState {
     ipcMain.on('update-song', updateSong);
     ipcMain.on('save-practice-run', savePracticeRun);
     ipcMain.on('load-practice-runs', loadPracticeRuns);
+    ipcMain.on('record-practice-day', recordPracticeDay);
+    ipcMain.on('load-practice-days', loadPracticeDays);
+    ipcMain.on('load-all-practice-runs', loadAllPracticeRuns);
     ipcMain.on('export-pdf', exportPdf);
     ipcMain.on('midi-device-list', loadMidiDeviceList);
     ipcMain.on('listen-midi', listenMidi);

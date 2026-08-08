@@ -44,6 +44,9 @@ export type Channels =
   | 'update-song'
   | 'save-practice-run'
   | 'load-practice-runs'
+  | 'record-practice-day'
+  | 'load-practice-days'
+  | 'load-all-practice-runs'
   | 'export-pdf';
 
 const electronHandler = {
