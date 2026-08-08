@@ -53,6 +53,10 @@ export type Channels =
   | 'record-practice-day'
   | 'load-practice-days'
   | 'load-all-practice-runs'
+  | 'save-goal'
+  | 'load-goals'
+  | 'delete-goal'
+  | 'set-primary-goal'
   | 'export-pdf';
 
 const electronHandler = {

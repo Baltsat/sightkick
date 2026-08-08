@@ -26,6 +26,9 @@ export interface SongListItemProps {
   onDownload: (id: string) => void;
   onClick: () => void;
   onSplit: (id: string) => void;
+  /** Omitted when the caller doesn't wire up a goal-setting flow (e.g.
+   * Storybook, the online-library rows this menu never renders for). */
+  onSetGoal?: (song: Song) => void;
   downloading?: boolean;
   difficulty: Difficulty;
   splitting: boolean;
@@ -44,6 +47,7 @@ export function SongListItem({
   difficulty,
   splitting,
   onSplit,
+  onSetGoal,
   downloadingDisabled,
   focused,
 }: SongListItemProps) {
@@ -71,6 +75,7 @@ export function SongListItem({
             canSplit={(local.audio?.length ?? 0) === 1}
             splitting={splitting}
             onSplit={() => onSplit(id)}
+            onSetGoal={onSetGoal && (() => onSetGoal(local))}
           />
 
           <IconButton
@@ -138,6 +143,7 @@ export function SongListItem({
     onLikeChange,
     downloadingDisabled,
     onSplit,
+    onSetGoal,
     splitting,
     name,
   ]);

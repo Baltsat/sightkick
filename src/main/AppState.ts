@@ -53,6 +53,12 @@ import {
   loadPracticeDays,
   recordPracticeDay,
 } from './ipc/gamification';
+import {
+  deleteGoal,
+  loadGoalsIpc,
+  saveGoal,
+  setPrimaryGoal,
+} from './ipc/goals';
 
 class AppState {
   private static instance: AppState;
@@ -163,6 +169,10 @@ class AppState {
     ipcMain.on('record-practice-day', recordPracticeDay);
     ipcMain.on('load-practice-days', loadPracticeDays);
     ipcMain.on('load-all-practice-runs', loadAllPracticeRuns);
+    ipcMain.on('save-goal', saveGoal);
+    ipcMain.on('load-goals', loadGoalsIpc);
+    ipcMain.on('delete-goal', deleteGoal);
+    ipcMain.on('set-primary-goal', setPrimaryGoal);
     ipcMain.on('export-pdf', exportPdf);
     ipcMain.on('midi-device-list', loadMidiDeviceList);
     ipcMain.on('listen-midi', listenMidi);

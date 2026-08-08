@@ -13,6 +13,7 @@ export interface SongListProps {
   onDownload: (id: string) => void;
   onClickSong: (id: string) => void;
   onSplit: (id: string) => void;
+  onSetGoal?: (song: Song) => void;
   onLoadMore?: () => void;
   downloadingIds?: Set<string>;
   splittingIds: Set<string>;
@@ -38,6 +39,7 @@ export function SongList({
   downloadingDisabled,
   splittingIds,
   onSplit,
+  onSetGoal,
   onLoadMore,
   focusedIndex,
 }: SongListProps) {
@@ -102,6 +104,7 @@ export function SongList({
                 onLikeChange={onLikeChange}
                 onDownload={onDownload}
                 onSplit={onSplit}
+                onSetGoal={onSetGoal}
                 onClick={() => onClickSong(songData.id)}
                 difficulty={difficulty}
                 downloading={downloadingIds?.has(songData.id)}
