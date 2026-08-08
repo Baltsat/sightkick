@@ -191,6 +191,7 @@ export function SongView() {
         ...summary,
         mode: gameMode ?? 'perform',
         playbackSpeed: playbackSpeedRef.current,
+        difficulty,
       };
       const isAttempt = (score.hitNotes ?? 0) > 0;
 

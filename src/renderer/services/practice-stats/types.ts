@@ -1,3 +1,4 @@
+import { Difficulty } from 'scan-chart';
 import { InputMapping } from '../../../types';
 import { GameMode } from '../../types';
 
@@ -30,6 +31,11 @@ export interface HitRecord {
   verdict: HitVerdict;
   velocity?: number;
 }
+
+export type StoredHitRecord = Pick<
+  HitRecord,
+  'tick' | 'deltaMs' | 'element' | 'verdict' | 'velocity'
+>;
 
 export interface LaneAccuracy {
   element: KitElement;
@@ -91,10 +97,23 @@ export interface RunSummary {
    * a Perform run is always 1 here; Practice reflects whatever the player
    * had dialed in via the speed control at the moment the run ended. */
   playbackSpeed?: number;
+  /** Difficulty the run was played at. Stamped on by SongView the same way
+   * as `mode`/`playbackSpeed` (never computed by `summarizeRun`), so it's
+   * optional for the same reason: runs persisted before this field existed
+   * still deserialize cleanly, just without a known difficulty. Consumers
+   * that need to scope run history to one difficulty (e.g. the mastery
+   * model) should treat a missing value as "unknown" rather than assuming
+   * any particular difficulty. */
+  difficulty?: Difficulty;
 }
 
 export interface RunTrendPoint {
   completedAt: string;
   accuracy: number;
   biasMeanMs: number;
+}
+
+export interface StoredPracticeRun {
+  summary: RunSummary;
+  records: StoredHitRecord[];
 }
