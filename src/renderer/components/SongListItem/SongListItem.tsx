@@ -6,10 +6,11 @@ import {
   faCheck,
 } from '@fortawesome/free-solid-svg-icons';
 import { faHeart } from '@fortawesome/free-regular-svg-icons';
+import { faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
 import appIcon from '../../../../assets/icon.png';
 import { Song } from '../../../types';
 import { cn } from '../../cn';
-import { Button, Tag, Tooltip } from 'antd';
+import { Button, Tooltip } from 'antd';
 import { useMemo } from 'react';
 import { SongMenu } from '../SongMenu';
 import { Stars } from '../Stars';
@@ -210,9 +211,15 @@ export function SongListItem({
           )}
 
           {autoChartToolName && (
-            <Tag className="hidden xl:inline-flex" color="purple">
-              Auto-charted with {autoChartToolName}
-            </Tag>
+            <Tooltip title={`Auto-charted with ${autoChartToolName}`}>
+              <span
+                className="hidden items-center text-text-dim xl:inline-flex"
+                tabIndex={0}
+                aria-label={`Auto-charted with ${autoChartToolName}`}
+              >
+                <FontAwesomeIcon icon={faWandMagicSparkles} />
+              </span>
+            </Tooltip>
           )}
 
           {local && (

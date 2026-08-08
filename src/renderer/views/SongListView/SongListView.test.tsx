@@ -320,7 +320,7 @@ describe('SongListView — difficulty', () => {
     ).toBeInTheDocument();
   });
 
-  it('labels the auto-chart tool separately from a human charter', () => {
+  it('labels the auto-chart tool separately from a human charter, calmly', () => {
     const view = setupSongListView();
 
     view.loadSongs([
@@ -330,7 +330,16 @@ describe('SongListView — difficulty', () => {
       }),
     ]);
 
-    expect(screen.getByText('Auto-charted with STRUM')).toBeInTheDocument();
+    // Provenance is available (accessibly labeled) but never a loud tag —
+    // no "Auto-charted with STRUM" text sits in the row itself, and no
+    // antd Tag renders for it.
+    expect(
+      screen.getByLabelText('Auto-charted with STRUM'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Auto-charted with STRUM'),
+    ).not.toBeInTheDocument();
+    expect(document.querySelector('.ant-tag')).not.toBeInTheDocument();
     expect(screen.queryByText('charter')).not.toBeInTheDocument();
   });
 });
