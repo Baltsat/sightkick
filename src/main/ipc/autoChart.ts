@@ -953,9 +953,20 @@ export async function applyOfficialMetadata(
     await fs.promises.writeFile(iniPath, updated, 'utf8');
   }
 
-  if (metadata.thumbnailUrl) {
+  // The inferred songName/artistName (never the raw oEmbed title/authorName,
+  // which still carries "Official Video"/"ft. X" cruft) is what lets
+  // ingestSongCover try a real iTunes cover before falling back to the
+  // YouTube thumbnail. Only build an identity when *both* are present —
+  // fetchOfficialYoutubeMetadata always sets them together via
+  // inferTrackIdentity, so this is really just a defensive narrowing.
+  const identity =
+    metadata.songName && metadata.artistName
+      ? { artist: metadata.artistName, title: metadata.songName }
+      : undefined;
+
+  if (metadata.thumbnailUrl || identity) {
     try {
-      await ingestSongCover(sourceDir, metadata.thumbnailUrl);
+      await ingestSongCover(sourceDir, metadata.thumbnailUrl, identity);
     } catch {
       metadata.thumbnailUrl = undefined;
     }

@@ -1,13 +1,29 @@
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
+import log from 'electron-log';
 import { nativeImage } from 'electron';
 import { parseFile } from 'music-metadata';
+import { findItunesArtwork } from './albumArtResolver';
 
-export type SongCoverSource = 'existing' | 'embedded' | 'remote' | 'none';
+export type SongCoverSource =
+  | 'existing'
+  | 'itunes'
+  | 'embedded'
+  | 'remote'
+  | 'none';
+
+// previewSongCover never performs a network lookup (it only inspects what's
+// already on disk), so its result can never be 'itunes' — narrowing the
+// type here (rather than in IpcImportSongPreview's coverSource, which is
+// outside this file's ownership) is what keeps that field's assignment
+// type-checking without widening it.
+export type PreviewCoverSource = Exclude<SongCoverSource, 'itunes'>;
 
 const COVER_EXTENSIONS = ['png', 'jpg', 'jpeg'];
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.ogg', '.opus']);
 const MAX_REMOTE_IMAGE_BYTES = 10_000_000;
+const REMOTE_FETCH_TIMEOUT_MS = 8_000;
 
 function existingCoverPath(dir: string): string | undefined {
   return COVER_EXTENSIONS.map((extension) =>
@@ -75,10 +91,31 @@ async function remoteArtwork(url: string): Promise<Uint8Array> {
     throw new Error('Artwork URL must use HTTPS');
   }
 
-  const response = await fetch(parsed);
+  const response = await fetch(parsed, {
+    signal: AbortSignal.timeout(REMOTE_FETCH_TIMEOUT_MS),
+  });
 
   if (!response.ok) {
     throw new Error(`Artwork download failed: ${response.status}`);
+  }
+
+  // fetch follows redirects transparently; a server that starts on https
+  // but hands back a redirect to a plain-http (or otherwise untrusted)
+  // location would otherwise have its response silently accepted here, so
+  // the final, post-redirect URL is checked too, not just the one we asked
+  // for.
+  if (response.url) {
+    let finalUrl: URL;
+
+    try {
+      finalUrl = new URL(response.url);
+    } catch {
+      throw new Error('Artwork response reported an invalid URL');
+    }
+
+    if (finalUrl.protocol !== 'https:') {
+      throw new Error('Artwork request redirected off HTTPS');
+    }
   }
 
   const contentType = response.headers.get('content-type') ?? '';
@@ -102,9 +139,80 @@ async function remoteArtwork(url: string): Promise<Uint8Array> {
   return data;
 }
 
+// Writes album.jpg via a sanitized temp file + rename so a reader can never
+// observe a partially-written cover, and a failure mid-write never leaves a
+// corrupt album.jpg behind. The temp file lives in `dir` itself (not the OS
+// tmp dir) so the rename is an atomic same-filesystem move rather than a
+// cross-device copy.
+function writeCoverAtomically(dir: string, data: Uint8Array): void {
+  const finalPath = path.join(dir, 'album.jpg');
+  const tempPath = path.join(dir, `.album.jpg.${randomUUID()}.tmp`);
+
+  fs.writeFileSync(tempPath, data);
+
+  try {
+    fs.renameSync(tempPath, finalPath);
+  } catch (error) {
+    fs.rmSync(tempPath, { force: true });
+
+    throw error;
+  }
+}
+
+interface SongIdentity {
+  artist?: string;
+  title?: string;
+}
+
+// Looks up real album art on iTunes for `identity` and, on a confident
+// match, downloads and writes it as album.jpg. Returns whether it won so
+// the caller can skip the embedded/thumbnail fallbacks; any failure
+// (no match, network error, bad download) resolves to false rather than
+// throwing, since this is always just the first link in a fallback chain.
+async function tryItunesCover(
+  dir: string,
+  identity: SongIdentity | undefined,
+): Promise<boolean> {
+  if (!identity?.artist?.trim() || !identity?.title?.trim()) {
+    return false;
+  }
+
+  const artworkUrl = await findItunesArtwork(identity.artist, identity.title);
+
+  if (!artworkUrl) {
+    log.info(
+      `[songCover] no confident iTunes match for "${identity.artist} - ${identity.title}"; falling back`,
+    );
+
+    return false;
+  }
+
+  try {
+    const artwork = await remoteArtwork(artworkUrl);
+
+    writeCoverAtomically(dir, toUint8Array(jpegData(artwork)));
+    log.info(
+      `[songCover] cover source=itunes for "${identity.artist} - ${identity.title}"`,
+    );
+
+    return true;
+  } catch (error) {
+    log.warn(
+      `[songCover] iTunes artwork download failed for "${identity.artist} - ${identity.title}":`,
+      error,
+    );
+
+    return false;
+  }
+}
+
+// Preview never performs a network lookup — it only reports what's already
+// on disk (or embedded in the audio) — so a review screen can show
+// something before committing to write anything. The iTunes lookup only
+// ever runs from ingestSongCover, at actual import time.
 export async function previewSongCover(
   dir: string,
-): Promise<{ dataUrl?: string; source: SongCoverSource }> {
+): Promise<{ dataUrl?: string; source: PreviewCoverSource }> {
   const existing = existingCoverPath(dir);
 
   if (existing) {
@@ -123,21 +231,34 @@ export async function previewSongCover(
   return { source: 'none' };
 }
 
+// Resolves and writes album.jpg for a song folder, in priority order:
+//   1. existing  — a cover is already there; never overwritten.
+//   2. itunes    — a confident iTunes Search API match for `identity`, when
+//                  given (real album art; see albumArtResolver.ts).
+//   3. embedded  — cover art embedded in the song's own audio file.
+//   4. remote    — `artworkUrl` as given (typically the YouTube thumbnail
+//                  for auto-charted imports, or a user-pasted URL).
+// `identity` is optional so callers without a known artist/title (e.g. a
+// manually imported prepared song folder) keep the pre-iTunes behavior
+// unchanged.
 export async function ingestSongCover(
   dir: string,
   artworkUrl?: string,
+  identity?: SongIdentity,
 ): Promise<SongCoverSource> {
   if (existingCoverPath(dir)) {
     return 'existing';
   }
 
+  if (await tryItunesCover(dir, identity)) {
+    return 'itunes';
+  }
+
   const embedded = await embeddedArtwork(dir);
 
   if (embedded) {
-    fs.writeFileSync(
-      path.join(dir, 'album.jpg'),
-      toUint8Array(jpegData(embedded)),
-    );
+    writeCoverAtomically(dir, toUint8Array(jpegData(embedded)));
+    log.info('[songCover] cover source=embedded');
 
     return 'embedded';
   }
@@ -145,13 +266,13 @@ export async function ingestSongCover(
   if (artworkUrl?.trim()) {
     const remote = await remoteArtwork(artworkUrl.trim());
 
-    fs.writeFileSync(
-      path.join(dir, 'album.jpg'),
-      toUint8Array(jpegData(remote)),
-    );
+    writeCoverAtomically(dir, toUint8Array(jpegData(remote)));
+    log.info('[songCover] cover source=remote (thumbnail)');
 
     return 'remote';
   }
+
+  log.info('[songCover] no cover art found (source=none)');
 
   return 'none';
 }

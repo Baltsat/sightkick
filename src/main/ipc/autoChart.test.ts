@@ -2,6 +2,23 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// None of the existing tests below exercise real app.*/dialog.* (every
+// path that would is overridden through the AutoChartQueue's injected
+// dependencies); nativeImage is the only part of 'electron' actually
+// invoked at runtime here, via applyOfficialMetadata -> ingestSongCover
+// for the iTunes-cover integration test below. Mirrors songCover.test.ts's
+// mock shape.
+vi.mock('electron', () => ({
+  nativeImage: {
+    createFromBuffer: vi.fn(() => ({
+      isEmpty: () => false,
+      toJPEG: () => Buffer.from('jpeg'),
+      toDataURL: () => 'data:image/jpeg;base64,cHJldmlldw==',
+    })),
+  },
+}));
+
 import {
   AutoChartQueue,
   AutoChartRunner,
@@ -351,6 +368,69 @@ describe('auto-chart source and worker protocol', () => {
 
     expect(fs.readFileSync(path.join(root, 'song.ini'), 'utf8')).toBe(
       '[song]\nname = Raging name = injected\nartist = Kygo artist = injected\n',
+    );
+  });
+
+  it('prefers a confident iTunes album cover over the YouTube thumbnail when importing', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auto-chart-cover-'));
+
+    cleanup.push(root);
+    fs.writeFileSync(
+      path.join(root, 'song.ini'),
+      '[song]\nname = generated filename\nartist = Unknown Artist\n',
+    );
+
+    const requestedUrls: string[] = [];
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL) => {
+        const url = input.toString();
+
+        requestedUrls.push(url);
+
+        if (url.startsWith('https://itunes.apple.com/search')) {
+          return {
+            ok: true,
+            status: 200,
+            url,
+            json: async () => ({
+              results: [
+                {
+                  artistName: 'Kygo feat. Kodaline',
+                  trackName: 'Raging',
+                  artworkUrl100:
+                    'https://is1-ssl.mzstatic.com/xx/100x100bb.jpg',
+                },
+              ],
+            }),
+          };
+        }
+
+        return {
+          ok: true,
+          status: 200,
+          url,
+          headers: new Headers({ 'content-type': 'image/jpeg' }),
+          arrayBuffer: async () => Uint8Array.from([9, 9, 9]).buffer,
+        };
+      }),
+    );
+
+    await applyOfficialMetadata(root, {
+      title: 'Kygo - Raging ft. Kodaline (Official Lyric Video)',
+      authorName: 'KygoOfficialVEVO',
+      songName: 'Raging',
+      artistName: 'Kygo feat. Kodaline',
+      thumbnailUrl: 'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg',
+    });
+
+    expect(fs.readFileSync(path.join(root, 'album.jpg'), 'utf-8')).toBe('jpeg');
+    expect(
+      requestedUrls.some((url) => url.startsWith('https://itunes.apple.com')),
+    ).toBe(true);
+    expect(requestedUrls.some((url) => url.includes('i.ytimg.com'))).toBe(
+      false,
     );
   });
 
