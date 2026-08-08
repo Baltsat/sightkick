@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +12,20 @@ from sk_transcriber.events import ProgressReporter
 from sk_transcriber.naming import parse_artist_title
 
 log = logging.getLogger("sk_transcriber.download")
+
+
+def _cookies_opts() -> dict[str, str]:
+    """yt-dlp options to authenticate past YouTube's bot-check wall.
+
+    Set ``SK_YTDLP_COOKIES`` to the path of a Netscape-format cookies.txt
+    (e.g. exported via a browser extension) to let yt-dlp send it as
+    ``--cookies``. Unset by default — no cookies are read or sent unless
+    the caller opts in explicitly.
+    """
+    cookies_path = os.environ.get("SK_YTDLP_COOKIES")
+    if not cookies_path:
+        return {}
+    return {"cookiefile": cookies_path}
 
 
 @dataclass
@@ -86,6 +101,7 @@ def download_audio(
         "progress_hooks": [_make_progress_hook(reporter, stage)],
         "retries": 5,
         "fragment_retries": 5,
+        **_cookies_opts(),
     }
 
     reporter.report(stage, 0.0, "Fetching video metadata")

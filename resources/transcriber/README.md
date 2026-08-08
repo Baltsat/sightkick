@@ -270,6 +270,21 @@ CLI callers may instead put ffmpeg on `PATH`. ffprobe is optional: the Python
 wrapper uses a sibling/system ffprobe when present and otherwise reads duration
 and best-effort local tags from `ffmpeg -i` output.
 
+### YouTube auth wall (`SK_YTDLP_COOKIES`)
+
+YouTube's bot-check ("Sign in to confirm you're not a bot") can block the
+`--url` download stage entirely, independent of which video or player
+client yt-dlp uses — this has been observed to affect _every_ video from
+a given network/IP uniformly, not specific videos. There is no cookie-free
+workaround; yt-dlp itself asks for `--cookies`/`--cookies-from-browser`.
+
+Set `SK_YTDLP_COOKIES` to the path of a Netscape-format `cookies.txt` (e.g.
+exported from a logged-in browser session via a cookies-export extension)
+and the download stage will pass it to yt-dlp as `--cookies`. Unset by
+default — no cookies are read or sent unless you opt in explicitly. This
+is the caller's responsibility to supply; the transcriber never sources
+cookies from a browser or app profile on its own.
+
 ## Measured accuracy (step 4 of VERIFY, extended in an accuracy sprint)
 
 ### The benchmark was wrong at first -- root-caused, then fixed
@@ -433,3 +448,8 @@ few minutes, network-dependent) on top of the cold-cache number above.
 - `--audio` runs never write `album.jpg` (no source thumbnail exists).
 - `--difficulty` is accepted but ignored (all four difficulties are always
   written) — see "Contract" above.
+- The `--url` download stage has no built-in retry or bypass for YouTube's
+  bot-check wall ("Sign in to confirm you're not a bot"); when a network/IP
+  hits it, every video fails identically regardless of player client or
+  yt-dlp version. The only way through is `SK_YTDLP_COOKIES` (see "Venv
+  bootstrap" above) — there is no cookie-free fix.
