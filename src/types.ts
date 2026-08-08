@@ -231,6 +231,25 @@ export interface IpcErrorResponse {
   error: string;
 }
 
+export interface IpcCoachSettings {
+  apiKeyConfigured: boolean;
+}
+
+export interface IpcSaveCoachSettingsRequest {
+  apiKey: string;
+}
+
+export interface IpcCoachSettingsSaved {
+  ok: boolean;
+  apiKeyConfigured: boolean;
+}
+
+export interface IpcCoachingNotesResponse {
+  notes?: string;
+  error?: string;
+  apiKeyMissing?: boolean;
+}
+
 export type IpcResult<T> = T | IpcErrorResponse;
 
 export function isIpcError<T extends object>(

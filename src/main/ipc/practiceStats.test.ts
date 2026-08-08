@@ -75,6 +75,7 @@ describe('savePracticeRun', () => {
 
   it('stores compact hit records separately from the summary history', () => {
     storeHolder.current = makeStore({});
+
     const event = makeEvent();
     const summary = fakeSummary();
 
@@ -108,6 +109,7 @@ describe('savePracticeRun', () => {
         records: [{ ...fakeRecord(index), timeSeconds: undefined }],
       }),
     );
+
     storeHolder.current = makeStore({
       practiceRunDetails: { 'song-1': existing },
     });
@@ -238,9 +240,11 @@ describe('loadPracticeRuns', () => {
     const fullRuns = [
       { summary: fakeSummary(0.8), records: [fakeRecord(240)] },
     ];
+
     storeHolder.current = makeStore({
       practiceRunDetails: { 'song-1': fullRuns },
     });
+
     const event = makeEvent();
 
     loadPracticeRuns(event as never, 'song-1');

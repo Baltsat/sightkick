@@ -14,6 +14,7 @@ import {
   makeSong,
   setupSongView,
 } from '../test-support';
+import { multiLaneRunFixture } from '../../components/PracticeStats/test-fixtures';
 
 const MULTI_STEM = {
   audio: [
@@ -1174,6 +1175,56 @@ describe('the score summary', () => {
     const modal = screen.getByTestId('score-modal');
 
     expect(within(modal).getByTestId('practice-stats')).toBeInTheDocument();
+  });
+
+  it('opens the coach with stored findings and presets a targeted practice loop', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong();
+    fireEvent.click(screen.getByTestId('ai-coach-button'));
+
+    expect(view.ipc.sent).toContainEqual({
+      channel: 'load-practice-runs',
+      args: ['song-1'],
+    });
+
+    const summary = {
+      ...multiLaneRunFixture(),
+      mode: 'practice' as const,
+      playbackSpeed: 0.7,
+    };
+
+    act(() => {
+      view.ipc.emit('load-practice-runs', {
+        songId: 'song-1',
+        runs: [summary],
+        fullRuns: [
+          {
+            summary,
+            records: [
+              { tick: 0, deltaMs: 4, element: 'snare', verdict: 'hit' },
+              { tick: 192, deltaMs: 0, element: 'snare', verdict: 'miss' },
+              { tick: 384, deltaMs: 0, element: 'snare', verdict: 'miss' },
+              { tick: 576, deltaMs: 0, element: 'snare', verdict: 'miss' },
+            ],
+          },
+        ],
+      });
+    });
+
+    expect(
+      await screen.findByTestId('coach-finding-trouble-bars'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('coach-notation')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('coach-practice-bars'));
+
+    expect(screen.getByTestId('loop-toggle')).toBeChecked();
+    expect(screen.getByRole('spinbutton')).toHaveValue('0.7');
+    expect(view.measureHighlights()[0]).toHaveAttribute(
+      'data-selected',
+      'true',
+    );
   });
 });
 

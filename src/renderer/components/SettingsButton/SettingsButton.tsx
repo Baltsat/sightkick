@@ -8,6 +8,7 @@ import { InputConfig, useInputConfig } from '../InputConfig';
 import { SongListSettings } from './SongListSettings';
 import { SongViewSettings } from './SongViewSettings';
 import { GameMode } from '../../types';
+import { CoachSettings } from '../AICoach/CoachSettings';
 
 interface Props {
   volumeSliders?: ReactNode[];
@@ -74,6 +75,7 @@ export const SettingsButton = memo(function Settings({
                 clickControls={clickControls}
               />
             )}
+            <CoachSettings />
           </div>
         }
       >

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Drawer, Modal, Spin, Tooltip } from 'antd';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -6,7 +6,12 @@ import {
   faMusic,
   faPlay,
 } from '@fortawesome/free-solid-svg-icons';
-import { Outlet, useNavigate, useOutlet } from 'react-router-dom';
+import {
+  Outlet,
+  useNavigate,
+  useOutlet,
+  useSearchParams,
+} from 'react-router-dom';
 import appIcon from '../../../../assets/icon.png';
 import { Song } from '../../../types';
 import { SongFilter } from '../../components/SongFilter';
@@ -56,6 +61,7 @@ export function SongListView() {
   const { currentPath, difficulty, setDifficulty } = useApp();
   const { controlMapping } = useInput();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const songOpen = useOutlet() !== null;
   const stemTools = useStemTools();
   const {
@@ -223,6 +229,30 @@ export function SongListView() {
 
     play(entry.song.id);
   };
+
+  useEffect(() => {
+    const lessonId = searchParams.get('coachLesson');
+
+    if (!lessonId) {
+      return;
+    }
+
+    const entry = lessonProgress.groups
+      .flatMap((group) => group.entries)
+      .find((candidate) => candidate.lesson.id === lessonId);
+
+    if (!entry) {
+      return;
+    }
+
+    const targetDifficulty = highestAvailableDifficulty(entry.song);
+
+    if (targetDifficulty && targetDifficulty !== difficulty) {
+      setDifficulty(targetDifficulty);
+    }
+
+    navigate(`/${entry.song.id}?gameMode=practice`, { replace: true });
+  }, [difficulty, lessonProgress, navigate, searchParams, setDifficulty]);
 
   useInputControls(
     controlMapping,

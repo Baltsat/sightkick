@@ -9,6 +9,7 @@ import { appState } from '../AppState';
 
 /** Keep only the most recent N runs per song, oldest dropped first. */
 export const MAX_STORED_RUNS_PER_SONG = 50;
+
 export const MAX_STORED_FULL_RUNS_PER_SONG = 30;
 
 const storeKey = (songId: string) => `practiceRuns.${songId}`;
@@ -75,9 +76,11 @@ export function savePracticeRun(
       : existingFullRuns;
 
     appState.store.set(storeKey(songId), next);
+
     if (records) {
       appState.store.set(detailsStoreKey(songId), fullRuns);
     }
+
     event.reply('save-practice-run', { songId, runs: next, fullRuns });
   } catch (error) {
     event.reply('save-practice-run', { error: toErrorMessage(error) });

@@ -167,7 +167,9 @@ function troubleBarFindings(scores: BarScore[]): CoachFinding[] {
           start === end
             ? `Bar ${start} needs a loop`
             : `Bars ${start}–${end} need a loop`,
-        summary: `${percent(accuracy)}% across ${hits + misses} scored notes; ${misses} misses cluster here.`,
+        summary: `${percent(accuracy)}% across ${
+          hits + misses
+        } scored notes; ${misses} misses cluster here.`,
         skillTag: measureSkill(
           cluster.find((score) => measureSkill(score.measure) !== 'timing')
             ?.measure ?? first,
@@ -194,7 +196,9 @@ function signature(measure: CoachMeasure): Set<string> {
   return new Set(
     measure.notes.map(
       (note) =>
-        `${note.element}:${Math.round(((note.tick - measure.startTick) / width) * 16)}`,
+        `${note.element}:${Math.round(
+          ((note.tick - measure.startTick) / width) * 16,
+        )}`,
     ),
   );
 }
@@ -232,7 +236,9 @@ function transitionFindings(scores: BarScore[]): CoachFinding[] {
           kind: 'breakdown-transition' as const,
           severity: cliff >= 0.4 ? ('high' as const) : ('medium' as const),
           title: `The pattern change at bar ${bar} breaks the run`,
-          summary: `Accuracy drops from ${percent(previous.accuracy)}% to ${percent(score.accuracy)}% when the rhythm changes.`,
+          summary: `Accuracy drops from ${percent(
+            previous.accuracy,
+          )}% to ${percent(score.accuracy)}% when the rhythm changes.`,
           skillTag: measureSkill(score.measure),
           evidence: {
             barStart: bar,
@@ -314,13 +320,15 @@ function limbFindings(input: AnalyzeCoachInput): CoachFinding[] {
           kind: 'limb-weakness' as const,
           severity,
           title: `${region.lane} ${direction} around ${region.bpm} BPM`,
-          summary: `${percent(accuracy)}% accuracy with ${Math.round(bias)} ms average timing bias.`,
+          summary: `${percent(accuracy)}% accuracy with ${Math.round(
+            bias,
+          )} ms average timing bias.`,
           skillTag:
             region.lane === 'kick'
               ? ('kick-independence' as const)
               : region.lane === 'hihat'
-                ? ('sixteenth-hihat' as const)
-                : ('timing' as const),
+              ? ('sixteenth-hihat' as const)
+              : ('timing' as const),
           evidence: {
             lane: region.lane,
             accuracy,
@@ -387,7 +395,9 @@ function speedFinding(runs: StoredPracticeRun[]): CoachFinding[] {
       kind: 'speed-sensitivity',
       severity: delta >= 0.25 ? 'high' : 'medium',
       title: `Clean at ${best.slow.speed}x, breaks at ${best.fast.speed}x`,
-      summary: `Accuracy falls ${percent(delta)} points as speed rises. Start the loop at ${best.slow.speed}x.`,
+      summary: `Accuracy falls ${percent(
+        delta,
+      )} points as speed rises. Start the loop at ${best.slow.speed}x.`,
       skillTag: 'timing',
       evidence: {
         slowSpeed: best.slow.speed,

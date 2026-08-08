@@ -43,6 +43,12 @@ import { searchYoutube } from './ipc/searchYoutube';
 import { fetchMyMusic } from './ipc/myMusic';
 import { savePracticeRun, loadPracticeRuns } from './ipc/practiceStats';
 import {
+  configureCoachStore,
+  getCoachingNotes,
+  getCoachSettings,
+  saveCoachSettings,
+} from './ipc/coach';
+import {
   loadAllPracticeRuns,
   loadPracticeDays,
   recordPracticeDay,
@@ -120,6 +126,7 @@ class AppState {
       process.env.DEBUG_PROD === 'true';
 
     configureRemoteAutoChartStore(this.store);
+    configureCoachStore(this.store);
 
     ipcMain.on('load-song', loadSong);
     ipcMain.on('load-song-list', loadSongList);
@@ -150,6 +157,9 @@ class AppState {
     ipcMain.on('update-song', updateSong);
     ipcMain.on('save-practice-run', savePracticeRun);
     ipcMain.on('load-practice-runs', loadPracticeRuns);
+    ipcMain.on('get-coach-settings', getCoachSettings);
+    ipcMain.on('save-coach-settings', saveCoachSettings);
+    ipcMain.on('get-coaching-notes', getCoachingNotes);
     ipcMain.on('record-practice-day', recordPracticeDay);
     ipcMain.on('load-practice-days', loadPracticeDays);
     ipcMain.on('load-all-practice-runs', loadAllPracticeRuns);

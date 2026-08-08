@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { App as AntdApp } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 import { Song } from '../../../types';
@@ -67,6 +67,18 @@ describe('ScoreSummary', () => {
 
     expect(modal.getByTestId('practice-stats')).toBeInTheDocument();
     expect(modal.getByTestId('lane-accuracy-bars')).toBeInTheDocument();
+  });
+
+  it('opens the coach from a completed run', () => {
+    const onCoach = vi.fn();
+    const { modal } = renderSummary({
+      practiceSummary: multiLaneRunFixture(),
+      onCoach,
+    });
+
+    fireEvent.click(modal.getByTestId('score-coach'));
+
+    expect(onCoach).toHaveBeenCalledOnce();
   });
 
   it('drops the star/accuracy chrome for a Practice run (no scoreData) and shows the practice stats instead', () => {

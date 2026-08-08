@@ -3,7 +3,11 @@ import { useMemo } from 'react';
 import { ScoreData, Song } from '../../../types';
 import { Difficulty } from 'scan-chart';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFire, faRepeat } from '@fortawesome/free-solid-svg-icons';
+import {
+  faFire,
+  faRepeat,
+  faWandMagicSparkles,
+} from '@fortawesome/free-solid-svg-icons';
 import { calculateAccuracy, getStarRating } from '../../scoring';
 import { MODAL_ABOVE_POPOVER_Z_INDEX, modalStyles } from '../../overlayStyles';
 import { cn } from '../../cn';
@@ -20,6 +24,7 @@ interface Props {
   isOpen: boolean;
   onRetry: () => void;
   onNextSong: () => void;
+  onCoach?: () => void;
   songData: Song | undefined;
   difficulty: Difficulty;
   scoreData?: ScoreData;
@@ -45,6 +50,7 @@ export function ScoreSummary({
   isOpen,
   onRetry,
   onNextSong,
+  onCoach,
   songData,
   difficulty,
   scoreData,
@@ -105,6 +111,17 @@ export function ScoreSummary({
       >
         Play again
       </Button>
+      {practiceSummary && onCoach && (
+        <Button
+          data-testid="score-coach"
+          className="grow"
+          onClick={onCoach}
+          icon={<FontAwesomeIcon icon={faWandMagicSparkles} />}
+          size="large"
+        >
+          Coach
+        </Button>
+      )}
       <Button
         data-testid="score-next"
         className="grow"

@@ -27,6 +27,7 @@ import {
   faChartLine,
   faPause,
   faPlay,
+  faWandMagicSparkles,
 } from '@fortawesome/free-solid-svg-icons';
 import { useApp } from '../../context/AppContext';
 import { useInput } from '../../context/InputContext';
@@ -50,7 +51,11 @@ import { useTransportShortcuts } from '../../hooks/useTransportShortcuts';
 import { ScoreSummary } from '../../components/ScoreSummary';
 import { CountIn } from '../../components/CountIn';
 import { ScoreData } from '../../../types';
-import { computeRunsTrend, RunSummary } from '../../services/practice-stats';
+import {
+  computeRunsTrend,
+  RunSummary,
+  StoredPracticeRun,
+} from '../../services/practice-stats';
 import { PracticeStats } from '../../components/PracticeStats';
 import { buildSheetPdfHtml } from '../../services/pdf-export';
 import { serializeMeasureToDsl } from '../../components/SheetMusic';
@@ -58,6 +63,8 @@ import { AudioVolume } from '../../components/AudioVolume';
 import { GameMode, PracticeRange } from '../../types';
 import { resolveModePolicy } from '../../modes';
 import { RenderData } from '../../../chart-parser/types';
+import { AICoach } from '../../components/AICoach';
+import { analyzePracticeRuns, buildCoachChart } from '../../services/coach';
 
 export function SongView() {
   const { difficulty, setDifficulty, isDev } = useApp();
@@ -77,7 +84,10 @@ export function SongView() {
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [isCoachOpen, setIsCoachOpen] = useState(false);
+  const [isCoachLoading, setIsCoachLoading] = useState(false);
   const [songRuns, setSongRuns] = useState<RunSummary[]>();
+  const [fullRuns, setFullRuns] = useState<StoredPracticeRun[]>();
   const [gamificationResult, setGamificationResult] =
     useState<RecordRunResult>();
   const exportPdfOffRef = useRef<(() => void) | undefined>(undefined);
@@ -90,7 +100,7 @@ export function SongView() {
   // rather than a crash.
   const gamification = useOutletContext<UseGamificationResult | undefined>();
   const { id } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const gameMode = useMemo<GameMode | undefined>(() => {
     return (searchParams.get('gameMode') as GameMode) ?? undefined;
   }, [searchParams]);
@@ -133,6 +143,20 @@ export function SongView() {
   const measures = useMemo(
     () => renderData.map((rd) => rd.measure),
     [renderData],
+  );
+  const coachResult = useMemo(() => {
+    if (!chart || !parsedMidi || !fullRuns) {
+      return undefined;
+    }
+
+    return analyzePracticeRuns({
+      runs: fullRuns,
+      chart: buildCoachChart(chart, parsedMidi.measures),
+    });
+  }, [chart, parsedMidi, fullRuns]);
+  const coachRecords = useMemo(
+    () => fullRuns?.flatMap((run) => run.records) ?? [],
+    [fullRuns],
   );
   const delaySeconds = songData?.delaySeconds ?? 0;
   const minDurationSeconds = useMemo(() => {
@@ -271,25 +295,46 @@ export function SongView() {
     setIsScoreModalOpen(false);
     playFromTick(0);
   };
+  const loadStoredRuns = useCallback(
+    (forCoach: boolean) => {
+      if (!id) {
+        return;
+      }
+
+      if (forCoach) {
+        setIsCoachLoading(true);
+      }
+
+      loadRunsOffRef.current?.();
+      loadRunsOffRef.current = window.electron.ipcRenderer.once<
+        | {
+            songId: string;
+            runs: RunSummary[];
+            fullRuns?: StoredPracticeRun[];
+          }
+        | { error: string }
+      >('load-practice-runs', (result) => {
+        loadRunsOffRef.current = undefined;
+        setIsCoachLoading(false);
+
+        if ('runs' in result) {
+          setSongRuns(result.runs);
+          setFullRuns(result.fullRuns ?? []);
+        }
+      });
+      window.electron.ipcRenderer.sendMessage('load-practice-runs', id);
+    },
+    [id],
+  );
   const onOpenStats = useCallback(() => {
     setIsStatsOpen(true);
-
-    if (!id) {
-      return;
-    }
-
-    loadRunsOffRef.current?.();
-    loadRunsOffRef.current = window.electron.ipcRenderer.once<
-      { songId: string; runs: RunSummary[] } | { error: string }
-    >('load-practice-runs', (result) => {
-      loadRunsOffRef.current = undefined;
-
-      if ('runs' in result) {
-        setSongRuns(result.runs);
-      }
-    });
-    window.electron.ipcRenderer.sendMessage('load-practice-runs', id);
-  }, [id]);
+    loadStoredRuns(false);
+  }, [loadStoredRuns]);
+  const onOpenCoach = useCallback(() => {
+    setIsScoreModalOpen(false);
+    setIsCoachOpen(true);
+    loadStoredRuns(true);
+  }, [loadStoredRuns]);
   const onExportPdf = useCallback(() => {
     if (!vexflowContainerRef.current || !songData) {
       return;
@@ -357,6 +402,94 @@ export function SongView() {
     isEnded,
     onExit: () => navigate('/'),
   });
+  const applyCoachLoop = useCallback(
+    (barStart: number, barEnd: number, speed: number): boolean => {
+      const start = barStart - 1;
+      const end = Math.min(barEnd - 1, renderData.length - 1);
+      const startMeasure = renderData[start]?.measure;
+
+      if (!chart || !startMeasure || end < start) {
+        return false;
+      }
+
+      pause();
+      setPlaybackSpeed(speed);
+      setIsLooping(true);
+      onPracticeRangeChange({ start, end });
+      seekSeconds(
+        ticksToSeconds(startMeasure.startTick, chart.resolution, chart.tempos) +
+          delaySeconds,
+      );
+      setIsCoachOpen(false);
+
+      return true;
+    },
+    [
+      chart,
+      delaySeconds,
+      onPracticeRangeChange,
+      pause,
+      renderData,
+      seekSeconds,
+      setIsLooping,
+      setPlaybackSpeed,
+    ],
+  );
+  const onPracticeBars = useCallback(
+    (barStart: number, barEnd: number, speed: number) => {
+      if (!id) {
+        return;
+      }
+
+      if (gameMode !== 'practice') {
+        navigate(
+          `/${id}?gameMode=practice&coachStart=${barStart}&coachEnd=${barEnd}&coachSpeed=${speed}`,
+        );
+
+        return;
+      }
+
+      applyCoachLoop(barStart, barEnd, speed);
+    },
+    [applyCoachLoop, gameMode, id, navigate],
+  );
+  const onTrainSkill = useCallback(
+    (lessonId: string) => navigate(`/?coachLesson=${lessonId}`),
+    [navigate],
+  );
+
+  useEffect(() => {
+    if (gameMode !== 'practice') {
+      return;
+    }
+
+    const barStart = Number(searchParams.get('coachStart'));
+    const barEnd = Number(searchParams.get('coachEnd'));
+    const speed = Number(searchParams.get('coachSpeed'));
+
+    if (
+      !Number.isInteger(barStart) ||
+      !Number.isInteger(barEnd) ||
+      !Number.isFinite(speed)
+    ) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      if (!applyCoachLoop(barStart, barEnd, speed)) {
+        return;
+      }
+
+      const next = new URLSearchParams(searchParams);
+
+      next.delete('coachStart');
+      next.delete('coachEnd');
+      next.delete('coachSpeed');
+      setSearchParams(next, { replace: true });
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, [applyCoachLoop, gameMode, searchParams, setSearchParams]);
 
   useEffect(() => {
     playbackSpeedRef.current = playbackSpeed;
@@ -524,6 +657,7 @@ export function SongView() {
         isOpen={isScoreModalOpen}
         onNextSong={onNextSong}
         onRetry={onRetry}
+        onCoach={onOpenCoach}
         songData={songData}
         difficulty={difficulty}
         scoreData={scoreData}
@@ -541,6 +675,27 @@ export function SongView() {
           variant="panel"
           summary={songRuns?.[songRuns.length - 1]}
           trend={songRuns ? computeRunsTrend(songRuns) : []}
+        />
+      </Drawer>
+      <Drawer
+        title="AI practice coach"
+        open={isCoachOpen}
+        onClose={() => setIsCoachOpen(false)}
+        destroyOnClose
+        width={620}
+      >
+        <AICoach
+          result={coachResult}
+          song={{
+            name: songData?.name ?? '',
+            artist: songData?.artist ?? '',
+            difficulty,
+          }}
+          measures={parsedMidi?.measures ?? []}
+          records={coachRecords}
+          loading={isCoachLoading}
+          onPracticeBars={onPracticeBars}
+          onTrainSkill={onTrainSkill}
         />
       </Drawer>
       <header
@@ -706,6 +861,14 @@ export function SongView() {
           }
           onExportPdf={onExportPdf}
           isExporting={isExporting}
+        />
+        <Button
+          icon={<FontAwesomeIcon icon={faWandMagicSparkles} />}
+          data-testid="ai-coach-button"
+          aria-label="AI practice coach"
+          onClick={onOpenCoach}
+          size="large"
+          className="shrink-0"
         />
         <Button
           icon={<FontAwesomeIcon icon={faChartLine} />}
