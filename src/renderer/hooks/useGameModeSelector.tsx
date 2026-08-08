@@ -1,26 +1,45 @@
-import { Button, Modal } from 'antd';
+import { Button, Modal, Select } from 'antd';
 import { useCallback, useRef, useState } from 'react';
+import { Difficulty } from 'scan-chart';
+import { useApp } from '../context/AppContext';
 import { useInput } from '../context/InputContext';
 import { modalStyles, MODAL_ABOVE_POPOVER_Z_INDEX } from '../overlayStyles';
 import { GameMode } from '../types';
 import { useInputControls } from './useInputControls';
 
-const GAME_MODES: GameMode[] = ['perform', 'practice'];
+// Practice comes first — it's the primary action (both visually and as the
+// default focus/highlight below), matching the owner's push towards
+// practice-first framing over Perform.
+const GAME_MODES: GameMode[] = ['practice', 'perform'];
 
 export function useGameModeSelector() {
+  const { difficulty, setDifficulty } = useApp();
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<GameMode>('perform');
+  const [selectedMode, setSelectedMode] = useState<GameMode>('practice');
+  // Difficulties the chart being opened actually carries. Falls back to
+  // just the current global difficulty (mirrors SongView's own
+  // availableDifficulties fallback) so the selector never offers a
+  // difficulty the chart can't parse.
+  const [availableDifficulties, setAvailableDifficulties] = useState<
+    Difficulty[]
+  >([difficulty]);
   const resolveRef = useRef<(gameMode?: GameMode) => void>(undefined);
   const { controlMapping } = useInput();
-  const open = useCallback(() => {
-    resolveRef.current?.(undefined);
-    setSelectedMode('perform');
-    setIsOpen(true);
+  const open = useCallback(
+    (chartDifficulties?: Difficulty[]) => {
+      resolveRef.current?.(undefined);
+      setSelectedMode('practice');
+      setAvailableDifficulties(
+        chartDifficulties?.length ? chartDifficulties : [difficulty],
+      );
+      setIsOpen(true);
 
-    return new Promise<GameMode | undefined>((resolve) => {
-      resolveRef.current = resolve;
-    });
-  }, []);
+      return new Promise<GameMode | undefined>((resolve) => {
+        resolveRef.current = resolve;
+      });
+    },
+    [difficulty],
+  );
   const close = useCallback((gameMode?: GameMode) => {
     setIsOpen(false);
     resolveRef.current?.(gameMode);
@@ -73,6 +92,28 @@ export function useGameModeSelector() {
             <div className="capitalize">{name}</div>
           </Button>
         ))}
+
+        <div className="flex items-center gap-2 pt-1">
+          <div className="text-text-faint">Difficulty:</div>
+
+          <Select
+            size="middle"
+            className="capitalize"
+            popupMatchSelectWidth={false}
+            value={difficulty}
+            data-testid="game-mode-difficulty-select"
+            aria-label="Difficulty"
+            disabled={availableDifficulties.length <= 1}
+            // App-global, same setter the library header tabs and the
+            // in-song difficulty Select use — picking a difficulty here
+            // sticks everywhere else too.
+            onChange={(value) => setDifficulty(value as Difficulty)}
+            options={availableDifficulties.map((d) => ({
+              value: d,
+              label: d,
+            }))}
+          />
+        </div>
       </div>
     </Modal>
   );

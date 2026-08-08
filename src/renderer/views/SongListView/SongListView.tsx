@@ -182,7 +182,8 @@ export function SongListView() {
       return;
     }
 
-    const gameMode = await gameModeSelector.open();
+    const song = songList.find((s) => s.id === id);
+    const gameMode = await gameModeSelector.open(song?.drumDifficulties);
 
     if (gameMode) {
       navigate(`/${id}?gameMode=${gameMode}`);

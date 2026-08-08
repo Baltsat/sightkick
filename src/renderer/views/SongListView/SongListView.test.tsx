@@ -378,6 +378,79 @@ describe('SongListView — opening a song', () => {
 
     expect(await screen.findByTestId('song-view-stub')).toBeInTheDocument();
   });
+
+  it('shows Practice as the primary, default-focused game mode', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([makeListSong('a')]);
+    view.clickSong('a');
+
+    const modal = within(screen.getByTestId('game-mode-selector-modal'));
+
+    expect(modal.getByTestId('game-mode-practice')).toHaveClass(
+      'ant-btn-primary',
+    );
+    expect(modal.getByTestId('game-mode-perform')).not.toHaveClass(
+      'ant-btn-primary',
+    );
+  });
+
+  it('prefills the difficulty select from the current global difficulty tab', () => {
+    const view = setupSongListView({ settings: { difficulty: 'hard' } });
+
+    view.loadSongs([makeListSong('a')]);
+    view.clickSong('a');
+
+    const modal = within(screen.getByTestId('game-mode-selector-modal'));
+
+    expect(modal.getByTestId('game-mode-difficulty-select')).toHaveTextContent(
+      'hard',
+    );
+  });
+
+  it('only offers difficulties the chart actually has', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('a', { drumDifficulties: ['medium', 'expert'] }),
+    ]);
+    view.clickSong('a');
+
+    const modal = within(screen.getByTestId('game-mode-selector-modal'));
+
+    fireEvent.mouseDown(modal.getByRole('combobox', { name: 'Difficulty' }));
+
+    expect(screen.getByRole('option', { name: 'medium' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'expert' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('option', { name: 'easy' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('option', { name: 'hard' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('changing the difficulty in the modal opens the song at the chosen difficulty', async () => {
+    const view = setupSongListView();
+
+    view.loadSongs([makeListSong('a')]);
+    view.clickSong('a');
+
+    const modal = within(screen.getByTestId('game-mode-selector-modal'));
+
+    fireEvent.mouseDown(modal.getByRole('combobox', { name: 'Difficulty' }));
+    fireEvent.click(screen.getByRole('option', { name: 'hard' }));
+    view.chooseGameMode('practice');
+
+    expect(await screen.findByTestId('song-view-stub')).toBeInTheDocument();
+    // The modal's difficulty picker writes the same app-global state the
+    // library header tabs read — SongView loads whatever that holds, so
+    // this is the observable proof the song opens at the chosen difficulty.
+    expect(screen.getByTestId('difficulty-hard')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
 });
 
 describe('SongListView — stem splitting', () => {
