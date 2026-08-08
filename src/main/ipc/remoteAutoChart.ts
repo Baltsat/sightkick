@@ -337,7 +337,7 @@ async function openAudioFile(filePath: string): Promise<Blob> {
   ).openAsBlob;
 
   if (!openAsBlob) {
-    throw new Error('This SightKick build cannot stream local audio uploads');
+    throw new Error('This Drumroll build cannot stream local audio uploads');
   }
 
   return openAsBlob(filePath);

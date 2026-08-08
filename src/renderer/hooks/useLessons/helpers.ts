@@ -12,6 +12,15 @@ import { getStarRating } from '../../scoring';
  */
 export const LESSON_NAME_PREFIX = 'SightKick Method - ';
 
+/**
+ * Presentation-only rebrand: the app now shows the curriculum as "Drumroll
+ * Method" in the UI, but the on-disk folder/name prefix above, the `sk_*`
+ * ini fields, and the isLessonSong() prefix fallback all still match
+ * "SightKick Method - " so existing libraries keep scanning correctly. Use
+ * this constant for anything the user reads; never for matching data.
+ */
+export const LESSON_METHOD_DISPLAY_NAME = 'Drumroll Method';
+
 /** Star rating a lesson needs to have been fully mastered ("continue" cutoff). */
 export const LESSON_MASTERED_STARS = 3;
 

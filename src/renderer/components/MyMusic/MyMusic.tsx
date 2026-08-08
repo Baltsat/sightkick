@@ -193,9 +193,9 @@ export function MyMusic({ librarySongs, disabled }: MyMusicProps) {
             color="var(--color-text-dim)"
           />
           <div className="max-w-sm text-sm leading-relaxed text-text-muted">
-            SightKick can read your YouTube Music Liked Songs using your
+            Drumroll can read your YouTube Music Liked Songs using your
             already-signed-in Chrome browser session — no separate login, no
-            password shared with SightKick. Make sure you&apos;re signed in to
+            password shared with Drumroll. Make sure you&apos;re signed in to
             music.youtube.com in Chrome, then connect.
           </div>
           <Tooltip

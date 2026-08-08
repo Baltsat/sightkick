@@ -78,7 +78,7 @@ export function EmptySongState({
         Choose your library folder
       </h2>
       <p className="text-sm leading-relaxed text-text-muted">
-        Open Settings, then select the folder where SightKick will keep your
+        Open Settings, then select the folder where Drumroll will keep your
         songs and progress.
       </p>
       <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface-raised px-4 text-sm text-text-body">

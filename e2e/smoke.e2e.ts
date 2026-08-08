@@ -229,7 +229,7 @@ test.describe('seeded library', () => {
       .getByTestId('auto-chart-youtube-url')
       .fill('https://youtu.be/abcdefghijk');
 
-    const sightkickOption = page.getByRole('radio', { name: 'SightKick' });
+    const sightkickOption = page.getByRole('radio', { name: 'Drumroll' });
 
     if (await sightkickOption.isVisible()) {
       await sightkickOption.click();

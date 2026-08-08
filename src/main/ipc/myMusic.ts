@@ -41,7 +41,7 @@ const CHROME_LOCKED_MESSAGE =
 const CHROME_UNAVAILABLE_MESSAGE =
   "Could not read Chrome's cookies. Make sure Chrome is installed and you're signed in to a profile.";
 const YT_DLP_MISSING_MESSAGE =
-  'My Music needs yt-dlp. Reinstall SightKick, or install yt-dlp and add it to PATH.';
+  'My Music needs yt-dlp. Reinstall Drumroll, or install yt-dlp and add it to PATH.';
 const TIMEOUT_MESSAGE =
   'Fetching your liked songs timed out. Check your connection and try again.';
 

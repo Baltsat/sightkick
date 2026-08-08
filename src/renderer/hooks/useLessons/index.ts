@@ -9,6 +9,7 @@ export {
   highestAvailableDifficulty,
   isLessonSong,
   LESSON_MASTERED_STARS,
+  LESSON_METHOD_DISPLAY_NAME,
   LESSON_NAME_PREFIX,
   lockedHint,
 } from './helpers';

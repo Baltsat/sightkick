@@ -76,7 +76,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'season-finale',
     title: 'Season Finale',
-    description: 'Mastered every lesson in a SightKick Method unit.',
+    description: 'Mastered every lesson in a Drumroll Method unit.',
     hint: 'Master (3⭐) every lesson in one Method unit.',
   },
   {

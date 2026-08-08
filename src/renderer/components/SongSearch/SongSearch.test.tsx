@@ -197,12 +197,12 @@ describe('SongSearch', () => {
 
     act(() => {
       ipc.emit('search-youtube', {
-        error: 'YouTube search needs yt-dlp. Reinstall SightKick.',
+        error: 'YouTube search needs yt-dlp. Reinstall Drumroll.',
       });
     });
 
     expect(screen.getByTestId('song-search-error')).toHaveTextContent(
-      'YouTube search needs yt-dlp. Reinstall SightKick.',
+      'YouTube search needs yt-dlp. Reinstall Drumroll.',
     );
   });
 

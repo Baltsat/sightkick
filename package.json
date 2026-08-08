@@ -137,7 +137,7 @@
     "vitest": "^4.1.9"
   },
   "build": {
-    "productName": "SightKick",
+    "productName": "Drumroll",
     "buildVersion": "1.2.1",
     "appId": "org.sk.SightKick",
     "asar": true,

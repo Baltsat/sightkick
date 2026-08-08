@@ -40,7 +40,7 @@ def write_song_ini(
         f"year = {year}",
         f"genre = {genre}",
         f"charter = {charter}",
-        "auto_chart_tool = SightKick Transcriber",
+        "auto_chart_tool = Drumroll Transcriber",
         "auto_chart = True",
         f"diff_drums = {diff_drums}",
         "pro_drums = True",

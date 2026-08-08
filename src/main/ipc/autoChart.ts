@@ -200,7 +200,7 @@ function backendLabel(backend: AutoChartBackend): string {
     return 'local OCTAVE';
   }
 
-  return backend === 'remote' ? 'remote SightKick' : 'SightKick';
+  return backend === 'remote' ? 'remote Drumroll' : 'Drumroll';
 }
 
 export function canonicalizeYoutubeUrl(value: string): string {
@@ -680,7 +680,7 @@ export function validateSightkickRuntime(
 
   if (!runnerPath) {
     throw new Error(
-      'The bundled SightKick transcriber is missing or is not executable; reinstall SightKick or switch to the OCTAVE backend',
+      'The bundled Drumroll transcriber is missing or is not executable; reinstall Drumroll or switch to the OCTAVE backend',
     );
   }
 
@@ -688,7 +688,7 @@ export function validateSightkickRuntime(
 
   if (!ffmpegPath) {
     throw new Error(
-      'The SightKick ffmpeg runtime is missing; reinstall SightKick before creating a chart',
+      'The Drumroll ffmpeg runtime is missing; reinstall Drumroll before creating a chart',
     );
   }
 
@@ -697,12 +697,12 @@ export function validateSightkickRuntime(
 
   if (!uvPath && !pythonPath) {
     throw new Error(
-      'SightKick auto-chart requires bundled uv or Python 3.12+; reinstall SightKick or install Python 3.12',
+      'Drumroll auto-chart requires bundled uv or Python 3.12+; reinstall Drumroll or install Python 3.12',
     );
   }
 
   if (!runtime.dataDir) {
-    throw new Error('SightKick transcriber data directory is unavailable');
+    throw new Error('Drumroll transcriber data directory is unavailable');
   }
 
   return {
@@ -775,7 +775,7 @@ function sightkickArgs(input: SightkickRunInput): string[] {
     args.push('--url', input.youtubeUrl);
   } else {
     throw new Error(
-      'SightKick auto-chart requires a YouTube URL or local audio file',
+      'Drumroll auto-chart requires a YouTube URL or local audio file',
     );
   }
 
@@ -1281,7 +1281,7 @@ export class AutoChartQueue {
     }
 
     throw new Error(
-      'No auto-chart backend is available. Bundle the SightKick transcriber (resources/transcriber) or install OCTAVE.app',
+      'No auto-chart backend is available. Bundle the Drumroll transcriber (resources/transcriber) or install OCTAVE.app',
     );
   }
 
@@ -1330,7 +1330,7 @@ export class AutoChartQueue {
           job.audioPath = this.dependencies.validateAudio(job.audioPath);
         } else if (!job.youtubeUrl) {
           throw new Error(
-            'SightKick auto-chart requires a YouTube URL or local audio file',
+            'Drumroll auto-chart requires a YouTube URL or local audio file',
           );
         }
 
@@ -1429,7 +1429,7 @@ export class AutoChartQueue {
       downloading ? 'downloading' : 'processing',
       downloading
         ? 'Downloading audio from YouTube'
-        : 'SightKick is preparing a drum chart',
+        : 'Drumroll is preparing a drum chart',
       0,
     );
 
@@ -1638,7 +1638,7 @@ export class AutoChartQueue {
   ): string {
     if (!job.tempDir) {
       throw new Error(
-        'SightKick returned an unexpected prepared-chart location',
+        'Drumroll returned an unexpected prepared-chart location',
       );
     }
 
@@ -1651,7 +1651,7 @@ export class AutoChartQueue {
       !stat.isDirectory() ||
       !isInside(tempDir, preparedDir)
     ) {
-      throw new Error('SightKick returned an unsafe prepared-chart location');
+      throw new Error('Drumroll returned an unsafe prepared-chart location');
     }
 
     return preparedDir;

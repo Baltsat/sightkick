@@ -2,6 +2,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlay } from '@fortawesome/free-solid-svg-icons';
 import { Button } from 'antd';
 import {
+  LESSON_METHOD_DISPLAY_NAME,
   LessonEntry,
   LessonProgress,
   lockedHint,
@@ -37,7 +38,7 @@ export function HeaderStrip({ progress, onPlay }: HeaderStripProps) {
     >
       <div>
         <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
-          <span>SightKick Method</span>
+          <span>{LESSON_METHOD_DISPLAY_NAME}</span>
           {info && (
             <>
               <span className="text-text-dim" aria-hidden="true">
@@ -120,8 +121,8 @@ export function HeaderStrip({ progress, onPlay }: HeaderStripProps) {
           data-testid="lesson-complete-card"
         >
           <p className="text-sm text-text-muted">
-            You&apos;ve completed the whole SightKick Method curriculum. Nice
-            work!
+            You&apos;ve completed the whole {LESSON_METHOD_DISPLAY_NAME}{' '}
+            curriculum. Nice work!
           </p>
         </section>
       )}

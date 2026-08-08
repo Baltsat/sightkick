@@ -191,7 +191,7 @@ function createHarness(options: HarnessOptions = {}) {
     preflightSightkick: () => {
       if (!backends.sightkick) {
         throw new Error(
-          'The bundled SightKick transcriber is missing; reinstall SightKick or switch to the OCTAVE backend',
+          'The bundled Drumroll transcriber is missing; reinstall Drumroll or switch to the OCTAVE backend',
         );
       }
 

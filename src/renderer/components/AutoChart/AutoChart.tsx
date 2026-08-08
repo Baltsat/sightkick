@@ -46,7 +46,7 @@ function backendName(backend: AutoChartBackend): string {
     return 'OCTAVE';
   }
 
-  return backend === 'remote' ? 'Remote' : 'SightKick';
+  return backend === 'remote' ? 'Remote' : 'Drumroll';
 }
 
 const chartSteps = [
@@ -143,7 +143,7 @@ export function AutoChart({ disabled, onImported }: Props) {
   const availableBackends = [
     backends?.sightkick
       ? {
-          label: 'SightKick',
+          label: 'Drumroll',
           value: 'sightkick' as const,
         }
       : undefined,
@@ -309,9 +309,8 @@ export function AutoChart({ disabled, onImported }: Props) {
               Paste a song. Get a playable drum chart.
             </h2>
             <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-text-muted">
-              SightKick downloads the audio, separates the drums, transcribes
-              the notes, and lets you review the chart before it joins your
-              library.
+              Drumroll downloads the audio, separates the drums, transcribes the
+              notes, and lets you review the chart before it joins your library.
             </p>
           </div>
 
@@ -415,7 +414,7 @@ export function AutoChart({ disabled, onImported }: Props) {
             >
               Using the {backendName(backend ?? backends.default)} auto-charter
               {!backends.sightkick &&
-                ' (bundled SightKick transcriber not found)'}
+                ' (bundled Drumroll transcriber not found)'}
               .
             </div>
           )}
@@ -426,7 +425,7 @@ export function AutoChart({ disabled, onImported }: Props) {
               data-testid="auto-chart-no-backend"
               role="alert"
             >
-              No auto-chart engine is available. Reinstall SightKick, or install
+              No auto-chart engine is available. Reinstall Drumroll, or install
               OCTAVE.app, or configure the remote transcriber, then try again.
             </div>
           )}

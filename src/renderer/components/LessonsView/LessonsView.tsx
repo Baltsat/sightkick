@@ -3,6 +3,7 @@ import { faArrowsRotate } from '@fortawesome/free-solid-svg-icons';
 import { App, Button, Progress } from 'antd';
 import { currentSeasonInfo, HeaderStrip, SeasonCard } from '../LessonsJourney';
 import {
+  LESSON_METHOD_DISPLAY_NAME,
   LessonEntry,
   LessonProgress,
   lockedHint,
@@ -58,7 +59,8 @@ export function LessonsView({
             Scanning your library
           </h2>
           <p className="text-sm leading-relaxed text-text-muted">
-            Looking for the SightKick Method curriculum in your songs folder…
+            Looking for the {LESSON_METHOD_DISPLAY_NAME} curriculum in your
+            songs folder…
           </p>
           <Progress percent={scanPercent} className="w-full" />
         </section>
@@ -71,8 +73,8 @@ export function LessonsView({
           No lessons found
         </h2>
         <p className="text-sm leading-relaxed text-text-muted">
-          The SightKick Method curriculum wasn&apos;t found in your library.
-          Rescan your library folder to pick it up.
+          The {LESSON_METHOD_DISPLAY_NAME} curriculum wasn&apos;t found in your
+          library. Rescan your library folder to pick it up.
         </p>
         <Button
           type="primary"
