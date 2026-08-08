@@ -607,6 +607,12 @@ def build_ini_text(
         f'sk_next = "{next_id}"',
         f'sk_unit = "{unit_name}"',
         f'sk_lesson_title = "{lesson_name}"',
+        # Comma-joined skill tags (see curriculum.yaml meta.skills_legend for
+        # the controlled vocabulary) -- consumed by the AI-coach lane for
+        # lesson-linking, not by the Lessons journey UI. Same additive/safe
+        # contract as the other sk_ fields above: unknown ini fields are
+        # ignored by the app's own parser.
+        f'sk_skills = "{",".join(exercise.get("skills", []))}"',
         "",
     ]
     return "\n".join(lines)
