@@ -15,7 +15,7 @@ import { PlayerMode } from '../services/audio-player';
 import { Engine, PlaybackSnapshot, PlaybackState } from '../services/engine';
 import { inputBus } from '../input';
 import { useInput } from '../context/InputContext';
-import { RunSummary } from '../services/practice-stats';
+import { HitRecord, RunSummary } from '../services/practice-stats';
 
 interface UseEngineParams {
   trackData: TrackConfig[];
@@ -29,7 +29,11 @@ interface UseEngineParams {
   playheadStyle: PlayheadStyle;
   mapping: InputMapping;
   player: PlayerMode;
-  onEnded: (score: ScoreData, practiceSummary: RunSummary) => void;
+  onEnded: (
+    score: ScoreData,
+    practiceSummary: RunSummary,
+    records: HitRecord[],
+  ) => void;
 }
 
 interface UseEngineResult {
@@ -107,8 +111,8 @@ export function useEngine({
       isDev: isDevRef.current,
       player: playerRef.current,
       subscribeInput: inputBus.subscribe,
-      onEnded: (score, practiceSummary) =>
-        onEndedRef.current(score, practiceSummary),
+      onEnded: (score, practiceSummary, records) =>
+        onEndedRef.current(score, practiceSummary, records),
       onError: () =>
         notification.error({
           title: 'Audio failed to load',

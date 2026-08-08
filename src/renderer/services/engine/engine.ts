@@ -44,7 +44,11 @@ export class Engine {
   private renderer = new GameRenderer((tick, key) =>
     this.judge.isHit(tick, key),
   );
-  private onEndedCb: (score: ScoreData, practiceSummary: RunSummary) => void;
+  private onEndedCb: (
+    score: ScoreData,
+    practiceSummary: RunSummary,
+    records: HitRecord[],
+  ) => void;
   private chart: ParsedChart | undefined;
   private measures: Measure[] = [];
   private delaySeconds = 0;
@@ -286,10 +290,8 @@ export class Engine {
     // a loop only ever contributes its *last* pass's hits/misses to the
     // summary below — honest evidence of the most recent attempt, not a
     // growing tally that rewards repetition over accuracy.
-    const practiceSummary = summarizeRun(
-      [...this.runRecords, ...this.deriveMisses()],
-      new Date().toISOString(),
-    );
+    const records = [...this.runRecords, ...this.deriveMisses()];
+    const practiceSummary = summarizeRun(records, new Date().toISOString());
 
     this.runRecords = [];
 
@@ -300,6 +302,7 @@ export class Engine {
         totalNotes: this.totalNotes(),
       },
       practiceSummary,
+      records,
     );
   }
 

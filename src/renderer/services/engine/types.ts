@@ -8,14 +8,18 @@ import { InputElement, InputMapping, ScoreData } from '../../../types';
 import { PlayheadStyle } from '../../types';
 import { InputEvent } from '../../input/types';
 import { AudioPlayerFactory, PlayerMode, TrackConfig } from '../audio-player';
-import { RunSummary } from '../practice-stats';
+import { HitRecord, RunSummary } from '../practice-stats';
 
 export interface EngineOptions {
   trackData: TrackConfig[];
   isDev: boolean;
   player: PlayerMode;
   subscribeInput: (listener: (event: InputEvent) => void) => () => void;
-  onEnded: (score: ScoreData, practiceSummary: RunSummary) => void;
+  onEnded: (
+    score: ScoreData,
+    practiceSummary: RunSummary,
+    records: HitRecord[],
+  ) => void;
   onError: () => void;
 }
 

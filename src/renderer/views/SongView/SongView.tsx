@@ -177,7 +177,7 @@ export function SongView() {
     player: policy.player,
     playheadStyle: policy.playheadOverride ?? playheadStyle,
     mapping: inputMapping,
-    onEnded: (score, summary) => {
+    onEnded: (score, summary, records) => {
       // Star rating / high-score submission stay Perform-only (see
       // ModePolicy.scoring's doc comment), but per-hit analytics capture,
       // save-practice-run, and showing the stats summary are NOT
@@ -222,6 +222,7 @@ export function SongView() {
         window.electron.ipcRenderer.sendMessage('save-practice-run', {
           songId: id,
           summary: runSummary,
+          records,
         });
 
         // Gated on the same isAttempt check as save-practice-run above, and

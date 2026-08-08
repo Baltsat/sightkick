@@ -316,6 +316,7 @@ describe('Engine', () => {
           { element: 'hihat', hits: 0, misses: 1, accuracy: 0 },
         ],
       }),
+      expect.any(Array),
     );
   });
 
@@ -436,6 +437,7 @@ describe('Engine', () => {
         totalWrong: 0,
         laneAccuracy: [{ element: 'snare', hits: 1, misses: 0, accuracy: 1 }],
       }),
+      expect.any(Array),
     );
   });
 
@@ -479,6 +481,7 @@ describe('Engine', () => {
         laneAccuracy: [{ element: 'snare', hits: 1, misses: 0, accuracy: 1 }],
         timingBias: expect.objectContaining({ meanMs: 0, sampleCount: 1 }),
       }),
+      expect.any(Array),
     );
   });
 
@@ -544,6 +547,7 @@ describe('Engine', () => {
         wrongHitCounts: [],
         laneAccuracy: [{ element: 'snare', hits: 0, misses: 1, accuracy: 0 }],
       }),
+      expect.any(Array),
     );
   });
 

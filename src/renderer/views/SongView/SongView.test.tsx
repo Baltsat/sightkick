@@ -1159,6 +1159,10 @@ describe('the score summary', () => {
     expect(practiceRunPayloads).toEqual([
       {
         songId: 'song-1',
+        records: expect.arrayContaining([
+          expect.objectContaining({ verdict: 'hit', element: 'snare' }),
+          expect.objectContaining({ verdict: 'miss', element: 'snare' }),
+        ]),
         summary: expect.objectContaining({
           mode: 'perform',
           playbackSpeed: 1,

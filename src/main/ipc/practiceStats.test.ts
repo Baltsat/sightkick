@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { RunSummary } from '../../renderer/services/practice-stats';
+import { HitRecord, RunSummary } from '../../renderer/services/practice-stats';
 import { FakeStore, lastReply, makeEvent, makeStore } from './test-support';
 
 const storeHolder = vi.hoisted(() => ({
@@ -16,8 +16,12 @@ vi.mock('../AppState', () => ({
   },
 }));
 
-const { MAX_STORED_RUNS_PER_SONG, loadPracticeRuns, savePracticeRun } =
-  await import('./practiceStats');
+const {
+  MAX_STORED_FULL_RUNS_PER_SONG,
+  MAX_STORED_RUNS_PER_SONG,
+  loadPracticeRuns,
+  savePracticeRun,
+} = await import('./practiceStats');
 
 function fakeSummary(overallAccuracy = 1): RunSummary {
   return {
@@ -41,6 +45,17 @@ function fakeSummary(overallAccuracy = 1): RunSummary {
   };
 }
 
+function fakeRecord(tick = 0): HitRecord {
+  return {
+    tick,
+    timeSeconds: tick / 480,
+    deltaMs: -12,
+    element: 'snare',
+    verdict: 'hit',
+    velocity: 92,
+  };
+}
+
 describe('savePracticeRun', () => {
   it('appends the run and persists it under the song id', () => {
     storeHolder.current = makeStore({});
@@ -54,6 +69,63 @@ describe('savePracticeRun', () => {
     expect(lastReply(event, 'save-practice-run')!.args[0]).toEqual({
       songId: 'song-1',
       runs: [summary],
+      fullRuns: [],
+    });
+  });
+
+  it('stores compact hit records separately from the summary history', () => {
+    storeHolder.current = makeStore({});
+    const event = makeEvent();
+    const summary = fakeSummary();
+
+    savePracticeRun(event as never, {
+      songId: 'song-1',
+      summary,
+      records: [fakeRecord(480)],
+    });
+
+    expect(storeHolder.current.get('practiceRunDetails.song-1')).toEqual([
+      {
+        summary,
+        records: [
+          {
+            tick: 480,
+            deltaMs: -12,
+            element: 'snare',
+            verdict: 'hit',
+            velocity: 92,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('caps full-resolution history independently at thirty runs', () => {
+    const existing = Array.from(
+      { length: MAX_STORED_FULL_RUNS_PER_SONG },
+      (_, index) => ({
+        summary: fakeSummary(index),
+        records: [{ ...fakeRecord(index), timeSeconds: undefined }],
+      }),
+    );
+    storeHolder.current = makeStore({
+      practiceRunDetails: { 'song-1': existing },
+    });
+
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary: fakeSummary(999),
+      records: [fakeRecord(999)],
+    });
+
+    const stored = storeHolder.current.get(
+      'practiceRunDetails.song-1',
+    ) as unknown[];
+
+    expect(stored).toHaveLength(MAX_STORED_FULL_RUNS_PER_SONG);
+    expect(stored[0]).toMatchObject({ summary: { overallAccuracy: 1 } });
+    expect(stored[stored.length - 1]).toMatchObject({
+      summary: { overallAccuracy: 999 },
     });
   });
 
@@ -144,6 +216,7 @@ describe('loadPracticeRuns', () => {
     expect(lastReply(event, 'load-practice-runs')!.args[0]).toEqual({
       songId: 'song-1',
       runs,
+      fullRuns: [],
     });
   });
 
@@ -157,6 +230,24 @@ describe('loadPracticeRuns', () => {
     expect(lastReply(event, 'load-practice-runs')!.args[0]).toEqual({
       songId: 'song-1',
       runs: [],
+      fullRuns: [],
+    });
+  });
+
+  it('returns full-resolution runs when available', () => {
+    const fullRuns = [
+      { summary: fakeSummary(0.8), records: [fakeRecord(240)] },
+    ];
+    storeHolder.current = makeStore({
+      practiceRunDetails: { 'song-1': fullRuns },
+    });
+    const event = makeEvent();
+
+    loadPracticeRuns(event as never, 'song-1');
+
+    expect(lastReply(event, 'load-practice-runs')!.args[0]).toMatchObject({
+      songId: 'song-1',
+      fullRuns,
     });
   });
 
