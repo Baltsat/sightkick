@@ -56,6 +56,39 @@ The rate limiter is isolate-local and therefore deliberately best-effort. A prod
 
 The transcriber URL must be reachable from Cloudflare's network. The preferred server-side path is a `cloudflared` tunnel bound to the service's loopback port; set `TRANSCRIBER_URL` to that tunnel hostname and keep the GCP service port closed. A firewall rule that admits a changing Cloudflare egress range is harder to maintain and is not required by this implementation.
 
+The server currently has no `cloudflared` binary. After choosing a hostname in a domain already managed by Cloudflare, run the following one-time setup. Replace the two angle-bracket values with the tunnel UUID printed by `tunnel create` and the chosen hostname:
+
+```sh
+ssh google
+sudo mkdir -p --mode=0755 /usr/share/keyrings
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
+sudo apt-get update
+sudo apt-get install cloudflared
+cloudflared tunnel login
+cloudflared tunnel create drumroll-transcriber
+cloudflared tunnel route dns drumroll-transcriber <transcriber-hostname>
+```
+
+Create `~/.cloudflared/config.yml` on that server:
+
+```yaml
+url: http://127.0.0.1:8010
+tunnel: <tunnel-uuid>
+credentials-file: /home/konstantinbaltsat/.cloudflared/<tunnel-uuid>.json
+```
+
+Install and verify the boot-persistent service:
+
+```sh
+sudo cloudflared --config /home/konstantinbaltsat/.cloudflared/config.yml service install
+sudo systemctl start cloudflared
+sudo systemctl status cloudflared
+curl https://<transcriber-hostname>/healthz
+```
+
+These commands follow Cloudflare's [locally managed tunnel](https://developers.cloudflare.com/tunnel/advanced/local-management/create-local-tunnel/) and [Linux service](https://developers.cloudflare.com/tunnel/advanced/local-management/as-a-service/linux/) procedures.
+
 Set production secrets without exposing their values:
 
 ```sh
