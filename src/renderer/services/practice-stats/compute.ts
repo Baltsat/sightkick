@@ -209,3 +209,33 @@ export function computeRunsTrend(
       biasMeanMs: summary.timingBias.meanMs,
     }));
 }
+
+/**
+ * Sums hits/misses per lane across many runs (e.g. every stored run in the
+ * library, for the gamification stats panel's "per-drum accuracy" view),
+ * recomputing accuracy from the totals rather than averaging each run's
+ * already-rounded per-run accuracy — a lane struck twice as often in one
+ * run correctly counts twice as much toward the aggregate.
+ */
+export function aggregateLaneAccuracy(summaries: RunSummary[]): LaneAccuracy[] {
+  const byLane = new Map<KitElement, { hits: number; misses: number }>();
+
+  for (const summary of summaries) {
+    for (const lane of summary.laneAccuracy) {
+      const entry = byLane.get(lane.element) ?? { hits: 0, misses: 0 };
+
+      entry.hits += lane.hits;
+      entry.misses += lane.misses;
+      byLane.set(lane.element, entry);
+    }
+  }
+
+  const entries = [...byLane.entries()].map(([element, { hits, misses }]) => ({
+    element,
+    hits,
+    misses,
+    accuracy: hits / (hits + misses),
+  }));
+
+  return sortByKitOrder(entries);
+}

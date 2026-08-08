@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  aggregateLaneAccuracy,
   computeLaneAccuracy,
   computeLaneBias,
   computeRunsTrend,
@@ -295,5 +296,78 @@ describe('computeRunsTrend', () => {
 
     expect(computeRunsTrend(runs, 0)).toEqual([]);
     expect(computeRunsTrend(runs, -3)).toEqual([]);
+  });
+});
+
+describe('aggregateLaneAccuracy', () => {
+  it('sums hits/misses per lane across multiple runs and recomputes accuracy', () => {
+    const runA = summarizeRun(
+      [hit('kick', 0), hit('kick', 0), miss('kick')],
+      '2026-08-01T00:00:00.000Z',
+    );
+    const runB = summarizeRun(
+      [hit('kick', 0), hit('snare', 0), miss('snare')],
+      '2026-08-02T00:00:00.000Z',
+    );
+    const aggregate = aggregateLaneAccuracy([runA, runB]);
+    const kick = aggregate.find((lane) => lane.element === 'kick')!;
+    const snare = aggregate.find((lane) => lane.element === 'snare')!;
+
+    // 3 kick hits, 1 kick miss across both runs.
+    expect(kick).toEqual({
+      element: 'kick',
+      hits: 3,
+      misses: 1,
+      accuracy: 0.75,
+    });
+    expect(snare).toEqual({
+      element: 'snare',
+      hits: 1,
+      misses: 1,
+      accuracy: 0.5,
+    });
+  });
+
+  it('weighs a lane by real attempt count, not by averaging each runs accuracy', () => {
+    // Run A: 1/1 kick (100%). Run B: 1/9 kick hits (~11%). A naive average
+    // of the two per-run accuracies would read ~55%; the real combined
+    // accuracy across 10 attempts is 2/10 = 20%.
+    const runA = summarizeRun([hit('kick', 0)], '2026-08-01T00:00:00.000Z');
+    const runB = summarizeRun(
+      [
+        hit('kick', 0),
+        miss('kick'),
+        miss('kick'),
+        miss('kick'),
+        miss('kick'),
+        miss('kick'),
+        miss('kick'),
+        miss('kick'),
+        miss('kick'),
+      ],
+      '2026-08-02T00:00:00.000Z',
+    );
+    const aggregate = aggregateLaneAccuracy([runA, runB]);
+
+    expect(aggregate.find((lane) => lane.element === 'kick')?.accuracy).toBe(
+      0.2,
+    );
+  });
+
+  it('returns [] for no runs', () => {
+    expect(aggregateLaneAccuracy([])).toEqual([]);
+  });
+
+  it('returns lanes in canonical kit order regardless of input order', () => {
+    const run = summarizeRun(
+      [hit('crash', 0), hit('kick', 0), hit('snare', 0)],
+      '2026-08-01T00:00:00.000Z',
+    );
+
+    expect(aggregateLaneAccuracy([run]).map((lane) => lane.element)).toEqual([
+      'kick',
+      'snare',
+      'crash',
+    ]);
   });
 });
