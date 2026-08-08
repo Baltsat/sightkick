@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Song } from '../../../types';
-import { RunSummary } from '../../services/practice-stats';
+import {
+  aggregateLaneAccuracy,
+  LaneAccuracy,
+  RunSummary,
+} from '../../services/practice-stats';
 import {
   addDays,
   computeCurrentStreak,
@@ -52,6 +56,9 @@ export interface UseGamificationResult {
   /** undefined until `loadAchievements()` (or a `recordRun()` reply) has
    * populated the run-history cache achievements are derived from. */
   achievements: AchievementViewModel[] | undefined;
+  /** Same run-history cache, aggregated per lane across every stored run -
+   * undefined on the same "not loaded yet" schedule as `achievements`. */
+  laneAccuracy: LaneAccuracy[] | undefined;
   loadAchievements: () => void;
   recordRun: (
     input: RecordRunInput,
@@ -208,6 +215,13 @@ export function useGamification(songList: Song[]): UseGamificationResult {
       unlocked: result.unlocked,
     }));
   }, [runsCache, songList, streak.longest]);
+  const laneAccuracy = useMemo<LaneAccuracy[] | undefined>(() => {
+    if (!runsCache) {
+      return undefined;
+    }
+
+    return aggregateLaneAccuracy(runsCache);
+  }, [runsCache]);
   const recordRun = useCallback(
     (input: RecordRunInput, onResult?: (result: RecordRunResult) => void) => {
       const now = new Date();
@@ -307,6 +321,7 @@ export function useGamification(songList: Song[]): UseGamificationResult {
     weekActivity,
     totalStars,
     achievements,
+    laneAccuracy,
     loadAchievements,
     recordRun,
   };

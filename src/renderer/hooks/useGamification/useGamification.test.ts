@@ -161,6 +161,37 @@ describe('achievements', () => {
     expect(result.current.achievements).toBeUndefined();
   });
 
+  it('laneAccuracy is undefined until the run cache loads, then aggregates every run', () => {
+    const { result } = renderHook(() => useGamification([]));
+
+    expect(result.current.laneAccuracy).toBeUndefined();
+
+    act(() => {
+      result.current.loadAchievements();
+    });
+
+    act(() => {
+      ipc.emit('load-all-practice-runs', {
+        runs: [
+          fakeRun({
+            laneAccuracy: [
+              { element: 'kick', hits: 4, misses: 1, accuracy: 0.8 },
+            ],
+          }),
+          fakeRun({
+            laneAccuracy: [
+              { element: 'kick', hits: 4, misses: 0, accuracy: 1 },
+            ],
+          }),
+        ],
+      });
+    });
+
+    expect(result.current.laneAccuracy).toEqual([
+      { element: 'kick', hits: 8, misses: 1, accuracy: 8 / 9 },
+    ]);
+  });
+
   it('loadAchievements fetches every run and derives the full badge list', () => {
     const { result } = renderHook(() => useGamification([]));
 

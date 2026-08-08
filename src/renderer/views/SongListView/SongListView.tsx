@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Modal, Spin, Tooltip } from 'antd';
+import { Button, Drawer, Modal, Spin, Tooltip } from 'antd';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faGraduationCap,
@@ -39,6 +39,10 @@ import {
 import { calculateAccuracy, getStarRating } from '../../scoring';
 import { Stars } from '../../components/Stars';
 import { LibraryView } from '../../types';
+import { last7Dates, useGamification } from '../../hooks/useGamification';
+import { GamificationHeaderStrip } from '../../components/GamificationHeaderStrip';
+import { StatsPanel } from '../../components/StatsPanel';
+import { localDateKey } from '../../services/streaks';
 import {
   nextDifficulty,
   nextSongIndex,
@@ -67,6 +71,23 @@ export function SongListView() {
     scanProgress && scanProgress.total > 0
       ? Math.round((scanProgress.current / scanProgress.total) * 100)
       : undefined;
+  // Full songList (lesson songs included) - Century/Season Finale/Speed
+  // Demon all need to see the whole library, not just the non-lesson
+  // subset `librarySongs` (below) filters down to for the songs grid.
+  // Mounted once here, passed to SongView via <Outlet context> below
+  // (SongView renders inside this component's Outlet - see App.tsx's
+  // nested route - so one instance is enough for both surfaces to share
+  // live state without a separate context provider).
+  const gamification = useGamification(songList);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const weeklyXp = useMemo(() => {
+    const today = new Date();
+
+    return last7Dates(today).map((date) => ({
+      date,
+      xp: gamification.days[localDateKey(date)]?.xp ?? 0,
+    }));
+  }, [gamification.days]);
   const {
     nameFilter,
     setNameFilter,
@@ -273,6 +294,21 @@ export function SongListView() {
               </p>
             </div>
 
+            <GamificationHeaderStrip
+              isLoaded={gamification.isLoaded}
+              streak={gamification.streak}
+              todayXp={gamification.todayXp}
+              goalXp={gamification.goalXp}
+              goalOption={gamification.goalOption}
+              onChangeGoal={gamification.setGoalOption}
+              weekActivity={gamification.weekActivity}
+              totalStars={gamification.totalStars}
+              onOpenStats={() => {
+                gamification.loadAchievements();
+                setIsStatsOpen(true);
+              }}
+            />
+
             {view === 'songs' &&
               libraryMode === 'local' &&
               continuedSong &&
@@ -446,6 +482,22 @@ export function SongListView() {
           />
         </Modal>
 
+        <Drawer
+          title="Your practice stats"
+          open={isStatsOpen}
+          onClose={() => setIsStatsOpen(false)}
+          destroyOnClose
+        >
+          <StatsPanel
+            streak={gamification.streak}
+            weeklyXp={weeklyXp}
+            goalXp={gamification.goalXp}
+            totalStars={gamification.totalStars}
+            laneAccuracy={gamification.laneAccuracy ?? []}
+            achievements={gamification.achievements}
+          />
+        </Drawer>
+
         <main
           id="library-content"
           className="relative grow overflow-hidden w-full flex"
@@ -520,7 +572,7 @@ export function SongListView() {
         </main>
 
         <div className="fixed inset-0 pointer-events-none z-100">
-          <Outlet />
+          <Outlet context={gamification} />
         </div>
       </div>
     </StemToolsProvider>

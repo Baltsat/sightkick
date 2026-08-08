@@ -3,6 +3,10 @@ import { App as AntdApp } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 import { Song } from '../../../types';
 import { multiLaneRunFixture } from '../PracticeStats/test-fixtures';
+import {
+  RecordRunResult,
+  UseGamificationResult,
+} from '../../hooks/useGamification';
 import { ScoreSummary } from './ScoreSummary';
 
 const songData = {
@@ -108,5 +112,149 @@ describe('ScoreSummary', () => {
     });
 
     expect(modal.getByTestId('practice-stats-empty')).toBeInTheDocument();
+  });
+
+  describe('gamification', () => {
+    function gamificationFixture(
+      overrides: Partial<UseGamificationResult> = {},
+    ): UseGamificationResult {
+      return {
+        isLoaded: true,
+        days: {},
+        streak: { current: 3, longest: 5 },
+        todayXp: 40,
+        goalXp: 50,
+        goalOption: 'regular',
+        setGoalOption: vi.fn(),
+        goalCrossedToday: false,
+        weekActivity: [],
+        totalStars: 0,
+        achievements: undefined,
+        laneAccuracy: undefined,
+        loadAchievements: vi.fn(),
+        recordRun: vi.fn(),
+        ...overrides,
+      };
+    }
+
+    function runResultFixture(
+      overrides: Partial<RecordRunResult> = {},
+    ): RecordRunResult {
+      return {
+        xpEarned: 42,
+        goalCrossed: false,
+        streakCurrent: 3,
+        newlyUnlocked: [],
+        ...overrides,
+      };
+    }
+
+    it('renders nothing gamification-related without a runResult', () => {
+      renderSummary({
+        scoreData: { hitNotes: 70, totalNotes: 100, falseHits: 5 },
+        gamification: gamificationFixture(),
+      });
+
+      expect(
+        screen.queryByTestId('gamification-summary'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows XP earned, streak status, and XP remaining to goal', () => {
+      const { modal } = renderSummary({
+        scoreData: { hitNotes: 70, totalNotes: 100, falseHits: 5 },
+        gamification: gamificationFixture({
+          todayXp: 40,
+          goalXp: 50,
+          streak: { current: 3, longest: 3 },
+        }),
+        runResult: runResultFixture({ xpEarned: 42 }),
+      });
+
+      expect(modal.getByTestId('run-xp-earned')).toHaveTextContent('+42 XP');
+      expect(modal.getByTestId('run-streak-status')).toHaveTextContent(
+        '3-day streak',
+      );
+      expect(modal.getByTestId('run-goal-status')).toHaveTextContent(
+        "10 XP to today's goal",
+      );
+    });
+
+    it("says the goal is reached once today's XP is at or past it", () => {
+      const { modal } = renderSummary({
+        scoreData: { hitNotes: 70, totalNotes: 100, falseHits: 5 },
+        gamification: gamificationFixture({ todayXp: 60, goalXp: 50 }),
+        runResult: runResultFixture({ goalCrossed: true }),
+      });
+
+      expect(modal.getByTestId('run-goal-status')).toHaveTextContent(
+        "Today's goal reached!",
+      );
+      expect(modal.getByTestId('gamification-summary').className).toContain(
+        'sk-goal-celebrate',
+      );
+    });
+
+    it('shows a "start a streak" message when there is no active streak', () => {
+      const { modal } = renderSummary({
+        scoreData: { hitNotes: 70, totalNotes: 100, falseHits: 5 },
+        gamification: gamificationFixture({
+          streak: { current: 0, longest: 3 },
+        }),
+        runResult: runResultFixture({ streakCurrent: 0 }),
+      });
+
+      expect(modal.getByTestId('run-streak-status')).toHaveTextContent(
+        'Start a streak',
+      );
+    });
+
+    it('shows the single next-best-action nudge when one is present', () => {
+      const { modal } = renderSummary({
+        scoreData: { hitNotes: 70, totalNotes: 100, falseHits: 5 },
+        gamification: gamificationFixture(),
+        runResult: runResultFixture({
+          nudge: {
+            achievementId: 'perfect-10',
+            message: '2 runs like this and Perfect 10 unlocks',
+          },
+        }),
+      });
+
+      expect(modal.getByTestId('run-nudge')).toHaveTextContent(
+        '2 runs like this and Perfect 10 unlocks',
+      );
+    });
+
+    it('omits the nudge line entirely when there is none to show', () => {
+      const { modal } = renderSummary({
+        scoreData: { hitNotes: 70, totalNotes: 100, falseHits: 5 },
+        gamification: gamificationFixture(),
+        runResult: runResultFixture({ nudge: undefined }),
+      });
+
+      expect(modal.queryByTestId('run-nudge')).not.toBeInTheDocument();
+    });
+
+    it('surfaces newly-unlocked achievements as a toast', () => {
+      const { modal } = renderSummary({
+        scoreData: { hitNotes: 70, totalNotes: 100, falseHits: 5 },
+        gamification: gamificationFixture(),
+        runResult: runResultFixture({
+          newlyUnlocked: [
+            {
+              id: 'first-blood',
+              title: 'First Blood',
+              description: 'Completed your first practice run.',
+              hint: 'Finish any run to unlock.',
+            },
+          ],
+        }),
+      });
+
+      expect(modal.getByTestId('achievement-toast')).toHaveTextContent(
+        'First Blood',
+      );
+    });
   });
 });

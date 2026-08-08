@@ -12,7 +12,12 @@ import {
 } from 'antd';
 import { Content } from 'antd/es/layout/layout';
 import { Difficulty } from 'scan-chart';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import {
+  useNavigate,
+  useOutletContext,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import { Playback } from '../../components/Playback';
 import { SettingsButton } from '../../components/SettingsButton';
 import { SheetMusic } from '../../components/SheetMusic';
@@ -33,7 +38,11 @@ import { useEngine } from '../../hooks/useEngine';
 import { useVolumeControls } from '../../hooks/useVolumeControls';
 import { useMuteToggle } from '../../hooks/useMuteToggle';
 import { ticksToSeconds } from '../../../chart-parser/timing';
-import { calculateAccuracy } from '../../scoring';
+import { calculateAccuracy, getStarRating } from '../../scoring';
+import {
+  RecordRunResult,
+  UseGamificationResult,
+} from '../../hooks/useGamification';
 import { usePracticeSession } from '../../hooks/usePracticeSession';
 import { useSheetMusic } from '../../hooks/useSheetMusic';
 import { useInputControls } from '../../hooks/useInputControls';
@@ -69,8 +78,17 @@ export function SongView() {
   const [isExporting, setIsExporting] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [songRuns, setSongRuns] = useState<RunSummary[]>();
+  const [gamificationResult, setGamificationResult] =
+    useState<RecordRunResult>();
   const exportPdfOffRef = useRef<(() => void) | undefined>(undefined);
   const loadRunsOffRef = useRef<(() => void) | undefined>(undefined);
+  // Provided by SongListView, which mounts <Outlet context={gamification}>
+  // around this route (see SongListView.tsx) - one hook instance shared by
+  // the library header and whichever song is open, so both read/update the
+  // same streak/XP state. Optional because a test (or any future caller)
+  // that mounts SongView outside that Outlet simply gets no gamification
+  // rather than a crash.
+  const gamification = useOutletContext<UseGamificationResult | undefined>();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const gameMode = useMemo<GameMode | undefined>(() => {
@@ -85,6 +103,12 @@ export function SongView() {
   // time a run actually ends (a later event, never the same tick as render)
   // it always holds this render's value.
   const playbackSpeedRef = useRef(1);
+  // Same ref-sync reasoning as playbackSpeedRef above: onEnded (in the same
+  // useEngine call below) wants the song's real length to turn "one
+  // completed run" into practice minutes, and `duration` is itself part of
+  // useEngine's return value - kept fresh via an effect rather than relied
+  // on directly, matching the established pattern in this file.
+  const durationRef = useRef(0);
   const navigate = useNavigate();
   const { fileData, format, songData, trackData } = useSongLoader(id);
   // The difficulties this specific chart actually carries - auto-charted
@@ -171,6 +195,10 @@ export function SongView() {
       const isAttempt = (score.hitNotes ?? 0) > 0;
 
       setPracticeSummary(runSummary);
+      // Cleared synchronously so a still-open modal from a prior run never
+      // shows last run's XP for a frame while this run's recordRun IPC
+      // round trip (below) is in flight.
+      setGamificationResult(undefined);
       setIsScoreModalOpen(true);
 
       if (policy.scoring) {
@@ -194,6 +222,24 @@ export function SongView() {
           songId: id,
           summary: runSummary,
         });
+
+        // Gated on the same isAttempt check as save-practice-run above, and
+        // sent strictly after it: an untouched play-through must not mint a
+        // streak day or XP, and gamification.recordRun's own
+        // load-all-practice-runs round trip (inside the hook) depends on
+        // this run already being persisted in the practiceRuns store by
+        // the time it reads it back - save-practice-run's store.set is
+        // synchronous, so that's guaranteed by send order alone.
+        gamification?.recordRun(
+          {
+            totalHits: runSummary.totalHits,
+            overallAccuracy: runSummary.overallAccuracy,
+            difficulty,
+            starsEarned: policy.scoring ? getStarRating(score) : 0,
+            minutes: durationRef.current / 60 / playbackSpeedRef.current,
+          },
+          setGamificationResult,
+        );
       }
     },
   });
@@ -313,6 +359,10 @@ export function SongView() {
   useEffect(() => {
     playbackSpeedRef.current = playbackSpeed;
   }, [playbackSpeed]);
+
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
 
   // Snapshot taken at the moment the user picks a new difficulty, consumed
   // once the reparsed chart's renderData actually lands (useSheetMusic
@@ -476,6 +526,8 @@ export function SongView() {
         difficulty={difficulty}
         scoreData={scoreData}
         practiceSummary={practiceSummary}
+        gamification={gamification}
+        runResult={gamificationResult}
       />
       <Drawer
         title="Practice stats"

@@ -3,12 +3,18 @@ import { useMemo } from 'react';
 import { ScoreData, Song } from '../../../types';
 import { Difficulty } from 'scan-chart';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRepeat } from '@fortawesome/free-solid-svg-icons';
+import { faFire, faRepeat } from '@fortawesome/free-solid-svg-icons';
 import { calculateAccuracy, getStarRating } from '../../scoring';
 import { MODAL_ABOVE_POPOVER_Z_INDEX, modalStyles } from '../../overlayStyles';
+import { cn } from '../../cn';
 import { Stars } from '../Stars';
 import { RunSummary } from '../../services/practice-stats';
 import { PracticeStats } from '../PracticeStats';
+import {
+  RecordRunResult,
+  UseGamificationResult,
+} from '../../hooks/useGamification';
+import { AchievementToastQueue } from '../AchievementToastQueue';
 
 interface Props {
   isOpen: boolean;
@@ -18,6 +24,17 @@ interface Props {
   difficulty: Difficulty;
   scoreData?: ScoreData;
   practiceSummary?: RunSummary;
+  /** Live streak/XP-vs-goal state, shared with the library header (see
+   * SongListView's <Outlet context>). Only used to phrase "N XP to
+   * today's goal" — everything specific to *this* run comes from
+   * `runResult`. */
+  gamification?: UseGamificationResult;
+  /** This run's outcome from `gamification.recordRun` - undefined until
+   * its IPC round trip resolves, or permanently if gamification isn't
+   * available at all (e.g. no attempt was made, so recordRun was never
+   * called). The whole XP/streak/nudge block simply doesn't render
+   * without it, same as `practiceSummary` already does. */
+  runResult?: RecordRunResult;
 }
 
 function noteCountLabel(count: number, verb: string): string {
@@ -32,6 +49,8 @@ export function ScoreSummary({
   difficulty,
   scoreData,
   practiceSummary,
+  gamification,
+  runResult,
 }: Props) {
   const starRating = useMemo(() => {
     if (!scoreData) {
@@ -50,6 +69,14 @@ export function ScoreSummary({
   const accuracy = scoreData ? calculateAccuracy(scoreData) : 0;
   const hitNotes = scoreData?.hitNotes ?? 0;
   const missedNotes = Math.max(0, (scoreData?.totalNotes ?? 0) - hitNotes);
+  // gamification.todayXp is live (reactive off the shared hook instance),
+  // so by the time runResult lands it already reflects this run's XP -
+  // no need to add xpEarned on top of it here.
+  const xpToGoal = gamification
+    ? Math.max(0, gamification.goalXp - gamification.todayXp)
+    : 0;
+  const streakCurrent =
+    gamification?.streak.current ?? runResult?.streakCurrent ?? 0;
   const header = (
     <>
       <div className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
@@ -163,6 +190,58 @@ export function ScoreSummary({
         <PracticeStats
           summary={practiceSummary}
           variant="inline"
+          className="w-full"
+        />
+        {runResult && (
+          <div
+            className={cn(
+              'flex w-full flex-col gap-2 rounded-xl border border-accent-soft-border bg-accent-soft-bg p-3',
+              runResult.goalCrossed && 'sk-goal-celebrate',
+            )}
+            data-testid="gamification-summary"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div
+                className="flex items-center gap-2 text-sm font-semibold text-text"
+                data-testid="run-streak-status"
+              >
+                <FontAwesomeIcon
+                  icon={faFire}
+                  style={{
+                    color:
+                      streakCurrent > 0
+                        ? 'var(--color-orange)'
+                        : 'var(--color-text-faint)',
+                  }}
+                />
+                {streakCurrent > 0
+                  ? `${streakCurrent}-day streak`
+                  : 'Start a streak tomorrow'}
+              </div>
+              <div
+                className="font-display text-lg font-semibold text-accent-text tabular-nums"
+                data-testid="run-xp-earned"
+              >
+                +{runResult.xpEarned} XP
+              </div>
+            </div>
+            <div
+              className="text-xs text-text-muted"
+              data-testid="run-goal-status"
+            >
+              {xpToGoal === 0
+                ? "Today's goal reached!"
+                : `${xpToGoal} XP to today's goal`}
+            </div>
+            {runResult.nudge && (
+              <div className="text-xs text-accent-text" data-testid="run-nudge">
+                {runResult.nudge.message}
+              </div>
+            )}
+          </div>
+        )}
+        <AchievementToastQueue
+          queue={runResult?.newlyUnlocked ?? []}
           className="w-full"
         />
       </div>
