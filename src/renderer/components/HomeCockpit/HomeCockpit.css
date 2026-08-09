@@ -53,6 +53,7 @@
 }
 
 .home-cockpit__intro,
+.home-cockpit__launch,
 .home-cockpit__status,
 .home-cockpit__live {
   position: absolute;
@@ -62,7 +63,22 @@
 .home-cockpit__intro {
   top: clamp(1.8rem, 6.4vh, 4.9rem);
   left: clamp(1.5rem, 5vw, 5rem);
-  max-width: min(28rem, 44%);
+  max-width: min(34rem, 48%);
+}
+
+.home-cockpit__launch {
+  bottom: clamp(2.25rem, 4.4vh, 3.8rem);
+  left: clamp(1.5rem, 5vw, 5rem);
+  z-index: 4;
+  width: min(28rem, 34%);
+  padding: 0.9rem 1rem 1rem;
+  border: 1px solid rgb(255 250 242 / 26%);
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgb(17 23 34 / 72%), rgb(17 23 34 / 46%));
+  box-shadow:
+    0 0.9rem 2.4rem rgb(17 23 34 / 28%),
+    inset 0 1px 0 rgb(255 255 255 / 12%);
+  backdrop-filter: blur(12px);
 }
 
 .daybreak-kicker,
@@ -103,26 +119,26 @@
 }
 
 .home-cockpit__intro h1 {
-  max-width: 16ch;
+  max-width: 22ch;
   color: #fffaf2;
-  font-size: clamp(1.85rem, 3vw, 3.15rem);
-  line-height: 0.93;
+  font-size: clamp(1.85rem, 2.55vw, 2.7rem);
+  line-height: 0.96;
   text-shadow: 0 0.45rem 2rem rgb(17 23 34 / 42%);
 }
 
 .home-cockpit__lede {
-  max-width: 25rem;
-  margin: 1.35rem 0 0;
+  max-width: none;
+  margin: 0;
   color: rgb(255 250 242 / 82%);
-  font-size: clamp(0.88rem, 1.2vw, 1.02rem);
-  line-height: 1.6;
+  font-size: clamp(0.76rem, 0.95vw, 0.9rem);
+  line-height: 1.48;
 }
 
 .home-cockpit__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
-  margin-top: 1.55rem;
+  margin-top: 0.85rem;
 }
 
 .home-cockpit__actions .ant-btn-primary,
@@ -600,7 +616,10 @@
 
 @media (max-width: 1050px) {
   .home-cockpit__intro {
-    max-width: 48%;
+    max-width: 52%;
+  }
+  .home-cockpit__launch {
+    width: 36%;
   }
   .home-cockpit__below,
   .coach-desk__grid {
@@ -616,7 +635,7 @@
     padding: 0.6rem;
   }
   .home-cockpit__hero {
-    min-height: 43rem;
+    min-height: 50rem;
   }
   .home-cockpit__studio {
     object-position: 58% center;
@@ -634,7 +653,21 @@
     max-width: calc(100% - 2.7rem);
   }
   .home-cockpit__intro h1 {
-    font-size: clamp(3rem, 14vw, 4.4rem);
+    max-width: 18ch;
+    font-size: clamp(2.2rem, 10vw, 3.35rem);
+  }
+  .home-cockpit__launch {
+    top: 9.8rem;
+    right: 1.35rem;
+    bottom: auto;
+    left: 1.35rem;
+    width: auto;
+  }
+  .home-cockpit__lede {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
   }
   .home-cockpit__status {
     top: auto;
@@ -647,7 +680,7 @@
     min-width: 0;
   }
   .home-cockpit__kit {
-    top: 10rem;
+    top: 20rem;
     bottom: 4.5rem;
   }
   .home-kit-hotspot {

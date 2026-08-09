@@ -400,6 +400,9 @@ export function HomeCockpit({
           <h1 id="home-cockpit-title">
             {currentSong?.name ?? 'Choose your next song'}
           </h1>
+        </div>
+
+        <div className="home-cockpit__launch">
           <p className="home-cockpit__lede">
             {currentSong && recommendation
               ? `${
