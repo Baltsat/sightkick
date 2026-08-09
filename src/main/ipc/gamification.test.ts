@@ -243,20 +243,27 @@ describe('loadAllPracticeRuns', () => {
 
     loadAllPracticeRuns(event as never);
 
-    expect(lastReply(event, 'load-all-practice-runs')!.args[0]).toEqual({
-      runs: [expect.any(Object)],
-      runsBySong: { 'song-1': [expect.any(Object)] },
-      archiveBySong: {
-        'song-1': {
-          ...archive,
-          days: {
-            '2023-01-01': {
-              ...archive.days['2023-01-01'],
-              historicalDetailState: 'historical-detail-unavailable',
-            },
-          },
-        },
-      },
+    const reply = lastReply(event, 'load-all-practice-runs')!.args[0] as {
+      runs: unknown[];
+      runsBySong: Record<string, unknown[]>;
+      archiveBySong: Record<string, { days: Record<string, unknown> }>;
+    };
+
+    expect(reply.runs).toEqual([expect.any(Object)]);
+    expect(reply.runsBySong).toEqual({
+      'song-1': [expect.any(Object)],
+    });
+    expect(reply.archiveBySong['song-1'].days['2023-01-01']).toMatchObject({
+      date: '2023-01-01',
+      runCount: 4,
+      totalHits: 0,
+      totalMisses: 0,
+      totalWrong: 0,
+      lanes: {},
+      wrongHits: {},
+      modes: {},
+      difficulties: {},
+      historicalDetailState: 'historical-detail-unavailable',
     });
   });
 

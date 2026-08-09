@@ -198,6 +198,199 @@ describe('bootstrapLessonLibrary', () => {
     expect(fs.existsSync(`${privateRoot}.previous`)).toBe(false);
   });
 
+  it('reconciles a real UUID-keyed legacy profile to 170 canonical lessons without losing retired metadata', () => {
+    const bundle = makeLessonBundle();
+    const seed = bootstrapLessonLibrary({
+      bundledRoot: bundle,
+      userDataRoot: path.join(root, 'seed-profile'),
+    });
+    const matchingLegacy = {
+      ...seed.songs?.['lesson:01.01'],
+      id: 'legacy-song-id',
+      dir: '/selected/SightKick Method - Lesson 01.01',
+      liked: true,
+      scoreData: {
+        expert: { totalNotes: 100, hitNotes: 94, falseHits: 2 },
+      },
+    };
+    const retiredLegacy = {
+      ...seed.songs?.['lesson:03.01'],
+      id: 'retired-song-id',
+      dir: '/selected/SightKick Method - Lesson 03.01 - Old Coordination',
+      name: 'Lesson 03.01 — Old Coordination Exercise',
+      scoreData: {
+        expert: { totalNotes: 80, hitNotes: 70, falseHits: 1 },
+      },
+    };
+    const userDataRoot = path.join(root, 'legacy-uuid-profile');
+    const upgraded = bootstrapLessonLibrary({
+      bundledRoot: bundle,
+      userDataRoot,
+      existingSongs: {
+        personal: { id: 'personal', dir: '/selected/personal' },
+        'legacy-storage-key': matchingLegacy,
+        'retired-storage-key': retiredLegacy,
+      } as never,
+    });
+
+    expect(Object.keys(upgraded.songs ?? {})).toHaveLength(171);
+    expect(
+      Object.keys(upgraded.songs ?? {}).filter((id) =>
+        id.startsWith('lesson:'),
+      ),
+    ).toHaveLength(170);
+    expect(upgraded.songs?.['legacy-storage-key']).toBeUndefined();
+    expect(upgraded.songs?.['retired-storage-key']).toBeUndefined();
+    expect(upgraded.songs?.personal?.dir).toBe('/selected/personal');
+    expect(upgraded.songs?.['lesson:01.01']?.liked).toBe(true);
+    expect(upgraded.songs?.['lesson:01.01']?.scoreData).toEqual(
+      matchingLegacy.scoreData,
+    );
+    expect(upgraded.songIdMigrations).toEqual({
+      'legacy-storage-key': 'lesson:01.01',
+      'legacy-song-id': 'lesson:01.01',
+    });
+    expect(upgraded.retiredLessonSongs).toEqual({
+      'retired-storage-key': retiredLegacy,
+    });
+
+    const relaunched = bootstrapLessonLibrary({
+      bundledRoot: bundle,
+      userDataRoot,
+      existingSongs: upgraded.songs,
+    });
+
+    expect(relaunched.installed).toBe(false);
+    expect(relaunched.songs).toEqual(upgraded.songs);
+    expect(relaunched.songIdMigrations).toEqual({});
+    expect(relaunched.retiredLessonSongs).toEqual({});
+  });
+
+  it('does not transfer a score to redesigned content merely because the lesson ID is reused', () => {
+    const bundle = makeLessonBundle();
+    const seed = bootstrapLessonLibrary({
+      bundledRoot: bundle,
+      userDataRoot: path.join(root, 'redesign-seed'),
+    });
+    const oldContent = {
+      ...seed.songs?.['lesson:03.01'],
+      id: 'lesson:03.01',
+      name: 'Lesson 03.01 — Hi-Hat and Snare Handshake',
+      scoreData: {
+        expert: { totalNotes: 100, hitNotes: 100, falseHits: 0 },
+      },
+    };
+    const upgraded = bootstrapLessonLibrary({
+      bundledRoot: bundle,
+      userDataRoot: path.join(root, 'redesign-profile'),
+      existingSongs: { 'lesson:03.01': oldContent } as never,
+    });
+
+    expect(upgraded.songs?.['lesson:03.01']?.name).toBe('Lesson 03.01');
+    expect(upgraded.songs?.['lesson:03.01']?.scoreData).toBeUndefined();
+    expect(upgraded.retiredLessonSongs).toEqual({
+      'lesson:03.01': oldContent,
+    });
+  });
+
+  it('keeps the score with the strongest displayed mastery instead of raw hit ratio', () => {
+    const bundle = makeLessonBundle();
+    const seed = bootstrapLessonLibrary({
+      bundledRoot: bundle,
+      userDataRoot: path.join(root, 'score-merge-seed'),
+    });
+    const lesson = seed.songs?.['lesson:01.01'];
+    const fourStars = {
+      ...lesson,
+      id: 'legacy-four-stars',
+      scoreData: {
+        expert: { totalNotes: 100, hitNotes: 80, falseHits: 0 },
+      },
+    };
+    const twoStars = {
+      ...lesson,
+      id: 'legacy-two-stars',
+      scoreData: {
+        expert: { totalNotes: 100, hitNotes: 81, falseHits: 50 },
+      },
+    };
+    const upgraded = bootstrapLessonLibrary({
+      bundledRoot: bundle,
+      userDataRoot: path.join(root, 'score-merge-profile'),
+      existingSongs: {
+        'legacy-four-stars': fourStars,
+        'legacy-two-stars': twoStars,
+      } as never,
+    });
+
+    expect(upgraded.songs?.['lesson:01.01']?.scoreData?.expert).toEqual(
+      fourStars.scoreData.expert,
+    );
+  });
+
+  it('moves an unchanged exercise to its renumbered canonical lesson identity', () => {
+    const bundle = makeLessonBundle();
+    const targetIni = path.join(
+      bundle,
+      'SightKick Method - Lesson 03.02',
+      'song.ini',
+    );
+
+    fs.writeFileSync(
+      targetIni,
+      '[Song]\nname = Lesson 03.02 — Moving Exercise\nartist = Drumroll Method\npro_drums = True\nsk_lesson_id = 03.02\n',
+    );
+
+    const legacy = {
+      id: 'legacy-moving-id',
+      dir: '/selected/SightKick Method - Lesson 01.01 - Moving Exercise',
+      name: 'Lesson 01.01 — Moving Exercise',
+      sk_lesson_id: '01.01',
+      liked: true,
+      scoreData: {
+        expert: { totalNotes: 100, hitNotes: 92, falseHits: 0 },
+      },
+    };
+    const upgraded = bootstrapLessonLibrary({
+      bundledRoot: bundle,
+      userDataRoot: path.join(root, 'renumbered-profile'),
+      existingSongs: { 'legacy-moving-storage': legacy } as never,
+    });
+
+    expect(upgraded.songIdMigrations).toEqual({
+      'legacy-moving-storage': 'lesson:03.02',
+      'legacy-moving-id': 'lesson:03.02',
+    });
+    expect(upgraded.songs?.['lesson:03.02']).toMatchObject({
+      name: 'Lesson 03.02 — Moving Exercise',
+      liked: true,
+      scoreData: legacy.scoreData,
+    });
+    expect(upgraded.songs?.['lesson:01.01']?.scoreData).toBeUndefined();
+    expect(upgraded.retiredLessonSongs).toEqual({});
+  });
+
+  it('never removes a personal song merely because its display name resembles a lesson', () => {
+    const bundle = makeLessonBundle();
+    const personal = {
+      id: 'personal-lesson-name',
+      dir: '/selected/Lesson 01.01 - My Own Recording',
+      name: 'Lesson 01.01 — My Own Recording',
+      scoreData: {
+        expert: { totalNotes: 20, hitNotes: 18, falseHits: 1 },
+      },
+    };
+    const upgraded = bootstrapLessonLibrary({
+      bundledRoot: bundle,
+      userDataRoot: path.join(root, 'lesson-name-guard'),
+      existingSongs: { 'personal-lesson-name': personal } as never,
+    });
+
+    expect(upgraded.songs?.['personal-lesson-name']).toEqual(personal);
+    expect(upgraded.retiredLessonSongs).toEqual({});
+    expect(Object.keys(upgraded.songs ?? {})).toHaveLength(171);
+  });
+
   it('recovers a previous complete install after an interrupted directory swap, then upgrades', () => {
     const oldBundle = makeLessonBundle(118, 'interrupted-old');
     const newBundle = makeLessonBundle(170, 'interrupted-new');

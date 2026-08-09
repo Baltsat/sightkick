@@ -44,6 +44,7 @@ import { searchYoutube } from './ipc/searchYoutube';
 import { fetchMyMusic } from './ipc/myMusic';
 import { loadLibraryCandidates } from './ipc/loadLibraryCandidates';
 import { bootstrapLessonLibrary } from './lessonLibrary';
+import { applyLessonProfileMigration } from './lessonIdentityMigration';
 import { savePracticeRun, loadPracticeRuns } from './ipc/practiceStats';
 import {
   configureCoachStore,
@@ -62,6 +63,7 @@ import {
   saveGoal,
   setPrimaryGoal,
 } from './ipc/goals';
+import { loadRetiredLessons } from './ipc/retiredLessons';
 
 class AppState {
   private static instance: AppState;
@@ -187,6 +189,7 @@ class AppState {
     ipcMain.on('record-practice-day', recordPracticeDay);
     ipcMain.on('load-practice-days', loadPracticeDays);
     ipcMain.on('load-all-practice-runs', loadAllPracticeRuns);
+    ipcMain.on('load-retired-lessons', loadRetiredLessons);
     ipcMain.on('save-goal', saveGoal);
     ipcMain.on('load-goals', loadGoalsIpc);
     ipcMain.on('delete-goal', deleteGoal);
@@ -239,9 +242,7 @@ class AppState {
         this.lessonLibraryRoot = result.libraryRoot;
       }
 
-      if (result.songs) {
-        this.store.set('songs', result.songs);
-      }
+      applyLessonProfileMigration(this.store, result);
 
       if (!existingLibraryRoot && result.libraryRoot) {
         this.setLibraryRoot(result.libraryRoot);

@@ -129,6 +129,58 @@ const EMPTY_PROGRESS: LessonProgress = {
   nextLockedEntry: undefined,
 };
 
+function authoredLessonRichness(
+  song: Song & { lesson: SongLessonInfo },
+): number {
+  const lesson = song.lesson;
+
+  return [
+    lesson.skills?.length,
+    lesson.prerequisiteIds?.length,
+    lesson.targetLanes?.length,
+    lesson.bpmStart,
+    lesson.bpmTarget,
+    lesson.doseRule,
+    lesson.masteryRule,
+    lesson.cue,
+    lesson.assessmentBoundary,
+  ].filter(Boolean).length;
+}
+
+/**
+ * Bootstrap owns the durable migration, but imported or interrupted legacy
+ * profiles can still briefly contain two rows for one lesson ID. Journey must
+ * never double-count their stars or render duplicate nodes. Prefer the richer
+ * authored kb.2 record; on an exact metadata tie, retain the record with the
+ * stronger earned result.
+ */
+function uniqueLessonSongs(
+  songList: Song[],
+): Array<Song & { lesson: SongLessonInfo }> {
+  const byLessonId = new Map<string, Song & { lesson: SongLessonInfo }>();
+
+  for (const song of songList) {
+    if (!isLessonSong(song) || !song.lesson) {
+      continue;
+    }
+
+    const lessonSong = song as Song & { lesson: SongLessonInfo };
+    const previous = byLessonId.get(lessonSong.lesson.id);
+
+    if (
+      !previous ||
+      authoredLessonRichness(lessonSong) > authoredLessonRichness(previous) ||
+      (authoredLessonRichness(lessonSong) ===
+        authoredLessonRichness(previous) &&
+        bestStarsForSong(lessonSong) > bestStarsForSong(previous))
+    ) {
+      byLessonId.set(lessonSong.lesson.id, lessonSong);
+    }
+  }
+
+  return [...byLessonId.values()];
+}
+
 /**
  * Computes the Lessons unlock chain from the full song library.
  *
@@ -138,10 +190,7 @@ const EMPTY_PROGRESS: LessonProgress = {
  * at chain position 0 is always unlocked.
  */
 export function computeLessonProgress(songList: Song[]): LessonProgress {
-  const lessonSongs = songList.filter(
-    (song): song is Song & { lesson: SongLessonInfo } =>
-      isLessonSong(song) && song.lesson !== undefined,
-  );
+  const lessonSongs = uniqueLessonSongs(songList);
 
   if (lessonSongs.length === 0) {
     return EMPTY_PROGRESS;

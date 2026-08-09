@@ -149,6 +149,183 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function finiteNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function normalizeNumberRecord<Key extends string>(
+  value: unknown,
+): Partial<Record<Key, number>> {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(
+        ([, entry]) => typeof entry === 'number' && Number.isFinite(entry),
+      )
+      .map(([key, entry]) => [key, entry]),
+  ) as Partial<Record<Key, number>>;
+}
+
+function normalizeTroubleRecovery(
+  value: unknown,
+): ArchivedTroubleRecoveryStats {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    troubleCount: Math.max(0, finiteNumber(record.troubleCount)),
+    recoveryCleanCount: Math.max(0, finiteNumber(record.recoveryCleanCount)),
+    recoveryRetryCount: Math.max(0, finiteNumber(record.recoveryRetryCount)),
+    recoveryDeferredCount: Math.max(
+      0,
+      finiteNumber(record.recoveryDeferredCount),
+    ),
+  };
+}
+
+function normalizeNamedTroubleRecovery(
+  value: unknown,
+  maximum: number,
+): Record<string, ArchivedTroubleRecoveryStats> {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  return capNamedEvidence(
+    Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        normalizeTroubleRecovery(entry),
+      ]),
+    ),
+    maximum,
+  );
+}
+
+function normalizeChartRevisions(
+  value: unknown,
+): Record<string, ArchivedChartRevisionEvidence> | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const revisions = Object.fromEntries(
+    Object.entries(value).flatMap(([key, rawRevision]) => {
+      if (!isRecord(rawRevision)) {
+        return [];
+      }
+
+      const chartRevision =
+        typeof rawRevision.chartRevision === 'string' &&
+        rawRevision.chartRevision.trim()
+          ? rawRevision.chartRevision
+          : key;
+
+      return [
+        [
+          chartRevision,
+          {
+            chartRevision,
+            lastCompletedAt:
+              typeof rawRevision.lastCompletedAt === 'string'
+                ? rawRevision.lastCompletedAt
+                : '',
+            runCount: Math.max(0, finiteNumber(rawRevision.runCount)),
+            skills: normalizeNamedTroubleRecovery(
+              rawRevision.skills,
+              MAX_ARCHIVED_SKILLS_PER_REVISION,
+            ),
+            bars: normalizeNamedTroubleRecovery(
+              rawRevision.bars,
+              MAX_ARCHIVED_BARS_PER_REVISION,
+            ),
+          },
+        ],
+      ];
+    }),
+  );
+
+  if (Object.keys(revisions).length === 0) {
+    return undefined;
+  }
+
+  return Object.fromEntries(
+    Object.entries(revisions)
+      .sort(
+        ([, left], [, right]) =>
+          right.lastCompletedAt.localeCompare(left.lastCompletedAt) ||
+          left.chartRevision.localeCompare(right.chartRevision),
+      )
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
+function normalizeArchiveDay(
+  date: string,
+  value: unknown,
+): PracticeRunDayArchive {
+  const day = isRecord(value) ? value : {};
+  const timing = isRecord(day.timing) ? day.timing : {};
+  const rawLanes = isRecord(day.lanes) ? day.lanes : {};
+  const lanes = Object.fromEntries(
+    Object.entries(rawLanes).flatMap(([lane, rawStats]) => {
+      if (!isRecord(rawStats)) {
+        return [];
+      }
+
+      return [
+        [
+          lane,
+          {
+            hits: Math.max(0, finiteNumber(rawStats.hits)),
+            misses: Math.max(0, finiteNumber(rawStats.misses)),
+            timingSampleCount: Math.max(
+              0,
+              finiteNumber(rawStats.timingSampleCount),
+            ),
+            totalDeltaMs: finiteNumber(rawStats.totalDeltaMs),
+          },
+        ],
+      ];
+    }),
+  );
+  const chartRevisions = normalizeChartRevisions(day.chartRevisions);
+
+  return {
+    date,
+    runCount: Math.max(0, finiteNumber(day.runCount)),
+    totalHits: Math.max(0, finiteNumber(day.totalHits)),
+    totalMisses: Math.max(0, finiteNumber(day.totalMisses)),
+    totalWrong: Math.max(0, finiteNumber(day.totalWrong)),
+    overallAccuracySum: finiteNumber(day.overallAccuracySum),
+    minOverallAccuracy: finiteNumber(day.minOverallAccuracy),
+    maxOverallAccuracy: finiteNumber(day.maxOverallAccuracy),
+    bestStreak: Math.max(0, finiteNumber(day.bestStreak)),
+    timing: {
+      ...emptyTiming(),
+      sampleCount: Math.max(0, finiteNumber(timing.sampleCount)),
+      totalDeltaMs: finiteNumber(timing.totalDeltaMs),
+      earlyCount: Math.max(0, finiteNumber(timing.earlyCount)),
+      lateCount: Math.max(0, finiteNumber(timing.lateCount)),
+      onTimeCount: Math.max(0, finiteNumber(timing.onTimeCount)),
+      medianMsSum: finiteNumber(timing.medianMsSum),
+      spreadMsSum: Math.max(0, finiteNumber(timing.spreadMsSum)),
+      summaryCount: Math.max(0, finiteNumber(timing.summaryCount)),
+    },
+    lanes,
+    wrongHits: normalizeNumberRecord<KitElement>(day.wrongHits),
+    modes: normalizeNumberRecord<GameMode>(day.modes),
+    difficulties: normalizeNumberRecord<Difficulty>(day.difficulties),
+    historicalDetailState:
+      day.historicalDetailState === 'available'
+        ? 'available'
+        : 'historical-detail-unavailable',
+    ...(chartRevisions ? { chartRevisions } : {}),
+  };
+}
+
 /**
  * Old electron-store data has no archive key. Treat it as a valid empty v1
  * archive. Malformed or unrecognised values stay readable as an empty archive
@@ -166,20 +343,10 @@ export function readPracticeRunArchive(raw: unknown): PracticeRunArchive {
   return {
     schemaVersion: PRACTICE_RUN_ARCHIVE_SCHEMA_VERSION,
     days: Object.fromEntries(
-      Object.entries(raw.days).map(([date, rawDay]) => {
-        const day = rawDay as PracticeRunDayArchive;
-
-        return [
-          date,
-          {
-            ...day,
-            historicalDetailState:
-              day.historicalDetailState === 'available'
-                ? 'available'
-                : 'historical-detail-unavailable',
-          },
-        ];
-      }),
+      Object.entries(raw.days).map(([date, rawDay]) => [
+        date,
+        normalizeArchiveDay(date, rawDay),
+      ]),
     ),
   };
 }
@@ -428,6 +595,235 @@ export function archiveRunSummaries(
     schemaVersion: PRACTICE_RUN_ARCHIVE_SCHEMA_VERSION,
     days: Object.fromEntries(
       Object.entries(days).sort(([left], [right]) => left.localeCompare(right)),
+    ),
+  };
+}
+
+function mergeNumberRecords<Key extends string>(
+  left: Partial<Record<Key, number>>,
+  right: Partial<Record<Key, number>>,
+): Partial<Record<Key, number>> {
+  const merged = { ...left };
+
+  for (const [rawKey, rawValue] of Object.entries(right) as Array<
+    [Key, number]
+  >) {
+    merged[rawKey] = (merged[rawKey] ?? 0) + rawValue;
+  }
+
+  return merged;
+}
+
+function mergeTroubleRecovery(
+  left: ArchivedTroubleRecoveryStats | undefined,
+  right: ArchivedTroubleRecoveryStats | undefined,
+): ArchivedTroubleRecoveryStats {
+  return {
+    troubleCount: (left?.troubleCount ?? 0) + (right?.troubleCount ?? 0),
+    recoveryCleanCount:
+      (left?.recoveryCleanCount ?? 0) + (right?.recoveryCleanCount ?? 0),
+    recoveryRetryCount:
+      (left?.recoveryRetryCount ?? 0) + (right?.recoveryRetryCount ?? 0),
+    recoveryDeferredCount:
+      (left?.recoveryDeferredCount ?? 0) + (right?.recoveryDeferredCount ?? 0),
+  };
+}
+
+function mergeNamedTroubleRecovery(
+  left: Record<string, ArchivedTroubleRecoveryStats>,
+  right: Record<string, ArchivedTroubleRecoveryStats>,
+  maximum: number,
+): Record<string, ArchivedTroubleRecoveryStats> {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+
+  return capNamedEvidence(
+    Object.fromEntries(
+      [...keys].map((key) => [
+        key,
+        mergeTroubleRecovery(left[key], right[key]),
+      ]),
+    ),
+    maximum,
+  );
+}
+
+function mergeChartRevisionEvidence(
+  left: Record<string, ArchivedChartRevisionEvidence> | undefined,
+  right: Record<string, ArchivedChartRevisionEvidence> | undefined,
+): Record<string, ArchivedChartRevisionEvidence> | undefined {
+  const leftRecords = left ?? {};
+  const rightRecords = right ?? {};
+  const keys = new Set([
+    ...Object.keys(leftRecords),
+    ...Object.keys(rightRecords),
+  ]);
+
+  if (keys.size === 0) {
+    return undefined;
+  }
+
+  const revisions = Object.fromEntries(
+    [...keys].map((key) => {
+      const leftRevision = leftRecords[key];
+      const rightRevision = rightRecords[key];
+
+      if (!leftRevision) {
+        return [key, rightRevision];
+      }
+
+      if (!rightRevision) {
+        return [key, leftRevision];
+      }
+
+      return [
+        key,
+        {
+          chartRevision: key,
+          lastCompletedAt:
+            leftRevision.lastCompletedAt.localeCompare(
+              rightRevision.lastCompletedAt,
+            ) >= 0
+              ? leftRevision.lastCompletedAt
+              : rightRevision.lastCompletedAt,
+          runCount: leftRevision.runCount + rightRevision.runCount,
+          skills: mergeNamedTroubleRecovery(
+            leftRevision.skills,
+            rightRevision.skills,
+            MAX_ARCHIVED_SKILLS_PER_REVISION,
+          ),
+          bars: mergeNamedTroubleRecovery(
+            leftRevision.bars,
+            rightRevision.bars,
+            MAX_ARCHIVED_BARS_PER_REVISION,
+          ),
+        },
+      ];
+    }),
+  );
+
+  return Object.fromEntries(
+    Object.entries(revisions)
+      .sort(
+        ([, leftRevision], [, rightRevision]) =>
+          rightRevision.lastCompletedAt.localeCompare(
+            leftRevision.lastCompletedAt,
+          ) ||
+          leftRevision.chartRevision.localeCompare(rightRevision.chartRevision),
+      )
+      .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey)),
+  );
+}
+
+function mergeArchiveDay(
+  left: PracticeRunDayArchive,
+  right: PracticeRunDayArchive,
+): PracticeRunDayArchive {
+  const laneKeys = new Set([
+    ...Object.keys(left.lanes),
+    ...Object.keys(right.lanes),
+  ] as KitElement[]);
+  const lanes = Object.fromEntries(
+    [...laneKeys].map((lane) => {
+      const leftLane = left.lanes[lane];
+      const rightLane = right.lanes[lane];
+
+      return [
+        lane,
+        {
+          hits: (leftLane?.hits ?? 0) + (rightLane?.hits ?? 0),
+          misses: (leftLane?.misses ?? 0) + (rightLane?.misses ?? 0),
+          timingSampleCount:
+            (leftLane?.timingSampleCount ?? 0) +
+            (rightLane?.timingSampleCount ?? 0),
+          totalDeltaMs:
+            (leftLane?.totalDeltaMs ?? 0) + (rightLane?.totalDeltaMs ?? 0),
+        },
+      ];
+    }),
+  );
+  const chartRevisions = mergeChartRevisionEvidence(
+    left.chartRevisions,
+    right.chartRevisions,
+  );
+
+  return {
+    date: left.date,
+    runCount: left.runCount + right.runCount,
+    totalHits: left.totalHits + right.totalHits,
+    totalMisses: left.totalMisses + right.totalMisses,
+    totalWrong: left.totalWrong + right.totalWrong,
+    overallAccuracySum: left.overallAccuracySum + right.overallAccuracySum,
+    minOverallAccuracy:
+      left.runCount === 0
+        ? right.minOverallAccuracy
+        : right.runCount === 0
+        ? left.minOverallAccuracy
+        : Math.min(left.minOverallAccuracy, right.minOverallAccuracy),
+    maxOverallAccuracy:
+      left.runCount === 0
+        ? right.maxOverallAccuracy
+        : right.runCount === 0
+        ? left.maxOverallAccuracy
+        : Math.max(left.maxOverallAccuracy, right.maxOverallAccuracy),
+    bestStreak: Math.max(left.bestStreak, right.bestStreak),
+    timing: {
+      sampleCount: left.timing.sampleCount + right.timing.sampleCount,
+      totalDeltaMs: left.timing.totalDeltaMs + right.timing.totalDeltaMs,
+      earlyCount: left.timing.earlyCount + right.timing.earlyCount,
+      lateCount: left.timing.lateCount + right.timing.lateCount,
+      onTimeCount: left.timing.onTimeCount + right.timing.onTimeCount,
+      medianMsSum: left.timing.medianMsSum + right.timing.medianMsSum,
+      spreadMsSum: left.timing.spreadMsSum + right.timing.spreadMsSum,
+      summaryCount: left.timing.summaryCount + right.timing.summaryCount,
+    },
+    lanes,
+    wrongHits: mergeNumberRecords(left.wrongHits, right.wrongHits),
+    modes: mergeNumberRecords(left.modes, right.modes),
+    difficulties: mergeNumberRecords(left.difficulties, right.difficulties),
+    historicalDetailState:
+      left.historicalDetailState === 'available' ||
+      right.historicalDetailState === 'available'
+        ? 'available'
+        : 'historical-detail-unavailable',
+    ...(chartRevisions ? { chartRevisions } : {}),
+  };
+}
+
+/**
+ * Combines two already-aggregated per-song archives without discarding
+ * identity-migration evidence. This is used only when a proven legacy lesson
+ * identity is moved to its canonical ID. Unlike normal rolling archival,
+ * their existing chart-revision buckets are unioned without applying the
+ * per-day ingestion cap; every numeric count remains additive. Inputs are
+ * normalized first so legacy/malformed values cannot break profile startup.
+ */
+export function mergePracticeRunArchives(
+  leftRaw: unknown,
+  rightRaw: unknown,
+): PracticeRunArchive {
+  const left = readPracticeRunArchive(leftRaw);
+  const right = readPracticeRunArchive(rightRaw);
+  const dates = new Set([
+    ...Object.keys(left.days),
+    ...Object.keys(right.days),
+  ]);
+
+  return {
+    schemaVersion: PRACTICE_RUN_ARCHIVE_SCHEMA_VERSION,
+    days: Object.fromEntries(
+      [...dates]
+        .sort((leftDate, rightDate) => leftDate.localeCompare(rightDate))
+        .map((date) => {
+          const leftDay = left.days[date];
+          const rightDay = right.days[date];
+
+          return [
+            date,
+            leftDay && rightDay
+              ? mergeArchiveDay(leftDay, rightDay)
+              : leftDay ?? rightDay,
+          ];
+        }),
     ),
   };
 }

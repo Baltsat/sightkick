@@ -209,6 +209,35 @@ describe('computeLessonProgress', () => {
     expect(progress.totalStars).toBe(8);
   });
 
+  it('deduplicates interrupted legacy aliases by lesson ID and prefers authored kb.2 metadata', () => {
+    const legacy = makeLessonSong(
+      'legacy-uuid',
+      { id: '01.01', starsToUnlock: 0, title: 'Old unit title' },
+      { scoreData: { expert: scoreFor(0.99) } },
+    );
+    const canonical = makeLessonSong('lesson:01.01', {
+      id: '01.01',
+      starsToUnlock: 0,
+      title: 'Alternating Singles Warm-Up',
+      skills: ['single-stroke'],
+      targetLanes: [{ element: 'snare', weight: 1 }],
+      bpmStart: 60,
+      bpmTarget: 80,
+      doseRule: 'Four clean passes.',
+      masteryRule: 'Three clean passes in a row.',
+      cue: 'Keep both hands even.',
+      assessmentBoundary: 'MIDI assesses timing and pad choice.',
+    });
+    const progress = computeLessonProgress([legacy, canonical]);
+
+    expect(progress.totalLessons).toBe(1);
+    expect(progress.totalStars).toBe(0);
+    expect(progress.entries[0].song.id).toBe('lesson:01.01');
+    expect(progress.entries[0].lesson.title).toBe(
+      'Alternating Singles Warm-Up',
+    );
+  });
+
   it('orders entries by sk_stars_to_unlock and groups them by sk_unit', () => {
     const songs = [
       makeLessonSong('c', { id: '02.01', starsToUnlock: 10, unit: 'Unit 2' }),

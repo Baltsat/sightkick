@@ -15,6 +15,7 @@ import { MasteryGraph } from './MasteryGraph';
 export interface GoalCardProps {
   goal: Goal;
   song: Song | undefined;
+  fallbackName?: string;
   breakdown: MasteryBreakdown | undefined;
   timeline: MasteryTimelinePoint[];
   trend: MasteryTrendProjection | undefined;
@@ -51,6 +52,7 @@ function TermBar({ label, value }: { label: string; value: number }) {
 export function GoalCard({
   goal,
   song,
+  fallbackName,
   breakdown,
   timeline,
   trend,
@@ -89,7 +91,7 @@ export function GoalCard({
             Primary goal
           </div>
           <h3 className="truncate font-display text-xl font-semibold text-text-body">
-            {song?.name ?? 'Unknown song'}
+            {song?.name ?? fallbackName ?? 'Unknown song'}
           </h3>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-text-muted">
             <span className="rounded-full bg-fill px-2 py-0.5 capitalize">

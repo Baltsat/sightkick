@@ -17,6 +17,7 @@ import { GoalCard } from './GoalCard';
 import { XpSkillLine } from './XpSkillLine';
 import { SkillBars } from './SkillBars';
 import { useMastery } from './useMastery';
+import { useRetiredLessons } from './useRetiredLessons';
 
 export interface ProfileViewProps {
   songList: Song[];
@@ -74,11 +75,15 @@ export function ProfileView({
   );
   const [isSetGoalOpen, setIsSetGoalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | undefined>(undefined);
+  const retiredLessons = useRetiredLessons();
   const activeGoal =
     goals.find((g) => g.id === selectedGoalId) ??
     goals.find((g) => g.isPrimary) ??
     goals[0];
   const activeSong = songList.find((song) => song.id === activeGoal?.songId);
+  const activeRetiredLesson = retiredLessons.find((lesson) =>
+    activeGoal ? lesson.legacySongIds.includes(activeGoal.songId) : false,
+  );
   const mastery = useMastery(activeGoal, activeSong);
   const weekXp = last7Dates(new Date()).reduce(
     (sum, date) => sum + (gamification.days[localDateKey(date)]?.xp ?? 0),
@@ -172,6 +177,7 @@ export function ProfileView({
           <GoalCard
             goal={activeGoal}
             song={activeSong}
+            fallbackName={activeRetiredLesson?.name}
             breakdown={mastery.breakdown}
             timeline={mastery.timeline}
             trend={mastery.trend}
@@ -179,6 +185,18 @@ export function ProfileView({
             isLoaded={mastery.isLoaded}
             onEdit={openEditGoalModal}
           />
+
+          {activeRetiredLesson && (
+            <div
+              className="rounded-xl border border-accent-soft-border bg-accent-soft-bg px-4 py-3 text-sm leading-relaxed text-text-body"
+              data-testid="retired-goal-notice"
+            >
+              This goal belongs to a retired curriculum exercise. Its score and
+              practice history are preserved below, but it does not unlock the
+              new Journey. Edit the goal to point it at a current lesson or
+              song.
+            </div>
+          )}
 
           {!activeGoal.isPrimary && (
             <Button
@@ -222,6 +240,51 @@ export function ProfileView({
         </p>
         <SkillBars laneAccuracy={mastery.last30DaysLaneAccuracy} />
       </section>
+
+      {retiredLessons.length > 0 && (
+        <section
+          className="flex flex-col gap-3 rounded-2xl border border-border-soft bg-surface p-5"
+          data-testid="retired-lessons-history"
+        >
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint">
+              Archived curriculum history
+            </h3>
+            <p className="mt-1 text-xs leading-relaxed text-text-muted">
+              These exercises were replaced, so Drumroll keeps their evidence
+              readable without assigning it to different new material.
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {retiredLessons.map((lesson) => {
+              const totalRuns = lesson.recentRunCount + lesson.archivedRunCount;
+
+              return (
+                <article
+                  key={lesson.legacySongIds.join(':')}
+                  className="rounded-xl bg-fill px-3 py-3"
+                  data-testid="retired-lesson-row"
+                >
+                  <div className="text-sm font-semibold text-text-body">
+                    {lesson.name}
+                  </div>
+                  <div className="mt-1 text-xs text-text-faint">
+                    Former lesson {lesson.lessonId ?? 'unlabelled'} ·{' '}
+                    {lesson.bestStars} star
+                    {lesson.bestStars === 1 ? '' : 's'} · {totalRuns} run
+                    {totalRuns === 1 ? '' : 's'}
+                    {lesson.goalCount > 0
+                      ? ` · ${lesson.goalCount} saved goal${
+                          lesson.goalCount === 1 ? '' : 's'
+                        }`
+                      : ''}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {activeGoal && (
         <Button

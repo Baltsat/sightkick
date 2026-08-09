@@ -31,6 +31,10 @@ walking back to the computer between tasks.
   as playable until lawful local audio and a reviewed drum chart are present.
 - App-private lesson installation that coexists with a selected personal song
   library instead of replacing it.
+- Safe curriculum reconciliation for profiles created by the former
+  118-lesson build. Exact exercises keep their best scores and saved evidence,
+  renumbering chains move atomically, and replaced exercises remain readable as
+  archived curriculum history instead of being assigned to unrelated lessons.
 
 ## Safety and scope
 

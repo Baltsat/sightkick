@@ -117,6 +117,12 @@ describe('web platform channel mapping', () => {
     });
   });
 
+  it('reports no retired desktop curriculum evidence in a web-only profile', async () => {
+    await expect(
+      reply('load-retired-lessons', 'load-retired-lessons'),
+    ).resolves.toEqual({ lessons: [] });
+  });
+
   it('persists desktop-compatible goals with stable ids and timestamps', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-09T10:00:00.000Z'));

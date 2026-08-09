@@ -435,6 +435,7 @@ export class WebPlatform implements PlatformAdapter {
       'save-practice-run': 'save-practice-run',
       'load-practice-runs': 'load-practice-runs',
       'load-all-practice-runs': 'load-all-practice-runs',
+      'load-retired-lessons': 'load-retired-lessons',
       'record-practice-day': 'record-practice-day',
       'load-goals': 'load-goals',
       'save-goal': 'save-goal',
@@ -902,6 +903,13 @@ export class WebPlatform implements PlatformAdapter {
 
         break;
       }
+
+      case 'load-retired-lessons':
+        // Browser storage has never shipped the legacy 118-lesson desktop
+        // schema, so it has no retired migration archive to expose.
+        this.emit('load-retired-lessons', { lessons: [] });
+
+        break;
 
       case 'load-practice-days':
         this.emit('load-practice-days', {

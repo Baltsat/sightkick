@@ -567,6 +567,23 @@ export interface IpcLibraryCandidatesResponse {
   yandex: YandexLibraryCandidateSources;
 }
 
+/** User-readable evidence retained when an authored lesson is superseded. */
+export interface RetiredLessonEvidence {
+  /** Every historical song/storage ID which can still own saved evidence. */
+  legacySongIds: string[];
+  lessonId?: string;
+  name: string;
+  bestStars: number;
+  recentRunCount: number;
+  fullRunCount: number;
+  archivedRunCount: number;
+  goalCount: number;
+}
+
+export interface IpcRetiredLessonsResponse {
+  lessons: RetiredLessonEvidence[];
+}
+
 export interface StorageSchema {
   songs: {
     [key: string]: SongData;

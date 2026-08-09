@@ -54,6 +54,7 @@ export type Channels =
   | 'record-practice-day'
   | 'load-practice-days'
   | 'load-all-practice-runs'
+  | 'load-retired-lessons'
   | 'save-goal'
   | 'load-goals'
   | 'delete-goal'

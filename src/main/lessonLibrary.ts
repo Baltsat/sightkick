@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { SongData, StorageSchema } from '../types';
-import { buildSongFromDir } from './util';
+import { ScoreData, SongData, StorageSchema } from '../types';
+import { calculateAccuracy, getStarRating } from '../renderer/scoring';
+import { buildSongFromDir, stableLessonSongId } from './util';
 
 /** The app-private copy is deliberately separate from a musician's library. */
 export const DESKTOP_LESSON_LIBRARY_FOLDER = 'Drumroll Lessons';
@@ -24,6 +25,19 @@ interface LessonManifest {
 export interface LessonBootstrapResult {
   libraryRoot?: string;
   songs?: StorageSchema['songs'];
+  /**
+   * Legacy song IDs which describe the exact same authored exercise as a
+   * canonical bundled lesson. Main-process stores keyed by song ID use this
+   * map to move run history and goals without guessing across redesigned
+   * curriculum content.
+   */
+  songIdMigrations?: Record<string, string>;
+  /**
+   * Superseded lesson metadata which has no exact exercise in the current
+   * curriculum. It is removed from the active library, but retained by the
+   * profile as an audit/archive surface so an upgrade never destroys history.
+   */
+  retiredLessonSongs?: StorageSchema['songs'];
   installed: boolean;
   reason?: 'bundle-missing';
 }
@@ -114,7 +128,6 @@ function manifestsMatch(left: LessonManifest, right: LessonManifest): boolean {
 function scanBundledLessons(
   root: string,
   manifest: LessonManifest,
-  existingSongs: StorageSchema['songs'] = {},
 ): StorageSchema['songs'] {
   const expectedIds = new Set(manifest.lessons.map((entry) => entry.song.id));
   const directories = lessonDirectories(root);
@@ -126,24 +139,9 @@ function scanBundledLessons(
   }
 
   const songs = directories.map((dir) => {
-    const scanned = buildSongFromDir(dir, {
+    return buildSongFromDir(dir, {
       drumDifficulties: ['expert'],
     });
-    const existing = scanned ? existingSongs[scanned.id] : undefined;
-
-    if (!scanned || !existing) {
-      return scanned;
-    }
-
-    // Lesson files are app-owned, while these fields are musician-owned. Keep
-    // earned scores and explicit likes when a packaged lesson is refreshed.
-    return {
-      ...scanned,
-      ...(existing.liked !== undefined ? { liked: existing.liked } : {}),
-      ...(existing.scoreData !== undefined
-        ? { scoreData: existing.scoreData }
-        : {}),
-    };
   });
 
   if (songs.some((song) => !song)) {
@@ -163,6 +161,200 @@ function scanBundledLessons(
   }
 
   return Object.fromEntries(validSongs.map((song) => [song.id, song]));
+}
+
+function storedLessonId(storageId: string, song: SongData): string | undefined {
+  const parsed = stableLessonSongId(song.sk_lesson_id);
+
+  if (parsed) {
+    return parsed;
+  }
+
+  return /^lesson:\d{2}\.\d{2}$/.test(storageId)
+    ? storageId
+    : /^lesson:\d{2}\.\d{2}$/.test(song.id)
+    ? song.id
+    : undefined;
+}
+
+/**
+ * The original 118-lesson library stored random UUID song IDs and reused a
+ * unit title in `sk_lesson_title`. The exercise name is the only stable,
+ * truthful content identity across that schema and the redesigned 170-lesson
+ * curriculum. Strip the display number so an unchanged exercise can move to
+ * a new chain position without losing the musician's evidence.
+ */
+function lessonExerciseIdentity(song: SongData): string | undefined {
+  const raw = song.name?.trim();
+
+  if (!raw) {
+    return undefined;
+  }
+
+  const normalized = raw
+    .normalize('NFKD')
+    .replace(/^lesson\s+\d{2}\.\d{2}\s*(?:[-–—:]\s*)?/i, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+  return normalized || undefined;
+}
+
+function scoreQuality(score: ScoreData | undefined) {
+  if (!score) {
+    return [-1, -1, -Infinity] as const;
+  }
+
+  const total = Number(score.totalNotes ?? 0);
+  const hits = Number(score.hitNotes ?? 0);
+  const falseHits = Number(score.falseHits ?? 0);
+
+  return [
+    getStarRating(score),
+    calculateAccuracy(score),
+    hits,
+    -falseHits,
+    total,
+  ] as const;
+}
+
+function compareScoreQuality(
+  left: ScoreData | undefined,
+  right: ScoreData | undefined,
+): number {
+  const leftQuality = scoreQuality(left);
+  const rightQuality = scoreQuality(right);
+
+  for (let index = 0; index < leftQuality.length; index += 1) {
+    if (leftQuality[index] !== rightQuality[index]) {
+      return leftQuality[index] - rightQuality[index];
+    }
+  }
+
+  return 0;
+}
+
+function mergeScoreData(
+  candidates: readonly SongData[],
+): SongData['scoreData'] | undefined {
+  const merged: NonNullable<SongData['scoreData']> = {};
+
+  for (const candidate of candidates) {
+    for (const [difficulty, score] of Object.entries(
+      candidate.scoreData ?? {},
+    ) as Array<[keyof NonNullable<SongData['scoreData']>, ScoreData]>) {
+      const key = difficulty as keyof NonNullable<SongData['scoreData']>;
+      const current = merged[key];
+
+      if (!current || compareScoreQuality(score, current) > 0) {
+        merged[key] = score;
+      }
+    }
+  }
+
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
+interface ReconciledLessons {
+  activeSongs: StorageSchema['songs'];
+  songIdMigrations: Record<string, string>;
+  retiredLessonSongs: StorageSchema['songs'];
+}
+
+/**
+ * Replaces every parsed legacy lesson record with the canonical packaged
+ * record. Musician-owned fields move only when the exercise name is an exact
+ * normalized match; an ID alone is not enough because kb.2 deliberately
+ * redesigned and renumbered much of the old curriculum.
+ */
+function reconcileLessons(
+  existingSongs: StorageSchema['songs'],
+  installedLessons: StorageSchema['songs'],
+): ReconciledLessons {
+  const existingEntries = Object.entries(existingSongs);
+  const existingLessonEntries = existingEntries.filter(([storageId, song]) =>
+    storedLessonId(storageId, song),
+  );
+  const personalSongs = Object.fromEntries(
+    existingEntries.filter(
+      ([storageId, song]) => !storedLessonId(storageId, song),
+    ),
+  );
+  const candidatesByExercise = new Map<
+    string,
+    Array<{ storageId: string; song: SongData }>
+  >();
+  const identitylessCandidatesByLessonId = new Map<
+    string,
+    Array<{ storageId: string; song: SongData }>
+  >();
+
+  for (const [storageId, song] of existingLessonEntries) {
+    const identity = lessonExerciseIdentity(song);
+
+    if (identity) {
+      const candidates = candidatesByExercise.get(identity) ?? [];
+
+      candidates.push({ storageId, song });
+      candidatesByExercise.set(identity, candidates);
+    } else {
+      const lessonId = storedLessonId(storageId, song);
+
+      if (lessonId) {
+        const candidates = identitylessCandidatesByLessonId.get(lessonId) ?? [];
+
+        candidates.push({ storageId, song });
+        identitylessCandidatesByLessonId.set(lessonId, candidates);
+      }
+    }
+  }
+
+  const matchedStorageIds = new Set<string>();
+  const songIdMigrations: Record<string, string> = {};
+  const lessons = Object.fromEntries(
+    Object.values(installedLessons).map((lesson) => {
+      const identity = lessonExerciseIdentity(lesson);
+      const matches = identity
+        ? candidatesByExercise.get(identity) ?? []
+        : identitylessCandidatesByLessonId.get(lesson.id) ?? [];
+      const scoreData = mergeScoreData(matches.map(({ song }) => song));
+      const hasLiked = matches.some(({ song }) => song.liked !== undefined);
+      const liked = matches.some(({ song }) => song.liked === true);
+
+      for (const { storageId, song } of matches) {
+        matchedStorageIds.add(storageId);
+
+        if (storageId !== lesson.id) {
+          songIdMigrations[storageId] = lesson.id;
+        }
+
+        if (song.id !== lesson.id) {
+          songIdMigrations[song.id] = lesson.id;
+        }
+      }
+
+      return [
+        lesson.id,
+        {
+          ...lesson,
+          ...(hasLiked ? { liked } : {}),
+          ...(scoreData ? { scoreData } : {}),
+        },
+      ];
+    }),
+  );
+  const retiredLessonSongs = Object.fromEntries(
+    existingLessonEntries.filter(
+      ([storageId]) => !matchedStorageIds.has(storageId),
+    ),
+  );
+
+  return {
+    activeSongs: { ...personalSongs, ...lessons },
+    songIdMigrations,
+    retiredLessonSongs,
+  };
 }
 
 function isCompleteLessonLibrary(root: string): boolean {
@@ -292,11 +484,7 @@ export function bootstrapLessonLibrary({
 
   if (installedManifest && manifestsMatch(installedManifest, bundledManifest)) {
     try {
-      installedLessons = scanBundledLessons(
-        libraryRoot,
-        installedManifest,
-        existingSongs,
-      );
+      installedLessons = scanBundledLessons(libraryRoot, installedManifest);
     } catch {
       needsRefresh = true;
     }
@@ -315,12 +503,14 @@ export function bootstrapLessonLibrary({
   }
 
   const lessons =
-    installedLessons ??
-    scanBundledLessons(libraryRoot, currentManifest, existingSongs);
+    installedLessons ?? scanBundledLessons(libraryRoot, currentManifest);
+  const reconciled = reconcileLessons(existingSongs, lessons);
 
   return {
     libraryRoot,
-    songs: { ...existingSongs, ...lessons },
+    songs: reconciled.activeSongs,
+    songIdMigrations: reconciled.songIdMigrations,
+    retiredLessonSongs: reconciled.retiredLessonSongs,
     installed: needsRefresh,
   };
 }

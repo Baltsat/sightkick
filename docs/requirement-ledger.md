@@ -1,6 +1,6 @@
 # Drumroll requirement and proof ledger
 
-Last reconciled: 2026-08-09, integrated source freeze
+Last reconciled: 2026-08-10, atomic legacy-profile migration proof
 
 This is the release contract for the Drumroll redesign. It maps the active
 session into sequential epochs and requires evidence, not implementation
@@ -77,30 +77,31 @@ learner studies support that claim.
 
 ## Epoch 4 — Learning intelligence and durable progress
 
-| ID    | Requirement                                                                    | State  | Evidence / remaining gate                                                                                                      |
-| ----- | ------------------------------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| E4.01 | One Play action selects the next useful, prerequisite-safe task.               | passed | Deterministic ranking covers skill/lane gap, tempo, spacing, preference, variety, fatigue, and difficulty.                     |
-| E4.02 | Explain every recommendation with stored evidence and intended gain.           | passed | Home reason objects resolve to saved mastery/Coach evidence and honest fallbacks.                                              |
-| E4.03 | Join Coach findings to exact loops and matching lessons.                       | passed | Persisted finding, weak-bar, remediation, prerequisite, and cross-screen tests pass.                                           |
-| E4.04 | Keep AI narrative optional over deterministic cited evidence.                  | passed | Local deterministic narrative works offline; optional provider output cannot invent unsupported bars.                          |
-| E4.05 | Use interpretable recent/decayed mastery rather than lifetime vanity accuracy. | passed | Home uses a 28-day window, seven-day half-life, evidence counts, eight-sample confidence gate, trend, and insufficiency state. |
-| E4.06 | Separate recent readiness, raw accuracy, long-term mastery, and achievements.  | passed | Home and Profile label distinct windows/definitions; achievement XP is separate.                                               |
-| E4.07 | Show meaningful recent per-drum metrics on an interactive kit.                 | passed | Lane, window, raw samples, run count, trend, focus, and hit-state behavior are rendered/tested.                                |
-| E4.08 | Use stable session, schema, app, chart, and scoring identity.                  | passed | Versioned storage and migration/legacy tests preserve identity and evidence limits.                                            |
-| E4.09 | Retain compact multi-year evidence beyond per-song detail caps.                | passed | Archive/aggregate policy and regression tests preserve historical trend availability.                                          |
+| ID    | Requirement                                                                    | State  | Evidence / remaining gate                                                                                                         |
+| ----- | ------------------------------------------------------------------------------ | ------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| E4.01 | One Play action selects the next useful, prerequisite-safe task.               | passed | Deterministic ranking covers skill/lane gap, tempo, spacing, preference, variety, fatigue, and difficulty.                        |
+| E4.02 | Explain every recommendation with stored evidence and intended gain.           | passed | Home reason objects resolve to saved mastery/Coach evidence and honest fallbacks.                                                 |
+| E4.03 | Join Coach findings to exact loops and matching lessons.                       | passed | Persisted finding, weak-bar, remediation, prerequisite, and cross-screen tests pass.                                              |
+| E4.04 | Keep AI narrative optional over deterministic cited evidence.                  | passed | Local deterministic narrative works offline; optional provider output cannot invent unsupported bars.                             |
+| E4.05 | Use interpretable recent/decayed mastery rather than lifetime vanity accuracy. | passed | Home uses a 28-day window, seven-day half-life, evidence counts, eight-sample confidence gate, trend, and insufficiency state.    |
+| E4.06 | Separate recent readiness, raw accuracy, long-term mastery, and achievements.  | passed | Home and Profile label distinct windows/definitions; achievement XP is separate.                                                  |
+| E4.07 | Show meaningful recent per-drum metrics on an interactive kit.                 | passed | Lane, window, raw samples, run count, trend, focus, and hit-state behavior are rendered/tested.                                   |
+| E4.08 | Use stable session, schema, app, chart, and scoring identity.                  | passed | Versioned storage and atomic lesson-identity migration tests preserve identity through renumbering chains and interrupted writes. |
+| E4.09 | Retain compact multi-year evidence beyond per-song detail caps.                | passed | Archive/aggregate policy, exact-alias de-duplication, and 16-revision migration regression tests preserve historical evidence.    |
 
 ## Epoch 5 — Curriculum and personal music
 
-| ID    | Requirement                                                                                                            | State   | Evidence / remaining gate                                                                                                                     |
-| ----- | ---------------------------------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| E5.01 | Ship a deterministic 170-exercise route grounded in the supplied method reference without copying protected prose/art. | passed  | Generator, semantic validator, and complete 170-folder/681-file package pass.                                                                 |
-| E5.02 | Carry stable IDs, prerequisites, skill tags, lanes, tempo, dosage, cues, transfer, and mastery rules.                  | passed  | Curriculum validator reports 170 stable IDs, 434 authored lane targets, 11 rising ladders, and reading/transfer coverage.                     |
-| E5.03 | Repair T1/T2/T3 identification and transfer.                                                                           | passed  | Validator proves 11 T2 exercises, all directed transitions, isolated drills, eight sweeps, five groove and two fill contexts.                 |
-| E5.04 | Represent every supplied Drums playlist row.                                                                           | passed  | Timestamped metadata-only manifest contains 13 rows and 11 stable source URLs, including the two unavailable-link rows.                       |
-| E5.05 | Represent all authenticated Yandex Favorites read-only.                                                                | passed  | Timestamped manifest contains 230 rows and 211 stable source URLs.                                                                            |
-| E5.06 | Keep metadata-only, candidate, reviewed-chart, authorized-audio, and playable states distinct.                         | passed  | Candidate loader/UI never launches a metadata-only source; validators enforce availability and provenance.                                    |
-| E5.07 | Bundle/bootstrap all lessons on a clean desktop install.                                                               | partial | Packaging integrity is green; signed clean-profile installation is Epoch 8.                                                                   |
-| E5.08 | Validate pedagogy and technique limits independently.                                                                  | partial | Curriculum semantics and bounded claims pass automated review; human drum-teacher/learner retention and transfer study remains outside proof. |
+| ID    | Requirement                                                                                                            | State   | Evidence / remaining gate                                                                                                                                                      |
+| ----- | ---------------------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| E5.01 | Ship a deterministic 170-exercise route grounded in the supplied method reference without copying protected prose/art. | passed  | Generator, semantic validator, and complete 170-folder/681-file package pass.                                                                                                  |
+| E5.02 | Carry stable IDs, prerequisites, skill tags, lanes, tempo, dosage, cues, transfer, and mastery rules.                  | passed  | Curriculum validator reports 170 stable IDs, 434 authored lane targets, 11 rising ladders, and reading/transfer coverage.                                                      |
+| E5.03 | Repair T1/T2/T3 identification and transfer.                                                                           | passed  | Validator proves 11 T2 exercises, all directed transitions, isolated drills, eight sweeps, five groove and two fill contexts.                                                  |
+| E5.04 | Represent every supplied Drums playlist row.                                                                           | passed  | Timestamped metadata-only manifest contains 13 rows and 11 stable source URLs, including the two unavailable-link rows.                                                        |
+| E5.05 | Represent all authenticated Yandex Favorites read-only.                                                                | passed  | Timestamped manifest contains 230 rows and 211 stable source URLs.                                                                                                             |
+| E5.06 | Keep metadata-only, candidate, reviewed-chart, authorized-audio, and playable states distinct.                         | passed  | Candidate loader/UI never launches a metadata-only source; validators enforce availability and provenance.                                                                     |
+| E5.07 | Bundle/bootstrap all lessons on a clean desktop install.                                                               | partial | Packaging integrity is green; signed clean-profile installation is Epoch 8.                                                                                                    |
+| E5.08 | Validate pedagogy and technique limits independently.                                                                  | partial | Curriculum semantics and bounded claims pass automated review; human drum-teacher/learner retention and transfer study remains outside proof.                                  |
+| E5.09 | Upgrade the former 118-lesson profile without losing or misassigning evidence.                                         | passed  | Fresh copied-profile boots produce 170 unique active lessons, 112 personal songs, and seven readable retired exercises; the second boot preserves an identical config SHA-256. |
 
 ## Epoch 6 — Premium app world and gameplay craft
 
@@ -127,15 +128,15 @@ learner studies support that claim.
 
 ## Epoch 8 — Signed package, install, and public release
 
-| ID    | Requirement                                                                  | State            | Evidence / remaining gate                                                                                                                  |
-| ----- | ---------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| E8.01 | Rebuild the full integrated tree and distribution inputs.                    | passed           | Typecheck, lint, 1,540 tests, desktop/web builds, curriculum, Yandex, Cloudflare Functions, FFmpeg, transcriber, and integrity gates pass. |
-| E8.02 | Build a fresh Apple Silicon package without overwriting the previous output. | missing          | Credentialed `release:build:mac:api-key` run is next.                                                                                      |
-| E8.03 | Sign with Developer ID and hardened runtime.                                 | missing          | Final `codesign --deep --strict` and authority/runtime readback required.                                                                  |
-| E8.04 | Notarize, staple, and pass Gatekeeper.                                       | missing          | Apple Accepted result, stapler validation, and `spctl` acceptance required.                                                                |
-| E8.05 | Smoke-test clean and copied-real profiles without mutating live data.        | missing          | Packaged Home/Songs/Journey/Practice/Coach/Profile flow and 170/13/230 counts required.                                                    |
-| E8.06 | Publish DMG/source/checksum, verify a clean download, then deploy the site.  | missing          | Exact public HTTP, SHA-256, release, production manifest, and deployment readback required.                                                |
-| E8.07 | Prove the complete zero-touch loop on the physical Yamaha DTX402.            | external-blocker | The kit is disconnected; real ready → play → recovery → pause/resume → result → continue/end remains physical proof.                       |
+| ID    | Requirement                                                                  | State            | Evidence / remaining gate                                                                                                                                   |
+| ----- | ---------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E8.01 | Rebuild the full integrated tree and distribution inputs.                    | passed           | Typecheck, lint, 1,557 tests across 132 files, desktop/web builds, curriculum, Yandex, Cloudflare Functions, FFmpeg, transcriber, and integrity gates pass. |
+| E8.02 | Build a fresh Apple Silicon package without overwriting the previous output. | missing          | Credentialed `release:build:mac:api-key` run is next.                                                                                                       |
+| E8.03 | Sign with Developer ID and hardened runtime.                                 | missing          | Final `codesign --deep --strict` and authority/runtime readback required.                                                                                   |
+| E8.04 | Notarize, staple, and pass Gatekeeper.                                       | missing          | Apple Accepted result, stapler validation, and `spctl` acceptance required.                                                                                 |
+| E8.05 | Smoke-test clean and copied-real profiles without mutating live data.        | missing          | Packaged Home/Songs/Journey/Practice/Coach/Profile flow and 170/13/230 counts required.                                                                     |
+| E8.06 | Publish DMG/source/checksum, verify a clean download, then deploy the site.  | missing          | Exact public HTTP, SHA-256, release, production manifest, and deployment readback required.                                                                 |
+| E8.07 | Prove the complete zero-touch loop on the physical Yamaha DTX402.            | external-blocker | The kit is disconnected; real ready → play → recovery → pause/resume → result → continue/end remains physical proof.                                        |
 
 ## Epoch 9 — Independent closure
 
@@ -147,8 +148,10 @@ learner studies support that claim.
 
 ## Current release verdict
 
-The integrated source is locally green and the core tutor, learning, curriculum,
-library, and visual-system requirements are implemented. Release closure is
-still **pending** the credentialed package, packaged-app QA, public readback,
-and fresh independent artifact audit. Physical DTX402 and human learning-
-efficacy validation remain explicit outside proof rather than being guessed.
+The integrated source is locally green, and the real copied-profile migration
+is deterministic across two boots without touching the live profile. The core
+tutor, learning, curriculum, library, and visual-system requirements are
+implemented. Release closure is still **pending** the credentialed package,
+packaged-app QA, public readback, and fresh independent artifact audit.
+Physical DTX402 and human learning-efficacy validation remain explicit outside
+proof rather than being guessed.

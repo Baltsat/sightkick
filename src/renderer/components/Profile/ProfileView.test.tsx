@@ -155,4 +155,55 @@ describe('ProfileView', () => {
       'true',
     );
   });
+
+  it('keeps a retired lesson goal and its saved evidence readable', async () => {
+    render(
+      <ProfileView
+        songList={[]}
+        goals={[goal({ songId: 'legacy-song-id' })]}
+        isGoalsLoaded
+        onSaveGoal={() => {}}
+        onSetPrimaryGoal={() => {}}
+        gamification={gamification()}
+      />,
+    );
+
+    expect(ipc.sent).toContainEqual({
+      channel: 'load-retired-lessons',
+      args: [],
+    });
+
+    await act(async () => {
+      ipc.emit('load-retired-lessons', {
+        lessons: [
+          {
+            legacySongIds: ['legacy-song-id'],
+            lessonId: '05.06',
+            name: 'Lesson 05.06 — Roadhouse Cat',
+            bestStars: 4,
+            recentRunCount: 2,
+            fullRunCount: 1,
+            archivedRunCount: 3,
+            goalCount: 1,
+          },
+        ],
+      });
+      ipc.emit('load-practice-runs', {
+        songId: 'legacy-song-id',
+        runs: [],
+      });
+      ipc.emit('load-all-practice-runs', { runs: [] });
+    });
+
+    expect(screen.getByTestId('retired-goal-notice')).toHaveTextContent(
+      'does not unlock the new Journey',
+    );
+    expect(screen.getByTestId('retired-lessons-history')).toHaveTextContent(
+      'Lesson 05.06 — Roadhouse Cat',
+    );
+    expect(screen.getByTestId('retired-lessons-history')).toHaveTextContent(
+      '4 stars · 5 runs · 1 saved goal',
+    );
+    expect(screen.getAllByText('Lesson 05.06 — Roadhouse Cat')).toHaveLength(2);
+  });
 });
