@@ -50,6 +50,7 @@ import { useInputControls } from '../../hooks/useInputControls';
 import { useTransportShortcuts } from '../../hooks/useTransportShortcuts';
 import { ScoreSummary } from '../../components/ScoreSummary';
 import { CountIn } from '../../components/CountIn';
+import { StreakMeter, useStreakEngine } from '../../components/StreakMeter';
 import { ScoreData } from '../../../types';
 import {
   computeRunsTrend,
@@ -119,6 +120,11 @@ export function SongView() {
   // useEngine's return value - kept fresh via an effect rather than relied
   // on directly, matching the established pattern in this file.
   const durationRef = useRef(0);
+  // Same ref-sync reasoning again: onEnded wants the run's best streak at
+  // the moment it fires to stamp onto the saved summary, but the streak
+  // itself lives in `useStreakEngine` (below, after `engine` exists) - see
+  // that ref-sync effect further down.
+  const bestStreakRef = useRef(0);
   const navigate = useNavigate();
   const { fileData, format, songData, trackData } = useSongLoader(id);
   // The difficulties this specific chart actually carries - auto-charted
@@ -216,6 +222,7 @@ export function SongView() {
         mode: gameMode ?? 'perform',
         playbackSpeed: playbackSpeedRef.current,
         difficulty,
+        bestStreak: bestStreakRef.current,
       };
       const isAttempt = (score.hitNotes ?? 0) > 0;
 
@@ -269,6 +276,13 @@ export function SongView() {
       }
     },
   });
+  // Additive: subscribes to this same `engine` instance's public
+  // onHit/onFalseHit/onMiss/onReset events (see engine.ts) and turns them
+  // into in-play streak state, without touching anything above. Perform
+  // and Practice both render the meter - it's motivation, not scoring, so
+  // it isn't gated on `policy.scoring` the way the star-rating block above
+  // is.
+  const streakUi = useStreakEngine(engine);
   const { volumeSliders } = useVolumeControls(
     trackData,
     setStemVolume,
@@ -498,6 +512,10 @@ export function SongView() {
   useEffect(() => {
     durationRef.current = duration;
   }, [duration]);
+
+  useEffect(() => {
+    bestStreakRef.current = streakUi.streak.best;
+  }, [streakUi.streak.best]);
 
   // Snapshot taken at the moment the user picks a new difficulty, consumed
   // once the reparsed chart's renderData actually lands (useSheetMusic
@@ -921,6 +939,7 @@ export function SongView() {
           </div>
         )}
         <CountIn count={countInBeat} beatMs={countInBeatMs} />
+        <StreakMeter ui={streakUi} />
         {transportIndicator && (
           <div
             data-testid="transport-indicator"

@@ -65,6 +65,11 @@ export function PracticeStats({
   }
 
   const modeLabel = runModeLabel(summary);
+  // A run that never left the ground floor of the streak ladder isn't
+  // worth a "Best streak 0" line - only show it once there's something to
+  // brag about.
+  const hasBestStreak =
+    summary.bestStreak !== undefined && summary.bestStreak > 0;
 
   return (
     <div
@@ -76,12 +81,24 @@ export function PracticeStats({
       data-testid="practice-stats"
       data-variant={variant}
     >
-      {modeLabel && (
-        <div
-          data-testid="practice-run-mode"
-          className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint"
-        >
-          {modeLabel}
+      {(modeLabel || hasBestStreak) && (
+        <div className="flex items-center justify-between gap-2">
+          {modeLabel && (
+            <div
+              data-testid="practice-run-mode"
+              className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint"
+            >
+              {modeLabel}
+            </div>
+          )}
+          {hasBestStreak && (
+            <div
+              data-testid="practice-best-streak"
+              className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-text"
+            >
+              Best streak {summary.bestStreak}
+            </div>
+          )}
         </div>
       )}
 

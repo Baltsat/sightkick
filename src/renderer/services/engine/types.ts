@@ -86,6 +86,26 @@ export interface JudgeContext {
 
 export type IsHit = (tick: number, prefix: string) => boolean;
 
+/**
+ * Fired when GameRenderer resolves a passed, unhit note-key as a miss
+ * during a forward walk of the active note (see `colorNote`'s
+ * `flashMisses` branch in game-renderer.ts - the same moment it flashes
+ * `MISS_CLASS`). This is the engine's only "a note just got missed, live"
+ * signal; it inherits that spot's existing semantics as-is rather than
+ * inventing stricter rules GameRenderer itself doesn't follow:
+ *
+ * - A late-but-still-in-tolerance hit that lands just after the *next*
+ *   note has already activated on a dense chart can still arrive after
+ *   this fires - the visual layer already accepts that trade-off (see
+ *   `paintHit` clearing `MISSED_CLASS`).
+ * - A forward seek (scrubbing ahead) fires this for whatever it skips
+ *   over, same as normal playback would - GameRenderer's first internal
+ *   render pass on a seek can't tell "fast-forwarded" apart from "played
+ *   through fast". A *backward* seek never fires it (the walk runs in
+ *   reverse, which is never treated as a pass-through).
+ */
+export type MissHandler = (tick: number) => void;
+
 export interface GameRendererContext {
   chart: ParsedChart | undefined;
   renderData: RenderData[];

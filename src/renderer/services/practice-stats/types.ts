@@ -105,6 +105,15 @@ export interface RunSummary {
    * model) should treat a missing value as "unknown" rather than assuming
    * any particular difficulty. */
   difficulty?: Difficulty;
+  /** Highest consecutive-correct-hit streak reached during the run (the
+   * in-play "STREAK/RAGE mode" HUD - see `services/streak`). Stamped on by
+   * SongView the same way as `mode`/`playbackSpeed`/`difficulty` (never
+   * computed by `summarizeRun`, which knows nothing about the streak
+   * feature), so it's optional for the same reason: runs persisted before
+   * this field existed still deserialize cleanly. Kept here (rather than
+   * only living in-memory) so achievements/stats can use it later without
+   * SongView having to re-derive it. */
+  bestStreak?: number;
 }
 
 export interface RunTrendPoint {

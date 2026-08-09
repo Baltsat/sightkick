@@ -88,6 +88,7 @@ function uncolored(note: StaveNote, head = 0): boolean {
 interface SetupOptions {
   playheadStyle?: 'Cursor' | 'Measure';
   isHit?: (tick: number, prefix: string) => boolean;
+  onMiss?: (tick: number) => void;
   cursorEl?: HTMLElement;
   highlightEls?: (HTMLElement | undefined)[];
   overlayEl?: HTMLElement;
@@ -100,11 +101,12 @@ function setup(
   const {
     playheadStyle = 'Cursor',
     isHit = () => false,
+    onMiss,
     cursorEl,
     highlightEls = [],
     overlayEl,
   } = options;
-  const view = new GameRenderer(isHit);
+  const view = new GameRenderer(isHit, onMiss);
 
   view.setContext({ chart: CHART, renderData });
   view.setSettings(playheadStyle);
@@ -199,6 +201,36 @@ describe('GameRenderer', () => {
     expect(hasClass(n0, 'vf-note-miss')).toBe(false);
 
     view.render(0, 480);
+    expect(hasClass(n0, 'vf-note-miss')).toBe(true);
+  });
+
+  it('calls the optional onNoteMiss callback at the same moment it flashes the miss class', () => {
+    const n0 = staveNote(['c/5']);
+    const n1 = staveNote(['d/5']);
+    const missed: number[] = [];
+    const view = setup(
+      [measureData(0, 1920, [rendered(0, n0), rendered(480, n1)])],
+      { onMiss: (tick) => missed.push(tick) },
+    );
+
+    view.render(0, 0);
+    expect(missed).toEqual([]);
+
+    view.render(0, 480);
+    expect(missed).toEqual([0]);
+  });
+
+  it('works without an onNoteMiss callback (additive, optional)', () => {
+    const n0 = staveNote(['c/5']);
+    const n1 = staveNote(['d/5']);
+    const view = setup([
+      measureData(0, 1920, [rendered(0, n0), rendered(480, n1)]),
+    ]);
+
+    expect(() => {
+      view.render(0, 0);
+      view.render(0, 480);
+    }).not.toThrow();
     expect(hasClass(n0, 'vf-note-miss')).toBe(true);
   });
 

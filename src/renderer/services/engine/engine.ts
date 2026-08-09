@@ -20,7 +20,10 @@ import {
   EngineOptions,
   GameRendererRefs,
   EngineSettings,
+  JudgeFalseHitHandler,
+  JudgeHitHandler,
   LoopRegion,
+  MissHandler,
   PlaybackSnapshot,
 } from './types';
 
@@ -41,9 +44,19 @@ export class Engine {
   private transport: Transport;
   private player: AudioPlayer | undefined;
   private judge = new Judge();
-  private renderer = new GameRenderer((tick, key) =>
-    this.judge.isHit(tick, key),
+  private renderer = new GameRenderer(
+    (tick, key) => this.judge.isHit(tick, key),
+    (tick) => this.missListeners.forEach((listener) => listener(tick)),
   );
+  // Additive event surface for the streak/rage feature (and anything else
+  // that wants to watch play live without touching Judge/Transport
+  // internals): `onMiss` forwards GameRenderer's live miss-resolution hook
+  // (see MissHandler's doc comment), and `onReset` fires whenever this
+  // engine already resets Judge/GameRenderer state for a seek or restart -
+  // see `onSeek` below, the Transport option that already drives
+  // `judge.rewindTo`.
+  private missListeners = new Set<MissHandler>();
+  private resetListeners = new Set<() => void>();
   private onEndedCb: (
     score: ScoreData,
     practiceSummary: RunSummary,
@@ -97,6 +110,11 @@ export class Engine {
         // stale. Both passes happen synchronously within this call, before
         // anything is painted, so nothing stale is ever visible.
         this.renderFrame(true);
+        // Notify after the rewind is fully applied and repainted, same as
+        // the runRecords prune above - a listener reacting to this (e.g.
+        // the streak feature resetting its own count) should see state
+        // that already reflects the seek destination.
+        this.resetListeners.forEach((listener) => listener());
       },
     });
     this.timeUnsub = this.transport.timeStore.subscribe(this.handleFrame);
@@ -147,6 +165,42 @@ export class Engine {
 
   subscribe = (listener: () => void): (() => void) =>
     this.transport.subscribe(listener);
+
+  /**
+   * The same live judge events the renderer itself paints from - a
+   * pass-through onto `Judge.onHit`/`Judge.onFalseHit`, additive to the
+   * internal subscription this constructor already sets up above. Judge
+   * already supports multiple independent listeners (a `Set`), so nothing
+   * about the existing wiring changes.
+   */
+  onHit(listener: JudgeHitHandler): () => void {
+    return this.judge.onHit(listener);
+  }
+
+  onFalseHit(listener: JudgeFalseHitHandler): () => void {
+    return this.judge.onFalseHit(listener);
+  }
+
+  /** See `MissHandler`'s doc comment in types.ts. */
+  onMiss(listener: MissHandler): () => void {
+    this.missListeners.add(listener);
+
+    return () => {
+      this.missListeners.delete(listener);
+    };
+  }
+
+  /** Fires whenever this engine resets Judge/GameRenderer state for a seek
+   * or restart (see the `onSeek` Transport option above). Does NOT fire
+   * for a miss or wrong hit - those are `onMiss`/`onFalseHit`, not a
+   * reset. */
+  onReset(listener: () => void): () => void {
+    this.resetListeners.add(listener);
+
+    return () => {
+      this.resetListeners.delete(listener);
+    };
+  }
 
   getSnapshot = (): PlaybackSnapshot => this.transport.getSnapshot();
 

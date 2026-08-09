@@ -14,6 +14,7 @@ import {
   GameRendererContext,
   GameRendererRefs,
   IsHit,
+  MissHandler,
   NotePos,
 } from './types';
 import {
@@ -60,7 +61,14 @@ export class GameRenderer {
   private vanishedNotes = new Map<StaveNote, SVGElement[]>();
   private wrongHitMarkers: { tick: number; x: number; el: HTMLElement }[] = [];
 
-  constructor(private isHit: IsHit) {}
+  constructor(
+    private isHit: IsHit,
+    /** Additive, optional: nothing outside the streak feature passes this,
+     * and every existing caller (tests included) still works with just
+     * `isHit`. See `MissHandler`'s doc comment in types.ts for what "live
+     * miss" means here. */
+    private onNoteMiss?: MissHandler,
+  ) {}
 
   setContext(context: GameRendererContext): void {
     const renderDataChanged = this.renderData !== context.renderData;
@@ -390,6 +398,7 @@ export class GameRenderer {
 
       if (flashMisses && !hit && !isRest) {
         flashClass(el, MISS_CLASS);
+        this.onNoteMiss?.(tick);
       }
     };
     const walkNote = (note: StaveNote, tick: number) => {

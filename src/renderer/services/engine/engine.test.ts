@@ -551,6 +551,133 @@ describe('Engine', () => {
     );
   });
 
+  it('fires onMiss for each passed-unhit note during forward playback', async () => {
+    const n0 = staveNote(['c/5']);
+    const n1 = staveNote(['d/5']);
+    const n2 = staveNote(['e/5']);
+    const { engine } = await setup({
+      renderData: [
+        measureData(0, 1920, [
+          rendered(0, n0),
+          rendered(240, n1),
+          rendered(480, n2),
+        ]),
+      ],
+    });
+    const missed: number[] = [];
+
+    engine.onMiss((tick) => missed.push(tick));
+    engine.setSettings({ playheadStyle: 'Cursor' });
+    engine.setRendererRefs({
+      cursorEl: document.createElement('div'),
+      highlightEls: [],
+    });
+    engine.timeStore.set(0.5);
+
+    // Same forward walk the "progress-colours notes" test above asserts
+    // paints vf-note-missed on n0/n1 - onMiss fires once per passed-unhit
+    // note-key, in the order they're walked.
+    expect(missed).toEqual([0, 240]);
+  });
+
+  it('still fires onMiss for a note skipped by a forward seek', async () => {
+    // A forward seek's *first* internal render pass (see Engine's onSeek
+    // comment on why there are two) walks exactly like normal forward
+    // playback - GameRenderer has no way to tell "fast-forwarded" apart
+    // from "played through fast". So this inherits the same live-miss
+    // signal, same as the plain-forward-playback test above. The one
+    // difference is that a seek also always fires onReset (next test) -
+    // whatever a streak-style listener does in reaction to this onMiss
+    // gets immediately wiped by that onReset anyway, so the end state is
+    // the same either way.
+    const n0 = staveNote(['c/5']);
+    const n1 = staveNote(['d/5']);
+    const { engine } = await setup({
+      renderData: [measureData(0, 1920, [rendered(0, n0), rendered(960, n1)])],
+    });
+    const missed: number[] = [];
+
+    engine.setSettings({ playheadStyle: 'Cursor' });
+    engine.setRendererRefs({
+      cursorEl: document.createElement('div'),
+      highlightEls: [],
+    });
+    engine.onMiss((tick) => missed.push(tick));
+    engine.playFromTick(0);
+    // n1 sits at tick 960 (1.0s at this fixture's 120bpm/480 resolution),
+    // so seeking to 1.1s makes n1 active and walks n0 as passed.
+    engine.seekSeconds(1.1);
+
+    expect(hasClass(n0, 'vf-note-missed')).toBe(true);
+    expect(missed).toEqual([0]);
+  });
+
+  it('does not fire onMiss when a seek rewinds the active note backward', async () => {
+    const n0 = staveNote(['c/5']);
+    const n1 = staveNote(['d/5']);
+    const { engine } = await setup({
+      renderData: [measureData(0, 1920, [rendered(0, n0), rendered(960, n1)])],
+    });
+    const missed: number[] = [];
+
+    engine.setSettings({ playheadStyle: 'Cursor' });
+    engine.setRendererRefs({
+      cursorEl: document.createElement('div'),
+      highlightEls: [],
+    });
+    engine.playFromTick(0);
+    engine.timeStore.set(1.1); // normal forward advance past n0, before subscribing below
+    engine.onMiss((tick) => missed.push(tick));
+    engine.seekSeconds(0.1); // rewinds the active note back to n0 - a real backward walk
+
+    expect(missed).toEqual([]);
+  });
+
+  it('fires onReset whenever a seek/restart rewinds Judge state', async () => {
+    const { engine } = await setup();
+    const resets: number[] = [];
+
+    engine.onReset(() => resets.push(resets.length));
+    engine.playFromTick(0);
+    expect(resets).toHaveLength(1);
+
+    engine.seekSeconds(0.5);
+    expect(resets).toHaveLength(2);
+  });
+
+  it('forwards judge hit/false-hit events to external onHit/onFalseHit subscribers', async () => {
+    const note = staveNote(['c/5']);
+    const { engine } = await setup({
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [rendered(480, note)],
+          [{ tick: 480, isRest: false, notes: ['c/5'] } as Note],
+        ),
+      ],
+    });
+    const hits: unknown[] = [];
+    const falseHits: unknown[] = [];
+
+    engine.onHit((pos) => hits.push(pos));
+    engine.onFalseHit((record) => falseHits.push(record));
+    engine.setSettings({ playheadStyle: 'Cursor' });
+    engine.setRendererRefs({
+      cursorEl: document.createElement('div'),
+      highlightEls: [],
+    });
+    engine.setMapping({ snare: ['midi:38'], crash: ['midi:49'] });
+    engine.playFromTick(0);
+    engine.seekSeconds(0.5);
+
+    emitInput('midi:38');
+    emitInput('midi:49');
+
+    expect(hits).toHaveLength(1);
+    expect(falseHits).toHaveLength(1);
+  });
+
   it('does not register input hits before playback starts', async () => {
     const note = staveNote(['c/5']);
     const { engine } = await setup({
