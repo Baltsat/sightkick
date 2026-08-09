@@ -1,22 +1,26 @@
 .drumroll-tutor-hud {
-  --tutor-signal: var(--color-cyan);
+  --tutor-signal: #ffd064;
   position: absolute;
-  inset-inline: clamp(1rem, 3vw, 3rem);
-  bottom: clamp(1rem, 2.4vw, 2rem);
+  inset-inline: clamp(1rem, 2.4vw, 2.25rem);
+  bottom: clamp(1rem, 2.1vw, 1.75rem);
   z-index: 16;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(18rem, 1fr) auto;
   align-items: center;
-  gap: 0.9rem;
-  min-height: 4.5rem;
-  padding: 0.8rem 1rem;
-  color: var(--color-text);
-  background: color-mix(in srgb, var(--color-bg) 88%, transparent);
-  border-radius: 14px;
-  box-shadow: 0 12px 32px
-    color-mix(in srgb, var(--tutor-signal) 24%, #172033 18%);
-  backdrop-filter: blur(18px) saturate(1.18);
+  gap: clamp(1rem, 2vw, 1.6rem);
+  min-height: clamp(6.6rem, 12vh, 8rem);
+  padding: clamp(1rem, 1.6vw, 1.35rem) clamp(1.1rem, 2vw, 1.75rem);
   overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--tutor-signal) 38%, #fff 10%);
+  border-left-width: 4px;
+  border-radius: 18px;
+  color: #fffaf2;
+  background: linear-gradient(135deg, rgb(17 23 34 / 96%), rgb(27 36 48 / 93%));
+  box-shadow:
+    0 18px 48px rgb(4 8 14 / 42%),
+    0 0 28px color-mix(in srgb, var(--tutor-signal) 18%, transparent),
+    inset 0 1px 0 rgb(255 255 255 / 12%);
+  backdrop-filter: blur(20px) saturate(1.08);
   pointer-events: none;
 }
 
@@ -37,15 +41,15 @@
 }
 
 .drumroll-tutor-hud[data-tone='warning'] {
-  --tutor-signal: var(--color-orange);
+  --tutor-signal: #ffad2f;
 }
 
 .drumroll-tutor-hud[data-tone='recovery'] {
-  --tutor-signal: var(--color-magenta);
+  --tutor-signal: #ff684f;
 }
 
 .drumroll-tutor-hud[data-tone='success'] {
-  --tutor-signal: var(--color-green);
+  --tutor-signal: #5ed39a;
 }
 
 .drumroll-tutor-hud[data-tone='recovery']::after {
@@ -55,13 +59,15 @@
 .drumroll-tutor-hud__signal {
   display: grid;
   place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: clamp(3.4rem, 5vw, 4.5rem);
+  height: clamp(3.4rem, 5vw, 4.5rem);
+  border: 1px solid color-mix(in srgb, var(--tutor-signal) 52%, transparent);
   color: var(--tutor-signal);
-  background: color-mix(in srgb, var(--tutor-signal) 13%, transparent);
+  background: color-mix(in srgb, var(--tutor-signal) 14%, #111722 86%);
   border-radius: 50%;
+  font-size: clamp(1.25rem, 2vw, 1.8rem);
   filter: drop-shadow(
-    0 4px 9px color-mix(in srgb, var(--tutor-signal) 45%, transparent)
+    0 5px 14px color-mix(in srgb, var(--tutor-signal) 52%, transparent)
   );
 }
 
@@ -73,60 +79,114 @@
 .drumroll-tutor-hud__copy strong,
 .drumroll-tutor-hud__copy span {
   display: block;
+}
+
+.drumroll-tutor-hud__copy .drumroll-tutor-hud__eyebrow {
+  margin: 0 0 0.2rem;
+  color: var(--tutor-signal);
+  font-size: clamp(0.68rem, 0.85vw, 0.78rem);
+  font-weight: 760;
+  line-height: 1;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.drumroll-tutor-hud__copy strong {
   overflow: hidden;
+  color: #fffaf2;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2.4vw, 2rem);
+  font-weight: 650;
+  line-height: 1.03;
+  letter-spacing: -0.035em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.drumroll-tutor-hud__copy strong {
-  font-size: 0.93rem;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-}
-
 .drumroll-tutor-hud__copy span {
-  margin-top: 0.18rem;
-  color: color-mix(in srgb, var(--color-text) 72%, var(--tutor-signal));
-  font-size: 0.78rem;
-  line-height: 1.35;
+  margin-top: 0.32rem;
+  max-width: 68ch;
+  color: rgb(255 250 242 / 86%);
+  font-size: clamp(0.88rem, 1.25vw, 1.05rem);
+  line-height: 1.4;
 }
 
 .drumroll-tutor-hud__telemetry {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(6.2rem, auto);
   align-items: center;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  color: color-mix(in srgb, var(--color-text) 78%, var(--tutor-signal));
+  gap: 0.55rem;
+  margin: 0;
+  color: #fffaf2;
   font-family: var(--font-ui);
-  font-size: 0.74rem;
-  font-weight: 700;
+}
+
+.drumroll-tutor-hud__metric {
+  display: grid;
+  min-height: 4.2rem;
+  align-content: center;
+  gap: 0.24rem;
+  padding: 0.65rem 0.78rem;
+  border: 1px solid rgb(255 250 242 / 14%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 6%);
+}
+
+.drumroll-tutor-hud__metric dt {
+  color: rgb(255 250 242 / 70%);
+  font-size: 0.67rem;
+  font-weight: 720;
+  line-height: 1;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
   white-space: nowrap;
 }
 
-.drumroll-tutor-hud__speed {
-  display: inline-flex;
+.drumroll-tutor-hud__metric dd {
+  display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.34rem;
+  margin: 0;
+  color: #fffaf2;
+  font-size: clamp(1.15rem, 1.8vw, 1.55rem);
+  font-weight: 720;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+
+.drumroll-tutor-hud__speed dd {
   color: var(--tutor-signal);
 }
 
 .drumroll-tutor-hud__lives {
   display: inline-flex;
   align-items: center;
-  gap: 0.24rem;
+  gap: 0.17rem;
 }
 
-.drumroll-tutor-hud__lives [data-active='true'] {
+.drumroll-tutor-hud__lives > strong {
+  color: #fffaf2;
+  font: inherit;
+}
+
+.drumroll-tutor-hud__life-icons {
+  display: inline-flex;
+  gap: 0.2rem;
+  margin-left: 0.32rem;
+  font-size: 0.8rem;
+}
+
+.drumroll-tutor-hud__life-icons [data-active='true'] {
   color: var(--color-red);
   filter: drop-shadow(
     0 2px 5px color-mix(in srgb, var(--color-red) 42%, transparent)
   );
 }
 
-.drumroll-tutor-hud__lives [data-active='false'] {
-  color: color-mix(in srgb, var(--color-text-faint) 42%, transparent);
+.drumroll-tutor-hud__life-icons [data-active='false'] {
+  color: rgb(255 250 242 / 28%);
 }
 
 @keyframes drumroll-tutor-scan {
@@ -149,8 +209,28 @@
 
   .drumroll-tutor-hud__telemetry {
     grid-column: 1 / -1;
-    justify-content: flex-start;
-    padding-left: 3.65rem;
+    grid-auto-columns: minmax(0, 1fr);
+    padding-left: calc(clamp(3.4rem, 5vw, 4.5rem) + 1rem);
+  }
+}
+
+@media (max-width: 620px) {
+  .drumroll-tutor-hud {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .drumroll-tutor-hud__signal {
+    display: none;
+  }
+
+  .drumroll-tutor-hud__telemetry {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-left: 0;
+  }
+
+  .drumroll-tutor-hud__copy strong {
+    white-space: normal;
   }
 }
 

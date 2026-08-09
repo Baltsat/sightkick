@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { App as AntdApp } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installIpcMock, IpcMock } from '../../hooks/test-support';
-import { SongSearch } from './SongSearch';
+import { SongSearch, SongSearchRequest } from './SongSearch';
 
 // antd's Popover drives its open/close animation (CSSMotion) off real
 // browser timing primitives regardless of vi.useFakeTimers() below, so these
@@ -11,10 +11,13 @@ vi.setConfig({ testTimeout: 30_000 });
 
 let ipc: IpcMock;
 
-function renderSongSearch(disabled = false) {
-  render(
+function renderSongSearch(
+  disabled = false,
+  requestedSearch?: SongSearchRequest,
+) {
+  return render(
     <AntdApp>
-      <SongSearch disabled={disabled} />
+      <SongSearch disabled={disabled} requestedSearch={requestedSearch} />
     </AntdApp>,
   );
 }
@@ -51,6 +54,15 @@ const sampleResults = [
     watchUrl: 'https://www.youtube.com/watch?v=11111111111',
   },
 ];
+const yandexProvenance = {
+  provider: 'yandex-music' as const,
+  collectionId: 'f37c90e8-ddab-5270-9379-4a72d66e0cac',
+  collectionName: 'drums',
+  trackId: 'yandex:f37c90e8-ddab-5270-9379-4a72d66e0cac:2',
+  title: 'Natural Villain',
+  artists: ['Mokita'],
+  sourceUrl: 'https://music.yandex.ru/album/123/track/456',
+};
 
 describe('SongSearch', () => {
   beforeEach(() => {
@@ -86,6 +98,38 @@ describe('SongSearch', () => {
     ]);
   });
 
+  it('opens a reviewed search from a playlist candidate request', () => {
+    const view = renderSongSearch(false, {
+      id: 1,
+      query: 'Heat Waves Glass Animals',
+    });
+
+    expect(screen.getByTestId('song-search-input')).toHaveValue(
+      'Heat Waves Glass Animals',
+    );
+    expect(screen.getByTestId('song-search-input')).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+
+    flushDebounce();
+    expect(ipc.sent).toContainEqual({
+      channel: 'search-youtube',
+      args: [{ query: 'Heat Waves Glass Animals' }],
+    });
+
+    view.rerender(
+      <AntdApp>
+        <SongSearch
+          requestedSearch={{ id: 2, query: 'Natural Villain Mokita' }}
+        />
+      </AntdApp>,
+    );
+    expect(screen.getByTestId('song-search-input')).toHaveValue(
+      'Natural Villain Mokita',
+    );
+  });
+
   it('renders results with thumbnail, uploader and duration once the reply arrives', () => {
     renderSongSearch();
 
@@ -119,6 +163,61 @@ describe('SongSearch', () => {
     act(() => {
       ipc.emit('search-youtube', { results: sampleResults });
     });
+
+    fireEvent.click(screen.getByTestId('song-search-result-abcdefghijk'));
+
+    expect(ipc.sent).toContainEqual({
+      channel: 'create-auto-chart',
+      args: [{ youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk' }],
+    });
+  });
+
+  it('carries the reviewed Yandex source row into the selected chart job', () => {
+    renderSongSearch(false, {
+      id: 3,
+      query: 'Natural Villain Mokita',
+      sourceProvenance: yandexProvenance,
+    });
+    flushDebounce();
+
+    act(() => {
+      ipc.emit('search-youtube', { results: sampleResults });
+    });
+
+    expect(screen.getByTestId('song-search-provenance')).toHaveTextContent(
+      'Reviewing matches for Natural Villain from drums',
+    );
+
+    fireEvent.click(screen.getByTestId('song-search-result-abcdefghijk'));
+
+    expect(ipc.sent).toContainEqual({
+      channel: 'create-auto-chart',
+      args: [
+        {
+          youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+          sourceProvenance: yandexProvenance,
+        },
+      ],
+    });
+  });
+
+  it('drops source linkage when the reviewed query is edited', () => {
+    renderSongSearch(false, {
+      id: 4,
+      query: 'Natural Villain Mokita',
+      sourceProvenance: yandexProvenance,
+    });
+
+    typeQuery('A different song');
+    flushDebounce();
+
+    act(() => {
+      ipc.emit('search-youtube', { results: sampleResults });
+    });
+
+    expect(screen.getByTestId('song-search-provenance')).toHaveTextContent(
+      'Results from YouTube search',
+    );
 
     fireEvent.click(screen.getByTestId('song-search-result-abcdefghijk'));
 

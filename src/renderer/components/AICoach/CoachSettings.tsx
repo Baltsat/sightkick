@@ -1,4 +1,4 @@
-import { Button, Divider, Input, Segmented } from 'antd';
+import { Button, Input, Segmented } from 'antd';
 import { useEffect, useState } from 'react';
 import {
   CoachProvider,
@@ -83,109 +83,100 @@ export function CoachSettings() {
   };
 
   return (
-    <>
-      <Divider className="my-1" />
-      <div className="flex flex-col gap-3" data-testid="coach-settings">
-        <div>
-          <div className="text-sm font-semibold text-text">
-            AI coaching notes
+    <div className="flex flex-col gap-3" data-testid="coach-settings">
+      <div>
+        <div className="text-sm font-semibold text-text">AI coaching notes</div>
+        <div className="text-xs text-text-muted">
+          Drumroll sends findings and song metadata, never audio.
+        </div>
+      </div>
+      <Segmented
+        data-testid="coach-provider-select"
+        options={PROVIDER_OPTIONS}
+        value={provider}
+        onChange={(value) => changeProvider(value as CoachProvider)}
+      />
+      {provider === 'codex' && (
+        <div className="text-xs text-text-muted" data-testid="coach-codex-hint">
+          Runs the Codex CLI already installed on this machine — no key needed.
+          If notes fail, install Codex and run <code>codex login</code>.
+        </div>
+      )}
+      {provider === 'huggingface' && (
+        <div className="flex flex-col gap-2">
+          <Input.Password
+            aria-label="Hugging Face token"
+            autoComplete="off"
+            placeholder={hfTokenConfigured ? 'Token saved' : 'hf_…'}
+            value={hfToken}
+            onChange={(event) => setHfToken(event.target.value)}
+          />
+          <div className="flex gap-2">
+            <Button
+              type="primary"
+              size="small"
+              loading={savingHfToken}
+              disabled={hfToken.trim() === ''}
+              onClick={() => saveHfToken(hfToken.trim())}
+            >
+              Save token
+            </Button>
+            {hfTokenConfigured && (
+              <Button
+                size="small"
+                disabled={savingHfToken}
+                onClick={() => saveHfToken('')}
+              >
+                Remove token
+              </Button>
+            )}
           </div>
-          <div className="text-xs text-text-muted">
-            Drumroll sends findings and song metadata, never audio.
+          <Input
+            aria-label="Hugging Face model"
+            value={hfModel}
+            onChange={(event) => setHfModel(event.target.value)}
+          />
+          <Button
+            size="small"
+            loading={savingHfModel}
+            disabled={hfModel.trim() === ''}
+            onClick={() => saveHfModel(hfModel.trim())}
+          >
+            Save model
+          </Button>
+        </div>
+      )}
+      {provider === 'anthropic' && (
+        <div className="flex flex-col gap-2">
+          <Input.Password
+            aria-label="Anthropic API key"
+            autoComplete="off"
+            placeholder={apiKeyConfigured ? 'API key saved' : 'sk-ant-…'}
+            value={apiKey}
+            onChange={(event) => setApiKey(event.target.value)}
+          />
+          <div className="flex gap-2">
+            <Button
+              type="primary"
+              size="small"
+              loading={savingApiKey}
+              disabled={apiKey.trim() === ''}
+              onClick={() => saveApiKey(apiKey.trim())}
+            >
+              Save key
+            </Button>
+            {apiKeyConfigured && (
+              <Button
+                size="small"
+                disabled={savingApiKey}
+                onClick={() => saveApiKey('')}
+              >
+                Remove key
+              </Button>
+            )}
           </div>
         </div>
-        <Segmented
-          data-testid="coach-provider-select"
-          options={PROVIDER_OPTIONS}
-          value={provider}
-          onChange={(value) => changeProvider(value as CoachProvider)}
-        />
-        {provider === 'codex' && (
-          <div
-            className="text-xs text-text-muted"
-            data-testid="coach-codex-hint"
-          >
-            Runs the Codex CLI already installed on this machine — no key
-            needed. If notes fail, install Codex and run{' '}
-            <code>codex login</code>.
-          </div>
-        )}
-        {provider === 'huggingface' && (
-          <div className="flex flex-col gap-2">
-            <Input.Password
-              aria-label="Hugging Face token"
-              autoComplete="off"
-              placeholder={hfTokenConfigured ? 'Token saved' : 'hf_…'}
-              value={hfToken}
-              onChange={(event) => setHfToken(event.target.value)}
-            />
-            <div className="flex gap-2">
-              <Button
-                type="primary"
-                size="small"
-                loading={savingHfToken}
-                disabled={hfToken.trim() === ''}
-                onClick={() => saveHfToken(hfToken.trim())}
-              >
-                Save token
-              </Button>
-              {hfTokenConfigured && (
-                <Button
-                  size="small"
-                  disabled={savingHfToken}
-                  onClick={() => saveHfToken('')}
-                >
-                  Remove token
-                </Button>
-              )}
-            </div>
-            <Input
-              aria-label="Hugging Face model"
-              value={hfModel}
-              onChange={(event) => setHfModel(event.target.value)}
-            />
-            <Button
-              size="small"
-              loading={savingHfModel}
-              disabled={hfModel.trim() === ''}
-              onClick={() => saveHfModel(hfModel.trim())}
-            >
-              Save model
-            </Button>
-          </div>
-        )}
-        {provider === 'anthropic' && (
-          <div className="flex flex-col gap-2">
-            <Input.Password
-              aria-label="Anthropic API key"
-              autoComplete="off"
-              placeholder={apiKeyConfigured ? 'API key saved' : 'sk-ant-…'}
-              value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
-            />
-            <div className="flex gap-2">
-              <Button
-                type="primary"
-                size="small"
-                loading={savingApiKey}
-                disabled={apiKey.trim() === ''}
-                onClick={() => saveApiKey(apiKey.trim())}
-              >
-                Save key
-              </Button>
-              {apiKeyConfigured && (
-                <Button
-                  size="small"
-                  disabled={savingApiKey}
-                  onClick={() => saveApiKey('')}
-                >
-                  Remove key
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </>
+      )}
+    </div>
   );
 }

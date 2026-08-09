@@ -1,4 +1,5 @@
 import fs from 'fs';
+import ini from 'ini';
 import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -84,6 +85,11 @@ function latestJob(event: ReturnType<typeof makeEvent>) {
     error?: string;
     preview?: { sourceDir: string };
     youtubeUrl?: string;
+    sourceProvenance?: {
+      provider: string;
+      collectionId: string;
+      trackId: string;
+    };
     jobs?: { id: string; stage: string; youtubeUrl?: string }[];
   };
 }
@@ -170,6 +176,7 @@ function createHarness(options: HarnessOptions = {}) {
       return { kill: run.kill, done };
     },
   };
+  const applyMetadata = vi.fn(async () => {});
   const queue = new AutoChartQueue({
     selectAudio: async () => {
       selectAudioCalls += 1;
@@ -216,7 +223,7 @@ function createHarness(options: HarnessOptions = {}) {
         await fs.promises.rm(tempDir, { recursive: true, force: true });
       }
     },
-    applyMetadata: async () => {},
+    applyMetadata,
     makeId: () => `job-${++jobIndex}`,
   } as never);
   const completeOctave = async (run: OctaveRun) => {
@@ -244,6 +251,7 @@ function createHarness(options: HarnessOptions = {}) {
     remoteRuns,
     queue,
     importSong,
+    applyMetadata,
     completeOctave,
     get selectAudioCalls() {
       return selectAudioCalls;
@@ -370,6 +378,42 @@ describe('auto-chart source and worker protocol', () => {
     expect(fs.readFileSync(path.join(root, 'song.ini'), 'utf8')).toBe(
       '[song]\nname = Raging name = injected\nartist = Kygo artist = injected\n',
     );
+  });
+
+  it('persists reviewed source provenance in schema-compatible song metadata', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auto-chart-source-'));
+
+    cleanup.push(root);
+    fs.writeFileSync(
+      path.join(root, 'song.ini'),
+      '[song]\nname = generated filename\nartist = Unknown Artist\n',
+    );
+
+    await applyOfficialMetadata(root, undefined, {
+      provider: 'yandex-music',
+      collectionId: 'drums-playlist',
+      collectionName: 'drums',
+      trackId: 'yandex:drums-playlist:2',
+      title: 'Natural Villain',
+      artists: ['Mokita'],
+      sourceUrl: 'https://music.yandex.ru/album/123/track/456',
+    });
+
+    const stored = ini.parse(
+      fs.readFileSync(path.join(root, 'song.ini'), 'utf8'),
+    ).song;
+
+    expect(stored).toMatchObject({
+      name: 'generated filename',
+      artist: 'Unknown Artist',
+      sk_source_provider: 'yandex-music',
+      sk_source_collection_id: 'drums-playlist',
+      sk_source_collection_name: 'drums',
+      sk_source_track_id: 'yandex:drums-playlist:2',
+      sk_source_title: 'Natural Villain',
+      sk_source_artists: '["Mokita"]',
+      sk_source_url: 'https://music.yandex.ru/album/123/track/456',
+    });
   });
 
   it('prefers a confident iTunes album cover over the YouTube thumbnail when importing', async () => {
@@ -873,6 +917,51 @@ describe('auto-chart queue — sightkick backend', () => {
       'https://www.youtube.com/watch?v=abcdefghijk',
     );
     expect(latestJob(event)).toMatchObject({ stage: 'downloading' });
+  });
+
+  it('carries reviewed source provenance through the chart preparation boundary', async () => {
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+    const sourceProvenance = {
+      provider: 'yandex-music' as const,
+      collectionId: 'drums-playlist',
+      collectionName: 'drums',
+      trackId: 'yandex:drums-playlist:2',
+      title: 'Natural Villain',
+      artists: ['Mokita'],
+      sourceUrl: 'https://music.yandex.ru/album/123/track/456',
+    };
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://youtu.be/abcdefghijk',
+      sourceProvenance,
+    });
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+
+    const songDir = path.join(harness.skRuns[0].input.tempDir, 'prepared');
+
+    fs.mkdirSync(songDir, { recursive: true });
+    harness.skRuns[0].emit({ kind: 'complete', success: true, songDir });
+
+    await vi.waitFor(() =>
+      expect(latestJob(event)).toMatchObject({
+        stage: 'preview-ready',
+        sourceProvenance,
+      }),
+    );
+    expect(harness.applyMetadata).toHaveBeenCalledOnce();
+    expect(harness.applyMetadata).toHaveBeenCalledWith(
+      fs.realpathSync(songDir),
+      undefined,
+      sourceProvenance,
+    );
+
+    harness.skRuns[0].finish();
   });
 
   it('downloads audio automatically from a pasted YouTube URL without prompting for a local file', async () => {

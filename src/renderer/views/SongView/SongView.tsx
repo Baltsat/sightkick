@@ -389,20 +389,14 @@ export function SongView() {
       setGamificationResult(undefined);
       setIsScoreModalOpen(true);
 
+      const previousScore = songData?.scoreData?.[difficulty];
+      const isHighScore =
+        policy.scoring &&
+        (!previousScore ||
+          calculateAccuracy(score) > calculateAccuracy(previousScore));
+
       if (policy.scoring) {
         setScoreData(score);
-
-        const previousScore = songData?.scoreData?.[difficulty];
-        const isHighScore =
-          !previousScore ||
-          calculateAccuracy(score) > calculateAccuracy(previousScore);
-
-        if (id && isHighScore && rewardEligible) {
-          window.electron.ipcRenderer.sendMessage('update-song', {
-            id,
-            scoreData: { [difficulty]: score },
-          });
-        }
       }
 
       if (id && persistEligible) {
@@ -423,6 +417,29 @@ export function SongView() {
             // A saved all-wrong/Tutor run does not earn rewards, but it is
             // still fresh Coach evidence. Refresh the shared Home cache only
             // after persistence succeeds so its next recommendation is live.
+            if (isHighScore && rewardEligible) {
+              window.electron.ipcRenderer.sendMessage('update-song', {
+                id,
+                scoreData: { [difficulty]: score },
+              });
+            }
+
+            // Practice history is the source evidence for every durable
+            // reward. Only mint XP, streak days, stars, or a high score after
+            // the main process confirms that evidence reached disk.
+            if (rewardEligible) {
+              gamification?.recordRun(
+                {
+                  totalHits: runSummary.totalHits,
+                  overallAccuracy: runSummary.overallAccuracy,
+                  difficulty,
+                  starsEarned: policy.scoring ? getStarRating(score) : 0,
+                  minutes: durationRef.current / 60 / runPlaybackSpeed,
+                },
+                setGamificationResult,
+              );
+            }
+
             gamification?.loadAchievements();
           }
         });
@@ -431,23 +448,6 @@ export function SongView() {
           summary: runSummary,
           records,
         });
-
-        // Persistence and reward are deliberately separate. A real all-wrong
-        // attempt is useful coaching evidence, but only a run with an
-        // authoritative correct hit may mint XP, streak days, stars, or a
-        // high score.
-        if (rewardEligible) {
-          gamification?.recordRun(
-            {
-              totalHits: runSummary.totalHits,
-              overallAccuracy: runSummary.overallAccuracy,
-              difficulty,
-              starsEarned: policy.scoring ? getStarRating(score) : 0,
-              minutes: durationRef.current / 60 / runPlaybackSpeed,
-            },
-            setGamificationResult,
-          );
-        }
       }
 
       const nextRunIdentity = createPracticeRunIdentity();
@@ -1107,6 +1107,7 @@ export function SongView() {
         <Switch
           size="small"
           data-testid="setting-adaptive-tutor"
+          aria-label="Tutor listens"
           checked={adaptiveTutorEnabled}
           onChange={setAdaptiveTutorEnabled}
         />
@@ -1119,6 +1120,7 @@ export function SongView() {
         <Switch
           size="small"
           data-testid="setting-tutor-auto-rewind"
+          aria-label="Smart rewind"
           checked={tutorAutoRewind}
           disabled={!adaptiveTutorEnabled}
           onChange={setTutorAutoRewind}
@@ -1132,6 +1134,7 @@ export function SongView() {
         <Switch
           size="small"
           data-testid="setting-tutor-lives"
+          aria-label="Practice lives"
           checked={tutorLivesEnabled}
           disabled={!adaptiveTutorEnabled}
           onChange={setTutorLivesEnabled}
@@ -1145,6 +1148,7 @@ export function SongView() {
         <Switch
           size="small"
           data-testid="setting-auto-continue"
+          aria-label="Auto-continue"
           checked={autoContinueEnabled}
           onChange={setAutoContinueEnabled}
         />
@@ -1157,6 +1161,7 @@ export function SongView() {
         <Switch
           size="small"
           data-testid="setting-hands-free-controls"
+          aria-label="Kit controls"
           checked={handsFreeControlsEnabled}
           onChange={setHandsFreeControlsEnabled}
         />
@@ -1313,6 +1318,7 @@ export function SongView() {
         />
         <div
           className="flex shrink-0 items-center gap-1 rounded-xl border border-border-soft bg-surface-raised p-1"
+          role="group"
           aria-label="Notation view"
         >
           <Button
@@ -1343,6 +1349,7 @@ export function SongView() {
                 <InputNumber
                   mode="spinner"
                   size="medium"
+                  aria-label="Playback speed"
                   min={0.3}
                   max={2}
                   step={0.1}
@@ -1372,6 +1379,7 @@ export function SongView() {
                 <Switch
                   size="medium"
                   data-testid="loop-toggle"
+                  aria-label="Loop section"
                   checked={isLooping}
                   onChange={(checked) => {
                     setIsLooping(checked);

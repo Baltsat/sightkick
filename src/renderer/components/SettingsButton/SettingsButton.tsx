@@ -1,5 +1,5 @@
 import { ReactNode, memo, useEffect, useState } from 'react';
-import { Button, Popover } from 'antd';
+import { Button, Collapse, Popover } from 'antd';
 import { useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCog } from '@fortawesome/free-solid-svg-icons';
@@ -78,7 +78,16 @@ export const SettingsButton = memo(function Settings({
                 tutorControls={tutorControls}
               />
             )}
-            <CoachSettings />
+            <Collapse
+              size="small"
+              items={[
+                {
+                  key: 'coach-provider',
+                  label: 'Advanced AI coach provider',
+                  children: <CoachSettings />,
+                },
+              ]}
+            />
           </div>
         }
       >

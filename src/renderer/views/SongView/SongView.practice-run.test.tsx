@@ -2,6 +2,22 @@ import { act, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeSong, setupSongView } from '../test-support';
 
+const outletContextHolder = vi.hoisted(() => ({
+  current: undefined as unknown,
+}));
+
+vi.mock('react-router-dom', async () => {
+  const actual =
+    await vi.importActual<typeof import('react-router-dom')>(
+      'react-router-dom',
+    );
+
+  return {
+    ...actual,
+    useOutletContext: () => outletContextHolder.current,
+  };
+});
+
 // Practice mode always resolves to the speed-controllable player
 // (MODE_POLICIES.practice.player === 'speed' - see ../../modes.ts), which
 // schedules audio through StretchStream's real FFT time-stretch pipeline
@@ -40,6 +56,7 @@ vi.mock('../../services/audio-player/speed/stretch-stream', () => {
 });
 
 afterEach(() => {
+  outletContextHolder.current = undefined;
   vi.unstubAllGlobals();
 });
 
@@ -66,6 +83,105 @@ async function runToEnd(view: ReturnType<typeof setupSongView>) {
 }
 
 describe('practice mode analytics', () => {
+  it('does not mint a high score or durable rewards when practice evidence fails to save', async () => {
+    const recordRun = vi.fn((input: unknown) => {
+      window.electron.ipcRenderer.sendMessage('record-practice-day', input);
+    });
+    const loadAchievements = vi.fn();
+
+    outletContextHolder.current = {
+      recordRun,
+      loadAchievements,
+      todayXp: 0,
+      goalXp: 100,
+      streak: { current: 0, longest: 0 },
+    };
+
+    const view = setupSongView({
+      route: '/song-1?gameMode=perform',
+      settings: { countIn: false },
+      keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+    });
+
+    await view.loadSong();
+    view.clickPlay();
+    await view.pressKey('KeyJ');
+    await view.finishSong();
+
+    expect(screen.getByTestId('score-modal')).toBeInTheDocument();
+    expect(view.updateSongPayloads()).toHaveLength(0);
+    expect(recordRun).not.toHaveBeenCalled();
+    expect(loadAchievements).not.toHaveBeenCalled();
+    expect(view.sentChannels()).not.toContain('record-practice-day');
+
+    await act(async () => {
+      view.ipc.emit('save-practice-run', { error: 'Storage quota exceeded' });
+    });
+
+    expect(view.updateSongPayloads()).toHaveLength(0);
+    expect(recordRun).not.toHaveBeenCalled();
+    expect(loadAchievements).not.toHaveBeenCalled();
+    expect(view.sentChannels()).not.toContain('record-practice-day');
+  });
+
+  it('mints the high score and durable reward exactly once after save success', async () => {
+    const recordRun = vi.fn((input: unknown) => {
+      // useGamification.recordRun owns the real XP/day/streak IPC write. This
+      // focused context double exposes that boundary as the same channel so
+      // the test can prove its post-save ordering and exact call count.
+      window.electron.ipcRenderer.sendMessage('record-practice-day', input);
+    });
+    const loadAchievements = vi.fn();
+
+    outletContextHolder.current = {
+      recordRun,
+      loadAchievements,
+      todayXp: 0,
+      goalXp: 100,
+      streak: { current: 0, longest: 0 },
+    };
+
+    const view = setupSongView({
+      route: '/song-1?gameMode=perform',
+      settings: { countIn: false },
+      keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+    });
+
+    await view.loadSong();
+    view.clickPlay();
+    await view.pressKey('KeyJ');
+    await view.finishSong();
+
+    expect(view.updateSongPayloads()).toHaveLength(0);
+    expect(recordRun).not.toHaveBeenCalled();
+    expect(view.sentChannels()).not.toContain('record-practice-day');
+
+    await act(async () => {
+      view.ipc.emit('save-practice-run', { songId: 'song-1' });
+      view.ipc.emit('save-practice-run', { songId: 'song-1' });
+    });
+
+    expect(view.updateSongPayloads()).toEqual([
+      {
+        id: 'song-1',
+        scoreData: { expert: { hitNotes: 1, totalNotes: 8, falseHits: 0 } },
+      },
+    ]);
+    expect(recordRun).toHaveBeenCalledOnce();
+    expect(recordRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        totalHits: 1,
+        difficulty: 'expert',
+        starsEarned: 0,
+      }),
+      expect.any(Function),
+    );
+    expect(loadAchievements).toHaveBeenCalledOnce();
+    expect(
+      view.ipc.sent.filter(({ channel }) => channel === 'record-practice-day'),
+    ).toHaveLength(1);
+  });
+
   it('captures analytics, saves a run, and shows practice stats for a completed run - without star scoring or high-score submission', async () => {
     vi.useFakeTimers();
 
@@ -166,6 +282,11 @@ describe('practice mode analytics', () => {
     vi.useFakeTimers();
 
     const continuePractice = vi.fn();
+
+    outletContextHolder.current = {
+      gamification: undefined,
+      continuePractice,
+    };
 
     try {
       const view = setupSongView({

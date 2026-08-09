@@ -320,6 +320,42 @@ describe('toSong', () => {
     expect(song.scoreData).toEqual(scoreData);
   });
 
+  it('round-trips exact reviewed source provenance from song.ini metadata', () => {
+    const song = toSong(
+      stored({
+        sk_source_provider: 'yandex-music',
+        sk_source_collection_id: 'drums-playlist',
+        sk_source_collection_name: 'drums',
+        sk_source_track_id: 'yandex:drums-playlist:2',
+        sk_source_title: 'Natural Villain',
+        sk_source_artists: '["Mokita"]',
+        sk_source_url: 'https://music.yandex.ru/album/123/track/456',
+      }),
+    );
+
+    expect(song.sourceProvenance).toEqual({
+      provider: 'yandex-music',
+      collectionId: 'drums-playlist',
+      collectionName: 'drums',
+      trackId: 'yandex:drums-playlist:2',
+      title: 'Natural Villain',
+      artists: ['Mokita'],
+      sourceUrl: 'https://music.yandex.ru/album/123/track/456',
+    });
+    expect(
+      toSong(
+        stored({
+          sk_source_provider: 'yandex-music',
+          sk_source_collection_id: 'drums-playlist',
+          sk_source_collection_name: 'drums',
+          sk_source_track_id: 'yandex:drums-playlist:2',
+          sk_source_title: 'Natural Villain',
+          sk_source_artists: 'not-json',
+        }),
+      ).sourceProvenance,
+    ).toBeUndefined();
+  });
+
   it('keeps auto-chart provenance separate from a human charter', () => {
     const song = toSong(
       stored({

@@ -23,6 +23,8 @@ export const MAX_STORED_FULL_RUNS_PER_SONG =
 
 const storeKey = (songId: string) => `practiceRuns.${songId}`;
 const detailsStoreKey = (songId: string) => `practiceRunDetails.${songId}`;
+const PRACTICE_RUNS_STORE_KEY = 'practiceRuns';
+const PRACTICE_RUN_DETAILS_STORE_KEY = 'practiceRunDetails';
 
 export const PRACTICE_RUN_ARCHIVE_STORE_KEY = 'practiceRunArchive';
 
@@ -46,6 +48,12 @@ export interface IpcPracticeRunsResponse {
 export interface IpcPracticeStatsError {
   error: string;
 }
+
+type PracticeRunsStore = Record<string, RunSummary[]>;
+
+type PracticeRunDetailsStore = Record<string, StoredPracticeRun[]>;
+
+type PracticeRunArchiveStore = Record<string, PracticeRunArchive>;
 
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -79,8 +87,19 @@ export function savePracticeRun(
       throw new Error('songId is required');
     }
 
-    const existing =
-      (appState.store.get(storeKey(songId)) as RunSummary[] | undefined) ?? [];
+    const practiceRuns =
+      (appState.store.get(PRACTICE_RUNS_STORE_KEY) as
+        | PracticeRunsStore
+        | undefined) ?? {};
+    const practiceRunArchive =
+      (appState.store.get(PRACTICE_RUN_ARCHIVE_STORE_KEY) as
+        | PracticeRunArchiveStore
+        | undefined) ?? {};
+    const practiceRunDetails =
+      (appState.store.get(PRACTICE_RUN_DETAILS_STORE_KEY) as
+        | PracticeRunDetailsStore
+        | undefined) ?? {};
+    const existing = practiceRuns[songId] ?? [];
     const allRuns = [...existing, summary];
     const firstRetainedIndex = Math.max(
       0,
@@ -89,13 +108,10 @@ export function savePracticeRun(
     const evicted = allRuns.slice(0, firstRetainedIndex);
     const next = allRuns.slice(firstRetainedIndex);
     const archive = archiveRunSummaries(
-      readPracticeRunArchive(appState.store.get(archiveStoreKey(songId))),
+      readPracticeRunArchive(practiceRunArchive[songId]),
       evicted,
     );
-    const existingFullRuns =
-      (appState.store.get(detailsStoreKey(songId)) as
-        | StoredPracticeRun[]
-        | undefined) ?? [];
+    const existingFullRuns = practiceRunDetails[songId] ?? [];
     const fullRuns =
       records !== undefined
         ? [
@@ -104,15 +120,21 @@ export function savePracticeRun(
           ].slice(-MAX_STORED_FULL_RUNS_PER_SONG)
         : existingFullRuns;
 
-    appState.store.set(storeKey(songId), next);
-
-    if (evicted.length > 0) {
-      appState.store.set(archiveStoreKey(songId), archive);
-    }
-
-    if (records !== undefined) {
-      appState.store.set(detailsStoreKey(songId), fullRuns);
-    }
+    // electron-store's object-form setter builds the complete next store in
+    // memory and performs one filesystem write. Keeping all three evidence
+    // namespaces in that single snapshot prevents a failed write from leaving
+    // summaries, archives, and full-resolution details out of sync.
+    appState.store.set({
+      [PRACTICE_RUNS_STORE_KEY]: { ...practiceRuns, [songId]: next },
+      [PRACTICE_RUN_ARCHIVE_STORE_KEY]:
+        evicted.length > 0
+          ? { ...practiceRunArchive, [songId]: archive }
+          : practiceRunArchive,
+      [PRACTICE_RUN_DETAILS_STORE_KEY]:
+        records !== undefined
+          ? { ...practiceRunDetails, [songId]: fullRuns }
+          : practiceRunDetails,
+    });
 
     event.reply('save-practice-run', { songId, runs: next, fullRuns, archive });
   } catch (error) {

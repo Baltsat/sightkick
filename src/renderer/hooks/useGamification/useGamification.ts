@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Song } from '../../../types';
 import {
   aggregateLaneAccuracy,
+  computeLongitudinalProgress,
   LaneAccuracy,
+  LongitudinalProgress,
+  PracticeRunArchiveBySong,
   RunSummary,
 } from '../../services/practice-stats';
 import {
@@ -72,6 +75,9 @@ export interface UseGamificationResult {
   /** Versioned summaries grouped by their stable song/lesson id. The
    * recommendation layer consumes this evidence without reaching into IPC. */
   runsBySong?: Readonly<Record<string, RunSummary[]>>;
+  /** Bounded monthly plus all-history evidence. Archived (evicted) summaries
+   * and recent verbatim summaries are each counted exactly once. */
+  longitudinalProgress?: LongitudinalProgress;
   loadAchievements: () => void;
   recordRun: (
     input: RecordRunInput,
@@ -91,6 +97,7 @@ interface RecordDayReply {
 interface LoadRunsReply {
   runs: RunSummary[];
   runsBySong?: Record<string, RunSummary[]>;
+  archiveBySong?: PracticeRunArchiveBySong;
 }
 
 function isErrorReply(reply: object): reply is { error: string } {
@@ -128,6 +135,8 @@ export function useGamification(songList: Song[]): UseGamificationResult {
   const [runsCache, setRunsCache] = useState<RunSummary[]>();
   const [runsBySongCache, setRunsBySongCache] =
     useState<Record<string, RunSummary[]>>();
+  const [archiveBySongCache, setArchiveBySongCache] =
+    useState<PracticeRunArchiveBySong>();
   const [goalOption, setGoalOption] = usePersisted<GoalOption>(
     'settings.dailyGoalOption',
     DEFAULT_GOAL_OPTION,
@@ -202,6 +211,7 @@ export function useGamification(songList: Song[]): UseGamificationResult {
       if (!isErrorReply(reply)) {
         setRunsCache(reply.runs);
         setRunsBySongCache(reply.runsBySong);
+        setArchiveBySongCache(reply.archiveBySong ?? {});
       }
     });
   }, []);
@@ -258,6 +268,16 @@ export function useGamification(songList: Song[]): UseGamificationResult {
           Date.parse(b.summary.completedAt) - Date.parse(a.summary.completedAt),
       )[0];
   }, [runsBySongCache]);
+  const longitudinalProgress = useMemo<LongitudinalProgress | undefined>(() => {
+    if (!runsCache || !archiveBySongCache) {
+      return undefined;
+    }
+
+    const recentRunsBySong =
+      runsBySongCache ?? (runsCache.length > 0 ? { unknown: runsCache } : {});
+
+    return computeLongitudinalProgress(archiveBySongCache, recentRunsBySong);
+  }, [archiveBySongCache, runsBySongCache, runsCache]);
   const recordRun = useCallback(
     (input: RecordRunInput, onResult?: (result: RecordRunResult) => void) => {
       const now = new Date();
@@ -299,11 +319,15 @@ export function useGamification(songList: Song[]): UseGamificationResult {
           recordRunsOffRef.current = undefined;
 
           const runs = isErrorReply(runsReply) ? [] : runsReply.runs;
+          const archiveBySong = isErrorReply(runsReply)
+            ? undefined
+            : runsReply.archiveBySong || {};
 
           setRunsCache(runs);
           setRunsBySongCache(
             isErrorReply(runsReply) ? undefined : runsReply.runsBySong,
           );
+          setArchiveBySongCache(archiveBySong);
 
           const achievementRuns = runs.map(toAchievementRun);
           const results = computeAchievements({
@@ -364,6 +388,7 @@ export function useGamification(songList: Song[]): UseGamificationResult {
     recentLaneSignals,
     latestRun,
     runsBySong: runsBySongCache,
+    longitudinalProgress,
     loadAchievements,
     recordRun,
   };

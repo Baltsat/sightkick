@@ -12,10 +12,12 @@ import {
   IpcAutoChartMetadata,
   IpcCreateAutoChartRequest,
   IpcImportSongPreview,
+  LibrarySourceTrackProvenance,
   Song,
 } from '../../types';
 import { caCertEnv, getBinaryPath } from '../stemTools';
 import { ingestSongCover } from '../songCover';
+import { normalizeLibrarySourceProvenance } from '../../library-sources/provenance';
 import { importPreparedSong, previewPreparedSong } from './importSong';
 import {
   createRemoteAutoChartRunner,
@@ -152,6 +154,7 @@ interface AutoChartDependencies {
   applyMetadata: (
     sourceDir: string,
     metadata?: IpcAutoChartMetadata,
+    sourceProvenance?: LibrarySourceTrackProvenance,
   ) => Promise<void>;
   makeId: () => string;
 }
@@ -938,7 +941,16 @@ function cleanIniValue(value: string): string {
 
 function upsertIniField(
   source: string,
-  field: 'name' | 'artist',
+  field:
+    | 'name'
+    | 'artist'
+    | 'sk_source_provider'
+    | 'sk_source_collection_id'
+    | 'sk_source_collection_name'
+    | 'sk_source_track_id'
+    | 'sk_source_title'
+    | 'sk_source_artists'
+    | 'sk_source_url',
   value: string,
 ): string {
   const cleanValue = cleanIniValue(value);
@@ -966,18 +978,41 @@ function upsertIniField(
 export async function applyOfficialMetadata(
   sourceDir: string,
   metadata?: IpcAutoChartMetadata,
+  sourceProvenance?: LibrarySourceTrackProvenance,
 ): Promise<void> {
-  if (!metadata) {
+  if (!metadata && !sourceProvenance) {
     return;
   }
 
   const iniPath = path.join(sourceDir, 'song.ini');
   const source = await fs.promises.readFile(iniPath, 'utf8');
-  const updated = upsertIniField(
-    upsertIniField(source, 'name', metadata.songName ?? metadata.title),
-    'artist',
-    metadata.artistName ?? metadata.authorName,
-  );
+  let updated = source;
+
+  if (metadata) {
+    updated = upsertIniField(
+      upsertIniField(updated, 'name', metadata.songName ?? metadata.title),
+      'artist',
+      metadata.artistName ?? metadata.authorName,
+    );
+  }
+
+  if (sourceProvenance) {
+    const fields = [
+      ['sk_source_provider', sourceProvenance.provider],
+      ['sk_source_collection_id', sourceProvenance.collectionId],
+      ['sk_source_collection_name', sourceProvenance.collectionName],
+      ['sk_source_track_id', sourceProvenance.trackId],
+      ['sk_source_title', sourceProvenance.title],
+      ['sk_source_artists', JSON.stringify(sourceProvenance.artists)],
+      ...(sourceProvenance.sourceUrl
+        ? ([['sk_source_url', sourceProvenance.sourceUrl]] as const)
+        : []),
+    ] as const;
+
+    for (const [field, value] of fields) {
+      updated = upsertIniField(updated, field, value);
+    }
+  }
 
   if (updated !== source) {
     await fs.promises.writeFile(iniPath, updated, 'utf8');
@@ -990,15 +1025,17 @@ export async function applyOfficialMetadata(
   // fetchOfficialYoutubeMetadata always sets them together via
   // inferTrackIdentity, so this is really just a defensive narrowing.
   const identity =
-    metadata.songName && metadata.artistName
+    metadata?.songName && metadata.artistName
       ? { artist: metadata.artistName, title: metadata.songName }
       : undefined;
 
-  if (metadata.thumbnailUrl || identity) {
+  if (metadata?.thumbnailUrl || identity) {
     try {
-      await ingestSongCover(sourceDir, metadata.thumbnailUrl, identity);
+      await ingestSongCover(sourceDir, metadata?.thumbnailUrl, identity);
     } catch {
-      metadata.thumbnailUrl = undefined;
+      if (metadata) {
+        metadata.thumbnailUrl = undefined;
+      }
     }
   }
 }
@@ -1090,6 +1127,9 @@ export class AutoChartQueue {
     };
 
     try {
+      job.sourceProvenance = normalizeLibrarySourceProvenance(
+        request?.sourceProvenance,
+      );
       job.backend = this.resolveBackend(
         request?.backend,
         await this.dependencies.detectBackends(),
@@ -1201,6 +1241,12 @@ export class AutoChartQueue {
       youtubeUrl: previous.youtubeUrl,
       sourceName: previous.sourceName,
       metadata: previous.metadata,
+      sourceProvenance: previous.sourceProvenance
+        ? {
+            ...previous.sourceProvenance,
+            artists: [...previous.sourceProvenance.artists],
+          }
+        : undefined,
       backend: previous.backend,
       cancelled: false,
     };
@@ -1623,7 +1669,11 @@ export class AutoChartQueue {
     job: AutoChartJob,
     preparedDir: string,
   ): Promise<void> {
-    await this.dependencies.applyMetadata(preparedDir, job.metadata);
+    await this.dependencies.applyMetadata(
+      preparedDir,
+      job.metadata,
+      job.sourceProvenance,
+    );
     job.preparedDir = preparedDir;
     job.preview = await this.dependencies.preview(
       preparedDir,

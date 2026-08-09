@@ -53,14 +53,22 @@ describe('adaptive tutor surfaces', () => {
     const hud = screen.getByTestId('tutor-hud');
 
     expect(within(hud).getByText('Ready when you are')).toBeInTheDocument();
-    expect(hud).toHaveAccessibleName(/kick, crash, kick, crash/i);
+    expect(hud).toHaveAccessibleDescription(/kick, crash, kick, crash/i);
+    expect(
+      screen.getByRole('spinbutton', { name: 'Playback speed' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('switch', { name: 'Loop section' }),
+    ).toBeInTheDocument();
 
     practice.openSettings();
-    expect(screen.getByTestId('setting-adaptive-tutor')).toBeChecked();
-    expect(screen.getByTestId('setting-tutor-auto-rewind')).toBeChecked();
-    expect(screen.getByTestId('setting-tutor-lives')).toBeChecked();
-    expect(screen.getByTestId('setting-auto-continue')).toBeChecked();
-    expect(screen.getByTestId('setting-hands-free-controls')).toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Tutor listens' })).toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Smart rewind' })).toBeChecked();
+    expect(
+      screen.getByRole('switch', { name: 'Practice lives' }),
+    ).toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Auto-continue' })).toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Kit controls' })).toBeChecked();
 
     practice.unmount();
 
@@ -95,7 +103,7 @@ describe('safe hands-free run intent', () => {
       '0.7',
     );
     expect(
-      within(screen.getByTestId('tutor-hud')).getByText('70%'),
+      within(screen.getByTestId('tutor-hud')).getByText('0.7×'),
     ).toBeInTheDocument();
   });
 

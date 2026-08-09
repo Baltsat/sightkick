@@ -17,7 +17,14 @@ export function filterLibraryCandidates(
   );
 }
 
-export function libraryCandidateState(track: YandexPlaylistCandidate): string {
+export function libraryCandidateState(
+  track: YandexPlaylistCandidate,
+  linked = false,
+): string {
+  if (linked) {
+    return 'Linked · local chart ready';
+  }
+
   if (
     track.sourceAvailability === 'unavailable' ||
     track.practiceStatus === 'unavailable'

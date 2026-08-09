@@ -2,7 +2,11 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installIpcMock, IpcMock } from '../test-support';
 import { ScoreData, Song } from '../../../types';
-import { RunSummary } from '../../services/practice-stats';
+import {
+  archiveRunSummaries,
+  emptyPracticeRunArchive,
+  RunSummary,
+} from '../../services/practice-stats';
 import { PracticeDays } from '../../services/streaks';
 import { computeRunXp } from '../../services/xp';
 import { GOAL_XP_BY_OPTION, useGamification } from './useGamification';
@@ -218,6 +222,65 @@ describe('achievements', () => {
     expect(result.current.latestRun).toEqual({
       songId: 'song-new',
       summary: newest,
+    });
+  });
+
+  it('exposes archive plus recent summaries as one non-overlapping all-history model', () => {
+    const { result } = renderHook(() => useGamification([]));
+    const archived = fakeRun({
+      completedAt: '2026-07-01T14:00:00.000Z',
+      totalHits: 30,
+      totalMisses: 10,
+      overallAccuracy: 0.75,
+      timingBias: {
+        meanMs: -5,
+        medianMs: -4,
+        spreadMs: 8,
+        earlyCount: 20,
+        lateCount: 5,
+        onTimeCount: 5,
+        sampleCount: 30,
+      },
+    });
+    const recent = fakeRun({
+      totalHits: 40,
+      totalMisses: 10,
+      overallAccuracy: 0.8,
+      timingBias: {
+        meanMs: 5,
+        medianMs: 4,
+        spreadMs: 8,
+        earlyCount: 5,
+        lateCount: 25,
+        onTimeCount: 10,
+        sampleCount: 40,
+      },
+    });
+
+    act(() => {
+      result.current.loadAchievements();
+      ipc.emit('load-all-practice-runs', {
+        runs: [recent],
+        runsBySong: { 'song-new': [recent] },
+        archiveBySong: {
+          'song-old': archiveRunSummaries(emptyPracticeRunArchive(), [
+            archived,
+          ]),
+        },
+      });
+    });
+
+    expect(result.current.longitudinalProgress).toMatchObject({
+      archivedRunCount: 1,
+      recentRunCount: 1,
+      aggregateOnlyArchivedRunCount: 1,
+      allTime: {
+        runCount: 2,
+        scoredNoteCount: 90,
+        accuracy: 70 / 90,
+        timingSampleCount: 70,
+        meanTimingMs: 5 / 7,
+      },
     });
   });
 

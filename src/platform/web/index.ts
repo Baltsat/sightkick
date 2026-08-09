@@ -6,6 +6,7 @@ import type {
   IpcCreateAutoChartRequest,
   IpcLibraryCandidatesResponse,
   IpcUpdateSongPayload,
+  LibrarySourceTrackProvenance,
   MidiMessage,
   Song,
 } from '../../types';
@@ -14,6 +15,7 @@ import {
   YANDEX_DRUMS_SOURCE_FILE,
   YANDEX_FAVORITES_SOURCE_FILE,
 } from '../../library-sources/yandex';
+import { normalizeLibrarySourceProvenance } from '../../library-sources/provenance';
 import type { PlatformAdapter } from '../types';
 import type {
   HitRecord,
@@ -49,6 +51,7 @@ interface PendingImport {
   id: string;
   url: string;
   attempt: number;
+  sourceProvenance?: LibrarySourceTrackProvenance;
   stored?: StoredWebSong;
 }
 
@@ -671,6 +674,7 @@ export class WebPlatform implements PlatformAdapter {
       message: 'Queued by Drumroll web',
       backend: 'remote',
       youtubeUrl: job.url,
+      sourceProvenance: job.sourceProvenance,
       ...patch,
     };
 
@@ -686,6 +690,9 @@ export class WebPlatform implements PlatformAdapter {
       );
     }
 
+    const sourceProvenance = normalizeLibrarySourceProvenance(
+      request.sourceProvenance,
+    );
     const response = await fetch('/api/import', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -703,6 +710,7 @@ export class WebPlatform implements PlatformAdapter {
       id: body.jobId,
       url: request.youtubeUrl,
       attempt: 1,
+      sourceProvenance,
     };
 
     this.pending.set(job.id, job);
@@ -749,6 +757,20 @@ export class WebPlatform implements PlatformAdapter {
         const files = await extractTarGzip(await result.arrayBuffer());
 
         job.stored = await finalizeArchiveSong(job.id, files);
+
+        if (job.sourceProvenance) {
+          job.stored = {
+            ...job.stored,
+            song: {
+              ...job.stored.song,
+              sourceProvenance: {
+                ...job.sourceProvenance,
+                artists: [...job.sourceProvenance.artists],
+              },
+            },
+          };
+        }
+
         this.importJob(job, {
           stage: 'preview-ready',
           percent: 100,

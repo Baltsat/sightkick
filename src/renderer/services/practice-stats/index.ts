@@ -7,3 +7,5 @@ export * from './compute';
 export * from './evidence';
 
 export * from './learning-evidence';
+
+export * from './longitudinal';

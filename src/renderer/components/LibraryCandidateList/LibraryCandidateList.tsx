@@ -2,6 +2,9 @@ import type {
   YandexPlaylistCandidate,
   YandexPlaylistCandidateCollection,
 } from '../../../types';
+import { Button, Tooltip } from 'antd';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCheck, faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
 import { libraryCandidateState } from './libraryCandidates';
 
 function durationLabel(durationSeconds: number | null): string | undefined {
@@ -21,12 +24,18 @@ export interface LibraryCandidateListProps {
   source: YandexPlaylistCandidateCollection;
   tracks: readonly YandexPlaylistCandidate[];
   query: string;
+  linkedTrackIds?: ReadonlySet<string>;
+  canFindAndChart: boolean;
+  onFindAndChart: (track: YandexPlaylistCandidate) => void;
 }
 
 export function LibraryCandidateList({
   source,
   tracks,
   query,
+  linkedTrackIds,
+  canFindAndChart,
+  onFindAndChart,
 }: LibraryCandidateListProps) {
   if (tracks.length === 0) {
     return (
@@ -70,13 +79,14 @@ export function LibraryCandidateList({
           const duration = durationLabel(track.durationSeconds);
           const unavailable = track.practiceStatus === 'unavailable';
           const privateOnly = track.sourceAvailability === 'private';
+          const linked = linkedTrackIds?.has(track.id) ?? false;
 
           return (
             <li
               key={track.id}
               className="mb-2 flex min-h-18 items-center gap-3 rounded-xl border border-border-soft bg-surface px-4 py-3"
               data-testid={`library-candidate-${track.ordinal}`}
-              data-practice-status={track.practiceStatus}
+              data-practice-status={linked ? 'linked' : track.practiceStatus}
             >
               <span className="w-7 shrink-0 text-right text-sm tabular-nums text-text-faint">
                 {track.ordinal.toString().padStart(2, '0')}
@@ -92,7 +102,9 @@ export function LibraryCandidateList({
                   </span>
                   <span
                     className={
-                      unavailable
+                      linked
+                        ? 'shrink-0 font-medium text-accent-text'
+                        : unavailable
                         ? 'shrink-0 font-medium text-red'
                         : privateOnly
                         ? 'shrink-0 font-medium text-orange'
@@ -100,10 +112,39 @@ export function LibraryCandidateList({
                     }
                     data-testid={`library-candidate-state-${track.ordinal}`}
                   >
-                    {libraryCandidateState(track)}
+                    {libraryCandidateState(track, linked)}
                   </span>
                 </div>
               </div>
+              <Tooltip
+                title={
+                  linked
+                    ? 'This source row is linked to a playable local chart'
+                    : canFindAndChart
+                    ? 'Review matching YouTube results, then create a local practice chart'
+                    : 'Select a local library folder first'
+                }
+              >
+                <Button
+                  className="shrink-0"
+                  icon={
+                    <FontAwesomeIcon
+                      icon={linked ? faCheck : faMagnifyingGlass}
+                    />
+                  }
+                  disabled={linked || !canFindAndChart}
+                  aria-label={
+                    linked
+                      ? `${track.title} is linked to a local chart`
+                      : `Find audio and create a chart for ${
+                          track.title
+                        } by ${track.artists.join(', ')}`
+                  }
+                  onClick={() => onFindAndChart(track)}
+                >
+                  {linked ? 'Linked' : 'Find & chart'}
+                </Button>
+              </Tooltip>
             </li>
           );
         })}

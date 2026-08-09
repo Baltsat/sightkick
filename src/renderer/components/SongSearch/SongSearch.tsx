@@ -3,15 +3,25 @@ import { App, Empty, Input, Popover, Spin } from 'antd';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
 import appIcon from '../../../../assets/icon.png';
-import { IpcYoutubeSearchResult } from '../../../types';
+import {
+  IpcYoutubeSearchResult,
+  LibrarySourceTrackProvenance,
+} from '../../../types';
 import { formatTime } from '../../helpers';
 import { cn } from '../../cn';
 import { popoverStyles } from '../../overlayStyles';
 import { Tooltip } from '../Tooltip';
 import { useYoutubeSearch } from '../../hooks/useYoutubeSearch';
 
+export interface SongSearchRequest {
+  id: number;
+  query: string;
+  sourceProvenance?: LibrarySourceTrackProvenance;
+}
+
 interface Props {
   disabled?: boolean;
+  requestedSearch?: SongSearchRequest;
 }
 
 function resultSubtitle(result: IpcYoutubeSearchResult): string {
@@ -28,11 +38,24 @@ function resultSubtitle(result: IpcYoutubeSearchResult): string {
   return parts.join(' · ');
 }
 
-export function SongSearch({ disabled }: Props) {
+function SongSearchInner({ disabled, requestedSearch }: Props) {
   const { notification } = App.useApp();
-  const [query, setQuery] = useState('');
-  const [open, setOpen] = useState(false);
+  const requestedQuery = disabled ? '' : requestedSearch?.query.trim() ?? '';
+  const [query, setQuery] = useState(requestedQuery);
+  const [open, setOpen] = useState(Boolean(requestedQuery));
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [sourceProvenance, setSourceProvenance] = useState<
+    LibrarySourceTrackProvenance | undefined
+  >(() => {
+    if (!requestedQuery || !requestedSearch?.sourceProvenance) {
+      return undefined;
+    }
+
+    return {
+      ...requestedSearch.sourceProvenance,
+      artists: [...requestedSearch.sourceProvenance.artists],
+    };
+  });
   const trimmed = query.trim();
   const { results, loading, error } = useYoutubeSearch(query);
   const [prevResults, setPrevResults] = useState(results);
@@ -45,6 +68,7 @@ export function SongSearch({ disabled }: Props) {
   const select = (result: IpcYoutubeSearchResult) => {
     window.electron.ipcRenderer.sendMessage('create-auto-chart', {
       youtubeUrl: result.watchUrl,
+      ...(sourceProvenance ? { sourceProvenance } : {}),
     });
     notification.info({
       title: 'Creating a chart',
@@ -52,12 +76,14 @@ export function SongSearch({ disabled }: Props) {
       placement: 'bottomRight',
     });
     setQuery('');
+    setSourceProvenance(undefined);
     setOpen(false);
     setActiveIndex(-1);
   };
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Escape') {
       setOpen(false);
+      setSourceProvenance(undefined);
 
       return;
     }
@@ -170,7 +196,9 @@ export function SongSearch({ disabled }: Props) {
           className="border-t border-border-soft px-3 py-2 text-xs text-text-faint"
           data-testid="song-search-provenance"
         >
-          Results from YouTube search
+          {sourceProvenance
+            ? `Reviewing matches for ${sourceProvenance.title} from ${sourceProvenance.collectionName}`
+            : 'Results from YouTube search'}
         </div>
       )}
     </div>
@@ -198,7 +226,18 @@ export function SongSearch({ disabled }: Props) {
           activeIndex >= 0 ? `song-search-option-${activeIndex}` : undefined
         }
         onChange={(event) => {
-          setQuery(event.target.value);
+          const nextQuery = event.target.value;
+
+          setQuery(nextQuery);
+
+          // The exact Yandex row is a reviewed assertion, not a fuzzy title
+          // match. As soon as the user changes that generated query, return
+          // to an ordinary unlinked search so the chosen result cannot be
+          // falsely attributed to the original source row.
+          if (nextQuery.trim() !== requestedQuery) {
+            setSourceProvenance(undefined);
+          }
+
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
@@ -224,5 +263,16 @@ export function SongSearch({ disabled }: Props) {
     >
       {input}
     </Popover>
+  );
+}
+
+export function SongSearch(props: Props) {
+  const requestKey = props.requestedSearch?.id ?? 'manual';
+
+  return (
+    <SongSearchInner
+      key={`${props.disabled ? 'disabled' : 'enabled'}:${requestKey}`}
+      {...props}
+    />
   );
 }

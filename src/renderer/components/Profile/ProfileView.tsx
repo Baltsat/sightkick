@@ -14,6 +14,7 @@ import { localDateKey } from '../../services/streaks';
 import { cn } from '../../cn';
 import { Goal, SaveGoalInput, SetGoalModal } from '../Goals';
 import { GoalCard } from './GoalCard';
+import { PracticeHistory } from './PracticeHistory';
 import { XpSkillLine } from './XpSkillLine';
 import { SkillBars } from './SkillBars';
 import { useMastery } from './useMastery';
@@ -225,6 +226,8 @@ export function ProfileView({
           </Button>
         </div>
       )}
+
+      <PracticeHistory progress={gamification.longitudinalProgress} />
 
       <section className="flex flex-col gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint">

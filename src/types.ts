@@ -80,6 +80,14 @@ export interface SongData {
   sk_cue?: string;
   /** Explicit capability boundary paired with authored technique cues. */
   sk_assessment_boundary?: string;
+  /** Schema-compatible source-to-chart provenance written by reviewed imports. */
+  sk_source_provider?: string;
+  sk_source_collection_id?: string;
+  sk_source_collection_name?: string;
+  sk_source_track_id?: string;
+  sk_source_title?: string;
+  sk_source_artists?: string;
+  sk_source_url?: string;
 }
 
 export interface Song {
@@ -103,6 +111,8 @@ export interface Song {
   liked?: boolean;
   updatedAt?: string;
   scoreData?: Partial<Record<Difficulty, ScoreData>>;
+  /** Discovery metadata linked to this playable local chart, when available. */
+  sourceProvenance?: LibrarySourceTrackProvenance;
   // Present only for SightKick Method lesson songs.
   lesson?: SongLessonInfo;
 }
@@ -384,6 +394,7 @@ export interface IpcCreateAutoChartRequest {
   youtubeUrl?: string;
   localFile?: boolean;
   backend?: AutoChartBackend;
+  sourceProvenance?: LibrarySourceTrackProvenance;
 }
 
 export interface IpcAutoChartBackendsResponse {
@@ -434,6 +445,8 @@ export interface IpcAutoChartJob {
   // can recognize its own in-flight jobs by watch URL without a separate
   // lookup channel.
   youtubeUrl?: string;
+  /** Reviewed discovery row that this generated chart will resolve. */
+  sourceProvenance?: LibrarySourceTrackProvenance;
   // A snapshot of every currently non-terminal job the queue knows about —
   // not just this one — attached to every 'auto-chart-update' event so any
   // listener can render the full pending/active queue and cancel any job by
@@ -547,6 +560,20 @@ export interface YandexPlaylistCandidate {
   sourceReferenceStatus: LibrarySourceReferenceStatus;
   localStatus: LibraryCandidateLocalStatus;
   practiceStatus: LibraryCandidatePracticeStatus;
+}
+
+/**
+ * Immutable discovery identity carried into a generated local chart. This is
+ * metadata only: it never grants download, streaming, or playback rights.
+ */
+export interface LibrarySourceTrackProvenance {
+  provider: 'yandex-music';
+  collectionId: string;
+  collectionName: string;
+  trackId: string;
+  title: string;
+  artists: string[];
+  sourceUrl?: string;
 }
 
 export interface YandexPlaylistCandidateCollection {

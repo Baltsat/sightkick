@@ -103,7 +103,7 @@ export function LessonNode({
       <div className="min-w-0">
         <span className="daybreak-node-status">{stateLabel}</span>
         <div
-          className="truncate font-ui text-[13px] font-semibold leading-tight text-[#111722]"
+          className="daybreak-lesson-node__title font-ui text-[13px] font-semibold leading-tight text-[#111722]"
           title={exerciseTitle}
         >
           {exerciseTitle}

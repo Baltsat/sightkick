@@ -17,7 +17,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import appIcon from '../../../../assets/icon.png';
-import { Song } from '../../../types';
+import { Song, YandexPlaylistCandidate } from '../../../types';
 import { SongFilter } from '../../components/SongFilter';
 import { SongList } from '../../components/SongList';
 import { SettingsButton } from '../../components/SettingsButton';
@@ -27,6 +27,7 @@ import { EmptySongState } from '../../components/EmptySongState';
 import { AutoChart } from '../../components/AutoChart';
 import { SongImport } from '../../components/SongImport';
 import { SongSearch } from '../../components/SongSearch';
+import type { SongSearchRequest } from '../../components/SongSearch';
 import { MyMusic } from '../../components/MyMusic';
 import { LessonsView } from '../../components/LessonsView';
 import { useApp } from '../../context/AppContext';
@@ -192,6 +193,22 @@ export function SongListView() {
     () => filterLibraryCandidates(candidateSource?.tracks ?? [], nameFilter),
     [candidateSource?.tracks, nameFilter],
   );
+  const linkedCandidateIds = useMemo(() => {
+    if (!candidateSource) {
+      return new Set<string>();
+    }
+
+    return new Set(
+      songList
+        .map((song) => song.sourceProvenance)
+        .filter(
+          (source) =>
+            source?.provider === candidateSource.source &&
+            source.collectionId === candidateSource.playlist.id,
+        )
+        .map((source) => source!.trackId),
+    );
+  }, [candidateSource, songList]);
   const { downloadingIds, handleDownload } = useDownload(
     onlineResults,
     addSong,
@@ -209,6 +226,8 @@ export function SongListView() {
   const gameModeSelector = useGameModeSelector();
   const [view, setView] = useState<ArenaView>('home');
   const [myMusicOpen, setMyMusicOpen] = useState(false);
+  const [requestedSongSearch, setRequestedSongSearch] =
+    useState<SongSearchRequest>();
   const [recommendationNowMs] = useState(() => Date.now());
   // The Lessons unlock chain always looks at every lesson song, regardless
   // of the app's globally selected difficulty tab — lesson charts only ever
@@ -349,6 +368,30 @@ export function SongListView() {
       setLibraryMode('local');
     },
     [addSong, setLibraryMode],
+  );
+  const findAndChartCandidate = useCallback(
+    (track: YandexPlaylistCandidate) => {
+      if (!candidateSource) {
+        return;
+      }
+
+      const query = [track.title, ...track.artists].filter(Boolean).join(' ');
+
+      setRequestedSongSearch((previous) => ({
+        id: (previous?.id ?? 0) + 1,
+        query,
+        sourceProvenance: {
+          provider: 'yandex-music',
+          collectionId: candidateSource.playlist.id,
+          collectionName: candidateSource.playlist.name,
+          trackId: track.id,
+          title: track.title,
+          artists: [...track.artists],
+          ...(track.sourceTrackUrl ? { sourceUrl: track.sourceTrackUrl } : {}),
+        },
+      }));
+    },
+    [candidateSource],
   );
 
   if (
@@ -728,7 +771,10 @@ export function SongListView() {
                       <span className="px-2 text-xs font-semibold uppercase tracking-[0.12em] text-text-faint">
                         Add music
                       </span>
-                      <SongSearch disabled={currentPath === null} />
+                      <SongSearch
+                        disabled={currentPath === null}
+                        requestedSearch={requestedSongSearch}
+                      />
                       <SongImport
                         disabled={currentPath === null}
                         onImported={handleSongImported}
@@ -796,6 +842,9 @@ export function SongListView() {
                     source={candidateSource}
                     tracks={filteredLibraryCandidates}
                     query={nameFilter}
+                    linkedTrackIds={linkedCandidateIds}
+                    canFindAndChart={currentPath !== null}
+                    onFindAndChart={findAndChartCandidate}
                   />
                 ) : (
                   <div

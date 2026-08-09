@@ -374,7 +374,19 @@ describe('SongListView — loading the library', () => {
       'data-practice-status',
       'unavailable',
     );
-    expect(within(surface).queryAllByRole('button')).toHaveLength(0);
+    expect(
+      within(surface).getAllByRole('button', {
+        name: /find audio and create/i,
+      }),
+    ).toHaveLength(13);
+    fireEvent.click(
+      within(screen.getByTestId('library-candidate-1')).getByRole('button', {
+        name: /find audio and create/i,
+      }),
+    );
+    expect(screen.getByTestId('song-search-input')).toHaveValue(
+      'Pendant que les champs brûlent Niagara',
+    );
     expect(screen.getByText('13 results')).toBeInTheDocument();
 
     fireEvent.change(screen.getByTestId('song-search'), {
@@ -391,7 +403,119 @@ describe('SongListView — loading the library', () => {
     expect(screen.getByText('1 result')).toBeInTheDocument();
   });
 
-  it('selects Favorites and makes a private-only row non-actionable', () => {
+  it('marks only an exactly linked source row as resolved by a local chart', () => {
+    const view = setupSongListView();
+    const drums = parseYandexPlaylistCandidates(yandexSource);
+    const linkedTrack = drums.tracks[0];
+
+    view.loadSongs(
+      [
+        makeListSong('linked-chart', {
+          sourceProvenance: {
+            provider: 'yandex-music',
+            collectionId: drums.playlist.id,
+            collectionName: drums.playlist.name,
+            trackId: linkedTrack.id,
+            title: linkedTrack.title,
+            artists: [...linkedTrack.artists],
+            ...(linkedTrack.sourceTrackUrl
+              ? { sourceUrl: linkedTrack.sourceTrackUrl }
+              : {}),
+          },
+        }),
+      ],
+      'Browser library',
+    );
+    view.loadLibraryCandidates({
+      yandex: {
+        drums,
+        favorites: parseYandexPlaylistCandidates(yandexFavoritesSource),
+      },
+    });
+    view.selectMode('drums');
+
+    const linkedRow = within(screen.getByTestId('library-candidate-1'));
+    const unresolvedRow = within(screen.getByTestId('library-candidate-2'));
+
+    expect(linkedRow.getByText('Linked · local chart ready')).toBeVisible();
+    expect(screen.getByTestId('library-candidate-1')).toHaveAttribute(
+      'data-practice-status',
+      'linked',
+    );
+    expect(
+      linkedRow.getByRole('button', { name: /linked to a local chart/i }),
+    ).toBeDisabled();
+    expect(
+      unresolvedRow.getByText('Metadata only · needs local audio + chart'),
+    ).toBeVisible();
+    expect(screen.getByTestId('library-candidate-2')).toHaveAttribute(
+      'data-practice-status',
+      'needs-local-chart',
+    );
+    expect(
+      unresolvedRow.getByRole('button', { name: /find audio and create/i }),
+    ).toBeEnabled();
+  });
+
+  it('carries the selected collection and track identity into reviewed chart creation', async () => {
+    const view = setupSongListView();
+    const drums = parseYandexPlaylistCandidates(yandexSource);
+    const track = drums.tracks[0];
+
+    view.loadSongs([], 'Browser library');
+    view.loadLibraryCandidates({
+      yandex: {
+        drums,
+        favorites: parseYandexPlaylistCandidates(yandexFavoritesSource),
+      },
+    });
+    view.selectMode('drums');
+    fireEvent.click(
+      within(screen.getByTestId('library-candidate-1')).getByRole('button', {
+        name: /find audio and create/i,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(view.ipc.sent).toContainEqual({
+        channel: 'search-youtube',
+        args: [{ query: [track.title, ...track.artists].join(' ') }],
+      });
+    });
+    view.emit('search-youtube', {
+      results: [
+        {
+          videoId: 'abcdefghijk',
+          title: `${track.title} — reviewed match`,
+          uploader: track.artists[0],
+          watchUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+        },
+      ],
+    });
+    fireEvent.click(screen.getByTestId('song-search-result-abcdefghijk'));
+
+    expect(view.ipc.sent).toContainEqual({
+      channel: 'create-auto-chart',
+      args: [
+        {
+          youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+          sourceProvenance: {
+            provider: 'yandex-music',
+            collectionId: drums.playlist.id,
+            collectionName: drums.playlist.name,
+            trackId: track.id,
+            title: track.title,
+            artists: track.artists,
+            ...(track.sourceTrackUrl
+              ? { sourceUrl: track.sourceTrackUrl }
+              : {}),
+          },
+        },
+      ],
+    });
+  });
+
+  it('selects Favorites and lets a private-source row start a reviewed chart search', () => {
     const view = setupSongListView();
     const favorites = parseYandexPlaylistCandidates(yandexFavoritesSource);
     const privateTrack = favorites.tracks[87];
@@ -418,7 +542,16 @@ describe('SongListView — loading the library', () => {
     expect(
       within(surface).getByText('Private · metadata only'),
     ).toBeInTheDocument();
-    expect(within(surface).queryAllByRole('button')).toHaveLength(0);
+
+    const findButton = within(surface).getByRole('button', {
+      name: /find audio and create/i,
+    });
+
+    expect(findButton).toBeEnabled();
+    fireEvent.click(findButton);
+    expect(screen.getByTestId('song-search-input')).toHaveValue(
+      [privateTrack.title, ...privateTrack.artists].join(' '),
+    );
   });
 
   it('keeps filters and add-music controls on a wrapping toolbar with width floors', () => {

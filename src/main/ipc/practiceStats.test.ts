@@ -1,17 +1,48 @@
-import { describe, expect, it, vi } from 'vitest';
-import { HitRecord, RunSummary } from '../../renderer/services/practice-stats';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  HitRecord,
+  PracticeRunArchive,
+  RunSummary,
+  StoredPracticeRun,
+} from '../../renderer/services/practice-stats';
 import { FakeStore, lastReply, makeEvent, makeStore } from './test-support';
 
 const storeHolder = vi.hoisted(() => ({
   current: undefined as FakeStore | undefined,
+}));
+const storeSetControl = vi.hoisted(() => ({
+  calls: [] as (string | Record<string, unknown>)[],
+  failNext: undefined as Error | undefined,
 }));
 
 vi.mock('../AppState', () => ({
   appState: {
     store: {
       get: (key: string) => storeHolder.current!.get(key),
-      set: (key: string, value: unknown) =>
-        storeHolder.current!.set(key, value),
+      set: (
+        keyOrSnapshot: string | Record<string, unknown>,
+        value?: unknown,
+      ) => {
+        storeSetControl.calls.push(keyOrSnapshot);
+
+        if (storeSetControl.failNext) {
+          const error = storeSetControl.failNext;
+
+          storeSetControl.failNext = undefined;
+
+          throw error;
+        }
+
+        if (typeof keyOrSnapshot === 'string') {
+          storeHolder.current!.set(keyOrSnapshot, value);
+
+          return;
+        }
+
+        Object.entries(keyOrSnapshot).forEach(([key, snapshotValue]) => {
+          storeHolder.current!.set(key, snapshotValue);
+        });
+      },
     },
   },
 }));
@@ -92,6 +123,11 @@ function evidenceSummary(index: number, completedAt: string): RunSummary {
   };
 }
 
+beforeEach(() => {
+  storeSetControl.calls.length = 0;
+  storeSetControl.failNext = undefined;
+});
+
 describe('savePracticeRun', () => {
   it('appends the run and persists it under the song id', () => {
     storeHolder.current = makeStore({});
@@ -136,6 +172,142 @@ describe('savePracticeRun', () => {
         ],
       },
     ]);
+  });
+
+  it('commits summary, archive, and detail evidence in one consistent snapshot', () => {
+    const existing = Array.from(
+      { length: MAX_STORED_RUNS_PER_SONG },
+      (_, index) => evidenceSummary(index, '2026-07-01T12:00:00.000Z'),
+    );
+    const existingFullRun = {
+      summary: existing[existing.length - 1],
+      records: [fakeRecord(240)],
+    };
+
+    storeHolder.current = makeStore({
+      practiceRuns: {
+        'song-1': existing,
+        'other-song': [fakeSummary(0.4)],
+      },
+      practiceRunArchive: {
+        'song-1': emptyArchive(),
+        'other-song': emptyArchive(),
+      },
+      practiceRunDetails: {
+        'song-1': [existingFullRun],
+        'other-song': [],
+      },
+    });
+
+    const event = makeEvent();
+    const summary = evidenceSummary(99, '2026-08-10T12:00:00.000Z');
+
+    savePracticeRun(event as never, {
+      songId: 'song-1',
+      summary,
+      records: [fakeRecord(960)],
+    });
+
+    expect(storeSetControl.calls).toHaveLength(1);
+    expect(Object.keys(storeSetControl.calls[0])).toEqual([
+      'practiceRuns',
+      'practiceRunArchive',
+      'practiceRunDetails',
+    ]);
+
+    const runs = storeHolder.current.get('practiceRuns.song-1') as RunSummary[];
+    const archive = storeHolder.current.get(
+      'practiceRunArchive.song-1',
+    ) as PracticeRunArchive;
+    const fullRuns = storeHolder.current.get(
+      'practiceRunDetails.song-1',
+    ) as StoredPracticeRun[];
+
+    expect(runs).toEqual([...existing.slice(1), summary]);
+    expect(archive.days['2026-07-01']).toMatchObject({ runCount: 1 });
+    expect(fullRuns).toEqual([
+      existingFullRun,
+      {
+        summary,
+        records: [
+          {
+            tick: 960,
+            deltaMs: -12,
+            element: 'snare',
+            verdict: 'hit',
+            velocity: 92,
+          },
+        ],
+      },
+    ]);
+    expect(lastReply(event, 'save-practice-run')!.args[0]).toEqual({
+      songId: 'song-1',
+      runs,
+      fullRuns,
+      archive,
+    });
+    expect(storeHolder.current.get('practiceRuns.other-song')).toEqual([
+      fakeSummary(0.4),
+    ]);
+    expect(storeHolder.current.get('practiceRunArchive.other-song')).toEqual(
+      emptyArchive(),
+    );
+    expect(storeHolder.current.get('practiceRunDetails.other-song')).toEqual(
+      [],
+    );
+  });
+
+  it('leaves all evidence unchanged on a failed snapshot write and converges on retry', () => {
+    const existing = Array.from(
+      { length: MAX_STORED_RUNS_PER_SONG },
+      (_, index) => evidenceSummary(index, '2026-07-02T12:00:00.000Z'),
+    );
+    const initialState = {
+      practiceRuns: { 'song-1': existing },
+      practiceRunArchive: { 'song-1': emptyArchive() },
+      practiceRunDetails: { 'song-1': [] },
+    };
+    const summary = evidenceSummary(100, '2026-08-10T13:00:00.000Z');
+    const payload = {
+      songId: 'song-1',
+      summary,
+      records: [fakeRecord(1440)],
+    };
+
+    storeHolder.current = makeStore(initialState);
+
+    const beforeFailure = structuredClone(storeHolder.current.data);
+    const failedEvent = makeEvent();
+
+    storeSetControl.failNext = new Error('injected snapshot write failure');
+    savePracticeRun(failedEvent as never, payload);
+
+    expect(storeSetControl.calls).toHaveLength(1);
+    expect(storeSetControl.calls[0]).not.toEqual(expect.any(String));
+    expect(storeHolder.current.data).toEqual(beforeFailure);
+    expect(lastReply(failedEvent, 'save-practice-run')!.args[0]).toEqual({
+      error: 'injected snapshot write failure',
+    });
+
+    const retryEvent = makeEvent();
+
+    savePracticeRun(retryEvent as never, payload);
+
+    expect(storeSetControl.calls).toHaveLength(2);
+
+    const retryState = structuredClone(storeHolder.current.data);
+    const retryReply = lastReply(retryEvent, 'save-practice-run')!.args[0];
+
+    storeHolder.current = makeStore(initialState);
+
+    const cleanEvent = makeEvent();
+
+    savePracticeRun(cleanEvent as never, payload);
+
+    expect(storeHolder.current.data).toEqual(retryState);
+    expect(lastReply(cleanEvent, 'save-practice-run')!.args[0]).toEqual(
+      retryReply,
+    );
   });
 
   it('round-trips versioned run context without changing legacy summary fields', () => {

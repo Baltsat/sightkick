@@ -88,11 +88,15 @@
   align-items: center;
   gap: 0.45rem;
   margin: 0;
-  color: var(--color-amber);
+  color: var(--color-amber-text);
   font-size: 0.67rem;
   font-weight: 750;
   letter-spacing: 0.15em;
   text-transform: uppercase;
+}
+
+.home-cockpit__intro .daybreak-kicker {
+  color: #ffd57a;
 }
 
 .home-cockpit__intro h1,
@@ -141,7 +145,6 @@
   margin-top: 0.85rem;
 }
 
-.home-cockpit__actions .ant-btn-primary,
 .coach-desk .ant-btn-primary {
   border-color: var(--color-amber);
   color: var(--color-ink);
@@ -154,6 +157,20 @@
   color: #fffaf2;
   background: rgb(17 23 34 / 32%);
   backdrop-filter: blur(8px);
+}
+
+.home-cockpit__actions .home-cockpit__start-secondary {
+  border-color: rgb(255 255 255 / 26%);
+  color: rgb(255 250 242 / 84%);
+  background: rgb(17 23 34 / 24%);
+  box-shadow: none;
+}
+
+.home-cockpit__actions .home-cockpit__start-secondary:hover,
+.home-cockpit__actions .home-cockpit__start-secondary:focus-visible {
+  border-color: rgb(255 208 100 / 64%);
+  color: #fffaf2;
+  background: rgb(17 23 34 / 42%);
 }
 
 .home-cockpit__status {
@@ -197,15 +214,11 @@
   align-items: center;
   gap: 0.58rem;
   padding: 0.66rem 0.72rem;
-  border: 1px solid rgb(255 250 242 / 34%);
+  border: 1px solid rgb(255 250 242 / 22%);
   border-radius: 0.95rem;
   color: #fffaf2;
-  background: linear-gradient(
-    135deg,
-    rgb(247 53 134 / 60%),
-    rgb(17 23 34 / 58%)
-  );
-  box-shadow: 0 0.7rem 2.1rem rgb(17 23 34 / 28%);
+  background: rgb(17 23 34 / 58%);
+  box-shadow: 0 0.7rem 1.7rem rgb(17 23 34 / 24%);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -213,8 +226,7 @@
 }
 
 .home-cockpit__coach-link > svg:first-child {
-  color: #ffe1ef;
-  filter: drop-shadow(0 0 0.5rem rgb(247 53 134 / 88%));
+  color: #ffd77b;
 }
 
 .home-cockpit__coach-link > svg:last-child {
@@ -244,7 +256,7 @@
 .home-cockpit__coach-link:hover,
 .home-cockpit__coach-link:focus-visible {
   border-color: #ffd77b;
-  box-shadow: 0 0 2.4rem rgb(247 53 134 / 52%);
+  box-shadow: 0 0 1.6rem rgb(255 173 47 / 28%);
 }
 
 .home-cockpit__kit {
@@ -382,11 +394,27 @@
 }
 
 .home-kit-hotspot--kick .home-kit-hotspot__ring {
-  border-color: rgb(255 173 47 / 90%);
+  border: 2px solid rgb(255 208 100 / 96%);
+  background: radial-gradient(
+    circle,
+    rgb(17 23 34 / 84%),
+    rgb(17 23 34 / 35%) 66%,
+    transparent 69%
+  );
   box-shadow:
-    0 0 0 0.3rem rgb(255 173 47 / 14%),
-    0 0 2.4rem rgb(255 173 47 / 57%),
+    0 0 0 0.34rem rgb(255 173 47 / 18%),
+    0 0 3rem rgb(255 173 47 / 70%),
     inset 0 0 1.8rem rgb(17 23 34 / 72%);
+}
+
+.home-kit-hotspot--kick .home-kit-hotspot__copy strong {
+  font-size: clamp(0.72rem, 1.05vw, 0.9rem);
+  letter-spacing: 0.1em;
+}
+
+.home-kit-hotspot--kick .home-kit-hotspot__copy small {
+  color: #ffd064;
+  font-size: clamp(1rem, 1.6vw, 1.45rem);
 }
 
 .home-cockpit__live {

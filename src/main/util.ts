@@ -6,6 +6,7 @@ import { Difficulty, parseChartFile } from 'scan-chart';
 import {
   AudioData,
   LessonTargetLane,
+  LibrarySourceTrackProvenance,
   Song,
   SongData,
   SongLessonInfo,
@@ -119,6 +120,53 @@ export function parseLessonInfo(stored: SongData): SongLessonInfo | undefined {
   };
 }
 
+/**
+ * Reads a reviewed discovery row from schema-compatible `sk_*` song.ini
+ * fields. Malformed or partial metadata never creates a false source link.
+ */
+export function parseLibrarySourceProvenance(
+  stored: SongData,
+): LibrarySourceTrackProvenance | undefined {
+  if (stored.sk_source_provider !== 'yandex-music') {
+    return undefined;
+  }
+
+  const collectionId = stored.sk_source_collection_id?.trim();
+  const collectionName = stored.sk_source_collection_name?.trim();
+  const trackId = stored.sk_source_track_id?.trim();
+  const title = stored.sk_source_title?.trim();
+  let artists: unknown;
+
+  try {
+    artists = JSON.parse(stored.sk_source_artists ?? '');
+  } catch {
+    return undefined;
+  }
+
+  if (
+    !collectionId ||
+    !collectionName ||
+    !trackId ||
+    !title ||
+    !Array.isArray(artists) ||
+    artists.some((artist) => typeof artist !== 'string' || !artist.trim())
+  ) {
+    return undefined;
+  }
+
+  const sourceUrl = stored.sk_source_url?.trim();
+
+  return {
+    provider: 'yandex-music',
+    collectionId,
+    collectionName,
+    trackId,
+    title,
+    artists: [...artists],
+    ...(sourceUrl ? { sourceUrl } : {}),
+  };
+}
+
 export function toSong(stored: SongData): Song {
   const rating = parseInt(stored.diff_drums ?? '', 10);
   const autoChartTool = stored.auto_chart_tool?.trim();
@@ -145,6 +193,7 @@ export function toSong(stored: SongData): Song {
     liked: stored.liked,
     updatedAt: stored.updatedAt,
     scoreData: stored.scoreData,
+    sourceProvenance: parseLibrarySourceProvenance(stored),
     lesson: parseLessonInfo(stored),
   };
 }

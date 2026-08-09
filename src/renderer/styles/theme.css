@@ -13,9 +13,9 @@
   --color-text: #111722;
   --color-text-body: #1b2430;
   --color-text-muted: #526172;
-  --color-text-faint: #667588;
-  --color-text-dim: #748195;
-  --color-text-dimmer: #8490a1;
+  --color-text-faint: #566476;
+  --color-text-dim: #59687a;
+  --color-text-dimmer: #59687a;
 
   --color-accent: #f73586;
   --color-accent-bright: #ff684f;
@@ -63,6 +63,7 @@
   --color-pearl: #f8f5ef;
   --color-warm-paper: #eee8dc;
   --color-amber: #ffad2f;
+  --color-amber-text: #8b5708;
   --color-coral: #ff684f;
   --color-magenta: #f73586;
   --color-cyan: #56d8f2;

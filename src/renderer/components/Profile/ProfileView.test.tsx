@@ -106,6 +106,43 @@ describe('ProfileView', () => {
     ).toBeInTheDocument();
   });
 
+  it('renders the all-history archive model supplied by the shared gamification hook', () => {
+    render(
+      <ProfileView
+        songList={[song()]}
+        goals={[]}
+        isGoalsLoaded
+        onSaveGoal={() => {}}
+        onSetPrimaryGoal={() => {}}
+        gamification={gamification({
+          longitudinalProgress: {
+            allTime: {
+              runCount: 3,
+              scoredNoteCount: 240,
+              wrongHitCount: 4,
+              accuracy: 0.9,
+              meanTimingMs: 3,
+              timingSampleCount: 180,
+            },
+            months: [],
+            archivedRunCount: 2,
+            recentRunCount: 1,
+            aggregateOnlyArchivedRunCount: 2,
+            unknownDateRunCount: 0,
+            omittedActiveMonthCount: 0,
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId('profile-practice-history')).toHaveTextContent(
+      '2 archived + 1 recent',
+    );
+    expect(screen.getByTestId('profile-practice-history')).toHaveTextContent(
+      'Historical detail unavailable',
+    );
+  });
+
   it('renders the goal card and stat chips once a primary goal exists, resolving run history via the existing IPC channels', async () => {
     render(
       <ProfileView

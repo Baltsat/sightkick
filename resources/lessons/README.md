@@ -25,6 +25,10 @@ jazz ride pattern" or "the shuffle"), that's because the underlying rhythm
 is public-domain musical vocabulary any method book would teach, taught
 here in different words with a different note pattern.
 
+The exact source identity, SHA-256, 90-page section map, 118-exercise base
+coverage, 52-exercise original extension, and disclosed representation limits
+are recorded in `docs/curriculum-source-coverage.md`.
+
 The three "Rudiment Gym" units (see below) draw their rudiment names and
 stickings from the Percussive Arts Society's PAS International Drum
 Rudiments list — a standardized, public-domain naming system maintained by

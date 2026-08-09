@@ -23,6 +23,12 @@ const MULTI_STEM = {
   ],
 };
 
+function confirmPracticeRunSaved(view: ReturnType<typeof setupSongView>): void {
+  act(() => {
+    view.ipc.emit('save-practice-run', { songId: 'song-1' });
+  });
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -88,9 +94,12 @@ describe('opening a song', () => {
     const flowHud = screen.getByTestId('flow-viewport-hud');
 
     expect(flowNotation).toBeInTheDocument();
-    expect(flowNotation).toHaveAttribute('data-presentation-zoom', '1.50');
-    expect(flowNotation).toHaveStyle({ zoom: '1.5' });
+    expect(flowNotation).toHaveAttribute('data-presentation-zoom', '1.65');
+    expect(flowNotation).toHaveStyle({ zoom: '1.65' });
     expect(flowHud).toHaveAttribute('data-mode', 'perform');
+    expect(
+      screen.getByRole('group', { name: 'Notation view' }),
+    ).toBeInTheDocument();
     expect(within(flowHud).getByText('Master of Puppets')).toBeInTheDocument();
     expect(within(flowHud).getByText('Metallica')).toBeInTheDocument();
     expect(within(flowHud).getByText('Perform flow')).toBeInTheDocument();
@@ -114,6 +123,15 @@ describe('opening a song', () => {
       'aria-pressed',
       'true',
     );
+
+    const classicHeading = screen
+      .getAllByRole('heading', { name: 'Master of Puppets' })
+      .find((heading) => heading.classList.contains('text-4xl'));
+
+    expect(classicHeading).toBeDefined();
+    expect(classicHeading?.parentElement?.parentElement).toHaveStyle({
+      zoom: '1',
+    });
     expect(
       JSON.parse(
         window.localStorage.getItem('settings.practiceNotationLayout') ?? '""',
@@ -295,6 +313,7 @@ describe('drumming and scoring', () => {
     view.clickPlay();
     await view.pressKey('KeyJ');
     await view.finishSong();
+    confirmPracticeRunSaved(view);
 
     expect(screen.getByTestId('score-modal')).toBeInTheDocument();
     expect(view.updateSongPayloads()).toEqual([
@@ -319,6 +338,7 @@ describe('drumming and scoring', () => {
     await view.pressKey('KeyJ');
     await view.pressKey('KeyK');
     await view.finishSong();
+    confirmPracticeRunSaved(view);
 
     expect(view.updateSongPayloads()).toEqual([
       {
@@ -377,6 +397,7 @@ describe('drumming and scoring', () => {
     expect(view.audio.state).toBe('running');
 
     await view.finishSong();
+    confirmPracticeRunSaved(view);
 
     expect(view.updateSongPayloads()).toEqual([
       {
@@ -1590,6 +1611,7 @@ describe('in-practice difficulty switching', () => {
     await view.pressKey('KeyJ'); // the only hit that should count
 
     await view.finishSong();
+    confirmPracticeRunSaved(view);
 
     expect(view.updateSongPayloads()).toEqual([
       {

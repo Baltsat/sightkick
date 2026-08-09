@@ -4,6 +4,27 @@ import yandexSource from '../../../resources/library-sources/yandex-drums-2026-0
 import yandexFavoritesSource from '../../../resources/library-sources/yandex-favorites-2026-08-10.json';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('./tar', () => ({
+  extractTarGzip: vi.fn(
+    async () =>
+      new Map([
+        [
+          'prepared/song.ini',
+          new TextEncoder().encode(
+            '[Song]\nname = Natural Villain\nartist = Mokita\npro_drums = True\n',
+          ),
+        ],
+        ['prepared/notes.chart', new TextEncoder().encode('[Song]\n{}\n')],
+      ]),
+  ),
+}));
+
+vi.mock('./library', async () => {
+  const actual = await vi.importActual<typeof import('./library')>('./library');
+
+  return { ...actual, saveStoredSong: vi.fn(async () => {}) };
+});
+
 function reply<T>(request: string, response: string): Promise<T> {
   return new Promise((resolve) => {
     window.electron.ipcRenderer.once(response as never, resolve as never);
@@ -108,6 +129,69 @@ describe('web platform channel mapping', () => {
     );
     expect(fetchMock).toHaveBeenCalledWith(
       '/library-sources/yandex-favorites-2026-08-10.json',
+    );
+  });
+
+  it('keeps reviewed source provenance through the web import result', async () => {
+    const sourceProvenance = {
+      provider: 'yandex-music' as const,
+      collectionId: 'drums-playlist',
+      collectionName: 'drums',
+      trackId: 'yandex:drums-playlist:2',
+      title: 'Natural Villain',
+      artists: ['Mokita'],
+      sourceUrl: 'https://music.yandex.ru/album/123/track/456',
+    };
+    const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = input.toString();
+
+      if (url === '/api/import' && init?.method === 'POST') {
+        return new Response(JSON.stringify({ jobId: 'source-job' }), {
+          status: 200,
+        });
+      }
+
+      if (url === '/api/import/source-job') {
+        return new Response(JSON.stringify({ status: 'done' }), {
+          status: 200,
+        });
+      }
+
+      if (url === '/api/import/source-job/result') {
+        return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    const updates: { stage: string; song?: { sourceProvenance?: unknown } }[] =
+      [];
+
+    vi.stubGlobal('fetch', fetchMock);
+    window.electron.ipcRenderer.on('auto-chart-update', (update) => {
+      updates.push(update as (typeof updates)[number]);
+    });
+    window.electron.ipcRenderer.sendMessage('create-auto-chart', {
+      youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+      sourceProvenance,
+    });
+
+    await vi.waitFor(() =>
+      expect(updates.some(({ stage }) => stage === 'preview-ready')).toBe(true),
+    );
+    window.electron.ipcRenderer.sendMessage('import-auto-chart', 'source-job');
+
+    await vi.waitFor(() =>
+      expect(updates.find(({ stage }) => stage === 'imported')?.song).toEqual(
+        expect.objectContaining({ sourceProvenance }),
+      ),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/import',
+      expect.objectContaining({
+        body: JSON.stringify({
+          url: 'https://www.youtube.com/watch?v=abcdefghijk',
+        }),
+      }),
     );
   });
 

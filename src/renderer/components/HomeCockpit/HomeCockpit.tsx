@@ -417,9 +417,9 @@ export function HomeCockpit({
           <div className="home-cockpit__actions">
             {recommendation && (
               <Button
-                type="primary"
                 size="large"
                 data-testid="home-start-practice"
+                className="home-cockpit__start-secondary"
                 icon={<FontAwesomeIcon icon={faBolt} />}
                 onClick={handleStartRecommended}
               >
@@ -478,7 +478,11 @@ export function HomeCockpit({
           <FontAwesomeIcon icon={faArrowRight} aria-hidden="true" />
         </button>
 
-        <div className="home-cockpit__kit" aria-label="Interactive drum kit">
+        <div
+          className="home-cockpit__kit"
+          role="group"
+          aria-label="Interactive drum kit"
+        >
           {KIT_HOTSPOTS.map((hotspot) => {
             const isActive = activeLane === hotspot.element;
             const signal = laneSummary(

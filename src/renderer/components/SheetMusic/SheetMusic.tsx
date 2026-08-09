@@ -299,9 +299,11 @@ export function SheetMusic({
   ]);
   const isFlow = layout === 'flow';
   // Flow is viewed from the kit rather than at reading distance. Give the
-  // same score a distance-readable presentation boost while preserving the user's zoom
-  // control and its 2x ceiling; Classic keeps the exact requested value.
-  const presentationZoom = isFlow ? Math.min(2, zoom * 1.5) : zoom;
+  // same score a distance-readable presentation boost while preserving the
+  // user's zoom control and its 2x ceiling; Classic keeps the exact requested
+  // value. The 1.65x default keeps the score, rather than the surrounding HUD,
+  // as the dominant Flow surface from normal kit distance.
+  const presentationZoom = isFlow ? Math.min(2, zoom * 1.65) : zoom;
 
   return (
     <div
