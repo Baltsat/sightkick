@@ -19,6 +19,7 @@ interface Props {
   scanPercent?: number;
   onExportPdf?: () => void;
   isExporting?: boolean;
+  tutorControls?: ReactNode;
 }
 
 export const SettingsButton = memo(function Settings({
@@ -30,6 +31,7 @@ export const SettingsButton = memo(function Settings({
   gameMode,
   onExportPdf,
   isExporting,
+  tutorControls,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [inputConfigOpen, setInputConfigOpen] = useState(false);
@@ -73,6 +75,7 @@ export const SettingsButton = memo(function Settings({
                 masterVolumeControl={masterVolumeControl}
                 volumeSliders={volumeSliders}
                 clickControls={clickControls}
+                tutorControls={tutorControls}
               />
             )}
             <CoachSettings />

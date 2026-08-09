@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { act, renderHook, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { App as AntdApp, ConfigProvider } from 'antd';
 import {
   installIpcMock,
@@ -9,7 +9,12 @@ import {
 } from '../hooks/test-support';
 import { antdTheme } from '../antdTheme';
 import { InputDevice } from '../input';
-import { InputProvider, useInput } from './InputContext';
+import {
+  InputProvider,
+  MIDI_HEALTH_CHECK_DELAY_MS,
+  MIDI_RECONNECT_DELAY_MS,
+  useInput,
+} from './InputContext';
 
 let ipc: IpcMock;
 
@@ -46,6 +51,18 @@ async function respondWithMidiDevices(
     await new Promise((resolve) => {
       setTimeout(resolve, 0);
     });
+  });
+}
+
+async function flushMidiResponse(devices: { name: string; port: number }[]) {
+  await act(async () => {
+    ipc.emit('midi-device-list', devices);
+
+    // InputBus -> MidiSource -> InputContext is a short promise chain. Keep
+    // this helper timer-free so reconnect tests can use fake clocks.
+    for (let i = 0; i < 8; i += 1) {
+      await Promise.resolve();
+    }
   });
 }
 
@@ -516,6 +533,108 @@ describe('InputContext MIDI auto-select', () => {
     await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
 
     expect(result.current.selectedDevice).toEqual(DEVICE_A);
+  });
+
+  it('keeps a remembered kit selected when it is absent at launch, then restores it on its new port', async () => {
+    vi.useFakeTimers();
+    localStorage.setItem('settings.selectedDevice', JSON.stringify(DEVICE_A));
+
+    try {
+      const { result } = renderHook(() => useInput(), { wrapper });
+
+      expect(result.current.inputReadiness).toBe('reconnecting');
+      await flushMidiResponse([]);
+
+      // The preference and its DTX/GM mappings survive an unplugged launch;
+      // there is no stale-port listener while the device is absent.
+      expect(result.current.selectedDevice).toEqual(DEVICE_A);
+      expect(result.current.inputReadiness).toBe('reconnecting');
+      expect(listenPorts()).toEqual([]);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(MIDI_RECONNECT_DELAY_MS);
+      });
+      await flushMidiResponse([{ name: 'Pad A', port: 7 }]);
+
+      expect(result.current.selectedDevice).toEqual({ ...DEVICE_A, port: 7 });
+      expect(result.current.inputReadiness).toBe('connected');
+      expect(listenPorts()).toEqual([7]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('matches a remembered kit by name when macOS changes its port order', async () => {
+    localStorage.setItem('settings.selectedDevice', JSON.stringify(DEVICE_A));
+
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    await respondWithMidiDevices([{ name: 'Pad A', port: 9 }]);
+
+    expect(result.current.selectedDevice).toEqual({ ...DEVICE_A, port: 9 });
+    expect(result.current.inputReadiness).toBe('connected');
+    expect(listenPorts()).toEqual([9]);
+  });
+
+  it('detects a later physical disconnect during its background health check', async () => {
+    vi.useFakeTimers();
+    localStorage.setItem('settings.selectedDevice', JSON.stringify(DEVICE_A));
+
+    try {
+      const { result } = renderHook(() => useInput(), { wrapper });
+
+      await flushMidiResponse([{ name: 'Pad A', port: 2 }]);
+      expect(result.current.inputReadiness).toBe('connected');
+      expect(listenPorts()).toEqual([2]);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(MIDI_HEALTH_CHECK_DELAY_MS);
+      });
+      await flushMidiResponse([]);
+
+      expect(result.current.selectedDevice).toEqual(DEVICE_A);
+      expect(result.current.inputReadiness).toBe('reconnecting');
+      expect(stopCount()).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('re-enumerates and resumes the same kit after a MIDI error without duplicating its listener', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { result, unmount } = renderHook(() => useInput(), { wrapper });
+
+      act(() => result.current.setSelectedDevice(DEVICE_A));
+      await flushMidiResponse([{ name: 'Pad A', port: 2 }]);
+      expect(listenPorts()).toEqual([2]);
+      expect(ipc.onCount('midi-error')).toBe(1);
+
+      act(() => ipc.emit('midi-error', { error: 'device unavailable' }));
+      await flushMidiResponse([]);
+
+      expect(result.current.selectedDevice).toEqual(DEVICE_A);
+      expect(result.current.inputReadiness).toBe('reconnecting');
+      expect(stopCount()).toBe(1);
+      expect(ipc.onCount('midi-error')).toBe(0);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(MIDI_RECONNECT_DELAY_MS);
+      });
+      await flushMidiResponse([{ name: 'Pad A', port: 6 }]);
+
+      expect(result.current.selectedDevice).toEqual({ ...DEVICE_A, port: 6 });
+      expect(result.current.inputReadiness).toBe('connected');
+      expect(listenPorts()).toEqual([2, 6]);
+      expect(ipc.onCount('midi-error')).toBe(1);
+
+      unmount();
+      expect(stopCount()).toBe(2);
+      expect(ipc.onCount('midi-error')).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

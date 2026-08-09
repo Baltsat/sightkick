@@ -3,7 +3,11 @@ import { Measure, Note, ParsedChart } from '../../../chart-parser/types';
 import { InputEvent } from '../../input/types';
 import { ticksToSeconds } from '../../../chart-parser/timing';
 import { Judge } from './judge';
-import { JudgeContext, JudgeHitHandler } from './types';
+import {
+  JudgeContext,
+  JudgeHitHandler,
+  ResolvedJudgementHandler,
+} from './types';
 
 const CHART = {
   resolution: 480,
@@ -76,6 +80,98 @@ describe('Judge', () => {
       element: 'snare',
       velocity: 100,
     });
+  });
+
+  it('emits an authoritative hit judgement when a mapped note is accepted', () => {
+    const onJudgement = vi.fn<ResolvedJudgementHandler>();
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 480)])] },
+      { tick: 480 },
+    );
+
+    engine.onJudgement(onJudgement);
+    engine.handleInput(hit('midi:38'));
+
+    expect(onJudgement).toHaveBeenCalledWith({
+      id: 'note:480:c/5',
+      verdict: 'hit',
+      expectedTick: 480,
+      actualTick: 480,
+      expectedElement: 'snare',
+      actualElement: 'snare',
+      measureIndex: 0,
+      deltaMs: 0,
+      velocity: 100,
+      scoreable: true,
+    });
+  });
+
+  it('resolves a miss only after the late-hit tolerance window closes', () => {
+    const onJudgement = vi.fn<ResolvedJudgementHandler>();
+    const { engine } = setup({
+      measures: [
+        measure([note(['c/5'], 480)], { startTick: 0, endTick: 1920 }),
+      ],
+    });
+
+    engine.onJudgement(onJudgement);
+    engine.resolveThrough(575);
+    expect(onJudgement).not.toHaveBeenCalled();
+
+    engine.resolveThrough(577);
+    expect(onJudgement).toHaveBeenCalledTimes(1);
+    expect(onJudgement).toHaveBeenCalledWith({
+      id: 'note:480:c/5',
+      verdict: 'miss',
+      expectedTick: 480,
+      expectedElement: 'snare',
+      measureIndex: 0,
+      scoreable: true,
+    });
+
+    engine.resolveThrough(900);
+    expect(onJudgement).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves every unjudged chart head when a run ends inside the tail tolerance', () => {
+    const onJudgement = vi.fn<ResolvedJudgementHandler>();
+    const { engine } = setup({
+      measures: [
+        measure([note(['c/5'], 480), note(['f/4'], 960)], {
+          startTick: 0,
+          endTick: 1920,
+        }),
+      ],
+    });
+
+    engine.onJudgement(onJudgement);
+    engine.resolveThrough(500);
+    engine.resolveAll();
+
+    expect(onJudgement).toHaveBeenCalledTimes(2);
+    expect(onJudgement).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        id: 'note:960:f/4',
+        verdict: 'miss',
+        expectedElement: 'kick',
+      }),
+    );
+  });
+
+  it('re-arms resolved judgements when practice rewinds across a note', () => {
+    const onJudgement = vi.fn<ResolvedJudgementHandler>();
+    const { engine } = setup({
+      measures: [
+        measure([note(['c/5'], 480)], { startTick: 0, endTick: 1920 }),
+      ],
+    });
+
+    engine.onJudgement(onJudgement);
+    engine.resolveThrough(600);
+    engine.rewindTo(0);
+    engine.resolveThrough(600);
+
+    expect(onJudgement).toHaveBeenCalledTimes(2);
   });
 
   it('registers a hit using the remapped control after a remap', () => {

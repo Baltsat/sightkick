@@ -207,13 +207,10 @@ test.describe('seeded library', () => {
       env: {
         SIGHTKICK_TRANSCRIBER_PATH: transcriberPath,
         SIGHTKICK_DISABLE_YOUTUBE_METADATA: '1',
-        SK_FFMPEG: path.join(
-          __dirname,
-          '..',
-          'node_modules',
-          'ffmpeg-static',
-          process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
-        ),
+        // This protocol-only fixture never invokes FFmpeg; the executable
+        // sidecar fixture satisfies the runtime preflight without coupling
+        // cross-platform E2E to the macOS release runtime.
+        SK_FFMPEG: transcriberPath,
       },
     });
     await harness.app.evaluate(({ dialog }) => {

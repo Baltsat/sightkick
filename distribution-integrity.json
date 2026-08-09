@@ -1,0 +1,3565 @@
+{
+  "schemaVersion": 2,
+  "application": {
+    "productName": "Drumroll",
+    "releaseVersion": "1.2.0-kb.2",
+    "shortVersion": "1.2.0",
+    "buildVersion": "1.2.2"
+  },
+  "lessonLibrary": {
+    "lessonCount": 170,
+    "files": [
+      {
+        "path": "manifest.json",
+        "bytes": 399013,
+        "sha256": "257fb3492506fdcd79ab7b065dd1e2e96b11fc5e24302f2fdbcbbf343027d108"
+      },
+      {
+        "path": "SightKick Method - Lesson 01.01 - Alternating Singles Warm-Up/drums.ogg",
+        "bytes": 838093,
+        "sha256": "73184649dbe59e5b4ee2eb3de7d1fe55b5d3716535df2dc33b1f289f5d077e6c"
+      },
+      {
+        "path": "SightKick Method - Lesson 01.01 - Alternating Singles Warm-Up/notes.mid",
+        "bytes": 1257,
+        "sha256": "660b2f188d43405440c28830c61a80883b291c8b8b73d9f491dd8c498b431959"
+      },
+      {
+        "path": "SightKick Method - Lesson 01.01 - Alternating Singles Warm-Up/song.ini",
+        "bytes": 843,
+        "sha256": "8f94f3cb25c140b493fc69aee843dc5771de25f89e93a810539a83827b6362cb"
+      },
+      {
+        "path": "SightKick Method - Lesson 01.01 - Alternating Singles Warm-Up/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 01.02 - Paired Doubles Warm-Up/drums.ogg",
+        "bytes": 816148,
+        "sha256": "39602762af3387a1da19dafcb0bf00638a03f77e79e9112a5adbfa5b9d83bf59"
+      },
+      {
+        "path": "SightKick Method - Lesson 01.02 - Paired Doubles Warm-Up/notes.mid",
+        "bytes": 1193,
+        "sha256": "5ac5eef7a0b78e49b13a815945186a45b66add23992a9230c7650cc017b05733"
+      },
+      {
+        "path": "SightKick Method - Lesson 01.02 - Paired Doubles Warm-Up/song.ini",
+        "bytes": 840,
+        "sha256": "8a1309a6bd829c4f28c899db2161afcbc1ce5af3befbb637c6b274fcc4eb72fa"
+      },
+      {
+        "path": "SightKick Method - Lesson 01.02 - Paired Doubles Warm-Up/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 01.03 - Kick Drum Pulse/drums.ogg",
+        "bytes": 390810,
+        "sha256": "bbeca1d949929c8b8b1a87f15b4be4c616231c62ed65be7da0499eedf3bd8b91"
+      },
+      {
+        "path": "SightKick Method - Lesson 01.03 - Kick Drum Pulse/notes.mid",
+        "bytes": 537,
+        "sha256": "5ba911363c61864389c16ddece72ccf7c32d8695337c8674f6d4e5ca441c58b2"
+      },
+      {
+        "path": "SightKick Method - Lesson 01.03 - Kick Drum Pulse/song.ini",
+        "bytes": 815,
+        "sha256": "c4c6c5d531ae4c39c5637283dae53f012253ef7d174002fc1c0293041837d3ad"
+      },
+      {
+        "path": "SightKick Method - Lesson 01.03 - Kick Drum Pulse/song.ogg",
+        "bytes": 82545,
+        "sha256": "05be83413e6af5e77eb1952ebb877ffe98eef13d67b57434e4779b343a8a2487"
+      },
+      {
+        "path": "SightKick Method - Lesson 02.01 - Whole and Half Note Reading/drums.ogg",
+        "bytes": 471280,
+        "sha256": "6fc9993b1e105fdfec5f6fccb4c9437b9fe8b6342e13950d89514775f543c645"
+      },
+      {
+        "path": "SightKick Method - Lesson 02.01 - Whole and Half Note Reading/notes.mid",
+        "bytes": 321,
+        "sha256": "6a29b72367801ab5b013eea13f267ce68d35082301a02b108a6b32b982d00a00"
+      },
+      {
+        "path": "SightKick Method - Lesson 02.01 - Whole and Half Note Reading/song.ini",
+        "bytes": 849,
+        "sha256": "0bebb4c2e3fb308863b5fc3b6cd233eeb76fa2a56eec4519c911032cc4063352"
+      },
+      {
+        "path": "SightKick Method - Lesson 02.01 - Whole and Half Note Reading/song.ogg",
+        "bytes": 84855,
+        "sha256": "d53c16403dee1542c916ef3331edf417f7cacaf74830d843ea7f4339000cc5c5"
+      },
+      {
+        "path": "SightKick Method - Lesson 02.02 - Snare and Kick Trade-Off/drums.ogg",
+        "bytes": 631829,
+        "sha256": "cb9f69698457c18310276978232e34434a0de3eb33d20f3d3e238a6e8006c55c"
+      },
+      {
+        "path": "SightKick Method - Lesson 02.02 - Snare and Kick Trade-Off/notes.mid",
+        "bytes": 745,
+        "sha256": "99cb7a3a0a9185247872d761154d9acd9214afaa5182a6dcb62957900da30c30"
+      },
+      {
+        "path": "SightKick Method - Lesson 02.02 - Snare and Kick Trade-Off/song.ini",
+        "bytes": 937,
+        "sha256": "54dc7d6e57cc9b482eaac52bc43be8e74117312ce5b4791caafbeaba205fecf0"
+      },
+      {
+        "path": "SightKick Method - Lesson 02.02 - Snare and Kick Trade-Off/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 02.03 - Rests in the Groove/drums.ogg",
+        "bytes": 576974,
+        "sha256": "1348c3683446875bdf35226035f63e26c2ba58e459d32d644b404a1e7dfdd79b"
+      },
+      {
+        "path": "SightKick Method - Lesson 02.03 - Rests in the Groove/notes.mid",
+        "bytes": 609,
+        "sha256": "955aa8ef79f7d32ec9ba65adc1113f4ba1905667b326c5579f16a75a97d00825"
+      },
+      {
+        "path": "SightKick Method - Lesson 02.03 - Rests in the Groove/song.ini",
+        "bytes": 877,
+        "sha256": "c4d4d43d44d0e290694c949c6a6308e8480a67a774025a1812611b7f9ae827b9"
+      },
+      {
+        "path": "SightKick Method - Lesson 02.03 - Rests in the Groove/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.01 - Single Stroke Roll (60 BPM)/drums.ogg",
+        "bytes": 721423,
+        "sha256": "117df0977daa07b0f7743acd0239353ccbfee254037db9b1eda4b1286e41bf25"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.01 - Single Stroke Roll (60 BPM)/notes.mid",
+        "bytes": 1129,
+        "sha256": "ea6c18ccf4512a81540bd96c9bf9e03922e27372f2916d5c6c1c0b3239cf2688"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.01 - Single Stroke Roll (60 BPM)/song.ini",
+        "bytes": 1033,
+        "sha256": "9c3cdb2a152641ae1355db1d103a385916235e898498c69d677cc5b412db4cdb"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.01 - Single Stroke Roll (60 BPM)/song.ogg",
+        "bytes": 65824,
+        "sha256": "bfb67066dbc50f0b38f1d3ad2952fa37d85957ba961946241b0af80a12eccd60"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.02 - Single Stroke Roll (80 BPM)/drums.ogg",
+        "bytes": 803277,
+        "sha256": "2e3f5128c8ab1d3875c6eee2c56cd2b43bdd53d5f3272b4ea1a4063faac207ce"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.02 - Single Stroke Roll (80 BPM)/notes.mid",
+        "bytes": 1641,
+        "sha256": "727e643b12ef4550af011427048e5fcbad16de9aea09090dd67e389284ebfa29"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.02 - Single Stroke Roll (80 BPM)/song.ini",
+        "bytes": 976,
+        "sha256": "d531649fdb15fc5307814ecaaed4eb4d24b1556af5dbfdd687eb18972d8eccc0"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.02 - Single Stroke Roll (80 BPM)/song.ogg",
+        "bytes": 84855,
+        "sha256": "d53c16403dee1542c916ef3331edf417f7cacaf74830d843ea7f4339000cc5c5"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.03 - Single Stroke Roll (100 BPM)/drums.ogg",
+        "bytes": 840189,
+        "sha256": "dfd1587efaa698004af53d2b699886f2b53a1f496c51371dfe6f58bb3c18cd23"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.03 - Single Stroke Roll (100 BPM)/notes.mid",
+        "bytes": 2153,
+        "sha256": "54e0ee4ab28d72659ed8bb0f0707859fa7edd8a2222880dd20b765a5c4f3834a"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.03 - Single Stroke Roll (100 BPM)/song.ini",
+        "bytes": 953,
+        "sha256": "4448f9805d9ba1e01b68165e6ad34a78d02c5efebff359bcc10729816dd6ecd3"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.03 - Single Stroke Roll (100 BPM)/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.04 - Single Stroke Roll (120 BPM)/drums.ogg",
+        "bytes": 701405,
+        "sha256": "f39efcfbe6536564e9116f635ca754270761ccf81c9fb442b3397cbef8b4a02b"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.04 - Single Stroke Roll (120 BPM)/notes.mid",
+        "bytes": 2153,
+        "sha256": "6e9bfa00394748d62a190547846a93e3a8a8c843ccefd5756500c0b9b4d55746"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.04 - Single Stroke Roll (120 BPM)/song.ini",
+        "bytes": 1012,
+        "sha256": "1b2737ff8aba85ea20688f5a8ccc8eb29c85f372fc8faf74cda3bb988e1ccb4c"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.04 - Single Stroke Roll (120 BPM)/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.05 - Single Stroke Roll - Tom Cascade/drums.ogg",
+        "bytes": 916346,
+        "sha256": "c90c4e1843cde359b983f88716f3d8186d4231c4ce0fba5b9a6835271f914b1e"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.05 - Single Stroke Roll - Tom Cascade/notes.mid",
+        "bytes": 2377,
+        "sha256": "667ddf3e3cf53103db1d6a5041270e209bae0005c46b13a627031fecf1440a2d"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.05 - Single Stroke Roll - Tom Cascade/song.ini",
+        "bytes": 1097,
+        "sha256": "91a8b19a670927ff1e901a80626355f32a57a24d61b5e58d30b74117e703565e"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.05 - Single Stroke Roll - Tom Cascade/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.06 - Double Stroke Roll (60 BPM)/drums.ogg",
+        "bytes": 721423,
+        "sha256": "117df0977daa07b0f7743acd0239353ccbfee254037db9b1eda4b1286e41bf25"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.06 - Double Stroke Roll (60 BPM)/notes.mid",
+        "bytes": 1129,
+        "sha256": "ea6c18ccf4512a81540bd96c9bf9e03922e27372f2916d5c6c1c0b3239cf2688"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.06 - Double Stroke Roll (60 BPM)/song.ini",
+        "bytes": 1139,
+        "sha256": "8e4dc5b072aeb6eed082c4ea6ccf57b7d799c4a7f2ebaf6efd06ecdd9aaee101"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.06 - Double Stroke Roll (60 BPM)/song.ogg",
+        "bytes": 65824,
+        "sha256": "bfb67066dbc50f0b38f1d3ad2952fa37d85957ba961946241b0af80a12eccd60"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.07 - Double Stroke Roll (80 BPM)/drums.ogg",
+        "bytes": 803277,
+        "sha256": "2e3f5128c8ab1d3875c6eee2c56cd2b43bdd53d5f3272b4ea1a4063faac207ce"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.07 - Double Stroke Roll (80 BPM)/notes.mid",
+        "bytes": 1641,
+        "sha256": "727e643b12ef4550af011427048e5fcbad16de9aea09090dd67e389284ebfa29"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.07 - Double Stroke Roll (80 BPM)/song.ini",
+        "bytes": 1008,
+        "sha256": "3b2cba5a918e57c622aaaf86fec5ec524f19522f015f00712ac66e122e02b840"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.07 - Double Stroke Roll (80 BPM)/song.ogg",
+        "bytes": 84855,
+        "sha256": "d53c16403dee1542c916ef3331edf417f7cacaf74830d843ea7f4339000cc5c5"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.08 - Double Stroke Roll (100 BPM)/drums.ogg",
+        "bytes": 840189,
+        "sha256": "dfd1587efaa698004af53d2b699886f2b53a1f496c51371dfe6f58bb3c18cd23"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.08 - Double Stroke Roll (100 BPM)/notes.mid",
+        "bytes": 2153,
+        "sha256": "54e0ee4ab28d72659ed8bb0f0707859fa7edd8a2222880dd20b765a5c4f3834a"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.08 - Double Stroke Roll (100 BPM)/song.ini",
+        "bytes": 985,
+        "sha256": "259da590b189ef61bf7f0f606141ea4d14f1c169abb8bf46861c5bbcfcbd5dc4"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.08 - Double Stroke Roll (100 BPM)/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.09 - Double Stroke Roll (120 BPM)/drums.ogg",
+        "bytes": 701405,
+        "sha256": "f39efcfbe6536564e9116f635ca754270761ccf81c9fb442b3397cbef8b4a02b"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.09 - Double Stroke Roll (120 BPM)/notes.mid",
+        "bytes": 2153,
+        "sha256": "6e9bfa00394748d62a190547846a93e3a8a8c843ccefd5756500c0b9b4d55746"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.09 - Double Stroke Roll (120 BPM)/song.ini",
+        "bytes": 1008,
+        "sha256": "ddda9822b81b4fcb8822b478aef228b12f7f239fae983850f3ecee2096f7ad88"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.09 - Double Stroke Roll (120 BPM)/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.10 - Double Stroke Roll - Backbeat Fill/drums.ogg",
+        "bytes": 992278,
+        "sha256": "42bee2ee5aa37b1325a21b551f5088067b001a7c894f8fd15a993372181d5c30"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.10 - Double Stroke Roll - Backbeat Fill/notes.mid",
+        "bytes": 1865,
+        "sha256": "a9f95bde13cef7ecd760bf2ee19d0f325158133cf80f83a6937242bea2635fd3"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.10 - Double Stroke Roll - Backbeat Fill/song.ini",
+        "bytes": 1051,
+        "sha256": "ebd1b39fdb76e446c51df0697b1a2f79945f78b4f3d495a62878f9ec4b666769"
+      },
+      {
+        "path": "SightKick Method - Lesson 03.10 - Double Stroke Roll - Backbeat Fill/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.01 - Triple Stroke Roll (60 BPM)/drums.ogg",
+        "bytes": 721423,
+        "sha256": "117df0977daa07b0f7743acd0239353ccbfee254037db9b1eda4b1286e41bf25"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.01 - Triple Stroke Roll (60 BPM)/notes.mid",
+        "bytes": 1129,
+        "sha256": "ea6c18ccf4512a81540bd96c9bf9e03922e27372f2916d5c6c1c0b3239cf2688"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.01 - Triple Stroke Roll (60 BPM)/song.ini",
+        "bytes": 1119,
+        "sha256": "f88b491a3e4e3a9162433f4ba5dae992d3885419be6457835ca44fec22a2fa94"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.01 - Triple Stroke Roll (60 BPM)/song.ogg",
+        "bytes": 65824,
+        "sha256": "bfb67066dbc50f0b38f1d3ad2952fa37d85957ba961946241b0af80a12eccd60"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.02 - Triple Stroke Roll (80 BPM)/drums.ogg",
+        "bytes": 803277,
+        "sha256": "2e3f5128c8ab1d3875c6eee2c56cd2b43bdd53d5f3272b4ea1a4063faac207ce"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.02 - Triple Stroke Roll (80 BPM)/notes.mid",
+        "bytes": 1641,
+        "sha256": "727e643b12ef4550af011427048e5fcbad16de9aea09090dd67e389284ebfa29"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.02 - Triple Stroke Roll (80 BPM)/song.ini",
+        "bytes": 1007,
+        "sha256": "ea51ae9d854c9e10f85fb366493bab5d528edf5287e368ca84cec40668bb66e8"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.02 - Triple Stroke Roll (80 BPM)/song.ogg",
+        "bytes": 84855,
+        "sha256": "d53c16403dee1542c916ef3331edf417f7cacaf74830d843ea7f4339000cc5c5"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.03 - Triple Stroke Roll (100 BPM)/drums.ogg",
+        "bytes": 840189,
+        "sha256": "dfd1587efaa698004af53d2b699886f2b53a1f496c51371dfe6f58bb3c18cd23"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.03 - Triple Stroke Roll (100 BPM)/notes.mid",
+        "bytes": 2153,
+        "sha256": "54e0ee4ab28d72659ed8bb0f0707859fa7edd8a2222880dd20b765a5c4f3834a"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.03 - Triple Stroke Roll (100 BPM)/song.ini",
+        "bytes": 970,
+        "sha256": "80aefac1cae19abb991725ce1af049cd2fe0f9bc59cb49e21874ee7df6f47b11"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.03 - Triple Stroke Roll (100 BPM)/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.04 - Triple Stroke Roll - Triplet Fill/drums.ogg",
+        "bytes": 1036840,
+        "sha256": "0e15e8c745b317758527c87ac5697996c39edd53916e6f4d3ffac410568521d7"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.04 - Triple Stroke Roll - Triplet Fill/notes.mid",
+        "bytes": 2185,
+        "sha256": "2a4d3cff2cef6742fd412f04c06972311d85e2d74ba4ccff31d755e0d714da87"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.04 - Triple Stroke Roll - Triplet Fill/song.ini",
+        "bytes": 1070,
+        "sha256": "eaa7723a9639c38c9481d59581e3ce5dd56707428a58f12f54bd58374ae3fdd8"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.04 - Triple Stroke Roll - Triplet Fill/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.05 - Accent Study - Every Fourth Note/drums.ogg",
+        "bytes": 833753,
+        "sha256": "e368ce33070db02a9b1013f0e0e536f9bcec53b7de907f31da30e059d296f363"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.05 - Accent Study - Every Fourth Note/notes.mid",
+        "bytes": 2153,
+        "sha256": "9bf88c13fba85522814469e1ca0eadc5d3a4dbc30aad737ead71c4e6b90d3965"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.05 - Accent Study - Every Fourth Note/song.ini",
+        "bytes": 1051,
+        "sha256": "2e6de1ee9f33dee0694518553f7d519f346f2ddadb178bb18bd350fa7b251d97"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.05 - Accent Study - Every Fourth Note/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.06 - Accent Study - Every Third Note/drums.ogg",
+        "bytes": 830235,
+        "sha256": "6f683c8d5e81864f2f55620fc6f1145ee4ea62bbb18d00a2ea192b02596ad0fb"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.06 - Accent Study - Every Third Note/notes.mid",
+        "bytes": 2153,
+        "sha256": "718a7c4d70c62b62087f17691323d1fbcd34a032cd91c585637d4b7e850113dc"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.06 - Accent Study - Every Third Note/song.ini",
+        "bytes": 1056,
+        "sha256": "d3b1ca085804a68dd418cf01d85f8244bc77ced37b323460febb2738b7c18b5f"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.06 - Accent Study - Every Third Note/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.07 - Accent-Shift Linear Fill/drums.ogg",
+        "bytes": 1069705,
+        "sha256": "431d5627d74bdcd433c6a5752890f5cfa02241ecba49dec9c84bb1bd4711a40f"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.07 - Accent-Shift Linear Fill/notes.mid",
+        "bytes": 1993,
+        "sha256": "095f2c6a3b52a088b473c6c66be2036afbafa00da24301e7ccd84cd4ea2d3cf9"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.07 - Accent-Shift Linear Fill/song.ini",
+        "bytes": 1190,
+        "sha256": "ccf4c40569a2ebb060165a2a1c43c1734a8486e1ec7558b9e254d292b31dd168"
+      },
+      {
+        "path": "SightKick Method - Lesson 04.07 - Accent-Shift Linear Fill/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.01 - Hi-Hat and Snare Handshake/drums.ogg",
+        "bytes": 1122727,
+        "sha256": "081dac7e99a4199bcd014470b8308ae70db2d11c4962aa4634b2a040cc5f2499"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.01 - Hi-Hat and Snare Handshake/notes.mid",
+        "bytes": 809,
+        "sha256": "fc51654eacca0b77a82267fdff4c135a5677066818bbe89703e28cbb291b338a"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.01 - Hi-Hat and Snare Handshake/song.ini",
+        "bytes": 917,
+        "sha256": "e32f6a8ac79a9711daa59dd422d9cb82a287f9c9a5a40755d367a1a1b1cfd801"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.01 - Hi-Hat and Snare Handshake/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.02 - Hi-Hat and Kick Handshake/drums.ogg",
+        "bytes": 1068549,
+        "sha256": "2d42829a5a142ed236f8d99b9c4e594467ab50a11cb61e3ad4117d56922639cf"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.02 - Hi-Hat and Kick Handshake/notes.mid",
+        "bytes": 809,
+        "sha256": "3383c6d693c18d3138b961c2c903dd6c8ba362e2afd68eed47184b4e9e1a9c07"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.02 - Hi-Hat and Kick Handshake/song.ini",
+        "bytes": 867,
+        "sha256": "2a95dc6cc6f78fb0c0302bc6d60e84e3da4249705b9550130409c95ab4bb3bb4"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.02 - Hi-Hat and Kick Handshake/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.03 - First Rock Beat/drums.ogg",
+        "bytes": 1070156,
+        "sha256": "4a95afd59fbfb1d9c5c778de9eb89e0effad73f80da7fa49095a8985f206c17b"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.03 - First Rock Beat/notes.mid",
+        "bytes": 1769,
+        "sha256": "7d3c8f714c3415cc770875fd34e79155f39fcb55292f89f408c2d2934fd7dc29"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.03 - First Rock Beat/song.ini",
+        "bytes": 918,
+        "sha256": "011dce79378fb7cb828bb1fd450366935425abdf7a1fc4d3ed8400c4001a9901"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.03 - First Rock Beat/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.04 - Ride Cymbal Swap/drums.ogg",
+        "bytes": 1097540,
+        "sha256": "54de5aaf6f2c0498e139efafa107e78a2767ea283e6d5efc1dde72e4ae61b169"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.04 - Ride Cymbal Swap/notes.mid",
+        "bytes": 1769,
+        "sha256": "713dd3937d75ae3a07e1720911d1e552be99eb21b242a40dad85a7982f23f147"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.04 - Ride Cymbal Swap/song.ini",
+        "bytes": 909,
+        "sha256": "f5e6ed76caaa96e1ed3f96c9c51a8f7b8900b50fc6a182a06ba3d5b69b6849be"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.04 - Ride Cymbal Swap/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.05 - Waltz Feel/drums.ogg",
+        "bytes": 864262,
+        "sha256": "06d9286efb4a20388935199f321061a83ec74790c557ad1abb4e25e68714f2a9"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.05 - Waltz Feel/notes.mid",
+        "bytes": 956,
+        "sha256": "f60943c667efec8ee36c4f931e2339931bbc2e5d60ebd7aafbeeff193dec42dc"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.05 - Waltz Feel/song.ini",
+        "bytes": 908,
+        "sha256": "0d4120ce5d479471a1ab017ec3d15faa2cc8ae234c3995851ae4ad485a247dd2"
+      },
+      {
+        "path": "SightKick Method - Lesson 05.05 - Waltz Feel/song.ogg",
+        "bytes": 95437,
+        "sha256": "60584ec3fd8bbe68c5a85fce50720696ee7b241a00204131429a9f74d0182895"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.01 - Single Paradiddle Drill/drums.ogg",
+        "bytes": 702544,
+        "sha256": "db88c43b3e0cf794eac16a2fae77f3037fffae17c8e57157797d32f530feac3c"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.01 - Single Paradiddle Drill/notes.mid",
+        "bytes": 1257,
+        "sha256": "f2298daec3a3b6b9b8aa8e042d857f3c92e1f684556775e734b35ad1069d46d1"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.01 - Single Paradiddle Drill/song.ini",
+        "bytes": 930,
+        "sha256": "9237fe41f1416bfcd3b707845c20ad9c250b731b0a5a1d2b1fea3ad419f4aad9"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.01 - Single Paradiddle Drill/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.02 - Right Hand Steady, Left Hand Answers/drums.ogg",
+        "bytes": 1156143,
+        "sha256": "2c4d1493e988889d684717c0f02661900f960b0f122785f3780b133ae359562e"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.02 - Right Hand Steady, Left Hand Answers/notes.mid",
+        "bytes": 1385,
+        "sha256": "e6ce3e4fad3ad0e67e477118a80df436080305a1cc1245afbf2e1d56feb7a8d6"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.02 - Right Hand Steady, Left Hand Answers/song.ini",
+        "bytes": 906,
+        "sha256": "5e8d9c9f40c73918d3c200a21b328c9f6359501e62eb65ebaf4b77872116c357"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.02 - Right Hand Steady, Left Hand Answers/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.03 - Right Hand Steady, Kick Answers/drums.ogg",
+        "bytes": 1131435,
+        "sha256": "065eb2519abf7affd410a78dc3f351b49b993eb21200bdc6ad508e56318abd5d"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.03 - Right Hand Steady, Kick Answers/notes.mid",
+        "bytes": 1385,
+        "sha256": "170356f74927572ff8ecdace45f976f408a560174c6f24537e9a5d1bfbe004a7"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.03 - Right Hand Steady, Kick Answers/song.ini",
+        "bytes": 893,
+        "sha256": "223a19e52b57897b8f16ec7d65f8f9b0ae99492e6d3972055a5feee7f52936ea"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.03 - Right Hand Steady, Kick Answers/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.04 - House Beat/drums.ogg",
+        "bytes": 986888,
+        "sha256": "9e38100a549e0f46d9e425ac1389457af60b1956de4162eb5ad674b01bb83b1c"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.04 - House Beat/notes.mid",
+        "bytes": 1769,
+        "sha256": "a9f0e8a6dd2a5886eea085a1b1d45a93703904f2c9ce2e45ad0c6ecff07f723e"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.04 - House Beat/song.ini",
+        "bytes": 917,
+        "sha256": "cfc890615d26f39507b73b837de99397dcab3e9dfc09e0d07e0911f56be32e6f"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.04 - House Beat/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.05 - Syncopated Kick Groove/drums.ogg",
+        "bytes": 964770,
+        "sha256": "c0e373ccafd651fa1021b82b3d2ac0fed23ebd695098c8b3ca1d53057d4c6737"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.05 - Syncopated Kick Groove/notes.mid",
+        "bytes": 1897,
+        "sha256": "574eab7b68c98daef0016e1a5f89d0884e9e24d744ccf5db75133e168ece0043"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.05 - Syncopated Kick Groove/song.ini",
+        "bytes": 918,
+        "sha256": "f1905cd6f890883249bb7251e2dfc4a1efcd9010a3a17628fa044f692a823b10"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.05 - Syncopated Kick Groove/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.06 - Hat and Kick Unison Drill/drums.ogg",
+        "bytes": 801405,
+        "sha256": "59f5bbc8ba321db33d9dcdb4feeb02a2a2b2e2360fec59bfb27a4ff643e227d4"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.06 - Hat and Kick Unison Drill/notes.mid",
+        "bytes": 1193,
+        "sha256": "4b9ce2f5cb943d0b65299180927cea821cb0e2170b50576f53a1da017e28fb03"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.06 - Hat and Kick Unison Drill/song.ini",
+        "bytes": 876,
+        "sha256": "26963a8fd35546e067b096abaa02ff09bdcdef5393357c497955a011ee013da4"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.06 - Hat and Kick Unison Drill/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.07 - Backyard Groove/drums.ogg",
+        "bytes": 1090067,
+        "sha256": "f941956c8ae60b232d22c8d416f21230f6b069ecbdaf767b6b226852877a0413"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.07 - Backyard Groove/notes.mid",
+        "bytes": 2049,
+        "sha256": "0cac90b5e528bad4705a54fc14fc95ef01792c1006dde071523c4e7408551b38"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.07 - Backyard Groove/song.ini",
+        "bytes": 896,
+        "sha256": "d6e53a599676a1264129ada926df826488f50c222f2010873a3e88fc24054c2d"
+      },
+      {
+        "path": "SightKick Method - Lesson 06.07 - Backyard Groove/song.ogg",
+        "bytes": 110628,
+        "sha256": "0a0fe44e5b933797567be1f9e26ab98e32d9d904295f1c3012ef58fb6d91bda6"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.01 - Loud-to-Soft Control/drums.ogg",
+        "bytes": 704472,
+        "sha256": "5c769e0cc8550d6ceab00666eaaa47273be724c645921282e6e4a58267488585"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.01 - Loud-to-Soft Control/notes.mid",
+        "bytes": 1257,
+        "sha256": "6a6758e26062a5236d4ad872f900e57ef396f8e6bac8cc72acb7a68ae8eecc59"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.01 - Loud-to-Soft Control/song.ini",
+        "bytes": 871,
+        "sha256": "98efca9b576f810f15f70354eb2c1b9cc24ffc00963782fcf8677621122f0ecd"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.01 - Loud-to-Soft Control/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.02 - High and Mid Tom Signals/drums.ogg",
+        "bytes": 402205,
+        "sha256": "f2047476239f2e8a27fa97bbfa8b8b3101e812e1b11e9d215747f48ae5d8581c"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.02 - High and Mid Tom Signals/notes.mid",
+        "bytes": 1193,
+        "sha256": "fb6a1008e9f2d4ce674a183509ea5d312c75c711049428750e62fa6a0d1c92c5"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.02 - High and Mid Tom Signals/song.ini",
+        "bytes": 955,
+        "sha256": "94f55a6dcd9eef86e310f38759665e70ea34bcd2e3d75aeea41ea8da83a2b61f"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.02 - High and Mid Tom Signals/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.03 - Mid and Floor Tom Signals/drums.ogg",
+        "bytes": 349831,
+        "sha256": "60e6ac424b3e671a31dc7b658e788a60ed48ce8683e97ec7dffde51631f8d27b"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.03 - Mid and Floor Tom Signals/notes.mid",
+        "bytes": 1193,
+        "sha256": "590a218d424f4d3e5c0771c542029909b49d09e69dfc0017a3d182ff3244f778"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.03 - Mid and Floor Tom Signals/song.ini",
+        "bytes": 946,
+        "sha256": "8a0b5d8a9690ebb1f5dcfc889132172b58606f5b2c3ad7193b696c7defb7d668"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.03 - Mid and Floor Tom Signals/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.04 - Three-Tom Paths: Down and Back/drums.ogg",
+        "bytes": 382744,
+        "sha256": "12185b541b27b27c88447af2f15f8561978ca3f4f50b5726f42fa766693e8d1d"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.04 - Three-Tom Paths: Down and Back/notes.mid",
+        "bytes": 1193,
+        "sha256": "19934782e1012eeaef0410350e0ded0559859c67c6f2c9dd90453f8b1235c337"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.04 - Three-Tom Paths: Down and Back/song.ini",
+        "bytes": 951,
+        "sha256": "6891f348a6ce886f8f861b998c2f2954c650e3036485d7a5a77e64d06e6c77fd"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.04 - Three-Tom Paths: Down and Back/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.05 - Random-Order Three-Tom Callouts/drums.ogg",
+        "bytes": 381487,
+        "sha256": "54ae55be57bafa2701ddf5c7f011e16a89c08abfc7579da1526dfb73c21b263d"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.05 - Random-Order Three-Tom Callouts/notes.mid",
+        "bytes": 1193,
+        "sha256": "30dd15b0ef31a7108d8b0a4cefff0c98e1e6be1870de0b38b1b18587871030a7"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.05 - Random-Order Three-Tom Callouts/song.ini",
+        "bytes": 998,
+        "sha256": "35e60b8e43ad97489d31f5c390963c6dbf77bcefe67c9cc5f6475026aff32eb3"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.05 - Random-Order Three-Tom Callouts/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.06 - Three-Tom Pocket Groove/drums.ogg",
+        "bytes": 948497,
+        "sha256": "2763079962eacbcfb57674a110de552cf29a2d33c2cba4e6f7b72055ad2153f8"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.06 - Three-Tom Pocket Groove/notes.mid",
+        "bytes": 2129,
+        "sha256": "d7e724e42a62ed3d8a7182bbe833fb665a93cd6ef1ab5815ffe6b05a5809db06"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.06 - Three-Tom Pocket Groove/song.ini",
+        "bytes": 1033,
+        "sha256": "4dc00cd6a2afb4367b1f635343443cd15e969a9836d5fed51dcd5d7796458ec2"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.06 - Three-Tom Pocket Groove/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.07 - Three-Tom Groove and Fill/drums.ogg",
+        "bytes": 856414,
+        "sha256": "a1d506538d43248ed898b8000bfbd429647f3b72348c7685259b959f1b78d1d7"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.07 - Three-Tom Groove and Fill/notes.mid",
+        "bytes": 1889,
+        "sha256": "d9be11a364308474a9bfac4bfac3580cd37686f2d9d5058fed6198a48cfb2f08"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.07 - Three-Tom Groove and Fill/song.ini",
+        "bytes": 1077,
+        "sha256": "78c2c36d907812d5f06d845603399584dce619d536402ff2cfe907881345abce"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.07 - Three-Tom Groove and Fill/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.08 - Three-Tom Transfer: Faded Cues/drums.ogg",
+        "bytes": 948497,
+        "sha256": "2763079962eacbcfb57674a110de552cf29a2d33c2cba4e6f7b72055ad2153f8"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.08 - Three-Tom Transfer: Faded Cues/notes.mid",
+        "bytes": 2129,
+        "sha256": "d7e724e42a62ed3d8a7182bbe833fb665a93cd6ef1ab5815ffe6b05a5809db06"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.08 - Three-Tom Transfer: Faded Cues/song.ini",
+        "bytes": 1096,
+        "sha256": "c12bd5d82e7b39d45925af8a96a5f2c657816542413f3e735d3988c0acadb12f"
+      },
+      {
+        "path": "SightKick Method - Lesson 07.08 - Three-Tom Transfer: Faded Cues/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.01 - Tied Upbeat Feel/drums.ogg",
+        "bytes": 685012,
+        "sha256": "e898d65a81fa0bf5e7a138c18bed44c71559af0cdabec2188590e77c0724fb17"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.01 - Tied Upbeat Feel/notes.mid",
+        "bytes": 681,
+        "sha256": "3bc3efa476e7f76234a8399c69114f85cd3b80a5487fd22d0e5d51d490784f7f"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.01 - Tied Upbeat Feel/song.ini",
+        "bytes": 856,
+        "sha256": "a52c2f3fe31a510c4ec4c5b9f1344f711f92b32ccc5946c7189977fa7130b508"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.01 - Tied Upbeat Feel/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.02 - Snare and Kick with Ties/drums.ogg",
+        "bytes": 540319,
+        "sha256": "52ff5f9294bfadbb3994c237713e46739bb72c3c8acbf5cbbaa622b003d068b9"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.02 - Snare and Kick with Ties/notes.mid",
+        "bytes": 1225,
+        "sha256": "a73f0ba9c96e29da98f4e0d1872d02a4fa78e82c53d797d2179c75c6fcf1d705"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.02 - Snare and Kick with Ties/song.ini",
+        "bytes": 899,
+        "sha256": "b863adc50edadb9506dfee3810ae5f95600cb14bf4225b73974c9f7fd9e44dc3"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.02 - Snare and Kick with Ties/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.03 - Kick on the And of Two/drums.ogg",
+        "bytes": 1005121,
+        "sha256": "70ed0370d723bcd8774ef6c34dab627ce39cd465c5b4ff010034734ae294cb32"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.03 - Kick on the And of Two/notes.mid",
+        "bytes": 1897,
+        "sha256": "f51a11bff540736fd78971a0d9f2a9e2f3b643acbde846f727242c37a96c7db6"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.03 - Kick on the And of Two/song.ini",
+        "bytes": 933,
+        "sha256": "4e9f6bda4aa40ea291fecb026f0f73021241d3ee9bc890e46e985c1bf4d656dc"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.03 - Kick on the And of Two/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.04 - Kick Leading Into Beat 4/drums.ogg",
+        "bytes": 1005441,
+        "sha256": "7faed74137f0aa2993217b0382cf59ec1bc294570c84797d9783a0d727e72250"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.04 - Kick Leading Into Beat 4/notes.mid",
+        "bytes": 1897,
+        "sha256": "ac79344197204310cf94c08b8ee3e6735e16ffe6f958c9ace0e7fc3a61add404"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.04 - Kick Leading Into Beat 4/song.ini",
+        "bytes": 960,
+        "sha256": "91cdab81a138c898cc7fd2fcd364e223483072b77123b659171339db6a3887b1"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.04 - Kick Leading Into Beat 4/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.05 - Sunrise Shuffle-Free Groove/drums.ogg",
+        "bytes": 1001127,
+        "sha256": "f1ca20a95a256ae158ce0dad41bc09da26c78ae8bb69a264a843cc813fcff705"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.05 - Sunrise Shuffle-Free Groove/notes.mid",
+        "bytes": 1925,
+        "sha256": "6421fa44f8f40620cb205f9ab3f5ada8b185a5402d9b5f0057cf04cf78143ece"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.05 - Sunrise Shuffle-Free Groove/song.ini",
+        "bytes": 953,
+        "sha256": "7825a63702716feb53615d0841362b634cc4bdb4ba52e797eef13a04f1d8d1e4"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.05 - Sunrise Shuffle-Free Groove/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.06 - Accented Crash Downbeat in 3/drums.ogg",
+        "bytes": 890162,
+        "sha256": "6090c8ee1aa072fcccbe632957a7e23b86cf884697b302c89415860fef1f0401"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.06 - Accented Crash Downbeat in 3/notes.mid",
+        "bytes": 796,
+        "sha256": "bc50f752287cb494b846e345d20dfd3f1152100d6879c362c8c6e60c1c2e7ed3"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.06 - Accented Crash Downbeat in 3/song.ini",
+        "bytes": 947,
+        "sha256": "c05c10d789fbcd634b1545d2f189326ac9f7ca68a8b25e485bc58c39e7308c25"
+      },
+      {
+        "path": "SightKick Method - Lesson 08.06 - Accented Crash Downbeat in 3/song.ogg",
+        "bytes": 94364,
+        "sha256": "06249b18bcd9a0f62f427116e2af7fa448bb4d9b82fd3947fc7ba7c23008b2f6"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.01 - Accent and Rebound Control/drums.ogg",
+        "bytes": 762777,
+        "sha256": "a0dcadc3cdbdfc714ec8936d1bcedb74822c7692242ef7ccda8aca458de7b061"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.01 - Accent and Rebound Control/notes.mid",
+        "bytes": 1257,
+        "sha256": "044ce5cbd7eaf082bfa729678442266e506d9eb46d84aee02d1dde2b59c26746"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.01 - Accent and Rebound Control/song.ini",
+        "bytes": 903,
+        "sha256": "3fb34be4874d80df654f4c14c5bf5d503e3e47e70ac52d83e7d7c0cf6ba1ec8f"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.01 - Accent and Rebound Control/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.02 - Dotted-Quarter Kick Feel/drums.ogg",
+        "bytes": 1045579,
+        "sha256": "691a798dd13dc13244be5d81bab4ac4a04ea3d6a25883c12169a57c6f0166acd"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.02 - Dotted-Quarter Kick Feel/notes.mid",
+        "bytes": 1897,
+        "sha256": "6a634d3fdb2c475db272b401387aba48bd735e9cc6a27708f8f838f08353e8e5"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.02 - Dotted-Quarter Kick Feel/song.ini",
+        "bytes": 941,
+        "sha256": "82c7d8018dbfb4b31633cedb450b17992fc8dd316a3d20f26edfbc9fc1002f02"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.02 - Dotted-Quarter Kick Feel/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.03 - Dotted-Quarter Motown Feel/drums.ogg",
+        "bytes": 1006311,
+        "sha256": "0d7f28730c177f5d6548f084fe2787c83159ef4c82ddd36ef18f51e3a5e39cbd"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.03 - Dotted-Quarter Motown Feel/notes.mid",
+        "bytes": 1881,
+        "sha256": "8c5fbe7f59ddb34d1ed036733289c43b055e62fe9febf7413895117fdcb9fd1e"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.03 - Dotted-Quarter Motown Feel/song.ini",
+        "bytes": 946,
+        "sha256": "835f5caa84340e6051712df5bc7b505a20252fae5b85fc456c74fc4394727665"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.03 - Dotted-Quarter Motown Feel/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.04 - Groove with a Turnaround Tag/drums.ogg",
+        "bytes": 909553,
+        "sha256": "15b858c485c3c37f57e49978a4ac21e04cacfbf66335c04d37cf3f9b3295436e"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.04 - Groove with a Turnaround Tag/notes.mid",
+        "bytes": 1410,
+        "sha256": "fde295ea16971c45e552449dc1a2625be2eb2fccb20107caa172ec0a9c37542f"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.04 - Groove with a Turnaround Tag/song.ini",
+        "bytes": 1068,
+        "sha256": "7adf524ef2a7392781329e47d33063340e3863c15db04e17be168acd921d686a"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.04 - Groove with a Turnaround Tag/song.ogg",
+        "bytes": 95158,
+        "sha256": "d91cabdedd599202b868c40c0554310ffdcf0e88040eef8ef1dfd85fd157aa04"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.05 - Cross-Stick Ballad Pocket/drums.ogg",
+        "bytes": 946084,
+        "sha256": "a585cb0c60419433d2b65a96e070ea38272ba24de7135e3f6f27a05aa5484f97"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.05 - Cross-Stick Ballad Pocket/notes.mid",
+        "bytes": 1353,
+        "sha256": "ed6d28116e2a643e18175ae9f5c838e0a48e621aa08c57daa8c1d6d69cd33028"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.05 - Cross-Stick Ballad Pocket/song.ini",
+        "bytes": 965,
+        "sha256": "a7b6c40d31114b43911581a7fc6fad5b62f6c96e5fca9f65c28c22aadcfcdbab"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.05 - Cross-Stick Ballad Pocket/song.ogg",
+        "bytes": 79329,
+        "sha256": "5d554c67d1e1491ead2de4ca5f32708fe162222573397f60279c352156d82006"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.06 - Slow Ballad with Fills/drums.ogg",
+        "bytes": 820512,
+        "sha256": "c708ab3cda023f400b472bb350190497eaeead643caa9ea79298c5c4db5c3856"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.06 - Slow Ballad with Fills/notes.mid",
+        "bytes": 1248,
+        "sha256": "bc88309fec1093c9572dda8b1ce1ecf17129873567fe301200d75a19f37e1918"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.06 - Slow Ballad with Fills/song.ini",
+        "bytes": 985,
+        "sha256": "0221e8606fdf060523c95fc45da0efd9b9b88bd6ddf8fb0e93ad13523fc33b39"
+      },
+      {
+        "path": "SightKick Method - Lesson 09.06 - Slow Ballad with Fills/song.ogg",
+        "bytes": 79329,
+        "sha256": "5d554c67d1e1491ead2de4ca5f32708fe162222573397f60279c352156d82006"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.01 - Hand-to-Hand Accents/drums.ogg",
+        "bytes": 793855,
+        "sha256": "326b508f517dd0954762c933a5a1abb62b1970df232e6dd0f42fdd55686f002c"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.01 - Hand-to-Hand Accents/notes.mid",
+        "bytes": 1545,
+        "sha256": "43737d2196061a66a3f47ddf65e75d2eaa6aeef958d03893086ab4336b5c38b0"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.01 - Hand-to-Hand Accents/song.ini",
+        "bytes": 877,
+        "sha256": "5de7a277a03e0a1353440d24844ba2842321f521c2fcef7382c0567a98d30061"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.01 - Hand-to-Hand Accents/song.ogg",
+        "bytes": 120142,
+        "sha256": "8050b8ed26e39d4bf65ea5b5aab8422d97f7aaea57e2735788717b62a5d8f757"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.02 - Accent on the Downbeat/drums.ogg",
+        "bytes": 795434,
+        "sha256": "ce8eccf12c61993d99f0a9741908ee376320a340dab0a20fc969ea7faedaa463"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.02 - Accent on the Downbeat/notes.mid",
+        "bytes": 1545,
+        "sha256": "ed56cb46cea1f4ea731b2a17b4b94aad5cf9e1b929a75067f4a0ed25804b3910"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.02 - Accent on the Downbeat/song.ini",
+        "bytes": 869,
+        "sha256": "e2dde5757bb754c232205c708761c143264e8468532b03980039ae9414047478"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.02 - Accent on the Downbeat/song.ogg",
+        "bytes": 120142,
+        "sha256": "8050b8ed26e39d4bf65ea5b5aab8422d97f7aaea57e2735788717b62a5d8f757"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.03 - Accent on the Upbeat/drums.ogg",
+        "bytes": 795575,
+        "sha256": "542ffba3fb3b0489feede4fb57b91130bf3f8e0466bd247b6aba2d4139053ae6"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.03 - Accent on the Upbeat/notes.mid",
+        "bytes": 1545,
+        "sha256": "ecaa4afa46058d3a4daad676c7b67ab0fede335a07eb5e66a54f140697167fe1"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.03 - Accent on the Upbeat/song.ini",
+        "bytes": 875,
+        "sha256": "123667fcc1c06be4fe1df17c335972020e684d5c80b1f3fe0f928b5c251d2720"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.03 - Accent on the Upbeat/song.ogg",
+        "bytes": 120142,
+        "sha256": "8050b8ed26e39d4bf65ea5b5aab8422d97f7aaea57e2735788717b62a5d8f757"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.04 - Groove with a Single-Stroke Fill/drums.ogg",
+        "bytes": 908539,
+        "sha256": "081d6074fa50fdc91cd7162ba344427f9caf37258629282c9494b1e5bf24bdbf"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.04 - Groove with a Single-Stroke Fill/notes.mid",
+        "bytes": 1665,
+        "sha256": "ad08ed207b8a624799e3fd1dc144664fee5a7cd54a5444031db063d6bc3cfa4f"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.04 - Groove with a Single-Stroke Fill/song.ini",
+        "bytes": 1010,
+        "sha256": "1b213160f893b7d86b673934646fb6a07d2ed20d157e1792437189c3a069e93a"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.04 - Groove with a Single-Stroke Fill/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.05 - Groove with a Descending Fill/drums.ogg",
+        "bytes": 909286,
+        "sha256": "416ff02dc9b50ed8e63ddddfc25ade4983614c745ed0091f53c34b1516aad3e8"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.05 - Groove with a Descending Fill/notes.mid",
+        "bytes": 1765,
+        "sha256": "3e5985fc0cd301ac040bc09214e800a6dd3a53a178d96c2836f57c317038085b"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.05 - Groove with a Descending Fill/song.ini",
+        "bytes": 1049,
+        "sha256": "47752189f0afd322e5d68aeaaeea1418a18a5dacfd0672b9657cc2b15b20c49e"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.05 - Groove with a Descending Fill/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.06 - Groove with a Unison Fill/drums.ogg",
+        "bytes": 930478,
+        "sha256": "3f7086244be74f854c9ce88eadb441981543a38c6ffc758937f5bf30d6e8d5cf"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.06 - Groove with a Unison Fill/notes.mid",
+        "bytes": 1789,
+        "sha256": "26bdf59ed4ee266766467c21a16814df58907a2e2991ee8e6dc1106448d52c46"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.06 - Groove with a Unison Fill/song.ini",
+        "bytes": 978,
+        "sha256": "dafc08ee96a28ab4343d3354e1bca679baaee2451091ccb98aa66d433b9bbe57"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.06 - Groove with a Unison Fill/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.07 - Time-Keeping Discipline/drums.ogg",
+        "bytes": 945235,
+        "sha256": "cfbfa4e2403d70e60d4d70723f91ae45f971569d47bf15726819ad6d9adf6a34"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.07 - Time-Keeping Discipline/notes.mid",
+        "bytes": 1497,
+        "sha256": "438e69f6138b0e33ecca737ac9ef6aee23cb2bc5adb76c811772e80c38623627"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.07 - Time-Keeping Discipline/song.ini",
+        "bytes": 961,
+        "sha256": "c402cfcea257a76e06caff9d66bc31ad0f404c31c4579d74fa378d398ff7f017"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.07 - Time-Keeping Discipline/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.08 - Both-Sticks Tom Fill/drums.ogg",
+        "bytes": 863469,
+        "sha256": "2e57c77156096c1327649cada68fd31d59d9dd7fa0b6ecc1ecae0573121102a9"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.08 - Both-Sticks Tom Fill/notes.mid",
+        "bytes": 1881,
+        "sha256": "9c0a1f77132d4e6f6495709b8d583b2c061e83ba548faf6f28ea4c035db3b3cb"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.08 - Both-Sticks Tom Fill/song.ini",
+        "bytes": 956,
+        "sha256": "c49a299f9b824ffb9e5ad3097f8e00138f4e915cd35dcfa40a00c6b455c9fb55"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.08 - Both-Sticks Tom Fill/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.09 - Country Two-Beat Feel/drums.ogg",
+        "bytes": 897606,
+        "sha256": "652a69d7ace392fcb08982b993efa688a3203368ca3e9cc01b9817b90b0e1dd2"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.09 - Country Two-Beat Feel/notes.mid",
+        "bytes": 1465,
+        "sha256": "88803ad8f95a6bd98c7aae803c00701a74e4e6617f3face3c88b06778031f466"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.09 - Country Two-Beat Feel/song.ini",
+        "bytes": 918,
+        "sha256": "468bb89222ac673fe4d909465ff5637b3d53a5b41267f01282af08c2ce0f8ee8"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.09 - Country Two-Beat Feel/song.ogg",
+        "bytes": 117905,
+        "sha256": "9a849732afb52060ee2791317123e04edab0d251b5e214cdbfb37e083933caeb"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.10 - Open Hi-Hat Backbeat Splash/drums.ogg",
+        "bytes": 1011611,
+        "sha256": "f2ed9a7f47da63c09421c737d23c7e66b7f20f86a4371788c24e97cb1df476ce"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.10 - Open Hi-Hat Backbeat Splash/notes.mid",
+        "bytes": 1769,
+        "sha256": "d069bfeb9a7bb23bd8f0ec1fbc0e4e1d0a6ad3d4c4adbf13dd08a72e2d9cbd61"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.10 - Open Hi-Hat Backbeat Splash/song.ini",
+        "bytes": 996,
+        "sha256": "50d6541a6857397e42be25e2edf9614b6bfe5fafc06e80dc1604eada802bac78"
+      },
+      {
+        "path": "SightKick Method - Lesson 10.10 - Open Hi-Hat Backbeat Splash/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.01 - Accent Alternation Warm-Up/drums.ogg",
+        "bytes": 762777,
+        "sha256": "a0dcadc3cdbdfc714ec8936d1bcedb74822c7692242ef7ccda8aca458de7b061"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.01 - Accent Alternation Warm-Up/notes.mid",
+        "bytes": 1257,
+        "sha256": "044ce5cbd7eaf082bfa729678442266e506d9eb46d84aee02d1dde2b59c26746"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.01 - Accent Alternation Warm-Up/song.ini",
+        "bytes": 920,
+        "sha256": "fb71aa1fc5f644760d140802608849ecd3c432ec9ac4f26d481ef1edc4e4a2b8"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.01 - Accent Alternation Warm-Up/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.02 - Two-Bar Groove A/drums.ogg",
+        "bytes": 1015995,
+        "sha256": "f04d95a325226c59d94cccf9f4bdf8f83836a54a6530082c4494fa29131019ea"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.02 - Two-Bar Groove A/notes.mid",
+        "bytes": 1833,
+        "sha256": "84643cb28ab03c0873191a1edb85fa6fa8720ad9fad29d7e55582ee098472c2c"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.02 - Two-Bar Groove A/song.ini",
+        "bytes": 956,
+        "sha256": "f7947cad5d41944bc7fa910ba5bc2b9f3ef054806683945d877d5b75d0358947"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.02 - Two-Bar Groove A/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.03 - Two-Bar Groove B/drums.ogg",
+        "bytes": 1012520,
+        "sha256": "d5007749283fed1059587aa8dd94962620745d36429610b4a4869698b3497b74"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.03 - Two-Bar Groove B/notes.mid",
+        "bytes": 1481,
+        "sha256": "549b9b6d5966ed1dcf8d5dfcfdb67a0c739a587bd8212f16caa1b7923b348fd0"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.03 - Two-Bar Groove B/song.ini",
+        "bytes": 949,
+        "sha256": "fbe5d1c60b615852fbed8b84c9c08a4988f403799aa2348ee8727938c6600b29"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.03 - Two-Bar Groove B/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.04 - Two-Bar Fill Idea/drums.ogg",
+        "bytes": 856236,
+        "sha256": "cd0cb5787c2e663a49021fde4b8edeeced80afeeac9ff23019fae49168d99c7d"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.04 - Two-Bar Fill Idea/notes.mid",
+        "bytes": 1657,
+        "sha256": "b7ba2bd7ab4f3f892c8a76401b2c3c83ac394c37932986e6dbf3979578b5266d"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.04 - Two-Bar Fill Idea/song.ini",
+        "bytes": 1078,
+        "sha256": "cfab31d5a0707d5c735ac205a7060f7752d6f19b828fb7d97b5461de826eddcb"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.04 - Two-Bar Fill Idea/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.05 - Backbeat Shifted to Beat 3 Only/drums.ogg",
+        "bytes": 1036060,
+        "sha256": "10203fe48758bd7463fc1f08a6f43fb70a843b7a8284ed3eecb4659401d3e27c"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.05 - Backbeat Shifted to Beat 3 Only/notes.mid",
+        "bytes": 1641,
+        "sha256": "3fc5aa2386250a5a60bf9297213f81eadf4920f34308446ee21f8f740bcad1eb"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.05 - Backbeat Shifted to Beat 3 Only/song.ini",
+        "bytes": 1003,
+        "sha256": "939525ce0e3783951e97bd81fcb537384978865fccdc026dee0cae53950951d6"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.05 - Backbeat Shifted to Beat 3 Only/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.06 - Backbeat on the Upbeats/drums.ogg",
+        "bytes": 1032120,
+        "sha256": "979476aad0c90bb5162c296cd11c7d44b600305bde25addbb7a084fbe409f22f"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.06 - Backbeat on the Upbeats/notes.mid",
+        "bytes": 1769,
+        "sha256": "506ac154fd9b8199870d04cf73521b5ca5f3708c607dba5d80ccb31644cbf150"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.06 - Backbeat on the Upbeats/song.ini",
+        "bytes": 967,
+        "sha256": "4e49f0842eba440bbf65dea646f24c93d77e80d430c994302c0ee745c0c38d8b"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.06 - Backbeat on the Upbeats/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.07 - Riverside Groove/drums.ogg",
+        "bytes": 892398,
+        "sha256": "269f04b2c73d5b2b3f7a2d59eb95fca5ddac0e829a6bc678152e527566961c80"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.07 - Riverside Groove/notes.mid",
+        "bytes": 1417,
+        "sha256": "360dd2d348a83997d213429d60eff7054ec601865a4208d5cb41ac0515da84c7"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.07 - Riverside Groove/song.ini",
+        "bytes": 972,
+        "sha256": "bc9983adb281a5c0d036fac4cb38db2d2a27bdd7a8d1b7f38db3b276ae8484ce"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.07 - Riverside Groove/song.ogg",
+        "bytes": 96713,
+        "sha256": "985b77cfb8059a1d42b41d5b72e64edf48c07e0562e1e0b339773fd5dfac813d"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.08 - Groove Consolidation Etude/drums.ogg",
+        "bytes": 907558,
+        "sha256": "973cc7de6193f661aaa30bb3e479b4e0142616d0c81c99c5c3afc7aeb16525fa"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.08 - Groove Consolidation Etude/notes.mid",
+        "bytes": 1497,
+        "sha256": "d1c3e3a04f4ea7861d874f0bc249258d58653d54d7746dcb52c4f97d7a727f74"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.08 - Groove Consolidation Etude/song.ini",
+        "bytes": 1007,
+        "sha256": "b3d817e4eaf8c5dcefc4465ba415c0f87a72068e77098f818157257d8c1672cc"
+      },
+      {
+        "path": "SightKick Method - Lesson 11.08 - Groove Consolidation Etude/song.ogg",
+        "bytes": 96713,
+        "sha256": "985b77cfb8059a1d42b41d5b72e64edf48c07e0562e1e0b339773fd5dfac813d"
+      },
+      {
+        "path": "SightKick Method - Lesson 12.01 - Marking the Phrase/drums.ogg",
+        "bytes": 992222,
+        "sha256": "f30ae27eaf04fb777f86b932d57da4787846c57d741c29f70ce6f0ae7c2d936c"
+      },
+      {
+        "path": "SightKick Method - Lesson 12.01 - Marking the Phrase/notes.mid",
+        "bytes": 1769,
+        "sha256": "69c4e9e1990556cd5fb86a37f5f73b00cec1195ba260ce84988b48b4d7b49e6c"
+      },
+      {
+        "path": "SightKick Method - Lesson 12.01 - Marking the Phrase/song.ini",
+        "bytes": 988,
+        "sha256": "f97b9dd03bf053cf491ddae703a3905755f5fc291f787585c05d538ed8b3d586"
+      },
+      {
+        "path": "SightKick Method - Lesson 12.01 - Marking the Phrase/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 12.02 - Full-Form Etude/drums.ogg",
+        "bytes": 941881,
+        "sha256": "782e2f81d9e202efbf3cc1be0a8d563cb17a342bcfa5b2901c893f8c1c80d606"
+      },
+      {
+        "path": "SightKick Method - Lesson 12.02 - Full-Form Etude/notes.mid",
+        "bytes": 1715,
+        "sha256": "c4c073f02aa93600030b18cdc0c5ee4e0314ba8d7e0844cc7e04cf87d4f7ff6d"
+      },
+      {
+        "path": "SightKick Method - Lesson 12.02 - Full-Form Etude/song.ini",
+        "bytes": 1159,
+        "sha256": "27df137c5839e4034a7b9d338f3df34301821642d304caaa57325f95d496a620"
+      },
+      {
+        "path": "SightKick Method - Lesson 12.02 - Full-Form Etude/song.ogg",
+        "bytes": 108048,
+        "sha256": "eb3061009485b93a9c0306c7f05cd5f9786bc449bfb0c8cad4a3e32cc05ae51d"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.01 - Single Paradiddle (70 BPM)/drums.ogg",
+        "bytes": 903559,
+        "sha256": "2d34e374fb88ce8882898d8419e47b47acb290c2b6cf54912bacee5a60ba6048"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.01 - Single Paradiddle (70 BPM)/notes.mid",
+        "bytes": 1641,
+        "sha256": "d7137d2e4faea3ee2cc1390da58953101fd3decae9f062ffc4976320adc13a9d"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.01 - Single Paradiddle (70 BPM)/song.ini",
+        "bytes": 1012,
+        "sha256": "8596fab5f1e04b035e44a7f2428d8a90d133aa3d1b023f9a8220063df2f25e92"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.01 - Single Paradiddle (70 BPM)/song.ogg",
+        "bytes": 89695,
+        "sha256": "a53b0eabccef83bc6548b5044346d11e7b0b3d9661ddbc02130e0dae7fd2b57d"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.02 - Single Paradiddle (90 BPM)/drums.ogg",
+        "bytes": 714529,
+        "sha256": "54b5253a8c33846d230c543fe1e72ed31fa3f6089ddb2b13ff705b4926086a3e"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.02 - Single Paradiddle (90 BPM)/notes.mid",
+        "bytes": 1641,
+        "sha256": "a99eb0cad495e0e508d9b960886bd49b2277d48c4d5076326eb30116ed823f45"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.02 - Single Paradiddle (90 BPM)/song.ini",
+        "bytes": 1014,
+        "sha256": "eca762d51c0208b02b078558db93be6ef8c8fbe890345fff43d391860a38cbf4"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.02 - Single Paradiddle (90 BPM)/song.ogg",
+        "bytes": 82545,
+        "sha256": "05be83413e6af5e77eb1952ebb877ffe98eef13d67b57434e4779b343a8a2487"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.03 - Single Paradiddle (110 BPM)/drums.ogg",
+        "bytes": 756902,
+        "sha256": "664767b84a27af97cef3b3fb6c5e31479e3bf6b329182405e570a0485415f00a"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.03 - Single Paradiddle (110 BPM)/notes.mid",
+        "bytes": 2153,
+        "sha256": "70970f27ccf7da235752bc8fc0aa65cc7b324e96cd266565ad09aa26d3f079de"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.03 - Single Paradiddle (110 BPM)/song.ini",
+        "bytes": 949,
+        "sha256": "6bfaa2f15f7a932f7bd14cbe24e95cb39f4792928c95129ad439e7f98757f2f3"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.03 - Single Paradiddle (110 BPM)/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.04 - Single Paradiddle Groove/drums.ogg",
+        "bytes": 1175253,
+        "sha256": "7bb9e8f0a9992691ca4853fb32ef6336aa71d5b6291d3f7d1837a96065c8d65d"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.04 - Single Paradiddle Groove/notes.mid",
+        "bytes": 2441,
+        "sha256": "c5c90e3777dac4fad414b2f3e060853b2b1c8ba7acca077ef9a337b0271f19a1"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.04 - Single Paradiddle Groove/song.ini",
+        "bytes": 1165,
+        "sha256": "3295119689682da75067bf257a893224d2e5f6cb3c342657298cc26abc6a52a9"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.04 - Single Paradiddle Groove/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.05 - Double Paradiddle (65 BPM)/drums.ogg",
+        "bytes": 897250,
+        "sha256": "98eff5d917b2a66f3f3220926432ccfd4ecadb1f8c295486a3831000774fe62d"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.05 - Double Paradiddle (65 BPM)/notes.mid",
+        "bytes": 1269,
+        "sha256": "a32ea3f375fc9d2951a2a9a274bb4ca93b7f317f0086cd484384ff6ff9f0ecd4"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.05 - Double Paradiddle (65 BPM)/song.ini",
+        "bytes": 1097,
+        "sha256": "4f4228f98f2b83414f96845e0552d42d5a31c3d6cb9f0ac3e7c85b31087406c8"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.05 - Double Paradiddle (65 BPM)/song.ogg",
+        "bytes": 92253,
+        "sha256": "8d083b7e4b39e3c65163f9501fa70a6632aac123369be6a588d02c5c7c04c5eb"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.06 - Double Paradiddle (85 BPM)/drums.ogg",
+        "bytes": 738583,
+        "sha256": "72466a675251ec5a51572a4d14454794b56b33038bf31176b4ef353cce5b1346"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.06 - Double Paradiddle (85 BPM)/notes.mid",
+        "bytes": 1269,
+        "sha256": "a1ad9a591e99474e6bd242498f8e7d70d136cc15589ba2b1b73c8702dfe8bafb"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.06 - Double Paradiddle (85 BPM)/song.ini",
+        "bytes": 1032,
+        "sha256": "d457dd1a59f18e1e107b101b1b89162dbc24a3eb9418ce6864e1522ff5a20967"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.06 - Double Paradiddle (85 BPM)/song.ogg",
+        "bytes": 81900,
+        "sha256": "1bd0dcecc30819638535276f196e7786259949c9e4b965862d07bb56559cd59a"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.07 - Double Paradiddle (105 BPM)/drums.ogg",
+        "bytes": 778877,
+        "sha256": "c783f2aa2605b727bbae5ca605afb55c811d5544ea9a65e79681c6d80d8b904a"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.07 - Double Paradiddle (105 BPM)/notes.mid",
+        "bytes": 1657,
+        "sha256": "71e467ffe28d757934b0ed7bb60593902412bed4af4a2c4c0935baba62c37710"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.07 - Double Paradiddle (105 BPM)/song.ini",
+        "bytes": 941,
+        "sha256": "9ac712c4f325953d96cdd8d8a369f7c341f6a977cb3e0c065a385809d0810d37"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.07 - Double Paradiddle (105 BPM)/song.ogg",
+        "bytes": 103092,
+        "sha256": "e3e612c20214a801e5f8d4c0956dca114297ada17d0f120e43b8344e1a106051"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.08 - Double Paradiddle - Extended Fill/drums.ogg",
+        "bytes": 1042405,
+        "sha256": "58ac4bfce7e9a4b83efe0d03cc2bca21cec36df7586208380da52e5881e044bb"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.08 - Double Paradiddle - Extended Fill/notes.mid",
+        "bytes": 1933,
+        "sha256": "5066a2b64c57eed7f7fdb1763c48d722f9e0f9239110ac6a47ea6720309f8eeb"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.08 - Double Paradiddle - Extended Fill/song.ini",
+        "bytes": 1101,
+        "sha256": "f2b18eef38b60e83e19d08dd0a80846c01fd60f30fd085e47acce0e998f162a0"
+      },
+      {
+        "path": "SightKick Method - Lesson 13.08 - Double Paradiddle - Extended Fill/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.01 - Triple Paradiddle (60 BPM)/drums.ogg",
+        "bytes": 720656,
+        "sha256": "601b9dd49a268d046d756d58b7acfe141d446d7a6b76ec3078ae78bc821fda84"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.01 - Triple Paradiddle (60 BPM)/notes.mid",
+        "bytes": 1129,
+        "sha256": "5fb331234aac93c20f00363c90090272d78eeef963f099a1ab8df9b15b047d57"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.01 - Triple Paradiddle (60 BPM)/song.ini",
+        "bytes": 1028,
+        "sha256": "44f5c3d4d41ed9bf3bcbdfca37d65f3ba188fecf8e82e9623942f82c3c516981"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.01 - Triple Paradiddle (60 BPM)/song.ogg",
+        "bytes": 65824,
+        "sha256": "bfb67066dbc50f0b38f1d3ad2952fa37d85957ba961946241b0af80a12eccd60"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.02 - Triple Paradiddle (80 BPM)/drums.ogg",
+        "bytes": 801455,
+        "sha256": "87adb573cb0ace339defc54c1fa01c27c5dbdf4cf3fbebdfd9126e4af5d8c749"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.02 - Triple Paradiddle (80 BPM)/notes.mid",
+        "bytes": 1641,
+        "sha256": "fcba702146eebaf0d56704f1398e5fe88c0f326f97236a21d066eed0792cb6b0"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.02 - Triple Paradiddle (80 BPM)/song.ini",
+        "bytes": 1042,
+        "sha256": "c2f0c62515f0de3a5dc0d94117607a53844b379fefa28000e3d1d4e29cbcb2f2"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.02 - Triple Paradiddle (80 BPM)/song.ogg",
+        "bytes": 84855,
+        "sha256": "d53c16403dee1542c916ef3331edf417f7cacaf74830d843ea7f4339000cc5c5"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.03 - Triple Paradiddle (100 BPM)/drums.ogg",
+        "bytes": 836929,
+        "sha256": "dfef215158ba8d42895bcd2159bdf4227232f8cf9956e14e218f401f898f7678"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.03 - Triple Paradiddle (100 BPM)/notes.mid",
+        "bytes": 2153,
+        "sha256": "eb7dacfd32449e5d63f89eee09613dcaa22f8e5a2441f46641fc90823b1ad84c"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.03 - Triple Paradiddle (100 BPM)/song.ini",
+        "bytes": 980,
+        "sha256": "39be2e799db05a8e95139bfefa72ba1a700ac5b7b94c74a4fa0104747c6f36e7"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.03 - Triple Paradiddle (100 BPM)/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.04 - Triple Paradiddle - Extended Fill/drums.ogg",
+        "bytes": 847418,
+        "sha256": "a46094d395af3a755f0c8e640b49b173843536f616d8a90dff68de84b0bc0edd"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.04 - Triple Paradiddle - Extended Fill/notes.mid",
+        "bytes": 1617,
+        "sha256": "5e49856e4a6bcda71c481570c26f6a90ef01555f665ceadee51f402dff53bc78"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.04 - Triple Paradiddle - Extended Fill/song.ini",
+        "bytes": 1063,
+        "sha256": "092f43e5a626b9bdae62729f99294ab6f2ea6b78daeac46c415bdf49268f93db"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.04 - Triple Paradiddle - Extended Fill/song.ogg",
+        "bytes": 79329,
+        "sha256": "5d554c67d1e1491ead2de4ca5f32708fe162222573397f60279c352156d82006"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.05 - Paradiddle-Diddle (65 BPM)/drums.ogg",
+        "bytes": 897250,
+        "sha256": "98eff5d917b2a66f3f3220926432ccfd4ecadb1f8c295486a3831000774fe62d"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.05 - Paradiddle-Diddle (65 BPM)/notes.mid",
+        "bytes": 1269,
+        "sha256": "a32ea3f375fc9d2951a2a9a274bb4ca93b7f317f0086cd484384ff6ff9f0ecd4"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.05 - Paradiddle-Diddle (65 BPM)/song.ini",
+        "bytes": 1195,
+        "sha256": "c6c84490312e02490f101cc9b3aa6cbd27a8c5e69c130741a3f24b3b4764cc6c"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.05 - Paradiddle-Diddle (65 BPM)/song.ogg",
+        "bytes": 92253,
+        "sha256": "8d083b7e4b39e3c65163f9501fa70a6632aac123369be6a588d02c5c7c04c5eb"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.06 - Paradiddle-Diddle (85 BPM)/drums.ogg",
+        "bytes": 738583,
+        "sha256": "72466a675251ec5a51572a4d14454794b56b33038bf31176b4ef353cce5b1346"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.06 - Paradiddle-Diddle (85 BPM)/notes.mid",
+        "bytes": 1269,
+        "sha256": "a1ad9a591e99474e6bd242498f8e7d70d136cc15589ba2b1b73c8702dfe8bafb"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.06 - Paradiddle-Diddle (85 BPM)/song.ini",
+        "bytes": 1076,
+        "sha256": "b20eb80fb9bcc4ed73480aa2fc16b490e4f3f71301e3003df261533ada0cbfd6"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.06 - Paradiddle-Diddle (85 BPM)/song.ogg",
+        "bytes": 81900,
+        "sha256": "1bd0dcecc30819638535276f196e7786259949c9e4b965862d07bb56559cd59a"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.07 - Paradiddle-Diddle (105 BPM)/drums.ogg",
+        "bytes": 778877,
+        "sha256": "c783f2aa2605b727bbae5ca605afb55c811d5544ea9a65e79681c6d80d8b904a"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.07 - Paradiddle-Diddle (105 BPM)/notes.mid",
+        "bytes": 1657,
+        "sha256": "71e467ffe28d757934b0ed7bb60593902412bed4af4a2c4c0935baba62c37710"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.07 - Paradiddle-Diddle (105 BPM)/song.ini",
+        "bytes": 953,
+        "sha256": "0c30f731574f1abbafd0d91d08d8787d73682f24f88acad000ee5b3161831a26"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.07 - Paradiddle-Diddle (105 BPM)/song.ogg",
+        "bytes": 103092,
+        "sha256": "e3e612c20214a801e5f8d4c0956dca114297ada17d0f120e43b8344e1a106051"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.08 - Paradiddle-Diddle - Extended Fill/drums.ogg",
+        "bytes": 840296,
+        "sha256": "1971a2d754ef183c38cb2200a663e8671afd534adf9f409349bd691b16364acb"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.08 - Paradiddle-Diddle - Extended Fill/notes.mid",
+        "bytes": 1476,
+        "sha256": "4f0d3208bad7e21aaa1844bb8a8a997b1df4fdaaac3e0131cb52c782b2ac755b"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.08 - Paradiddle-Diddle - Extended Fill/song.ini",
+        "bytes": 1089,
+        "sha256": "7f0e291d2d9aac11d5255c3df99869929037d6bc02a078f40596ca8e275efce4"
+      },
+      {
+        "path": "SightKick Method - Lesson 14.08 - Paradiddle-Diddle - Extended Fill/song.ogg",
+        "bytes": 79329,
+        "sha256": "5d554c67d1e1491ead2de4ca5f32708fe162222573397f60279c352156d82006"
+      },
+      {
+        "path": "SightKick Method - Lesson 15.01 - Hand-to-Foot - Every Fourth Note/drums.ogg",
+        "bytes": 630039,
+        "sha256": "386be8a01b8f19ce20696a41e4c40252396d24f052551c22766aecdc54323c8f"
+      },
+      {
+        "path": "SightKick Method - Lesson 15.01 - Hand-to-Foot - Every Fourth Note/notes.mid",
+        "bytes": 1641,
+        "sha256": "b868c24cabd94e3f92d73d4ed5e8a64bbd0b6beb0a156b95d50184ad76ee1e00"
+      },
+      {
+        "path": "SightKick Method - Lesson 15.01 - Hand-to-Foot - Every Fourth Note/song.ini",
+        "bytes": 1079,
+        "sha256": "f2db2a31043e59644d77dcd843bff3afd5c58f3ab86194054b393b1c694f016b"
+      },
+      {
+        "path": "SightKick Method - Lesson 15.01 - Hand-to-Foot - Every Fourth Note/song.ogg",
+        "bytes": 82545,
+        "sha256": "05be83413e6af5e77eb1952ebb877ffe98eef13d67b57434e4779b343a8a2487"
+      },
+      {
+        "path": "SightKick Method - Lesson 15.02 - Hand-to-Foot - Every Third Note/drums.ogg",
+        "bytes": 577297,
+        "sha256": "5710a6dc6b1091c9d7729f1e05eb1200705cb02e06a829ab6227b975e3556c4b"
+      },
+      {
+        "path": "SightKick Method - Lesson 15.02 - Hand-to-Foot - Every Third Note/notes.mid",
+        "bytes": 1641,
+        "sha256": "74927f2d715f9a04814e322608ff8be6d5af41cdb4dbbd68e36469765b07fd60"
+      },
+      {
+        "path": "SightKick Method - Lesson 15.02 - Hand-to-Foot - Every Third Note/song.ini",
+        "bytes": 1094,
+        "sha256": "410cf845b81701e31f4d90f0b343db0251ab7a9200bd4d3f0311b7183fb633e8"
+      },
+      {
+        "path": "SightKick Method - Lesson 15.02 - Hand-to-Foot - Every Third Note/song.ogg",
+        "bytes": 79329,
+        "sha256": "5d554c67d1e1491ead2de4ca5f32708fe162222573397f60279c352156d82006"
+      },
+      {
+        "path": "SightKick Method - Lesson 15.03 - Hand-to-Foot Linear Groove/drums.ogg",
+        "bytes": 1014085,
+        "sha256": "9ade41fa12a82310793a2278f68a9f8f48e13e911a2783e030797384bb4ec3db"
+      },
+      {
+        "path": "SightKick Method - Lesson 15.03 - Hand-to-Foot Linear Groove/notes.mid",
+        "bytes": 3177,
+        "sha256": "f76271e087fc2f40cb351f41c2b1ad1632f5995622212005f14b6807893ebcc4"
+      },
+      {
+        "path": "SightKick Method - Lesson 15.03 - Hand-to-Foot Linear Groove/song.ini",
+        "bytes": 1168,
+        "sha256": "542acb3906e951190b79994d5e4a0512e8559eaaf9de9c79b7293fcd1fbf94f1"
+      },
+      {
+        "path": "SightKick Method - Lesson 15.03 - Hand-to-Foot Linear Groove/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.01 - 16th-Note Singles/drums.ogg",
+        "bytes": 760294,
+        "sha256": "92e0cae7d2b10d928950db1c0139ea1357539f926a1f6a917a6379f85f7b1084"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.01 - 16th-Note Singles/notes.mid",
+        "bytes": 2153,
+        "sha256": "da40620f67d909fe9300a46fbd64dac3bdb197cb376dc5a3250a27bda36c1005"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.01 - 16th-Note Singles/song.ini",
+        "bytes": 839,
+        "sha256": "86a749307590c267111b04067f355eadf410e088049529bac64f6f5665f79072"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.01 - 16th-Note Singles/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.02 - 16th-Note Alternating Accents/drums.ogg",
+        "bytes": 756902,
+        "sha256": "664767b84a27af97cef3b3fb6c5e31479e3bf6b329182405e570a0485415f00a"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.02 - 16th-Note Alternating Accents/notes.mid",
+        "bytes": 2153,
+        "sha256": "70970f27ccf7da235752bc8fc0aa65cc7b324e96cd266565ad09aa26d3f079de"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.02 - 16th-Note Alternating Accents/song.ini",
+        "bytes": 865,
+        "sha256": "f498cf2aa5a6098184b4685a98f246fd7328b81df3ba8f901d37ee9d526fe379"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.02 - 16th-Note Alternating Accents/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.03 - 16th Hi-Hat, Right Hand Only/drums.ogg",
+        "bytes": 1243182,
+        "sha256": "5a571d2daed28281b50e19f76016f11eb6321e0bae597eef3756faeeb74a5436"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.03 - 16th Hi-Hat, Right Hand Only/notes.mid",
+        "bytes": 2665,
+        "sha256": "1296af466af145322fea5c4c10976ceff2797cacbbb1bf9a845ef9e8763e2577"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.03 - 16th Hi-Hat, Right Hand Only/song.ini",
+        "bytes": 952,
+        "sha256": "0407dcc4c3aae381800d21eb9cc7a1500f238db8ec61281e8ebb77994751b600"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.03 - 16th Hi-Hat, Right Hand Only/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.04 - 16th Hi-Hat, Alternating Sticking/drums.ogg",
+        "bytes": 1243182,
+        "sha256": "5a571d2daed28281b50e19f76016f11eb6321e0bae597eef3756faeeb74a5436"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.04 - 16th Hi-Hat, Alternating Sticking/notes.mid",
+        "bytes": 2665,
+        "sha256": "1296af466af145322fea5c4c10976ceff2797cacbbb1bf9a845ef9e8763e2577"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.04 - 16th Hi-Hat, Alternating Sticking/song.ini",
+        "bytes": 953,
+        "sha256": "42a1a39685e1be99241f0bd8071a62baddc27035aa7e7b42e5fc194d812e80f9"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.04 - 16th Hi-Hat, Alternating Sticking/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.05 - 16th Ride, Right Hand Only/drums.ogg",
+        "bytes": 1257017,
+        "sha256": "6cdcea44ce5174711e2c47679c7eb1f4456b1579f1c681229bee15cfe7452da3"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.05 - 16th Ride, Right Hand Only/notes.mid",
+        "bytes": 2665,
+        "sha256": "40d42e1e485165baad8190d43ac17f84c9bf755cc7822ccc44b366f9817c9989"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.05 - 16th Ride, Right Hand Only/song.ini",
+        "bytes": 938,
+        "sha256": "225d724a8d07cf4bf1bde1982cafecca286eb95e58eac8346cfe80a2507505af"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.05 - 16th Ride, Right Hand Only/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.06 - Syncopated 16th Groove A/drums.ogg",
+        "bytes": 1226722,
+        "sha256": "b7cd96ff144e6bb57bde550b0fbc7ee96a10b49604cf4d1b60355def92b7441d"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.06 - Syncopated 16th Groove A/notes.mid",
+        "bytes": 2793,
+        "sha256": "188c1d89e011c9b70ec1d20f04ae0059e2b31e502af08a5da8c04f31e44ddf91"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.06 - Syncopated 16th Groove A/song.ini",
+        "bytes": 957,
+        "sha256": "3e6cd028968ee01255a8e942bfbee3a5d1c6ffb9973081dbbeeff7ece55d5505"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.06 - Syncopated 16th Groove A/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.07 - Syncopated 16th Groove B/drums.ogg",
+        "bytes": 1249969,
+        "sha256": "9a4f634c704226b9f68a2e783d3ef6562fdbcd74fb304fac433458e3adad36f1"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.07 - Syncopated 16th Groove B/notes.mid",
+        "bytes": 2665,
+        "sha256": "464ecbc32c617e0f514eb0a9a89a50ba59cb19c49ee8a2a612b142eecfda7081"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.07 - Syncopated 16th Groove B/song.ini",
+        "bytes": 940,
+        "sha256": "bf4afef27310e71a6f30425155566a9498b35f18bd1430a8914141227d9c238c"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.07 - Syncopated 16th Groove B/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.08 - Syncopated 16th Groove C/drums.ogg",
+        "bytes": 1211903,
+        "sha256": "6e02c5358c4007f575425d1fce4e60da9fc88a48c5ac3414cde231c77093db24"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.08 - Syncopated 16th Groove C/notes.mid",
+        "bytes": 2921,
+        "sha256": "65c92a1e755f7265ad7c3160d3dd6f5fb09b0bf9cef9cc9acb29647e9057f697"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.08 - Syncopated 16th Groove C/song.ini",
+        "bytes": 921,
+        "sha256": "c3222cc5c2d78f6ebd1ad51661a0bce13ebd0fbd91e3bdcbb2d6b3288e48a439"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.08 - Syncopated 16th Groove C/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.09 - Slow Ballad in 16ths/drums.ogg",
+        "bytes": 1153730,
+        "sha256": "d7a23002b6371798b6fcd4160eb96d9e9f8319a091131db4efa5cfd07123014f"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.09 - Slow Ballad in 16ths/notes.mid",
+        "bytes": 1857,
+        "sha256": "5e041beb74034f542753cb4a9bc406ce7a20980aa17fdac243128c5aecfadf43"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.09 - Slow Ballad in 16ths/song.ini",
+        "bytes": 948,
+        "sha256": "03d7ca05f538f074ee099c7e34909e37b83b2961c711efb973c4c1248e03a5ea"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.09 - Slow Ballad in 16ths/song.ogg",
+        "bytes": 81900,
+        "sha256": "1bd0dcecc30819638535276f196e7786259949c9e4b965862d07bb56559cd59a"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.10 - Made-in-Town Groove/drums.ogg",
+        "bytes": 1130258,
+        "sha256": "174b5452e47e3e21442776616affdbf9c6c189bb079b1c8e5be6b30f31969658"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.10 - Made-in-Town Groove/notes.mid",
+        "bytes": 2697,
+        "sha256": "69f088abbdac2eff2ea85a2c47771741bb8ebc09ed7892e1b3a7a3315dc1c2aa"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.10 - Made-in-Town Groove/song.ini",
+        "bytes": 927,
+        "sha256": "1e480e1486edd5e8f4310910aafc524683a63560d08912de3acdd9eb0e6618eb"
+      },
+      {
+        "path": "SightKick Method - Lesson 16.10 - Made-in-Town Groove/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.01 - Sixteenth-Then-Eighth Figure/drums.ogg",
+        "bytes": 797528,
+        "sha256": "fdeeef0cf63cab20f3da52f4525cec53eadc7437c3296efb12f763075508698f"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.01 - Sixteenth-Then-Eighth Figure/notes.mid",
+        "bytes": 1705,
+        "sha256": "d73468a1d29157c30a77bb88b8792a4293a54101d290a080f66a17929bddb6dd"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.01 - Sixteenth-Then-Eighth Figure/song.ini",
+        "bytes": 868,
+        "sha256": "fa7ac2dbc01dfe6c230d6155d34b3ca8a3821275a68cd722e72da891e457b322"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.01 - Sixteenth-Then-Eighth Figure/song.ogg",
+        "bytes": 103092,
+        "sha256": "e3e612c20214a801e5f8d4c0956dca114297ada17d0f120e43b8344e1a106051"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.02 - Eighth-Then-Sixteenth Figure/drums.ogg",
+        "bytes": 797763,
+        "sha256": "35f52415739ccd4b331f9d298a3e0b922aa467f6c36eae62fbcc4b67128c6488"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.02 - Eighth-Then-Sixteenth Figure/notes.mid",
+        "bytes": 1705,
+        "sha256": "8f67584108fce3f56fc8c7898dd1ce931bce4e2ed86d3352423ec5a9a5b17718"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.02 - Eighth-Then-Sixteenth Figure/song.ini",
+        "bytes": 868,
+        "sha256": "3c88d19c86d9ace67e1a5d44814d8c0ed65336e2b0e55bfd3cf71e86203f0dea"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.02 - Eighth-Then-Sixteenth Figure/song.ogg",
+        "bytes": 103092,
+        "sha256": "e3e612c20214a801e5f8d4c0956dca114297ada17d0f120e43b8344e1a106051"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.03 - New Rhythm Groove A/drums.ogg",
+        "bytes": 1166275,
+        "sha256": "4a814259ed692f8405e3d3c65303eb9a01bd073c561909b36955236c6cbdb038"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.03 - New Rhythm Groove A/notes.mid",
+        "bytes": 2217,
+        "sha256": "843191945564bfc8fee6ecc86b917e87026cd103ef9a10c21c8d6a7476929843"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.03 - New Rhythm Groove A/song.ini",
+        "bytes": 927,
+        "sha256": "a5ce99c0a1f258924a98b24f9d7612ee48275f51f273465a17546985b70f32da"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.03 - New Rhythm Groove A/song.ogg",
+        "bytes": 103092,
+        "sha256": "e3e612c20214a801e5f8d4c0956dca114297ada17d0f120e43b8344e1a106051"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.04 - New Rhythm Groove B/drums.ogg",
+        "bytes": 1137585,
+        "sha256": "2b845cc8e63944f05ecb1d462273d17a91bcc4bd014b60ace4f2adfe6a91d24c"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.04 - New Rhythm Groove B/notes.mid",
+        "bytes": 2217,
+        "sha256": "0f597362f545a50328f30f17e69686f309e5057ceeaf670d6fd76f5019f17169"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.04 - New Rhythm Groove B/song.ini",
+        "bytes": 920,
+        "sha256": "6002de9aa66c196e907dcb3cbee82a1e6fdee21096079c22a8dd64b12f0d99ea"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.04 - New Rhythm Groove B/song.ogg",
+        "bytes": 103092,
+        "sha256": "e3e612c20214a801e5f8d4c0956dca114297ada17d0f120e43b8344e1a106051"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.05 - Sundown Shuffle-Free Tune/drums.ogg",
+        "bytes": 1058084,
+        "sha256": "1b12bbb6a436cb22f2f0e5c5699a134fbc0cf73e9ad1fdff932f84cd4ccef8e6"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.05 - Sundown Shuffle-Free Tune/notes.mid",
+        "bytes": 2249,
+        "sha256": "f60d5bb48d2abaf7b7f6ea79aaeba3127335c2f5177fcf435348f7c3080a4425"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.05 - Sundown Shuffle-Free Tune/song.ini",
+        "bytes": 964,
+        "sha256": "343f553b76a5f97ed1090d03a50b27689f72ab7b931db9c4fc867b58743afc4a"
+      },
+      {
+        "path": "SightKick Method - Lesson 17.05 - Sundown Shuffle-Free Tune/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.01 - 16ths Around the Kit A/drums.ogg",
+        "bytes": 584958,
+        "sha256": "46ddfa26dbfa8abbdc398c1a56be687a1a224e26f290aaaaf6efeaebc1505fd4"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.01 - 16ths Around the Kit A/notes.mid",
+        "bytes": 3689,
+        "sha256": "429ede5845fb8aaa78ac4fe4692a3d153290fe11d4cc121ad270edfcf1b72930"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.01 - 16ths Around the Kit A/song.ini",
+        "bytes": 902,
+        "sha256": "fc9726eaf6bbfd568b46eae7775742d3ed6b4ea32bb8a8d51b9fc2a54a683476"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.01 - 16ths Around the Kit A/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.02 - 16ths Around the Kit B/drums.ogg",
+        "bytes": 646005,
+        "sha256": "bee4caa521d295b374fe20371dac6b90d9bd5e109f9624a664977ec083d94403"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.02 - 16ths Around the Kit B/notes.mid",
+        "bytes": 3177,
+        "sha256": "cd44eb0c096dc2112e46f251b0bfc2296fd620f45beba552a20c7027d4ff252c"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.02 - 16ths Around the Kit B/song.ini",
+        "bytes": 944,
+        "sha256": "17bdb5694089b77194a845b0dab45e12f089256e4c55c5c1191c3362590ac4e0"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.02 - 16ths Around the Kit B/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.03 - One-Bar 16th Fill A/drums.ogg",
+        "bytes": 983824,
+        "sha256": "d85d5856ec9e0486d1e4c47270289ba69313b0541fa0579693f30495a9573fca"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.03 - One-Bar 16th Fill A/notes.mid",
+        "bytes": 2921,
+        "sha256": "ad4e08df9c35b4110de4da093fb1abd5c34dd5857d00650a454dd523c3db06dc"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.03 - One-Bar 16th Fill A/song.ini",
+        "bytes": 962,
+        "sha256": "4e0d52ce5bc070d86fa40911a5077f1bb132a1dcdf101b0575c74ebc4f51cfcc"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.03 - One-Bar 16th Fill A/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.04 - One-Bar 16th Fill B/drums.ogg",
+        "bytes": 972525,
+        "sha256": "267879598c333ac0ec7a3946e77ccca563edbaf3f75134aeae3c73789fbe9de0"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.04 - One-Bar 16th Fill B/notes.mid",
+        "bytes": 3049,
+        "sha256": "22c92fed2d01200378e11426bbfcceeb12c7975104c93db1fe8d5befc37ac44a"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.04 - One-Bar 16th Fill B/song.ini",
+        "bytes": 985,
+        "sha256": "800562cb6f0a146446281892e6afd8ed7836b60371bb23aef4b6fdd757cce404"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.04 - One-Bar 16th Fill B/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.05 - One-Beat 16th Fill Insert/drums.ogg",
+        "bytes": 1090094,
+        "sha256": "a57ddc94d1418bc93d77f42d9b087eb304a300be7e977ec10ac83de5a6df8808"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.05 - One-Beat 16th Fill Insert/notes.mid",
+        "bytes": 2497,
+        "sha256": "2347121784c95dfd41535610f801f4d8616576fb91c5dcc5594a9a6180b32bca"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.05 - One-Beat 16th Fill Insert/song.ini",
+        "bytes": 987,
+        "sha256": "69b539c51ce8516765b1faaac278aa78dcd9f552af95343c4d5fc3422d356663"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.05 - One-Beat 16th Fill Insert/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.06 - Two-Beat 16th Fill Insert/drums.ogg",
+        "bytes": 1051744,
+        "sha256": "93ca413b83d9ea28a96215d54f124faeff95fc54ca4f3a6737acac13ad1cd4d0"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.06 - Two-Beat 16th Fill Insert/notes.mid",
+        "bytes": 2745,
+        "sha256": "fd6516e81ca72004b4074d4f79d241b854a25465da6524612204335ce077dd7f"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.06 - Two-Beat 16th Fill Insert/song.ini",
+        "bytes": 954,
+        "sha256": "a6fc8cc3addf8ba49700c19493d138c27e217da7503d860cd89e232192205010"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.06 - Two-Beat 16th Fill Insert/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.07 - Firecracker Etude/drums.ogg",
+        "bytes": 876743,
+        "sha256": "a76b7ed975f33844b81aa1d4d32a175b89e4b2566f8d82c743fdc92e60d34744"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.07 - Firecracker Etude/notes.mid",
+        "bytes": 2457,
+        "sha256": "682012f023b4033c69e84f1c63e1388db6976ccd5c00509eab55ffb56a69bb39"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.07 - Firecracker Etude/song.ini",
+        "bytes": 997,
+        "sha256": "65398b4ce34ed95da03a78192297a24e7c43aebdbedb78defccad250057b9347"
+      },
+      {
+        "path": "SightKick Method - Lesson 18.07 - Firecracker Etude/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.01 - Triplet Feel Introduction/drums.ogg",
+        "bytes": 844143,
+        "sha256": "2386b6f8a6471bb447f0a10806baed7a5d208a88122f9e329be68ca1d20dbc94"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.01 - Triplet Feel Introduction/notes.mid",
+        "bytes": 1833,
+        "sha256": "d5cee0ebd85c10a2364f420e5345b155f434fd129f6afad98c4dac597c77d9d6"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.01 - Triplet Feel Introduction/song.ini",
+        "bytes": 880,
+        "sha256": "4ddd0fd9e168d9c2db330c0e3be869bde15a613660f0c1cc4555db5520744535"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.01 - Triplet Feel Introduction/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.02 - Triplet Singles/drums.ogg",
+        "bytes": 844143,
+        "sha256": "2386b6f8a6471bb447f0a10806baed7a5d208a88122f9e329be68ca1d20dbc94"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.02 - Triplet Singles/notes.mid",
+        "bytes": 1833,
+        "sha256": "d5cee0ebd85c10a2364f420e5345b155f434fd129f6afad98c4dac597c77d9d6"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.02 - Triplet Singles/song.ini",
+        "bytes": 859,
+        "sha256": "7ac89991c69d26eb56afbe5c8af6279d0d89eaf6fbbcb6a82adcaa298b38373f"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.02 - Triplet Singles/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.03 - Triplet Accent on Beat/drums.ogg",
+        "bytes": 838601,
+        "sha256": "f701d41432f6cf2af0a0a12ab63b259cd4732ac588a44a2e4e57b14314ca2409"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.03 - Triplet Accent on Beat/notes.mid",
+        "bytes": 1833,
+        "sha256": "de6bce3b5edd1fce24177ae28a69509d479bbf489c447bb36c11181cc09fc912"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.03 - Triplet Accent on Beat/song.ini",
+        "bytes": 876,
+        "sha256": "ba1d4414635a520500d317a2800201bf8d027f11ad2575728bb2a08ed0252a6c"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.03 - Triplet Accent on Beat/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.04 - Quarter-Note Triplet/drums.ogg",
+        "bytes": 695982,
+        "sha256": "e52c63ae4827bee776f0558b1d5d4af795eb46ec41d6b78d232e03e7e6580847"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.04 - Quarter-Note Triplet/notes.mid",
+        "bytes": 843,
+        "sha256": "12abcad97c7d79401e19b180813f0687707aee484eadc6769203bfbbd32202a6"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.04 - Quarter-Note Triplet/song.ini",
+        "bytes": 879,
+        "sha256": "55c6bec3244571dcf46f48663f69c618585cb2aab491f8ea64a7df4a35ea119b"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.04 - Quarter-Note Triplet/song.ogg",
+        "bytes": 92162,
+        "sha256": "c8c3de3b2e87915cd1a1635f8ed0511ab090699b0624ea3b07d82f85693985bd"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.05 - Triplet Sticking Pattern/drums.ogg",
+        "bytes": 844143,
+        "sha256": "2386b6f8a6471bb447f0a10806baed7a5d208a88122f9e329be68ca1d20dbc94"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.05 - Triplet Sticking Pattern/notes.mid",
+        "bytes": 1833,
+        "sha256": "d5cee0ebd85c10a2364f420e5345b155f434fd129f6afad98c4dac597c77d9d6"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.05 - Triplet Sticking Pattern/song.ini",
+        "bytes": 876,
+        "sha256": "cc2475cb16b1d696d87a84dccf0f4b0caebfe1fbf7ab64605359ef343a2b9996"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.05 - Triplet Sticking Pattern/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.06 - Basic Jazz Ride Pattern/drums.ogg",
+        "bytes": 1209090,
+        "sha256": "5e73bce976428c42778e38a464793e96091be25df68f016ba04bdc96e0dbb102"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.06 - Basic Jazz Ride Pattern/notes.mid",
+        "bytes": 1545,
+        "sha256": "820d7a5f0c5210e694fddc218c1682b5dc440cb902988d24f67f7ac7edcfd47a"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.06 - Basic Jazz Ride Pattern/song.ini",
+        "bytes": 925,
+        "sha256": "ac344adff9329803df62f12f108d25b2cfde1940f94808123ec9371dea71205f"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.06 - Basic Jazz Ride Pattern/song.ogg",
+        "bytes": 120142,
+        "sha256": "8050b8ed26e39d4bf65ea5b5aab8422d97f7aaea57e2735788717b62a5d8f757"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.07 - Jazz Ride with Hi-Hat Chick/drums.ogg",
+        "bytes": 1208694,
+        "sha256": "d627aaf11a1235a728b4f4d95ea089e4d960a9fb60660f4e1aa64a4292c074a9"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.07 - Jazz Ride with Hi-Hat Chick/notes.mid",
+        "bytes": 1865,
+        "sha256": "58fee4a2d2b9b61c71e33a0b01349f980e33b16e4b3e7012b6e2b7056877423f"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.07 - Jazz Ride with Hi-Hat Chick/song.ini",
+        "bytes": 926,
+        "sha256": "83781da6e6208e06c55b8990bf3ceb02b82bd1a8ee8c1ace9b8a6a65b1a8484c"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.07 - Jazz Ride with Hi-Hat Chick/song.ogg",
+        "bytes": 120142,
+        "sha256": "8050b8ed26e39d4bf65ea5b5aab8422d97f7aaea57e2735788717b62a5d8f757"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.08 - Comping on the Snare/drums.ogg",
+        "bytes": 1198996,
+        "sha256": "905d65532a7680268900b95cfe55cbb191884b3c5e52073743f17f82e986b52b"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.08 - Comping on the Snare/notes.mid",
+        "bytes": 2205,
+        "sha256": "b1e8c010df4b3be3d46a74b24f1fd5804755bcc323cebc5e312e3db42e27167d"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.08 - Comping on the Snare/song.ini",
+        "bytes": 953,
+        "sha256": "b95b1da224b22c4d767f33b3bab21ed3833e2ca46527013eb7d986cc910147af"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.08 - Comping on the Snare/song.ogg",
+        "bytes": 120142,
+        "sha256": "8050b8ed26e39d4bf65ea5b5aab8422d97f7aaea57e2735788717b62a5d8f757"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.09 - Vibraphone Solo Etude/drums.ogg",
+        "bytes": 1190855,
+        "sha256": "4bc616deb535556756c8a274331e2efbcecc28e878e2f51385da50287b2d5ab8"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.09 - Vibraphone Solo Etude/notes.mid",
+        "bytes": 2270,
+        "sha256": "4bce3455642a753b55856c91640279163090c5fe05743cc9bbbcd6d9dfc95546"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.09 - Vibraphone Solo Etude/song.ini",
+        "bytes": 1038,
+        "sha256": "78c5259cc593ef804f27d8425b62d8052bf567ae408fb108da556aa51d489d86"
+      },
+      {
+        "path": "SightKick Method - Lesson 19.09 - Vibraphone Solo Etude/song.ogg",
+        "bytes": 120142,
+        "sha256": "8050b8ed26e39d4bf65ea5b5aab8422d97f7aaea57e2735788717b62a5d8f757"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.01 - Triplet Accent Shift -- First Note/drums.ogg",
+        "bytes": 761895,
+        "sha256": "599a5bcf71553002c7f5e5150a543c0e6cbe02c57547e79faaaa16a11641dfea"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.01 - Triplet Accent Shift -- First Note/notes.mid",
+        "bytes": 1833,
+        "sha256": "3bbdc1accf6c57097c98448f86fb36d9302e78143e611290bd9e993875925874"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.01 - Triplet Accent Shift -- First Note/song.ini",
+        "bytes": 909,
+        "sha256": "2fb43d151911c27221c92b74a07f24dfd8e659dc31974e0a5506f1380ab497b3"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.01 - Triplet Accent Shift -- First Note/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.02 - Triplet Accent Shift -- Second Note/drums.ogg",
+        "bytes": 761773,
+        "sha256": "9a255588b9b69ec0040f5fcc2221a9d99b4aac1279264949820620d172544807"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.02 - Triplet Accent Shift -- Second Note/notes.mid",
+        "bytes": 1833,
+        "sha256": "b912f38df3ad448bafdaf0e31ad9588daf16e7db9144b24f5fa087c2327d6ba5"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.02 - Triplet Accent Shift -- Second Note/song.ini",
+        "bytes": 902,
+        "sha256": "a9120355a2d25eb34df44ffdca4156d83c545be319c4054e67fd637ba289e3c1"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.02 - Triplet Accent Shift -- Second Note/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.03 - Triplet Accent Shift -- Third Note/drums.ogg",
+        "bytes": 762031,
+        "sha256": "c2f52e4d77cdf3cedd5926d1269abb17d3e435c1dcad9575bb5d482f6fbbc590"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.03 - Triplet Accent Shift -- Third Note/notes.mid",
+        "bytes": 1833,
+        "sha256": "b634989a3654d6dffb3ddb1f671910c912daf147a364a9e36c1964a92ab69eff"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.03 - Triplet Accent Shift -- Third Note/song.ini",
+        "bytes": 917,
+        "sha256": "c1b3c94ada3c74fe850c3f17eded5f6014c4d4c9afd4e718c0b895abfaf069c5"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.03 - Triplet Accent Shift -- Third Note/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.04 - Jazz Fill A/drums.ogg",
+        "bytes": 962834,
+        "sha256": "cfebbc1c9ab7e5b9029d0169dfd60cca6ec8a05b2bc7e24d8d8972b261b3c387"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.04 - Jazz Fill A/notes.mid",
+        "bytes": 1689,
+        "sha256": "38b1b81c6963a787d6ddaf053cdfe9b67946f1f98cd1ccfa8dce3dc43994efd7"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.04 - Jazz Fill A/song.ini",
+        "bytes": 934,
+        "sha256": "6514f55e1fe45cb80bcaf8088a6f717e112decbd72d579da1d87cc5bf6ab9833"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.04 - Jazz Fill A/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.05 - Jazz Fill B/drums.ogg",
+        "bytes": 935152,
+        "sha256": "81404c2b57d465e4510db405f0e0548ca415fca88169350f405de7c8c9a26ee4"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.05 - Jazz Fill B/notes.mid",
+        "bytes": 1637,
+        "sha256": "bf3db8c40bf6931c6ac7e88e6d9cb5e0bf50317a332f4b77fce42e7718f055ec"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.05 - Jazz Fill B/song.ini",
+        "bytes": 973,
+        "sha256": "906a6f080a63826a67de38f98bb865fb863e637838556916410899ed174858d2"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.05 - Jazz Fill B/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.06 - Jazz Fill C/drums.ogg",
+        "bytes": 972292,
+        "sha256": "2dffe3bb32571e725f5dcba326e8f4c86cfdfc208637c238883e29409760a36d"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.06 - Jazz Fill C/notes.mid",
+        "bytes": 1401,
+        "sha256": "9446581f83cb720268a9a4bc452857023090397938a029056c00585293322eb4"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.06 - Jazz Fill C/song.ini",
+        "bytes": 952,
+        "sha256": "a4f3da160253e9de15c95a347dfd2866414a2850ce83771e4cd2c5b79457031c"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.06 - Jazz Fill C/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.07 - Late-Night Blues Tune/drums.ogg",
+        "bytes": 1109292,
+        "sha256": "5779765b4f4c51023071de32b64b3de530453b1b6d96d9078a09e1745c8d613c"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.07 - Late-Night Blues Tune/notes.mid",
+        "bytes": 2130,
+        "sha256": "5210cd739da67deda3d7a93e46a753e36929a494e265dfc6c05198e8d7482e4c"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.07 - Late-Night Blues Tune/song.ini",
+        "bytes": 997,
+        "sha256": "0ee217e9b0540647ca0717128965b8d8f30dbe0cf2deaf42ab5f2df747bc0bc9"
+      },
+      {
+        "path": "SightKick Method - Lesson 20.07 - Late-Night Blues Tune/song.ogg",
+        "bytes": 120142,
+        "sha256": "8050b8ed26e39d4bf65ea5b5aab8422d97f7aaea57e2735788717b62a5d8f757"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.01 - Broken-Triplet Shuffle Feel/drums.ogg",
+        "bytes": 1046478,
+        "sha256": "a0a5d2110b4cdc9f3e6a7196177c0e6bb9177e63fe9a957c66ebea81ecfbb75d"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.01 - Broken-Triplet Shuffle Feel/notes.mid",
+        "bytes": 1257,
+        "sha256": "205a5f41cd5f12a252e46b8ec5063a3230e6928818ee9e67131266007c117b6a"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.01 - Broken-Triplet Shuffle Feel/song.ini",
+        "bytes": 920,
+        "sha256": "347ddd473bd8d7367627685db5e14eb837ab3b3d44bf1b94ee4e0173f6bb154a"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.01 - Broken-Triplet Shuffle Feel/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.02 - Rock Shuffle One/drums.ogg",
+        "bytes": 1145562,
+        "sha256": "fa7097f6ec364bea30a3925aa19a8f651aa64417da6bd1d3ca23287d891c1d61"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.02 - Rock Shuffle One/notes.mid",
+        "bytes": 2025,
+        "sha256": "8da9520ef38a4793a25fb700efab681f77dd9eb30acfe418616de407d0d17efa"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.02 - Rock Shuffle One/song.ini",
+        "bytes": 967,
+        "sha256": "0dfb4c9d7afca714b08a1920e52e2c2779f0c0057626b46e6352cbb5cfd4b03b"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.02 - Rock Shuffle One/song.ogg",
+        "bytes": 120142,
+        "sha256": "8050b8ed26e39d4bf65ea5b5aab8422d97f7aaea57e2735788717b62a5d8f757"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.03 - Rock Shuffle Two/drums.ogg",
+        "bytes": 1117019,
+        "sha256": "8ce1b67916c97a77777742bf93118078218ce21766475531dc3352a8f1cff469"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.03 - Rock Shuffle Two/notes.mid",
+        "bytes": 2185,
+        "sha256": "8db56ec4b1c91820b900472fe358e6c8a3395e78f932470e932462786162426c"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.03 - Rock Shuffle Two/song.ini",
+        "bytes": 940,
+        "sha256": "4469be993ed512a80a50f078f082f39206288aea00911aa4c5febe2584f2b923"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.03 - Rock Shuffle Two/song.ogg",
+        "bytes": 120142,
+        "sha256": "8050b8ed26e39d4bf65ea5b5aab8422d97f7aaea57e2735788717b62a5d8f757"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.04 - Texas Shuffle/drums.ogg",
+        "bytes": 1073710,
+        "sha256": "66ce642ff2dbf7a98a676e5b3ec87466137679708d25b3c5522c9e12570abe1c"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.04 - Texas Shuffle/notes.mid",
+        "bytes": 2025,
+        "sha256": "eb8b09123c3f0fa2ea9b809913f01ac965c7d23c5f78dba90e32f44498d86321"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.04 - Texas Shuffle/song.ini",
+        "bytes": 979,
+        "sha256": "2486abc33e600b567ce35daa47e3bf1f57afe4bdfe8751a10505e7f84c872e6a"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.04 - Texas Shuffle/song.ogg",
+        "bytes": 117905,
+        "sha256": "9a849732afb52060ee2791317123e04edab0d251b5e214cdbfb37e083933caeb"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.05 - Straight Shuffle/drums.ogg",
+        "bytes": 1036459,
+        "sha256": "54d851c0c98de2729158700509e83a583bdc0efc0b73375a1dcea41e667e06af"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.05 - Straight Shuffle/notes.mid",
+        "bytes": 1641,
+        "sha256": "e113baf18b3c671996036b2cd13bc9a5b6c6019b6ebe0ca795b4719e9bd203e9"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.05 - Straight Shuffle/song.ini",
+        "bytes": 935,
+        "sha256": "d503466a0f3007ed5b23b342e8a552bd31eb8d9dbbb4bd57b64e3ebdab5b3d9a"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.05 - Straight Shuffle/song.ogg",
+        "bytes": 100473,
+        "sha256": "495781d0d94be475e01513feefd648477c85c733e891180943d2d673dd7a48b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.06 - 12-Bar Blues Groove/drums.ogg",
+        "bytes": 961729,
+        "sha256": "c2ba8eb90995e4481f515baf70cb2c627baabbb33f4f7ea19e6952907fb91390"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.06 - 12-Bar Blues Groove/notes.mid",
+        "bytes": 1641,
+        "sha256": "c1c18f82490dc042f7b955b4f16af25e62d4c8bd01ccb221bbf4c2a1dbf324c5"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.06 - 12-Bar Blues Groove/song.ini",
+        "bytes": 957,
+        "sha256": "892c27106390b30b9f6e092666050fabc5e1417a0d78ccbf0af2e96237330ac6"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.06 - 12-Bar Blues Groove/song.ogg",
+        "bytes": 96713,
+        "sha256": "985b77cfb8059a1d42b41d5b72e64edf48c07e0562e1e0b339773fd5dfac813d"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.07 - Hi-Hat Shuffle with Foot Splash/drums.ogg",
+        "bytes": 999826,
+        "sha256": "aa20db85c7bfad62a1efe79588b7bad236553b70f0bd1a29f1ab6d3e6478c2b7"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.07 - Hi-Hat Shuffle with Foot Splash/notes.mid",
+        "bytes": 1513,
+        "sha256": "3db3aa920266cbd4a736650f49cbaca72d165b8c5f1e61097cec6f3fa471816f"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.07 - Hi-Hat Shuffle with Foot Splash/song.ini",
+        "bytes": 964,
+        "sha256": "132bfc86eb67e9b9ec033efa09f68927eb86bc5d2b514df92f0c3fd05b8920b6"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.07 - Hi-Hat Shuffle with Foot Splash/song.ogg",
+        "bytes": 99099,
+        "sha256": "819c2dc19611cf1026e2dd285c03e50501b8bc385a73bed5f354961b7275e970"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.08 - Train Beat/drums.ogg",
+        "bytes": 1177356,
+        "sha256": "1088c277a1847f11d17cd90906de38811613a2618221fb2db6fa91d152ea887d"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.08 - Train Beat/notes.mid",
+        "bytes": 1865,
+        "sha256": "6f17dafded1ac628524773ed3e3dfe455c1df193acbb55e8420bf22eef979f44"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.08 - Train Beat/song.ini",
+        "bytes": 940,
+        "sha256": "d6c4acc889cd2c6008e9cf7528cc79e4b8bf4381749f7e7344ad739f7f7ed611"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.08 - Train Beat/song.ogg",
+        "bytes": 120142,
+        "sha256": "8050b8ed26e39d4bf65ea5b5aab8422d97f7aaea57e2735788717b62a5d8f757"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.09 - Jazz Waltz in One/drums.ogg",
+        "bytes": 518268,
+        "sha256": "8e3be9d8f5b41e9d150c7fbbc1d3048a52088461b98e495a10b1d79de7ed21a8"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.09 - Jazz Waltz in One/notes.mid",
+        "bytes": 528,
+        "sha256": "2951b332edba6f298b4e937c625459b72327faf64778f9f76a38760b06388194"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.09 - Jazz Waltz in One/song.ini",
+        "bytes": 949,
+        "sha256": "ca0f8d43484e9c640f8d9d80fcd07ad1017dc97ec9ee8b873150ed014fe55fd4"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.09 - Jazz Waltz in One/song.ogg",
+        "bytes": 106570,
+        "sha256": "c80add48bcff364a0520cff6304d5aa51b3dd5ff2fafa280d646d954cd7ca5a0"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.10 - Jazz Waltz in Three/drums.ogg",
+        "bytes": 970971,
+        "sha256": "fd55d882c6435a5468211f6e5ada74f5845b207218aef6e18668f834d30861ac"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.10 - Jazz Waltz in Three/notes.mid",
+        "bytes": 1336,
+        "sha256": "f5db3844da0c469440d6e811277349a5637322408855f706bd7b82267c4ef7dc"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.10 - Jazz Waltz in Three/song.ini",
+        "bytes": 955,
+        "sha256": "ac47125c8614771b6d788fd8ade300521c01b91b2dbe951224e17083ffcdeecf"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.10 - Jazz Waltz in Three/song.ogg",
+        "bytes": 92958,
+        "sha256": "2c04c836e4d78d4e7a2d646052cc0d140ce94f06ce0bd40635278d8051f9e9f1"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.11 - Mixed Waltz Variation/drums.ogg",
+        "bytes": 949206,
+        "sha256": "3e9f5abda40065fde72d3ad679a733a764f126ce9f19f06392bac752a90d6e8e"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.11 - Mixed Waltz Variation/notes.mid",
+        "bytes": 1496,
+        "sha256": "9b18411c4d493a0ae1d5535cbd8406bf240f610c182e60614c997a23365554a6"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.11 - Mixed Waltz Variation/song.ini",
+        "bytes": 981,
+        "sha256": "fa2d4ddef5a4f835b3b26ab0604dc5139e67bbaf7e462a2a88cc187244ef31c1"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.11 - Mixed Waltz Variation/song.ogg",
+        "bytes": 92958,
+        "sha256": "2c04c836e4d78d4e7a2d646052cc0d140ce94f06ce0bd40635278d8051f9e9f1"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.12 - Waltz for a Rainy Evening/drums.ogg",
+        "bytes": 889647,
+        "sha256": "1dcc7dc489e693df081d524deda676ed6454c28e3ab4ac82e0e3ad37abd3748e"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.12 - Waltz for a Rainy Evening/notes.mid",
+        "bytes": 1056,
+        "sha256": "e67bebc6d5f634b0f2ce38a970365054f45436915f0c37f9d9e68c3a5fdffaa5"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.12 - Waltz for a Rainy Evening/song.ini",
+        "bytes": 1004,
+        "sha256": "9f45aa4cc62eceeb85d6003e9c721205bfb045cbaba80e4fa38f87b151c09e31"
+      },
+      {
+        "path": "SightKick Method - Lesson 21.12 - Waltz for a Rainy Evening/song.ogg",
+        "bytes": 109322,
+        "sha256": "0f110422400d877162d9d7c60fb6d413707936f597d6ba4fa8ffb8ddfc6acd25"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.01 - Five-Stroke Roll (70 BPM)/drums.ogg",
+        "bytes": 873020,
+        "sha256": "52674b63aa6ee98721ba4d08ce26e631f5afc6ce1884becdfa7b567513921cb7"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.01 - Five-Stroke Roll (70 BPM)/notes.mid",
+        "bytes": 1089,
+        "sha256": "69f391bcc168d151d862d1a9ccb97a33562bed066775bd11e3cf76377e6d8f8d"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.01 - Five-Stroke Roll (70 BPM)/song.ini",
+        "bytes": 1001,
+        "sha256": "eda4711f2337a168dbd805e6c13e7e794f3a86ffa0d70bdca78ff709735cf26b"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.01 - Five-Stroke Roll (70 BPM)/song.ogg",
+        "bytes": 89695,
+        "sha256": "a53b0eabccef83bc6548b5044346d11e7b0b3d9661ddbc02130e0dae7fd2b57d"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.02 - Five-Stroke Roll (90 BPM)/drums.ogg",
+        "bytes": 700083,
+        "sha256": "910650710c60c5be471baa361a75a7932660b787c410c62961ce221e03a5ed8c"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.02 - Five-Stroke Roll (90 BPM)/notes.mid",
+        "bytes": 1089,
+        "sha256": "1af9b4ef6a41e7bf9aa78fd51385bbcfded047c04d10609e827b8376fc4aaf3a"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.02 - Five-Stroke Roll (90 BPM)/song.ini",
+        "bytes": 983,
+        "sha256": "23d3c27912de794f82f146d0934e739d5b762fcb50c27adc25aafb1885528652"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.02 - Five-Stroke Roll (90 BPM)/song.ogg",
+        "bytes": 82545,
+        "sha256": "05be83413e6af5e77eb1952ebb877ffe98eef13d67b57434e4779b343a8a2487"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.03 - Five-Stroke Roll (110 BPM)/drums.ogg",
+        "bytes": 743073,
+        "sha256": "049a308fa2d7871ede6125606cda0b72a85190e060a37fbd9b47dc2f8a063ec0"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.03 - Five-Stroke Roll (110 BPM)/notes.mid",
+        "bytes": 1417,
+        "sha256": "9c8c610a923caa3f9ed5b614e2b8b927a1399fc8a09583c131c55182068ca617"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.03 - Five-Stroke Roll (110 BPM)/song.ini",
+        "bytes": 924,
+        "sha256": "e1bb623838ceb90dd1cd25acb7cab5dee30a99341156dad4f5d0799e7e049be8"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.03 - Five-Stroke Roll (110 BPM)/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.04 - Five-Stroke Roll - Fill Application/drums.ogg",
+        "bytes": 1079525,
+        "sha256": "968d4034b266d39d88486a5539e23289d82cc286af1de7be1e224e14fd627685"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.04 - Five-Stroke Roll - Fill Application/notes.mid",
+        "bytes": 1681,
+        "sha256": "d2f8f0ea87a68d5369e7b4caa3de87817180fcbcfa3b636e0c5f57eefa40164d"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.04 - Five-Stroke Roll - Fill Application/song.ini",
+        "bytes": 1054,
+        "sha256": "30749d026db19bf06191559c1d80fcd591569992b0d55a9fdf9c3b5bf2028959"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.04 - Five-Stroke Roll - Fill Application/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.05 - Six-Stroke Roll (70 BPM)/drums.ogg",
+        "bytes": 887095,
+        "sha256": "3035764cdf3ce5559a7da98c25446c71cad2c1d73d40c79bac32d5c7ca817beb"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.05 - Six-Stroke Roll (70 BPM)/notes.mid",
+        "bytes": 1281,
+        "sha256": "a2445e0eabfc03918068cc6f25aca8f146b3f2ad1649fe8cfb0a6297691710cd"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.05 - Six-Stroke Roll (70 BPM)/song.ini",
+        "bytes": 1026,
+        "sha256": "a8a9abe5277a9bc669f2ef251a4c46f47d3d939866679aab8bb13be01eddae73"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.05 - Six-Stroke Roll (70 BPM)/song.ogg",
+        "bytes": 89695,
+        "sha256": "a53b0eabccef83bc6548b5044346d11e7b0b3d9661ddbc02130e0dae7fd2b57d"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.06 - Six-Stroke Roll (90 BPM)/drums.ogg",
+        "bytes": 709423,
+        "sha256": "2b15640e158d688aa310f45d18b56088eddd709b62d69215b84de36accc55dcf"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.06 - Six-Stroke Roll (90 BPM)/notes.mid",
+        "bytes": 1281,
+        "sha256": "34c4adc1531c08c209c816f928a76d168f3cbda2e72ce0c2cfb9c14cc7817246"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.06 - Six-Stroke Roll (90 BPM)/song.ini",
+        "bytes": 941,
+        "sha256": "0f6ee34c252ffca496b06d4bfe1d37e30898121e9b2f1246ef260917b90fa280"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.06 - Six-Stroke Roll (90 BPM)/song.ogg",
+        "bytes": 82545,
+        "sha256": "05be83413e6af5e77eb1952ebb877ffe98eef13d67b57434e4779b343a8a2487"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.07 - Six-Stroke Roll (110 BPM)/drums.ogg",
+        "bytes": 751652,
+        "sha256": "6cee02a1fc09628efdb28fe8a0e8364506d756af443badde08dbbbfb79c8c5d6"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.07 - Six-Stroke Roll (110 BPM)/notes.mid",
+        "bytes": 1673,
+        "sha256": "8b31fb48bd89d836e2dfa08113265efb4a42df55119157fa190a7ccfa21325ef"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.07 - Six-Stroke Roll (110 BPM)/song.ini",
+        "bytes": 914,
+        "sha256": "28d9eabad81724dd175af68d39f462148cdcd04f74e969b9ef8c382e556ea3a7"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.07 - Six-Stroke Roll (110 BPM)/song.ogg",
+        "bytes": 102668,
+        "sha256": "9a677588e94549017a7efae17632e2621f4ae1a53819e60c0d8883133b907a99"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.08 - Six-Stroke Roll - Fill Application/drums.ogg",
+        "bytes": 1082157,
+        "sha256": "717f425da9fa004cb65849c9658698924348a7778c92de93f1f7e000fa810937"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.08 - Six-Stroke Roll - Fill Application/notes.mid",
+        "bytes": 1745,
+        "sha256": "a1229cd65ad3bdf9c6c4b01a9ca9fa82f16d66f274ebc00fbc7e9ea49e7fda34"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.08 - Six-Stroke Roll - Fill Application/song.ini",
+        "bytes": 1027,
+        "sha256": "564bfb703cc24ecd710f11457a1bf24c0ddb7004daa70bacf04cc529827c3234"
+      },
+      {
+        "path": "SightKick Method - Lesson 22.08 - Six-Stroke Roll - Fill Application/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.01 - Seven-Stroke Roll (65 BPM)/drums.ogg",
+        "bytes": 960082,
+        "sha256": "86f30f174f2b7681061b0e130e7d446c606c182527ae7b01b148273384719887"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.01 - Seven-Stroke Roll (65 BPM)/notes.mid",
+        "bytes": 1473,
+        "sha256": "043ff7232b6e551186f2476f4c9fb0ef0413fca4dd57649e800b093bb14a67c4"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.01 - Seven-Stroke Roll (65 BPM)/song.ini",
+        "bytes": 993,
+        "sha256": "e0f0039ecfb6e8c5a090014aa3143fef78195bca3bf325611ae6c860cbb907ad"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.01 - Seven-Stroke Roll (65 BPM)/song.ogg",
+        "bytes": 92253,
+        "sha256": "8d083b7e4b39e3c65163f9501fa70a6632aac123369be6a588d02c5c7c04c5eb"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.02 - Seven-Stroke Roll (85 BPM)/drums.ogg",
+        "bytes": 755802,
+        "sha256": "2fafbd46f35a1bc634adbabb2a5e86895d675f1769fb62775d8beb89af8d1c10"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.02 - Seven-Stroke Roll (85 BPM)/notes.mid",
+        "bytes": 1473,
+        "sha256": "3134e9671636151298354ff8bfba6e826634f46868c1a29b904cf32504b78d24"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.02 - Seven-Stroke Roll (85 BPM)/song.ini",
+        "bytes": 963,
+        "sha256": "390ca41a18647af9801e395f8386affe694b17e16ead390fc81b925581984ab8"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.02 - Seven-Stroke Roll (85 BPM)/song.ogg",
+        "bytes": 81900,
+        "sha256": "1bd0dcecc30819638535276f196e7786259949c9e4b965862d07bb56559cd59a"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.03 - Seven-Stroke Roll (105 BPM)/drums.ogg",
+        "bytes": 795474,
+        "sha256": "0a7c8ffb622fcd4b0cfec76a15184835670c211bb6ac23d8e16c071a6166d549"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.03 - Seven-Stroke Roll (105 BPM)/notes.mid",
+        "bytes": 1929,
+        "sha256": "5ed4036db0209b7628a910801993cb1f606f4d25abe64ccaae7080e0007ce742"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.03 - Seven-Stroke Roll (105 BPM)/song.ini",
+        "bytes": 922,
+        "sha256": "edc0958369ca1bf2b3c4abf5e8b897616e84e026a342f198e23dc8d7775b4da8"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.03 - Seven-Stroke Roll (105 BPM)/song.ogg",
+        "bytes": 103092,
+        "sha256": "e3e612c20214a801e5f8d4c0956dca114297ada17d0f120e43b8344e1a106051"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.04 - Seven-Stroke Roll - Fill Application/drums.ogg",
+        "bytes": 870724,
+        "sha256": "70fc31ead0fc57f81df39666bda596a9fd51dc8f7d02e84ddbf31e80ae6f0200"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.04 - Seven-Stroke Roll - Fill Application/notes.mid",
+        "bytes": 1383,
+        "sha256": "e8d0d8d7fb23156cd0390b4e8d1e7ad7d1ca45b32b15b3522ca039a449ac7e5a"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.04 - Seven-Stroke Roll - Fill Application/song.ini",
+        "bytes": 1034,
+        "sha256": "e99bc5c03181bfed5eb35873d21933111b0f0913c6493eb11ffd7a3b34a052d4"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.04 - Seven-Stroke Roll - Fill Application/song.ogg",
+        "bytes": 79329,
+        "sha256": "5d554c67d1e1491ead2de4ca5f32708fe162222573397f60279c352156d82006"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.05 - Nine-Stroke Roll (60 BPM)/drums.ogg",
+        "bytes": 550162,
+        "sha256": "9fa6d19183be0676ad47389f836739ebc9bbfca524d1466be52d48ce85cf0cfa"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.05 - Nine-Stroke Roll (60 BPM)/notes.mid",
+        "bytes": 689,
+        "sha256": "fd3a0814940fb89e27eab02a10604c7955f4e828b562d71700ba111dad2f3ed0"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.05 - Nine-Stroke Roll (60 BPM)/song.ini",
+        "bytes": 1002,
+        "sha256": "fe047f7a10fd096a008d54f20546665f24c1e37b4e24467a155ad844d5d773ac"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.05 - Nine-Stroke Roll (60 BPM)/song.ogg",
+        "bytes": 65824,
+        "sha256": "bfb67066dbc50f0b38f1d3ad2952fa37d85957ba961946241b0af80a12eccd60"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.06 - Nine-Stroke Roll (80 BPM)/drums.ogg",
+        "bytes": 657067,
+        "sha256": "c1140b468b18c9aa040970dee09f62571a241f4273306c1931469648259692c3"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.06 - Nine-Stroke Roll (80 BPM)/notes.mid",
+        "bytes": 981,
+        "sha256": "fb3227392ea6197f1fc6196dbf6db8a0e84a0fe8a9cb5dab8a5b0fc83ff7b1cb"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.06 - Nine-Stroke Roll (80 BPM)/song.ini",
+        "bytes": 962,
+        "sha256": "79a6bcd41e13a351d267aa4dba2ec90b11425cf928a32385d4ddba912ba9ea37"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.06 - Nine-Stroke Roll (80 BPM)/song.ogg",
+        "bytes": 84855,
+        "sha256": "d53c16403dee1542c916ef3331edf417f7cacaf74830d843ea7f4339000cc5c5"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.07 - Nine-Stroke Roll (100 BPM)/drums.ogg",
+        "bytes": 736858,
+        "sha256": "f8cf1aa04829115f3d720d737325523a14b023757b2756e222c88b797a5d7fd4"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.07 - Nine-Stroke Roll (100 BPM)/notes.mid",
+        "bytes": 1273,
+        "sha256": "0051797ae2016acc3a3dc118d749d62074325f313c6db2f575ac18b8f31af281"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.07 - Nine-Stroke Roll (100 BPM)/song.ini",
+        "bytes": 935,
+        "sha256": "203c0a4263654daadfb3a808bb5bee8af07acf60680bc5475d139643bc311e45"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.07 - Nine-Stroke Roll (100 BPM)/song.ogg",
+        "bytes": 104685,
+        "sha256": "c5da35b09c8e4505b09bfe32f7a34dea4ad7802199372b78f9ef02e0b2f10c76"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.08 - Nine-Stroke Roll - Fill Application/drums.ogg",
+        "bytes": 887152,
+        "sha256": "4ae84e5c1ea3ef49d52b008e08e4ec5dd28a6ac488446da971d920cec00fcee4"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.08 - Nine-Stroke Roll - Fill Application/notes.mid",
+        "bytes": 1260,
+        "sha256": "d63651c7bf6a24a6d2072a9f9038f65a325508e47b8e26fa89898343442754f1"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.08 - Nine-Stroke Roll - Fill Application/song.ini",
+        "bytes": 1004,
+        "sha256": "bf133de45b3e7b7726d771c4f4f1be65b59bcc0cdb8239a9e1d045d6d3dd7bad"
+      },
+      {
+        "path": "SightKick Method - Lesson 23.08 - Nine-Stroke Roll - Fill Application/song.ogg",
+        "bytes": 82545,
+        "sha256": "05be83413e6af5e77eb1952ebb877ffe98eef13d67b57434e4779b343a8a2487"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.01 - 12-8 Rock Feel/drums.ogg",
+        "bytes": 909319,
+        "sha256": "641a73ceb11452bf313d321863c09e84d3966a5ddea7587826483ee5381d7f6f"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.01 - 12-8 Rock Feel/notes.mid",
+        "bytes": 933,
+        "sha256": "9412494e79404c0e55ec082d29d45a03538a553f64d19efea62bbc2b14db4c25"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.01 - 12-8 Rock Feel/song.ini",
+        "bytes": 934,
+        "sha256": "e69de71d752be3743b5a2195880089d5ef1ab75611e5d28b732b99cba843c207"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.01 - 12-8 Rock Feel/song.ogg",
+        "bytes": 88602,
+        "sha256": "0d2ea8b62c122528744f787dd7184f325cadf64859b33765dab5b4a5275b8ea2"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.02 - 6-8 Groove/drums.ogg",
+        "bytes": 671098,
+        "sha256": "127dc3a6eab366626035be240453f0bf96779a5e9b63183baf97573da8354161"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.02 - 6-8 Groove/notes.mid",
+        "bytes": 767,
+        "sha256": "b570f5ce0e400f3a0da6a1b6593fb9a067f7b6101ebc4d44dbec3f55ae78f428"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.02 - 6-8 Groove/song.ini",
+        "bytes": 902,
+        "sha256": "4dc9185e91c73c11d9638d6ea4383decb440dd065ab8703ae01dd24fb750710f"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.02 - 6-8 Groove/song.ogg",
+        "bytes": 71076,
+        "sha256": "acd384e7fdd0f8cfbfbbd2b20501beea160492d2c4f0c4be2fbd5a6c6dff08dc"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.03 - Slow 12-8 Blues/drums.ogg",
+        "bytes": 687898,
+        "sha256": "2a3744c0da34d3f546fbb13e10ff791331ff976db9d687dbc86b40e0d3b585a5"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.03 - Slow 12-8 Blues/notes.mid",
+        "bytes": 631,
+        "sha256": "dabc630b4ca8085312b503f0c0fb395b96b0a520ccc1e45c1dcf734838310233"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.03 - Slow 12-8 Blues/song.ini",
+        "bytes": 920,
+        "sha256": "1748dbe42fc6e8b03f5ec398c55137d47039d2e3db873ef87060a4ef92e6bd72"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.03 - Slow 12-8 Blues/song.ogg",
+        "bytes": 67598,
+        "sha256": "68b7baa068d0db16788218aa62bbf3b64f887ec191960f063c9f1e6944ed72d0"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.04 - Medium Blues Shuffle in 6-8/drums.ogg",
+        "bytes": 643024,
+        "sha256": "f3b9ad2d93772585bb59efec2bda431a595fdd12a4cb392df2a12bbfcfe7c02b"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.04 - Medium Blues Shuffle in 6-8/notes.mid",
+        "bytes": 947,
+        "sha256": "d2f98a432bb739bfce58e5caf26e39d3246321782c8e1e0d25f2be434b7e3d88"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.04 - Medium Blues Shuffle in 6-8/song.ini",
+        "bytes": 967,
+        "sha256": "3ebdaa099f8bd2baabedd88ce689da251b24ff3472fb61a91556c39cef434eb6"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.04 - Medium Blues Shuffle in 6-8/song.ogg",
+        "bytes": 71076,
+        "sha256": "acd384e7fdd0f8cfbfbbd2b20501beea160492d2c4f0c4be2fbd5a6c6dff08dc"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.05 - Half-Time 6-8 Groove/drums.ogg",
+        "bytes": 872999,
+        "sha256": "a4d5c4b80060d6c1623520d547d2bdc391fd1ab6623df4007dd2ed3599736ec8"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.05 - Half-Time 6-8 Groove/notes.mid",
+        "bytes": 1127,
+        "sha256": "95e401c305ced0a90b0f2240bc787ac7eacd08672202a3e9286ae062e3f312a9"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.05 - Half-Time 6-8 Groove/song.ini",
+        "bytes": 927,
+        "sha256": "d9783fe192647a09d9adc99a363cbeafa2a71e577dcbc881840c2eae19c84b08"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.05 - Half-Time 6-8 Groove/song.ogg",
+        "bytes": 71076,
+        "sha256": "acd384e7fdd0f8cfbfbbd2b20501beea160492d2c4f0c4be2fbd5a6c6dff08dc"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.06 - Cut-Time Train Beat/drums.ogg",
+        "bytes": 1078939,
+        "sha256": "d27db65afc684cc1bc1da7c87dc15b313587ed6f909be1ffe427e087b49116c6"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.06 - Cut-Time Train Beat/notes.mid",
+        "bytes": 2007,
+        "sha256": "7f13ed09d4cae0b71abe4682c386473ea8c073d399eab5d2a84f7afe55d8e0fa"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.06 - Cut-Time Train Beat/song.ini",
+        "bytes": 966,
+        "sha256": "4327a9be63b3581934812c2b533959ff768e5a938d2f124770dbd7736f516f18"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.06 - Cut-Time Train Beat/song.ogg",
+        "bytes": 75269,
+        "sha256": "e00c8a179bd5054b67324ce4de161780c5ad6d80aad14ffac0f1e44ff087e482"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.07 - Classic Two-Beat in Cut Time/drums.ogg",
+        "bytes": 816881,
+        "sha256": "18df19d671d476096e33154ff517a3c280bb3bb7f3a5f6e39af4acf44ca65aa9"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.07 - Classic Two-Beat in Cut Time/notes.mid",
+        "bytes": 967,
+        "sha256": "992003539801f15b8b8923398fbafdeb700312b12e7e7784b0599ab00a64d37d"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.07 - Classic Two-Beat in Cut Time/song.ini",
+        "bytes": 939,
+        "sha256": "d11dac3bdd23cb98cb7e118fbb302d9b83574f645720ba62e99efe9e0886ebc1"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.07 - Classic Two-Beat in Cut Time/song.ogg",
+        "bytes": 75269,
+        "sha256": "e00c8a179bd5054b67324ce4de161780c5ad6d80aad14ffac0f1e44ff087e482"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.08 - Rainy Tuesday Etude/drums.ogg",
+        "bytes": 1019095,
+        "sha256": "83cd62198a3ebb40763d4a1d9519d50bf7c87895176becddf88bedbeeb88038b"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.08 - Rainy Tuesday Etude/notes.mid",
+        "bytes": 837,
+        "sha256": "86bbbc832e57dbaadaff1e5325e04088dfc81444ac0b8491840ce048aa1c57af"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.08 - Rainy Tuesday Etude/song.ini",
+        "bytes": 979,
+        "sha256": "87cb0800c03978948bca24d959cfcfada91bc0dcd730e6751b7ffed963c6a2ea"
+      },
+      {
+        "path": "SightKick Method - Lesson 24.08 - Rainy Tuesday Etude/song.ogg",
+        "bytes": 87404,
+        "sha256": "2798d56de3e846432359a91dd7d649800a78c5beab5a7e1b0c4354c16047d011"
+      },
+      {
+        "path": "SightKick Method - Lesson 25.01 - Encore Etude One/drums.ogg",
+        "bytes": 1116252,
+        "sha256": "81a0369aceb54a770840561c81e1985340bbf9547292889bb665e9b38f616748"
+      },
+      {
+        "path": "SightKick Method - Lesson 25.01 - Encore Etude One/notes.mid",
+        "bytes": 1921,
+        "sha256": "6dc708d1ecb8880a86bff7241cc1a7439b816f953bb19c139bc8ade7ab60d046"
+      },
+      {
+        "path": "SightKick Method - Lesson 25.01 - Encore Etude One/song.ini",
+        "bytes": 1133,
+        "sha256": "98314efc4c505228c06560bd6afcceac28df3b0c062534c655aad5575ca06554"
+      },
+      {
+        "path": "SightKick Method - Lesson 25.01 - Encore Etude One/song.ogg",
+        "bytes": 111756,
+        "sha256": "60758e37b3606853e9706de515ed54d3ce4015fcc9334bada7838520c73c5b6e"
+      },
+      {
+        "path": "SightKick Method - Lesson 25.02 - Encore Etude Two/drums.ogg",
+        "bytes": 856105,
+        "sha256": "051a9d5489a9dcc7345e8c50946e76857d1f777df2df472e1a3299721cd4292f"
+      },
+      {
+        "path": "SightKick Method - Lesson 25.02 - Encore Etude Two/notes.mid",
+        "bytes": 1639,
+        "sha256": "1797be327585cae706d410691d84fe614c390701f99b12fc0b1c983d4a89411c"
+      },
+      {
+        "path": "SightKick Method - Lesson 25.02 - Encore Etude Two/song.ini",
+        "bytes": 1044,
+        "sha256": "5f28501c3bfcf8fb00edabdc0f8870b6dbd3a2e5aef149b518cff829a9533a0f"
+      },
+      {
+        "path": "SightKick Method - Lesson 25.02 - Encore Etude Two/song.ogg",
+        "bytes": 106783,
+        "sha256": "cd52c186fc21c9b700dfbf791f002d7c71fefe07726fc9ff740fc18af96c53d5"
+      }
+    ]
+  },
+  "librarySources": {
+    "yandex-drums-2026-08-09.json": {
+      "bytes": 5178,
+      "sha256": "8d2bbe54ecba7307fd1acf1a0e4d23a540d12a69145d39085a15c6d34b616835",
+      "trackCount": 13,
+      "canonicalSha256": "90df6466df67ecf3f3351fcfb26a7d797fd7e883a1d541a5abc57953a910a184"
+    },
+    "yandex-favorites-2026-08-10.json": {
+      "bytes": 77577,
+      "sha256": "d01a4979de5b8c85642153d48a1be9ecf6f398227f44f92ae28ea80e3d43fa69",
+      "trackCount": 230,
+      "canonicalSha256": "d90431a5a4f944523f2059ee733872069e372319c0bf9c5744a45680e5158ea2"
+    }
+  },
+  "notices": {
+    "Drumroll-MIT.txt": {
+      "bytes": 1089,
+      "sha256": "049503eb681cc42116498908e747c9cc1599fece4d470cf6e0d51a28f7d09520"
+    },
+    "THIRD_PARTY_NOTICES.md": {
+      "bytes": 1930,
+      "sha256": "91d84ffafbd5c2db23909a0580a6304277ad854b6ca95a7e0c657d731482dea1"
+    }
+  },
+  "ffmpeg": {
+    "runtimeId": "ffmpeg-8.1.2-drumroll-lgpl-macos-arm64",
+    "version": "8.1.2",
+    "license": "LGPL-2.1-or-later",
+    "source": {
+      "url": "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+      "sha256": "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c"
+    },
+    "architecture": "arm64",
+    "minimumMacOSVersion": "12.0",
+    "externalLibraries": [
+      "zlib"
+    ],
+    "files": [
+      {
+        "path": "bin/ffmpeg",
+        "bytes": 3044216,
+        "sha256": "4c6c7f6e67727d42807372c8cfb315c6a201a8d837f39f679231d19576b6d637"
+      },
+      {
+        "path": "bin/ffprobe",
+        "bytes": 2884584,
+        "sha256": "9af8e9f7a6943466010e4499831b482519c94dbf211d63abb606bcdf4ad994e9"
+      },
+      {
+        "path": "licenses/COPYING.LGPLv2.1",
+        "bytes": 26517,
+        "sha256": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30"
+      },
+      {
+        "path": "licenses/LICENSE.md",
+        "bytes": 4346,
+        "sha256": "2e1d16c72fd74e12063776371da757322f8b77589386532f4fd8634bde7de1af"
+      },
+      {
+        "path": "provenance.json",
+        "bytes": 3363,
+        "sha256": "ba92b2be8e52e0a89071adff38611d1b6cd3f24dd564862e39a140f2b2cd841a"
+      }
+    ],
+    "versionLine": "ffmpeg version 8.1.2-drumroll-lgpl Copyright (c) 2000-2026 the FFmpeg developers",
+    "configurationLine": "configuration: --prefix=/opt/drumroll-ffmpeg-runtime --extra-version=drumroll-lgpl --arch=arm64 --cc=clang --disable-autodetect --enable-zlib --disable-doc --disable-debug --disable-network --disable-indevs --disable-outdevs --disable-devices --disable-ffplay --disable-sdl2 --disable-shared --enable-static --enable-small --disable-everything --enable-ffmpeg --enable-ffprobe --enable-protocol='file,pipe' --enable-demuxer='aac,flac,image2,image2pipe,image_jpeg_pipe,image_png_pipe,image_webp_pipe,matroska,mjpeg,mov,mp3,ogg,wav' --enable-muxer='image2,image2pipe,mjpeg,null,ogg,wav' --enable-decoder='aac,aac_fixed,alac,flac,mjpeg,mp3,mp3float,opus,pcm_f32be,pcm_f32le,pcm_f64be,pcm_f64le,pcm_s8,pcm_s16be,pcm_s16le,pcm_s24be,pcm_s24le,pcm_s32be,pcm_s32le,pcm_u8,pcm_u16be,pcm_u16le,pcm_u24be,pcm_u24le,pcm_u32be,pcm_u32le,png,vorbis,webp' --enable-encoder='mjpeg,pcm_s16le,vorbis' --enable-parser='aac,flac,mjpeg,mpegaudio,opus,png,vorbis,webp' --enable-filter='abuffer,abuffersink,aformat,amix,anull,aresample,asetrate,atrim,buffer,buffersink,format,null,pan,scale,setpts,trim,volume'",
+    "provenance": {
+      "schemaVersion": 1,
+      "runtimeId": "ffmpeg-8.1.2-drumroll-lgpl-macos-arm64",
+      "component": "FFmpeg",
+      "version": "8.1.2",
+      "source": {
+        "url": "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+        "sha256": "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c"
+      },
+      "sourceDateEpoch": 1781654400,
+      "license": "LGPL-2.1-or-later",
+      "platform": "darwin",
+      "architecture": "arm64",
+      "minimumMacOSVersion": "12.0",
+      "externalLibraries": [
+        "zlib"
+      ],
+      "configureArgs": [
+        "--prefix=/opt/drumroll-ffmpeg-runtime",
+        "--extra-version=drumroll-lgpl",
+        "--arch=arm64",
+        "--cc=clang",
+        "--disable-autodetect",
+        "--enable-zlib",
+        "--disable-doc",
+        "--disable-debug",
+        "--disable-network",
+        "--disable-indevs",
+        "--disable-outdevs",
+        "--disable-devices",
+        "--disable-ffplay",
+        "--disable-sdl2",
+        "--disable-shared",
+        "--enable-static",
+        "--enable-small",
+        "--disable-everything",
+        "--enable-ffmpeg",
+        "--enable-ffprobe",
+        "--enable-protocol=file,pipe",
+        "--enable-demuxer=aac,flac,image2,image2pipe,image_jpeg_pipe,image_png_pipe,image_webp_pipe,matroska,mjpeg,mov,mp3,ogg,wav",
+        "--enable-muxer=image2,image2pipe,mjpeg,null,ogg,wav",
+        "--enable-decoder=aac,aac_fixed,alac,flac,mjpeg,mp3,mp3float,opus,pcm_f32be,pcm_f32le,pcm_f64be,pcm_f64le,pcm_s8,pcm_s16be,pcm_s16le,pcm_s24be,pcm_s24le,pcm_s32be,pcm_s32le,pcm_u8,pcm_u16be,pcm_u16le,pcm_u24be,pcm_u24le,pcm_u32be,pcm_u32le,png,vorbis,webp",
+        "--enable-encoder=mjpeg,pcm_s16le,vorbis",
+        "--enable-parser=aac,flac,mjpeg,mpegaudio,opus,png,vorbis,webp",
+        "--enable-filter=abuffer,abuffersink,aformat,amix,anull,aresample,asetrate,atrim,buffer,buffersink,format,null,pan,scale,setpts,trim,volume"
+      ],
+      "toolchain": {
+        "clang": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+        "macOSSDK": "26.5"
+      },
+      "binaries": {
+        "ffmpeg": {
+          "bytes": 3044216,
+          "sha256": "4c6c7f6e67727d42807372c8cfb315c6a201a8d837f39f679231d19576b6d637"
+        },
+        "ffprobe": {
+          "bytes": 2884584,
+          "sha256": "9af8e9f7a6943466010e4499831b482519c94dbf211d63abb606bcdf4ad994e9"
+        }
+      },
+      "versionLine": "ffmpeg version 8.1.2-drumroll-lgpl Copyright (c) 2000-2026 the FFmpeg developers",
+      "configurationLine": "configuration: --prefix=/opt/drumroll-ffmpeg-runtime --extra-version=drumroll-lgpl --arch=arm64 --cc=clang --disable-autodetect --enable-zlib --disable-doc --disable-debug --disable-network --disable-indevs --disable-outdevs --disable-devices --disable-ffplay --disable-sdl2 --disable-shared --enable-static --enable-small --disable-everything --enable-ffmpeg --enable-ffprobe --enable-protocol='file,pipe' --enable-demuxer='aac,flac,image2,image2pipe,image_jpeg_pipe,image_png_pipe,image_webp_pipe,matroska,mjpeg,mov,mp3,ogg,wav' --enable-muxer='image2,image2pipe,mjpeg,null,ogg,wav' --enable-decoder='aac,aac_fixed,alac,flac,mjpeg,mp3,mp3float,opus,pcm_f32be,pcm_f32le,pcm_f64be,pcm_f64le,pcm_s8,pcm_s16be,pcm_s16le,pcm_s24be,pcm_s24le,pcm_s32be,pcm_s32le,pcm_u8,pcm_u16be,pcm_u16le,pcm_u24be,pcm_u24le,pcm_u32be,pcm_u32le,png,vorbis,webp' --enable-encoder='mjpeg,pcm_s16le,vorbis' --enable-parser='aac,flac,mjpeg,mpegaudio,opus,png,vorbis,webp' --enable-filter='abuffer,abuffersink,aformat,amix,anull,aresample,asetrate,atrim,buffer,buffersink,format,null,pan,scale,setpts,trim,volume'"
+    },
+    "linkedLibraries": {
+      "ffmpeg": [
+        "/usr/lib/libSystem.B.dylib",
+        "/usr/lib/libz.1.dylib",
+        "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+        "/System/Library/Frameworks/CoreVideo.framework/Versions/A/CoreVideo",
+        "/System/Library/Frameworks/CoreMedia.framework/Versions/A/CoreMedia"
+      ],
+      "ffprobe": [
+        "/usr/lib/libSystem.B.dylib",
+        "/usr/lib/libz.1.dylib",
+        "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+        "/System/Library/Frameworks/CoreVideo.framework/Versions/A/CoreVideo",
+        "/System/Library/Frameworks/CoreMedia.framework/Versions/A/CoreMedia"
+      ]
+    }
+  }
+}

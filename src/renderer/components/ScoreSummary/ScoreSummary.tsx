@@ -1,5 +1,5 @@
 import { Button, Modal } from 'antd';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScoreData, Song } from '../../../types';
 import { Difficulty } from 'scan-chart';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -24,6 +24,9 @@ interface Props {
   isOpen: boolean;
   onRetry: () => void;
   onNextSong: () => void;
+  nextLabel?: string;
+  autoContinueEnabled?: boolean;
+  autoContinueSeconds?: number;
   onCoach?: () => void;
   songData: Song | undefined;
   difficulty: Difficulty;
@@ -46,10 +49,76 @@ function noteCountLabel(count: number, verb: string): string {
   return `${count} note${count === 1 ? '' : 's'} ${verb}`;
 }
 
+interface AutoContinueCountdownProps {
+  label: string;
+  seconds: number;
+  onComplete: () => void;
+}
+
+function AutoContinueCountdown({
+  label,
+  seconds,
+  onComplete,
+}: AutoContinueCountdownProps) {
+  const [remaining, setRemaining] = useState(() =>
+    Math.max(1, Math.round(seconds)),
+  );
+  const [cancelled, setCancelled] = useState(false);
+  const triggeredRef = useRef(false);
+
+  useEffect(() => {
+    if (remaining <= 0 || cancelled) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setRemaining((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [cancelled, remaining]);
+
+  useEffect(() => {
+    if (remaining !== 0 || cancelled || triggeredRef.current) {
+      return;
+    }
+
+    triggeredRef.current = true;
+    onComplete();
+  }, [cancelled, onComplete, remaining]);
+
+  if (cancelled) {
+    return null;
+  }
+
+  return (
+    <div
+      className="flex items-center justify-between gap-3 rounded-xl border border-accent-soft-border bg-accent-soft-bg px-3 py-2 text-sm text-text-muted"
+      role="status"
+      data-testid="score-auto-continue"
+    >
+      <span>
+        {label} starts in {remaining}s
+      </span>
+      <Button
+        type="text"
+        size="small"
+        data-testid="score-auto-continue-cancel"
+        onClick={() => setCancelled(true)}
+      >
+        Cancel
+      </Button>
+    </div>
+  );
+}
+
 export function ScoreSummary({
   isOpen,
   onRetry,
   onNextSong,
+  nextLabel = 'Back to library',
+  autoContinueEnabled = false,
+  autoContinueSeconds = 8,
   onCoach,
   songData,
   difficulty,
@@ -101,36 +170,45 @@ export function ScoreSummary({
     </>
   );
   const footer = (
-    <div className="flex gap-3 w-full">
-      <Button
-        data-testid="score-retry"
-        className="grow"
-        onClick={() => onRetry()}
-        icon={<FontAwesomeIcon icon={faRepeat} />}
-        size="large"
-      >
-        Play again
-      </Button>
-      {practiceSummary && onCoach && (
+    <div className="flex w-full flex-col gap-3">
+      {isOpen && autoContinueEnabled && (
+        <AutoContinueCountdown
+          label={nextLabel}
+          seconds={autoContinueSeconds}
+          onComplete={onNextSong}
+        />
+      )}
+      <div className="flex w-full gap-3">
         <Button
-          data-testid="score-coach"
+          data-testid="score-retry"
           className="grow"
-          onClick={onCoach}
-          icon={<FontAwesomeIcon icon={faWandMagicSparkles} />}
+          onClick={() => onRetry()}
+          icon={<FontAwesomeIcon icon={faRepeat} />}
           size="large"
         >
-          Coach
+          Play again
         </Button>
-      )}
-      <Button
-        data-testid="score-next"
-        className="grow"
-        type="primary"
-        onClick={() => onNextSong()}
-        size="large"
-      >
-        Back to library
-      </Button>
+        {practiceSummary && onCoach && (
+          <Button
+            data-testid="score-coach"
+            className="grow"
+            onClick={onCoach}
+            icon={<FontAwesomeIcon icon={faWandMagicSparkles} />}
+            size="large"
+          >
+            Coach
+          </Button>
+        )}
+        <Button
+          data-testid="score-next"
+          className="grow"
+          type="primary"
+          onClick={() => onNextSong()}
+          size="large"
+        >
+          {nextLabel}
+        </Button>
+      </div>
     </div>
   );
 

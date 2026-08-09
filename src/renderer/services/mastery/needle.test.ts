@@ -12,7 +12,7 @@ describe('needleMoverLine', () => {
     expect(needleMoverLine(breakdown)).toMatch(/play a run/i);
   });
 
-  it('names accuracy when it is the worst term', () => {
+  it('names accuracy when coverage is measured and full-speed accuracy is the gap', () => {
     const breakdown = computeMastery({
       goal: GOAL,
       songRuns: [
@@ -40,6 +40,7 @@ describe('needleMoverLine', () => {
         },
       ],
       allRuns: [],
+      chartTotalNotes: 100,
     });
 
     expect(needleMoverLine(breakdown)).toMatch(/accuracy at full speed/i);

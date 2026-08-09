@@ -10,6 +10,7 @@ import {
   powerSaveBlocker,
 } from 'electron';
 import Store from 'electron-store';
+import { StorageSchema } from '../types';
 import MenuBuilder from './menu';
 import { ASSET_PROTOCOL, resolveAssetFilePath, resolveHtmlPath } from './util';
 import { AppUpdater } from './AppUpdater';
@@ -41,6 +42,8 @@ import {
 } from './ipc/remoteAutoChart';
 import { searchYoutube } from './ipc/searchYoutube';
 import { fetchMyMusic } from './ipc/myMusic';
+import { loadLibraryCandidates } from './ipc/loadLibraryCandidates';
+import { bootstrapLessonLibrary } from './lessonLibrary';
 import { savePracticeRun, loadPracticeRuns } from './ipc/practiceStats';
 import {
   configureCoachStore,
@@ -66,6 +69,7 @@ class AppState {
   private powerSaveBlockerId: number = -1;
   readonly store = new Store();
   private libraryRoot = this.store.get('lastOpenedPath') as string | undefined;
+  private lessonLibraryRoot: string | undefined;
 
   static getInstance(): AppState {
     if (!AppState.instance) {
@@ -78,6 +82,13 @@ class AppState {
   setLibraryRoot(root: string): void {
     this.libraryRoot = root;
     this.store.set('lastOpenedPath', root);
+  }
+
+  getLibraryRoots(): string[] {
+    return [this.libraryRoot, this.lessonLibraryRoot].filter(
+      (root, index, roots): root is string =>
+        Boolean(root) && roots.indexOf(root) === index,
+    );
   }
 
   start(): void {
@@ -106,8 +117,12 @@ class AppState {
     app
       .whenReady()
       .then(() => {
+        this.bootstrapBundledLessons();
         protocol.handle(ASSET_PROTOCOL, (request) => {
-          const filePath = resolveAssetFilePath(request.url, this.libraryRoot);
+          const filePath = resolveAssetFilePath(
+            request.url,
+            this.getLibraryRoots(),
+          );
 
           if (!filePath) {
             return new Response('Forbidden', { status: 403 });
@@ -150,6 +165,9 @@ class AppState {
     ipcMain.on('save-test-auto-chart-remote', saveAndTestRemoteAutoChart);
     ipcMain.on('search-youtube', searchYoutube);
     ipcMain.on('my-music-fetch', fetchMyMusic);
+    ipcMain.on('load-library-candidates', (event) => {
+      loadLibraryCandidates(event, this.librarySourcesDirectory());
+    });
 
     ipcMain.on('check-stem-tools', checkStemTools);
     ipcMain.on('check-stem-tools-update', checkStemToolsUpdate);
@@ -189,6 +207,48 @@ class AppState {
     });
     ipcMain.on('prevent-sleep', () => this.preventSleep());
     ipcMain.on('resume-sleep', () => this.resumeSleep());
+  }
+
+  private bundledLessonDirectory(): string {
+    return app.isPackaged
+      ? path.join(process.resourcesPath, 'lesson-library')
+      : path.resolve(__dirname, '../../web/public/library');
+  }
+
+  private librarySourcesDirectory(): string {
+    return app.isPackaged
+      ? path.join(process.resourcesPath, 'library-sources')
+      : path.resolve(__dirname, '../../resources/library-sources');
+  }
+
+  private bootstrapBundledLessons(): void {
+    try {
+      const existingLibraryRoot = this.store.get('lastOpenedPath') as
+        | string
+        | undefined;
+      const existingSongs =
+        (this.store.get('songs') as StorageSchema['songs'] | undefined) ?? {};
+      const result = bootstrapLessonLibrary({
+        bundledRoot: this.bundledLessonDirectory(),
+        userDataRoot: app.getPath('userData'),
+        existingLibraryRoot,
+        existingSongs,
+      });
+
+      if (result.libraryRoot) {
+        this.lessonLibraryRoot = result.libraryRoot;
+      }
+
+      if (result.songs) {
+        this.store.set('songs', result.songs);
+      }
+
+      if (!existingLibraryRoot && result.libraryRoot) {
+        this.setLibraryRoot(result.libraryRoot);
+      }
+    } catch (error) {
+      console.warn('Could not install bundled lesson library:', error);
+    }
   }
 
   async createWindow(): Promise<void> {

@@ -71,7 +71,8 @@ vi.mock('electron', () => ({
 }));
 
 const { AppUpdater } = await import('./AppUpdater');
-const RELEASES_URL = 'https://github.com/Baltsat/sightkick/releases/latest';
+const releaseUrl = (version: string) =>
+  `https://github.com/Baltsat/sightkick/releases/tag/v${version}`;
 
 function build() {
   const send = vi.fn();
@@ -166,7 +167,7 @@ describe('AppUpdater', () => {
     expect(send).toHaveBeenCalledWith('update-status', {
       phase: 'available',
       version: '1.2.0',
-      releaseUrl: RELEASES_URL,
+      releaseUrl: releaseUrl('1.2.0'),
       releaseNotes: undefined,
     });
   });
@@ -271,7 +272,7 @@ describe('AppUpdater', () => {
     expect(lastReply(event, 'update-status').args[0]).toEqual({
       phase: 'available',
       version: '1.2.0',
-      releaseUrl: RELEASES_URL,
+      releaseUrl: releaseUrl('1.2.0'),
       releaseNotes: undefined,
     });
   });

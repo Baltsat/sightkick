@@ -3,14 +3,21 @@ import { useRef, useState } from 'react';
 import { Measure } from '../../../chart-parser/types';
 import { IpcCoachingNotesResponse } from '../../../types';
 import { CoachFindings, CoachSongMetadata } from '../../services/coach';
-import { StoredHitRecord } from '../../services/practice-stats';
+import {
+  RunSummary,
+  StoredHitRecord,
+  StoredPracticeRun,
+} from '../../services/practice-stats';
 import { CoachCard } from './CoachCard';
+import { latestSummaryOnlyRun, SummaryCoachCard } from './SummaryCoachCard';
 
 interface Props {
   result?: CoachFindings;
   song: CoachSongMetadata;
   measures: Measure[];
   records: StoredHitRecord[];
+  summaryRuns?: RunSummary[];
+  fullRuns?: StoredPracticeRun[];
   loading?: boolean;
   onPracticeBars: (start: number, end: number, speed: number) => void;
   onTrainSkill: (lessonId: string) => void;
@@ -21,6 +28,8 @@ export function AICoach({
   song,
   measures,
   records,
+  summaryRuns,
+  fullRuns,
   loading = false,
   onPracticeBars,
   onTrainSkill,
@@ -30,6 +39,14 @@ export function AICoach({
   const [notesLoading, setNotesLoading] = useState(false);
   const notesOffRef = useRef<(() => void) | undefined>(undefined);
   const findings = result?.findings ?? [];
+  const summaryOnlyRun = latestSummaryOnlyRun(summaryRuns, fullRuns);
+  // Full-resolution records are the only source allowed to name exact bars.
+  // A summary-only run becomes a deliberate fallback only when no detail run
+  // has been analyzed, so newer evidence always takes precedence.
+  const showSummaryOnly =
+    findings.length === 0 &&
+    (result?.analyzedRuns ?? fullRuns?.length ?? 0) === 0 &&
+    summaryOnlyRun !== undefined;
   const requestNotes = () => {
     setNotesLoading(true);
     setNotes(undefined);
@@ -72,7 +89,9 @@ export function AICoach({
           {result?.analyzedRuns ?? 0} full-resolution runs analyzed.
         </p>
       </div>
-      {findings.length === 0 ? (
+      {showSummaryOnly ? (
+        <SummaryCoachCard summary={summaryOnlyRun} />
+      ) : findings.length === 0 ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
           description="Finish a scored run to give the coach enough evidence."

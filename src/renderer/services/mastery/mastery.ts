@@ -1,9 +1,5 @@
 import { Difficulty } from 'scan-chart';
-import {
-  aggregateLaneAccuracy,
-  LaneAccuracy,
-  RunSummary,
-} from '../practice-stats';
+import { LaneAccuracy, RunSummary } from '../practice-stats';
 import {
   LaneWeight,
   MasteryBreakdown,
@@ -11,64 +7,7 @@ import {
   MasteryTerm,
 } from './types';
 
-/**
- * mastery(goal) — how close a player is to their stated goal: play one
- * song, at one difficulty, at full (1.0x) speed, cleanly.
- *
- * ┌─────────────────────────────────────────────────────────────────────┐
- * │ mastery = 0.35·accuracy + 0.20·consistency + 0.15·speedFactor        │
- * │         + 0.15·coverage + 0.15·subReadiness                          │
- * └─────────────────────────────────────────────────────────────────────┘
- *
- * All five terms are 0..1 before weighting; the sum of weights is 1, so
- * `mastery` lands in 0..100 once scaled. Each term is returned individually
- * (`MasteryBreakdown`) so the UI can show *why* the number is what it is,
- * and so `worstMasteryTerm` can name the single highest-leverage thing to
- * practice next.
- *
- * — accuracy (dominant, 0.35): best `overallAccuracy` among the goal
- *   song's runs *at 1.0x speed* (see `isFullSpeedRun` below for what
- *   counts as "1.0x" given optional/legacy fields). This is the term that
- *   actually answers "can you play it, for real, at speed" — everything
- *   else is supporting signal, which is why it carries the largest single
- *   weight.
- *
- * — consistency (0.20): median accuracy of the last 5 scoped runs
- *   (regardless of speed — reliability of recent attempts matters even
- *   before you're full-speed). A single lucky perfect run isn't mastery;
- *   a middling-but-steady run of 5 is closer to it than one 100% buried in
- *   a string of 40%s.
- *
- * — speedFactor (0.15): best clean-run speed / 1.0, clamped to [0, 1]. A
- *   "clean" run is one at or above `CLEAN_RUN_ACCURACY_THRESHOLD` — this
- *   term rewards *approaching* 1.0x accurately, not just fast-and-sloppy
- *   runs, and caps at 1 because playing faster than the goal's target
- *   speed isn't "more mastery" for this goal.
- *
- * — coverage (0.15): the largest count of notes attempted (hits+misses) in
- *   any one scoped run, divided by the chart's total note count at this
- *   difficulty. Approximates "have you gotten through the whole song, not
- *   just a favorite 8 bars on repeat" without needing bar-level telemetry
- *   `RunSummary` doesn't carry. When the chart's real total note count
- *   isn't known (no scored Perform run yet at this difficulty — Practice
- *   grinding alone never populates `scoreData`), falls back to the largest
- *   attempted count seen so far as its own denominator, i.e. "fully
- *   covered relative to what you've attempted" rather than defaulting to
- *   100% — a missing denominator must never look like full coverage.
- *
- * — subReadiness (0.15): the player's *global*, cross-song per-lane
- *   accuracy (every song, every run — `aggregateLaneAccuracy`), weighted
- *   by how much this goal song's own runs lean on each lane. A goal song
- *   that's 40% kick hits cares far more about your all-time kick accuracy
- *   than your crash accuracy. No chart parsing involved — lane demand is
- *   read straight off the goal song's own `laneAccuracy` records, and
- *   global accuracy off every stored run in the library.
- *
- * Every helper here is a pure function of its inputs (no clock, no I/O) —
- * the only place "now" or storage enters is the IPC/hook layer that feeds
- * this module `RunSummary[]`.
- */
-
+/** The five transparent terms still sum to one; no hidden lifetime best. */
 export const ACCURACY_WEIGHT = 0.35;
 
 export const CONSISTENCY_WEIGHT = 0.2;
@@ -79,43 +18,125 @@ export const COVERAGE_WEIGHT = 0.15;
 
 export const SUB_READINESS_WEIGHT = 0.15;
 
-/** A run counts as "clean" for the speed-factor term at or above this
- * accuracy. Below it, going faster is just missing notes faster. */
 export const CLEAN_RUN_ACCURACY_THRESHOLD = 0.9;
 
-/** How many of the most recent scoped runs feed the consistency term. */
 export const CONSISTENCY_WINDOW = 5;
 
-function median(values: number[]): number {
-  if (values.length === 0) {
-    return 0;
-  }
+export const RECENT_READINESS_WINDOW_DAYS = 28;
 
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
+export const RETENTION_WINDOW_DAYS = 120;
 
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid];
-}
+export const RECENT_HALF_LIFE_DAYS = 7;
+
+export const RETENTION_HALF_LIFE_DAYS = 28;
+
+export const MIN_RECENT_RUNS_FOR_FULL_READINESS = 3;
+
+export const MIN_RETENTION_RUNS_FOR_FULL_MASTERY = 5;
+
+const DAY_MS = 86_400_000;
 
 function clamp01(value: number): number {
-  return Math.min(Math.max(value, 0), 1);
+  return Number.isFinite(value) ? Math.min(Math.max(value, 0), 1) : 0;
 }
 
 function byCompletedAtAsc(a: RunSummary, b: RunSummary): number {
   return a.completedAt.localeCompare(b.completedAt);
 }
 
-/**
- * Whether `run` counts as played "at 1.0x" for the accuracy/coverage
- * terms. Perform mode is defined to always lock speed at 1x (per
- * `RunSummary.playbackSpeed`'s doc comment) regardless of whether the
- * (optional, backfilled-later) `playbackSpeed` field itself is present, so
- * a Perform run with no stamped speed still safely counts. A Practice run
- * with no stamped speed is genuinely unknown — it predates the field —
- * and is excluded rather than guessed at.
- */
+function timestamp(run: RunSummary): number | undefined {
+  const value = Date.parse(run.completedAt);
+
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function resolveNowMs(
+  runs: readonly RunSummary[],
+  configuredNowMs?: number,
+): number {
+  if (configuredNowMs !== undefined && Number.isFinite(configuredNowMs)) {
+    return configuredNowMs;
+  }
+
+  const latest = Math.max(
+    0,
+    ...runs.flatMap((run) => {
+      const value = timestamp(run);
+
+      return value === undefined ? [] : [value];
+    }),
+  );
+
+  return latest;
+}
+
+function ageDays(run: RunSummary, nowMs: number): number {
+  const completedAt = timestamp(run);
+
+  // Undated legacy summaries remain usable but do not receive a fabricated
+  // historical timestamp. Treat them as current evidence for a finite,
+  // deterministic fallback rather than silently dropping the whole run.
+  return completedAt === undefined
+    ? 0
+    : Math.max(0, nowMs - completedAt) / DAY_MS;
+}
+
+function inWindow(
+  runs: readonly RunSummary[],
+  nowMs: number,
+  windowDays: number,
+): RunSummary[] {
+  return runs.filter((run) => {
+    return ageDays(run, nowMs) <= windowDays;
+  });
+}
+
+function timeDecayedMean(
+  runs: readonly RunSummary[],
+  nowMs: number,
+  halfLifeDays: number,
+  valueFor: (run: RunSummary) => number | undefined,
+): number {
+  let weighted = 0;
+  let weights = 0;
+
+  for (const run of runs) {
+    const age = ageDays(run, nowMs);
+    const value = valueFor(run);
+
+    if (value === undefined || !Number.isFinite(value)) {
+      continue;
+    }
+
+    const weight = 2 ** (-age / halfLifeDays);
+
+    weighted += clamp01(value) * weight;
+    weights += weight;
+  }
+
+  return weights === 0 ? 0 : weighted / weights;
+}
+
+function confidence(count: number, sufficientCount: number): number {
+  return clamp01(count / sufficientCount);
+}
+
+function evidenceWindow(
+  runs: readonly RunSummary[],
+  nowMs: number,
+  windowDays: number,
+) {
+  const ages = runs.map((run) => ageDays(run, nowMs)).filter(Number.isFinite);
+
+  return {
+    windowDays,
+    sampleCount: runs.length,
+    ...(ages.length > 0 ? { newestSampleAgeDays: Math.min(...ages) } : {}),
+    ...(ages.length > 0 ? { oldestSampleAgeDays: Math.max(...ages) } : {}),
+  };
+}
+
+/** See `RunSummary.playbackSpeed`: legacy Perform runs safely imply 1x. */
 export function isFullSpeedRun(run: RunSummary): boolean {
   if (run.playbackSpeed !== undefined) {
     return run.playbackSpeed === 1;
@@ -124,17 +145,6 @@ export function isFullSpeedRun(run: RunSummary): boolean {
   return run.mode === 'perform' || run.mode === undefined;
 }
 
-/**
- * Narrows `songRuns` (every stored run for one song, any difficulty) down
- * to the ones usable for scoring `difficulty`. A run tagged with a
- * *different* difficulty is always excluded. An untagged run (recorded
- * before `RunSummary.difficulty` existed) is included only when
- * `songDifficulties` shows the song never had more than one charted
- * difficulty to begin with — in that case there's no ambiguity about what
- * an untagged run was played at. Otherwise untagged runs are dropped
- * rather than guessed at, matching `isFullSpeedRun`'s stance on missing
- * data.
- */
 export function scopeRunsToDifficulty(
   songRuns: RunSummary[],
   difficulty: Difficulty,
@@ -143,92 +153,101 @@ export function scopeRunsToDifficulty(
   const singleDifficultySong = (songDifficulties?.length ?? 0) <= 1;
 
   return songRuns
-    .filter((run) => {
-      if (run.difficulty !== undefined) {
-        return run.difficulty === difficulty;
-      }
-
-      return singleDifficultySong;
-    })
+    .filter((run) =>
+      run.difficulty !== undefined
+        ? run.difficulty === difficulty
+        : singleDifficultySong,
+    )
     .sort(byCompletedAtAsc);
 }
 
-/** Best `overallAccuracy` among full-speed scoped runs, 0 when none. */
-export function computeAccuracyValue(scopedRuns: RunSummary[]): number {
-  const fullSpeedAccuracies = scopedRuns
-    .filter(isFullSpeedRun)
-    .map((run) => run.overallAccuracy);
+/**
+ * Full-speed accuracy is a time-decayed mean of actual full-speed runs.
+ * This intentionally rejects the former lifetime-best behavior: one lucky
+ * pass cannot dominate several recent weak passes.
+ */
+export function computeAccuracyValue(
+  scopedRuns: RunSummary[],
+  nowMs?: number,
+  halfLifeDays = RETENTION_HALF_LIFE_DAYS,
+): number {
+  const now = resolveNowMs(scopedRuns, nowMs);
 
-  return fullSpeedAccuracies.length === 0
-    ? 0
-    : Math.max(...fullSpeedAccuracies);
+  return timeDecayedMean(
+    scopedRuns.filter(isFullSpeedRun),
+    now,
+    halfLifeDays,
+    (run) => run.overallAccuracy,
+  );
 }
 
-/** Median accuracy of the last `CONSISTENCY_WINDOW` scoped runs (any
- * speed), 0 when there are none. */
-export function computeConsistencyValue(scopedRuns: RunSummary[]): number {
-  const lastFew = scopedRuns.slice(-CONSISTENCY_WINDOW);
+/** Weighted recent reliability, rather than a lifetime or single-run best. */
+export function computeConsistencyValue(
+  scopedRuns: RunSummary[],
+  nowMs?: number,
+  halfLifeDays = RETENTION_HALF_LIFE_DAYS,
+): number {
+  const now = resolveNowMs(scopedRuns, nowMs);
+  const recent = [...scopedRuns]
+    .sort(byCompletedAtAsc)
+    .slice(-CONSISTENCY_WINDOW);
 
-  return median(lastFew.map((run) => run.overallAccuracy));
+  return timeDecayedMean(
+    recent,
+    now,
+    halfLifeDays,
+    (run) => run.overallAccuracy,
+  );
 }
 
-/** Best playbackSpeed among "clean" (>= `CLEAN_RUN_ACCURACY_THRESHOLD`
- * accuracy) scoped runs, divided by 1.0 and clamped to [0, 1]. A clean
- * Perform run with no stamped speed counts as speed 1 (Perform is always
- * 1x); a clean Practice run with no stamped speed is unknown and skipped,
- * same reasoning as `isFullSpeedRun`. */
-export function computeSpeedFactorValue(scopedRuns: RunSummary[]): number {
-  const cleanSpeeds = scopedRuns
-    .filter((run) => run.overallAccuracy >= CLEAN_RUN_ACCURACY_THRESHOLD)
-    .map((run) => {
+export function computeSpeedFactorValue(
+  scopedRuns: RunSummary[],
+  nowMs?: number,
+  halfLifeDays = RETENTION_HALF_LIFE_DAYS,
+): number {
+  const now = resolveNowMs(scopedRuns, nowMs);
+
+  return timeDecayedMean(
+    scopedRuns.filter(
+      (run) => run.overallAccuracy >= CLEAN_RUN_ACCURACY_THRESHOLD,
+    ),
+    now,
+    halfLifeDays,
+    (run) => {
       if (run.playbackSpeed !== undefined) {
         return run.playbackSpeed;
       }
 
       return run.mode === 'perform' ? 1 : undefined;
-    })
-    .filter((speed): speed is number => speed !== undefined);
-
-  if (cleanSpeeds.length === 0) {
-    return 0;
-  }
-
-  return clamp01(Math.max(...cleanSpeeds) / 1);
+    },
+  );
 }
 
 /**
- * Largest notes-attempted (hits+misses) count seen in one scoped run,
- * divided by the chart's known total note count at this difficulty. Falls
- * back to the largest attempted count itself as the denominator when the
- * real total isn't known yet (see the module docstring's coverage
- * section) — never defaults to 1, which would silently claim full
- * coverage for songs the player hasn't necessarily finished.
+ * Coverage needs a chart denominator. Without it, the honest value is zero
+ * with `evidence.coverage === 'unknown'`; a looped partial run must never
+ * become a fabricated 100%-coverage claim.
  */
 export function computeCoverageValue(
   scopedRuns: RunSummary[],
   chartTotalNotes?: number,
+  nowMs?: number,
+  halfLifeDays = RETENTION_HALF_LIFE_DAYS,
 ): number {
-  const attemptedCounts = scopedRuns.map(
-    (run) => run.totalHits + run.totalMisses,
+  if (!chartTotalNotes || chartTotalNotes <= 0) {
+    return 0;
+  }
+
+  const now = resolveNowMs(scopedRuns, nowMs);
+
+  return timeDecayedMean(
+    scopedRuns,
+    now,
+    halfLifeDays,
+    (run) => (run.totalHits + run.totalMisses) / chartTotalNotes,
   );
-
-  if (attemptedCounts.length === 0) {
-    return 0;
-  }
-
-  const bestAttempted = Math.max(...attemptedCounts);
-  const denominator =
-    chartTotalNotes && chartTotalNotes > 0 ? chartTotalNotes : bestAttempted;
-
-  if (denominator <= 0) {
-    return 0;
-  }
-
-  return clamp01(bestAttempted / denominator);
 }
 
-/** Per-lane hit+miss share for one song's runs — "how much does this song
- * lean on each drum". Lanes the song never touches don't appear. */
 export function computeLaneWeights(songRuns: RunSummary[]): LaneWeight[] {
   const totals = new Map<string, number>();
   let grandTotal = 0;
@@ -252,14 +271,6 @@ export function computeLaneWeights(songRuns: RunSummary[]): LaneWeight[] {
   }));
 }
 
-/**
- * Demand-weighted global lane accuracy: for each lane the goal song
- * leans on, look up the player's all-time accuracy in that lane (from
- * `globalLaneAccuracy`, e.g. `aggregateLaneAccuracy` over every stored
- * run) and weight it by how much the goal song uses that lane. A lane the
- * song needs but the player has never played anywhere yields 0 for that
- * lane's contribution (untested, not assumed fine).
- */
 export function computeSubReadinessValue(
   laneWeights: LaneWeight[],
   globalLaneAccuracy: LaneAccuracy[],
@@ -279,36 +290,151 @@ export function computeSubReadinessValue(
   );
 }
 
+function timeDecayedLaneAccuracy(
+  allRuns: readonly RunSummary[],
+  nowMs: number,
+  windowDays: number,
+  halfLifeDays: number,
+): LaneAccuracy[] {
+  const totals = new Map<string, { hits: number; misses: number }>();
+
+  for (const run of inWindow(allRuns, nowMs, windowDays)) {
+    const age = ageDays(run, nowMs);
+    const weight = 2 ** (-age / halfLifeDays);
+
+    for (const lane of run.laneAccuracy) {
+      const current = totals.get(lane.element) ?? { hits: 0, misses: 0 };
+
+      current.hits += lane.hits * weight;
+      current.misses += lane.misses * weight;
+      totals.set(lane.element, current);
+    }
+  }
+
+  return [...totals.entries()].flatMap(([element, stats]) => {
+    const total = stats.hits + stats.misses;
+
+    return total > 0
+      ? [
+          {
+            element: element as LaneAccuracy['element'],
+            hits: stats.hits,
+            misses: stats.misses,
+            accuracy: stats.hits / total,
+          },
+        ]
+      : [];
+  });
+}
+
 function makeTerm(
   key: MasteryTerm['key'],
   label: string,
   value: number,
   weight: number,
+  evidenceState: MasteryTerm['evidenceState'] = 'measured',
 ): MasteryTerm {
   const clamped = clamp01(value);
 
-  return { key, label, value: clamped, weight, contribution: clamped * weight };
+  return {
+    key,
+    label,
+    value: clamped,
+    weight,
+    contribution: clamped * weight,
+    evidenceState,
+  };
 }
 
 export interface ComputeMasteryInput {
   goal: MasteryGoal;
-  /** Every stored run for the goal's song, any difficulty — this function
-   * does the difficulty scoping itself via `scopeRunsToDifficulty`. */
   songRuns: RunSummary[];
-  /** Every stored run across the whole library, for the sub-readiness
-   * term's global lane accuracy. Pass `songRuns`' own superset here if a
-   * separate library-wide fetch isn't available yet. */
   allRuns: RunSummary[];
-  /** Every difficulty this song has ever had charted, for the
-   * single-difficulty legacy-run fallback in `scopeRunsToDifficulty`. */
   songDifficulties?: Difficulty[];
-  /** `song.scoreData[goal.difficulty]?.totalNotes`, when known. */
   chartTotalNotes?: number;
-  /** Pre-aggregated cross-song lane accuracy
-   * (`aggregateLaneAccuracy(allRuns)`), so callers that already computed
-   * it (e.g. `useGamification`) don't pay for it twice. Computed from
-   * `allRuns` when omitted. */
   globalLaneAccuracy?: LaneAccuracy[];
+  /** Explicit clock makes decay and sample ages reproducible in tests/UI. */
+  nowMs?: number;
+}
+
+interface ScoredWindow {
+  score: number;
+  terms: Pick<
+    MasteryBreakdown,
+    'accuracy' | 'consistency' | 'speedFactor' | 'coverage' | 'subReadiness'
+  >;
+}
+
+function scoreWindow({
+  runs,
+  allRuns,
+  chartTotalNotes,
+  nowMs,
+  windowDays,
+  halfLifeDays,
+  globalLaneAccuracy,
+}: {
+  runs: RunSummary[];
+  allRuns: RunSummary[];
+  chartTotalNotes?: number;
+  nowMs: number;
+  windowDays: number;
+  halfLifeDays: number;
+  globalLaneAccuracy?: LaneAccuracy[];
+}): ScoredWindow {
+  const windowRuns = inWindow(runs, nowMs, windowDays);
+  const laneWeights = computeLaneWeights(windowRuns);
+  const lanes =
+    globalLaneAccuracy ??
+    timeDecayedLaneAccuracy(allRuns, nowMs, windowDays, halfLifeDays);
+  const coverageState: MasteryTerm['evidenceState'] =
+    !chartTotalNotes || chartTotalNotes <= 0 || windowRuns.length === 0
+      ? 'insufficient'
+      : 'measured';
+  const accuracy = makeTerm(
+    'accuracy',
+    'Full-speed accuracy (time-decayed)',
+    computeAccuracyValue(windowRuns, nowMs, halfLifeDays),
+    ACCURACY_WEIGHT,
+  );
+  const consistency = makeTerm(
+    'consistency',
+    'Recent consistency (time-decayed)',
+    computeConsistencyValue(windowRuns, nowMs, halfLifeDays),
+    CONSISTENCY_WEIGHT,
+  );
+  const speedFactor = makeTerm(
+    'speedFactor',
+    'Clean-speed readiness (time-decayed)',
+    computeSpeedFactorValue(windowRuns, nowMs, halfLifeDays),
+    SPEED_WEIGHT,
+  );
+  const coverage = makeTerm(
+    'coverage',
+    chartTotalNotes && chartTotalNotes > 0
+      ? 'Chart coverage (time-decayed)'
+      : 'Chart coverage (unknown total)',
+    computeCoverageValue(windowRuns, chartTotalNotes, nowMs, halfLifeDays),
+    COVERAGE_WEIGHT,
+    coverageState,
+  );
+  const subReadiness = makeTerm(
+    'subReadiness',
+    'Related-lane readiness (time-decayed)',
+    computeSubReadinessValue(laneWeights, lanes),
+    SUB_READINESS_WEIGHT,
+  );
+  const score =
+    accuracy.contribution +
+    consistency.contribution +
+    speedFactor.contribution +
+    coverage.contribution +
+    subReadiness.contribution;
+
+  return {
+    score,
+    terms: { accuracy, consistency, speedFactor, coverage, subReadiness },
+  };
 }
 
 export function computeMastery({
@@ -318,68 +444,65 @@ export function computeMastery({
   songDifficulties,
   chartTotalNotes,
   globalLaneAccuracy,
+  nowMs,
 }: ComputeMasteryInput): MasteryBreakdown {
   const scopedRuns = scopeRunsToDifficulty(
     songRuns,
     goal.difficulty,
     songDifficulties,
   );
-  const laneWeights = computeLaneWeights(scopedRuns);
-  const resolvedGlobalLaneAccuracy =
-    globalLaneAccuracy ?? aggregateLaneAccuracy(allRuns);
-  const accuracy = makeTerm(
-    'accuracy',
-    'Accuracy at full speed',
-    computeAccuracyValue(scopedRuns),
-    ACCURACY_WEIGHT,
-  );
-  const consistency = makeTerm(
-    'consistency',
-    'Consistency (last 5 runs)',
-    computeConsistencyValue(scopedRuns),
-    CONSISTENCY_WEIGHT,
-  );
-  const speedFactor = makeTerm(
-    'speedFactor',
-    'Speed toward 1.0x',
-    computeSpeedFactorValue(scopedRuns),
-    SPEED_WEIGHT,
-  );
-  const coverage = makeTerm(
-    'coverage',
-    'Section coverage',
-    computeCoverageValue(scopedRuns, chartTotalNotes),
-    COVERAGE_WEIGHT,
-  );
-  const subReadiness = makeTerm(
-    'subReadiness',
-    'Related-skill readiness',
-    computeSubReadinessValue(laneWeights, resolvedGlobalLaneAccuracy),
-    SUB_READINESS_WEIGHT,
-  );
-  const mastery = Math.round(
-    (accuracy.contribution +
-      consistency.contribution +
-      speedFactor.contribution +
-      coverage.contribution +
-      subReadiness.contribution) *
+  const now = resolveNowMs([...scopedRuns, ...allRuns], nowMs);
+  const recentRuns = inWindow(scopedRuns, now, RECENT_READINESS_WINDOW_DAYS);
+  const retentionRuns = inWindow(scopedRuns, now, RETENTION_WINDOW_DAYS);
+  const recent = scoreWindow({
+    runs: scopedRuns,
+    allRuns,
+    chartTotalNotes,
+    nowMs: now,
+    windowDays: RECENT_READINESS_WINDOW_DAYS,
+    halfLifeDays: RECENT_HALF_LIFE_DAYS,
+  });
+  const retention = scoreWindow({
+    runs: scopedRuns,
+    allRuns,
+    chartTotalNotes,
+    nowMs: now,
+    windowDays: RETENTION_WINDOW_DAYS,
+    halfLifeDays: RETENTION_HALF_LIFE_DAYS,
+    globalLaneAccuracy,
+  });
+  const recentReadiness = Math.round(
+    recent.score *
+      confidence(recentRuns.length, MIN_RECENT_RUNS_FOR_FULL_READINESS) *
       100,
   );
+  const longTermMastery = Math.round(
+    retention.score *
+      confidence(retentionRuns.length, MIN_RETENTION_RUNS_FOR_FULL_MASTERY) *
+      100,
+  );
+  const coverage =
+    !chartTotalNotes || chartTotalNotes <= 0
+      ? 'unknown'
+      : retentionRuns.length === 0
+      ? 'insufficient'
+      : 'measured';
 
   return {
-    mastery,
-    accuracy,
-    consistency,
-    speedFactor,
-    coverage,
-    subReadiness,
+    mastery: longTermMastery,
+    recentReadiness,
+    longTermMastery,
+    ...retention.terms,
     runsConsidered: scopedRuns.length,
+    evidence: {
+      evaluatedAtMs: now,
+      recent: evidenceWindow(recentRuns, now, RECENT_READINESS_WINDOW_DAYS),
+      retention: evidenceWindow(retentionRuns, now, RETENTION_WINDOW_DAYS),
+      coverage,
+    },
   };
 }
 
-/** The single lowest-scoring term in a breakdown — the highest-leverage
- * thing to practice next. Ties break toward the higher-weight term first
- * (moving the dominant term is worth more even at an equal raw score). */
 export function worstMasteryTerm(breakdown: MasteryBreakdown): MasteryTerm {
   const terms = [
     breakdown.accuracy,

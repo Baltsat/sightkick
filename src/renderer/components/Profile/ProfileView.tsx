@@ -210,8 +210,16 @@ export function ProfileView({
 
       <section className="flex flex-col gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint">
-          Per-drum accuracy — last 30 days
+          Per-drum accuracy — raw 30-day window
         </h3>
+        <p
+          className="text-xs leading-relaxed text-text-faint"
+          data-testid="profile-lane-accuracy-definition"
+        >
+          Unweighted hit / (hit + miss) across scored lane notes in the last 30
+          days. Home uses a separate 28-day time-decayed signal to guide the
+          next practice.
+        </p>
         <SkillBars laneAccuracy={mastery.last30DaysLaneAccuracy} />
       </section>
 

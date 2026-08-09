@@ -1,40 +1,29 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Engine } from '../../services/engine';
+import { ResolvedJudgement } from '../../services/engine/types';
 import { STREAK_STAGES } from '../../services/streak';
 import { INITIAL_STREAK_UI_STATE, useStreakEngine } from './useStreakEngine';
 
 type Listener = (...args: never[]) => void;
 
 /**
- * A minimal stand-in for Engine exposing only the 4 subscription methods
- * `useStreakEngine` actually calls (`onHit`/`onFalseHit`/`onMiss`/
- * `onReset`) - real Engine construction needs a live AudioContext/Judge/
+ * A minimal stand-in for Engine exposing only the subscription methods
+ * `useStreakEngine` actually calls (`onJudgement`/`onReset`) - real Engine
+ * construction needs a live AudioContext/Judge/
  * Transport stack, which is irrelevant to testing this hook's own event
  * -> streak-state wiring.
  */
 function fakeEngine() {
-  const hit = new Set<Listener>();
-  const falseHit = new Set<Listener>();
-  const miss = new Set<Listener>();
+  const judgement = new Set<(value: ResolvedJudgement) => void>();
   const reset = new Set<Listener>();
 
   return {
     engine: {
-      onHit: (l: Listener) => {
-        hit.add(l);
+      onJudgement: (l: (value: ResolvedJudgement) => void) => {
+        judgement.add(l);
 
-        return () => hit.delete(l);
-      },
-      onFalseHit: (l: Listener) => {
-        falseHit.add(l);
-
-        return () => falseHit.delete(l);
-      },
-      onMiss: (l: Listener) => {
-        miss.add(l);
-
-        return () => miss.delete(l);
+        return () => judgement.delete(l);
       },
       onReset: (l: Listener) => {
         reset.add(l);
@@ -43,14 +32,26 @@ function fakeEngine() {
       },
     } as unknown as Engine,
     emitHit: (pos: { measureIdx: number; noteIdx: number }) =>
-      hit.forEach((l) => l(pos as never)),
-    emitFalseHit: () => falseHit.forEach((l) => l()),
-    emitMiss: () => miss.forEach((l) => l()),
+      judgement.forEach((l) =>
+        l({
+          id: `note:${pos.measureIdx}:${pos.noteIdx}`,
+          verdict: 'hit',
+          expectedTick: pos.noteIdx,
+          measureIndex: pos.measureIdx,
+          scoreable: true,
+        }),
+      ),
+    emitFalseHit: (scoreable = true) =>
+      judgement.forEach((l) =>
+        l({ id: 'wrong:1', verdict: 'wrong', scoreable }),
+      ),
+    emitMiss: () =>
+      judgement.forEach((l) =>
+        l({ id: 'note:miss', verdict: 'miss', scoreable: true }),
+      ),
     emitReset: () => reset.forEach((l) => l()),
     listenerCounts: () => ({
-      hit: hit.size,
-      falseHit: falseHit.size,
-      miss: miss.size,
+      judgement: judgement.size,
       reset: reset.size,
     }),
   };
@@ -129,6 +130,17 @@ describe('useStreakEngine', () => {
     expect(result.current.shatterSeq).toBe(1);
   });
 
+  it('does not shatter on an unscoreable warm-up tap', () => {
+    const { engine, emitHit, emitFalseHit } = fakeEngine();
+    const { result } = renderHook(() => useStreakEngine(engine));
+
+    act(() => emitHit({ measureIdx: 0, noteIdx: 0 }));
+    act(() => emitFalseHit(false));
+
+    expect(result.current.streak.count).toBe(1);
+    expect(result.current.shatterSeq).toBe(0);
+  });
+
   it('does not shatter twice for repeated misses while already at zero', () => {
     const { engine, emitHit, emitMiss } = fakeEngine();
     const { result } = renderHook(() => useStreakEngine(engine));
@@ -172,23 +184,19 @@ describe('useStreakEngine', () => {
     expect(result.current.streak.best).toBe(0);
   });
 
-  it('unsubscribes from all four engine events on unmount', () => {
+  it('unsubscribes from all engine events on unmount', () => {
     const { engine, listenerCounts } = fakeEngine();
     const { unmount } = renderHook(() => useStreakEngine(engine));
 
     expect(listenerCounts()).toEqual({
-      hit: 1,
-      falseHit: 1,
-      miss: 1,
+      judgement: 1,
       reset: 1,
     });
 
     unmount();
 
     expect(listenerCounts()).toEqual({
-      hit: 0,
-      falseHit: 0,
-      miss: 0,
+      judgement: 0,
       reset: 0,
     });
   });

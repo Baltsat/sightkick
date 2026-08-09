@@ -30,6 +30,10 @@ export function useSongFilter(songList: Song[], difficulty: Difficulty) {
       return rankedOnline.songs;
     }
 
+    if (libraryMode === 'drums' || libraryMode === 'favorites') {
+      return [];
+    }
+
     const byDifficulty = songList.filter(
       (s) => s.drumDifficulties?.includes(difficulty),
     );

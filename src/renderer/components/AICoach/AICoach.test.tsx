@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { App as AntdApp } from 'antd';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { installIpcMock, IpcMock } from '../../hooks/test-support';
@@ -97,6 +97,62 @@ describe('AICoach', () => {
     expect(await screen.findByTestId('coaching-notes')).toHaveTextContent(
       'Loop bars 4–5 at 0.7x.',
     );
+  });
+
+  it('uses a latest summary-only run honestly without inventing bars or a loop', () => {
+    render(
+      <AntdApp>
+        <AICoach
+          song={{ name: 'Song', artist: 'Artist', difficulty: 'expert' }}
+          measures={[]}
+          records={[]}
+          summaryRuns={[
+            {
+              completedAt: '2026-08-08T14:00:00.000Z',
+              totalHits: 8,
+              totalMisses: 2,
+              totalWrong: 3,
+              overallAccuracy: 0.8,
+              laneAccuracy: [
+                { element: 'snare', hits: 5, misses: 2, accuracy: 0.71 },
+                { element: 'kick', hits: 3, misses: 0, accuracy: 1 },
+              ],
+              laneBias: [],
+              timingBias: {
+                meanMs: -12,
+                medianMs: -10,
+                spreadMs: 7,
+                earlyCount: 5,
+                lateCount: 1,
+                onTimeCount: 0,
+                sampleCount: 6,
+              },
+              wrongHitCounts: [{ element: 'kick', count: 3 }],
+              playbackSpeed: 0.8,
+              bestStreak: 6,
+            },
+          ]}
+          fullRuns={[]}
+          onPracticeBars={vi.fn()}
+          onTrainSkill={vi.fn()}
+        />
+      </AntdApp>,
+    );
+
+    const card = screen.getByTestId('coach-summary-only');
+
+    expect(card).toHaveTextContent('2026-08-08');
+    expect(card).toHaveTextContent('80% accuracy at 0.8x');
+    expect(card).toHaveTextContent('12 ms early');
+    expect(card).toHaveTextContent('Weakest lane: Snare at 71%');
+    expect(card).toHaveTextContent('Wrong hits: 3');
+    expect(card).toHaveTextContent('will not invent trouble bars or a loop');
+    expect(
+      within(card).queryByTestId('coach-practice-bars'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(card).queryByTestId('coach-notation'),
+    ).not.toBeInTheDocument();
   });
 });
 

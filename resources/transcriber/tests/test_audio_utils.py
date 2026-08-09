@@ -39,20 +39,19 @@ def test_duration_falls_back_to_explicit_ffmpeg_when_ffprobe_is_absent(
     assert audio_utils.probe_duration_seconds(audio) == 62.5
 
 
-def test_ogg_encoding_uses_native_vorbis_when_libvorbis_is_missing(
-    tmp_path, monkeypatch
-):
+def test_ogg_encoding_uses_redistributable_native_vorbis(tmp_path, monkeypatch):
     calls = []
 
     def run(args, desc):
         calls.append((args, desc))
-        if "libvorbis" in args:
-            raise RuntimeError("Unknown encoder 'libvorbis'")
 
     monkeypatch.setattr(audio_utils, "run_ffmpeg", run)
 
     audio_utils.to_ogg(tmp_path / "source.wav", tmp_path / "output.ogg")
 
-    assert "libvorbis" in calls[0][0]
-    assert "vorbis" in calls[1][0]
-    assert "experimental" in calls[1][0]
+    assert len(calls) == 1
+    assert "libvorbis" not in calls[0][0]
+    assert "vorbis" in calls[0][0]
+    assert "experimental" in calls[0][0]
+    assert calls[0][0].count("+bitexact") == 2
+    assert calls[0][0][calls[0][0].index("-map_metadata") + 1] == "-1"

@@ -116,18 +116,86 @@ describe('practice mode analytics', () => {
         {
           songId: 'song-1',
           records: expect.arrayContaining([
-            expect.objectContaining({ verdict: 'hit', element: 'snare' }),
             expect.objectContaining({ verdict: 'miss', element: 'snare' }),
           ]),
           summary: expect.objectContaining({
             mode: 'practice',
-            playbackSpeed: 1,
+            // The adaptive tutor stepped this incomplete run down while it
+            // recovered the failed phrase, so persistence must reflect the
+            // actual terminal playback speed rather than the requested one.
+            playbackSpeed: 0.5,
+            tutor: expect.objectContaining({
+              interventions: expect.arrayContaining([
+                expect.objectContaining({
+                  triggerJudgements: expect.arrayContaining([
+                    expect.objectContaining({
+                      verdict: 'hit',
+                      expectedElement: 'snare',
+                    }),
+                  ]),
+                }),
+              ]),
+            }),
+            context: expect.objectContaining({
+              chartRevision: 'song-1:expert:unversioned',
+            }),
+            // The producer saves only Tutor-asserted bars; it never rebuilds
+            // a bar map later from this summary's aggregate score.
+            learningEvidence: expect.objectContaining({
+              bars: expect.any(Object),
+            }),
+            coachEvidence: expect.arrayContaining([
+              expect.objectContaining({
+                id: expect.any(String),
+                skillTag: expect.any(String),
+                sampleCount: expect.any(Number),
+              }),
+            ]),
           }),
         },
       ]);
       // Perform-only side effects never fire for a Practice run, even
       // one that would have beaten the stored high score.
       expect(view.sentChannels()).not.toContain('update-song');
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 30000);
+
+  it('continues from Results with the just-completed evidence instead of returning to the library', async () => {
+    vi.useFakeTimers();
+
+    const continuePractice = vi.fn();
+
+    try {
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice',
+        settings: { countIn: false, adaptiveTutorEnabled: false },
+        keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+        onContinuePractice: continuePractice,
+      });
+
+      await view.loadSong();
+      view.clickPlay();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+      await view.pressKey('KeyJ');
+      await runToEnd(view);
+
+      expect(screen.getByTestId('score-next')).toHaveTextContent(
+        'Next practice',
+      );
+      view.clickTestId('score-next');
+
+      expect(continuePractice).toHaveBeenCalledWith(
+        expect.objectContaining({
+          candidateId: 'song-1',
+          summary: expect.objectContaining({ mode: 'practice' }),
+        }),
+      );
+      expect(screen.queryByTestId('song-list-stub')).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

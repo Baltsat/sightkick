@@ -1,0 +1,29 @@
+{
+  "viewport": {
+    "width": 1600,
+    "height": 1000
+  },
+  "seekPercent": 22,
+  "frameSample": {
+    "durationMs": 2002,
+    "frameCount": 241,
+    "framesPerSecond": 120.4
+  },
+  "flowProof": {
+    "scrollLeft": 5578,
+    "scrollWidth": 27708,
+    "clientWidth": 1592,
+    "visibleNonRestNoteheads": 78,
+    "playhead": {
+      "visible": true,
+      "viewportX": 0.54
+    },
+    "hud": {
+      "visible": true,
+      "text": "Boulevard of Broken DreamsPractice flowGreen DayContinuous score"
+    }
+  },
+  "proofFailures": [],
+  "consoleErrors": [],
+  "pageErrors": []
+}

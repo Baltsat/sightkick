@@ -52,53 +52,55 @@ export function GamificationHeaderStrip({
   }
 
   return (
-    <button
-      type="button"
-      onClick={onOpenStats}
-      data-testid="gamification-header-strip"
-      data-loaded="true"
-      aria-label="Open your practice stats"
+    <div
       className={cn(
-        'flex shrink-0 items-center gap-3 rounded-2xl border border-border-soft bg-surface p-2 pr-3.5 text-left transition-colors hover:border-accent-soft-border',
+        'flex shrink-0 items-center gap-1 rounded-2xl border border-border-soft bg-surface p-1.5 pr-2 transition-colors hover:border-accent-soft-border focus-within:border-accent-soft-border',
         className,
       )}
     >
-      <StreakFlame
-        streakDays={streak.current}
-        todayXp={todayXp}
-        goalXp={goalXp}
-        justCrossedGoal={justCrossedGoal}
-      />
-      <div className="flex min-w-0 flex-col gap-1">
-        <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={onOpenStats}
+        data-testid="gamification-header-strip"
+        data-loaded="true"
+        aria-label="Open your practice stats"
+        className="flex min-w-0 items-center gap-3 rounded-xl p-0.5 pr-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        <StreakFlame
+          streakDays={streak.current}
+          todayXp={todayXp}
+          goalXp={goalXp}
+          justCrossedGoal={justCrossedGoal}
+        />
+        <div className="flex min-w-0 flex-col gap-1">
           <span
             className="text-sm font-semibold tabular-nums text-text"
             data-testid="today-xp-label"
           >
             {todayXp} / {goalXp} XP today
           </span>
-          <GoalPopover
-            goalOption={goalOption}
-            onChange={onChangeGoal}
-            isOpen={isGoalPopoverOpen}
-            onOpenChange={setIsGoalPopoverOpen}
-          />
-        </div>
-        <div className="flex items-center gap-3">
-          <WeekDots activity={weekActivity} />
-          <div
-            className="flex items-center gap-1 text-xs text-text-faint"
-            data-testid="total-stars"
-          >
-            <FontAwesomeIcon
-              icon={faStar}
-              size="xs"
-              style={{ color: 'var(--color-yellow)' }}
-            />
-            <span className="tabular-nums">{totalStars}</span>
+          <div className="flex items-center gap-3">
+            <WeekDots activity={weekActivity} />
+            <div
+              className="flex items-center gap-1 text-xs text-text-faint"
+              data-testid="total-stars"
+            >
+              <FontAwesomeIcon
+                icon={faStar}
+                size="xs"
+                style={{ color: 'var(--color-yellow)' }}
+              />
+              <span className="tabular-nums">{totalStars}</span>
+            </div>
           </div>
         </div>
-      </div>
-    </button>
+      </button>
+      <GoalPopover
+        goalOption={goalOption}
+        onChange={onChangeGoal}
+        isOpen={isGoalPopoverOpen}
+        onOpenChange={setIsGoalPopoverOpen}
+      />
+    </div>
   );
 }

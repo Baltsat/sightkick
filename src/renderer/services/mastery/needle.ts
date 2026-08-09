@@ -12,6 +12,10 @@ export function needleMoverLine(breakdown: MasteryBreakdown): string {
     return 'Play a run at this difficulty to start tracking mastery.';
   }
 
+  if (breakdown.evidence.coverage === 'unknown') {
+    return 'Chart coverage is unknown because this chart has no saved total-note count; finish a scored full pass after the chart is available.';
+  }
+
   const worst = worstMasteryTerm(breakdown);
   const percent = Math.round(worst.value * 100);
   const linesByTerm: Record<MasteryBreakdown['accuracy']['key'], string> = {

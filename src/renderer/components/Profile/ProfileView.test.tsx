@@ -55,6 +55,8 @@ function gamification(
     totalStars: 12,
     achievements: [],
     laneAccuracy: [],
+    recentLaneSignals: [],
+    latestRun: undefined,
     loadAchievements: vi.fn(),
     recordRun: vi.fn(),
     ...overrides,
@@ -94,6 +96,11 @@ describe('ProfileView', () => {
     );
 
     expect(screen.getByTestId('no-goals-empty-state')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-lane-accuracy-definition'),
+    ).toHaveTextContent(
+      'Unweighted hit / (hit + miss) across scored lane notes in the last 30 days.',
+    );
     expect(
       screen.getByRole('button', { name: /set your first goal/i }),
     ).toBeInTheDocument();

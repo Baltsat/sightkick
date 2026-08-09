@@ -1,10 +1,13 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import yandexFavoritesSource from '../../../../resources/library-sources/yandex-favorites-2026-08-10.json';
+import yandexSource from '../../../../resources/library-sources/yandex-drums-2026-08-09.json';
+import { parseYandexPlaylistCandidates } from '../../../library-sources/yandex';
 import {
   makeEnchorChart,
   makeLessonSong,
   makeListSong,
-  setupSongListView,
+  setupSongListView as mountSongListView,
 } from '../test-support';
 
 vi.mock('@tanstack/react-virtual', () => ({
@@ -27,7 +30,253 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// The product now opens at the kit cockpit. These library-focused regression
+// tests intentionally enter Songs first, so their assertions continue to
+// describe the detailed surface rather than a background default screen.
+function setupSongListView(...args: Parameters<typeof mountSongListView>) {
+  const view = mountSongListView(...args);
+
+  fireEvent.click(screen.getByTestId('view-songs'));
+
+  return view;
+}
+
 describe('SongListView — loading the library', () => {
+  it('opens on the playfield-first Home cockpit', () => {
+    mountSongListView();
+
+    expect(screen.getByTestId('home-cockpit')).toBeInTheDocument();
+    expect(screen.getByTestId('kit-hotspot-kick')).toBeInTheDocument();
+    expect(screen.getByTestId('home-hit-feedback')).not.toHaveAttribute(
+      'aria-live',
+    );
+    expect(screen.getByTestId('home-session-status')).toHaveAttribute(
+      'aria-live',
+      'polite',
+    );
+    expect(screen.getByTestId('open-profile-button')).toHaveTextContent(
+      'Profile',
+    );
+    expect(
+      screen.getByRole('button', { name: /choose a song/i }),
+    ).toBeEnabled();
+  });
+
+  it('launches the deterministic next lesson directly in Practice at its recommended speed', async () => {
+    const view = mountSongListView();
+
+    view.loadSongs([
+      makeListSong('song-a', { liked: true }),
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Pulse and posture',
+        starsToUnlock: 0,
+      }),
+    ]);
+
+    expect(screen.getByText('Pulse and posture')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('home-start-practice'));
+
+    const opened = await screen.findByTestId('song-view-stub');
+
+    expect(opened).toHaveAttribute('data-song-id', 'lesson-1');
+    expect(opened.getAttribute('data-search')).toContain('gameMode=practice');
+    expect(opened.getAttribute('data-search')).toContain('autoStart=1');
+    expect(opened.getAttribute('data-search')).toContain('practiceSpeed=0.7');
+    expect(
+      screen.queryByTestId('game-mode-selector-modal'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('ranks persisted supported Coach evidence into Home without bypassing lesson prerequisites', async () => {
+    const view = mountSongListView();
+    const savedWeakRun = {
+      completedAt: '2026-08-09T12:00:00.000Z',
+      totalHits: 20,
+      totalMisses: 80,
+      totalWrong: 0,
+      overallAccuracy: 0.2,
+      laneAccuracy: [{ element: 'tom2', hits: 2, misses: 8, accuracy: 0.2 }],
+      laneBias: [],
+      wrongHitCounts: [],
+      timingBias: {
+        meanMs: 0,
+        medianMs: 0,
+        spreadMs: 0,
+        earlyCount: 0,
+        lateCount: 0,
+        onTimeCount: 0,
+        sampleCount: 0,
+      },
+      mode: 'practice' as const,
+      playbackSpeed: 0.7,
+      difficulty: 'expert' as const,
+      coachEvidence: [
+        {
+          id: 'pad-tom2-tom3',
+          kind: 'pad-confusion',
+          severity: 'high' as const,
+          skillTag: 'pad-accuracy',
+          sampleCount: 3,
+          barStart: 4,
+          barEnd: 4,
+          remediationLessonId: '07.03',
+        },
+      ],
+    };
+
+    view.loadSongs([
+      makeLessonSong(
+        'foundation',
+        {
+          id: '07.01',
+          title: 'Tom foundations',
+          skills: ['timing'],
+          starsToUnlock: 0,
+        },
+        {
+          scoreData: {
+            expert: { hitNotes: 100, totalNotes: 100, falseHits: 0 },
+          },
+        },
+      ),
+      makeLessonSong('supported-route', {
+        id: '07.03',
+        title: 'Mid and Floor Tom Signals',
+        skills: ['pad-accuracy'],
+        prerequisiteIds: ['07.01'],
+        starsToUnlock: 0,
+      }),
+      makeLessonSong('locked-skip', {
+        id: '07.04',
+        title: 'Unsafe later tom route',
+        skills: ['pad-accuracy'],
+        prerequisiteIds: ['07.03'],
+        starsToUnlock: 0,
+      }),
+    ]);
+    // Re-enter Home after the library response so this test controls the
+    // exact live IPC request that hydrates its recommendation evidence.
+    fireEvent.click(screen.getByTestId('view-songs'));
+    fireEvent.click(screen.getByTestId('view-home'));
+    await waitFor(() =>
+      expect(
+        view
+          .sentChannels()
+          .filter((channel) => channel === 'load-all-practice-runs').length,
+      ).toBeGreaterThan(0),
+    );
+    view.emit('load-all-practice-runs', {
+      runs: [savedWeakRun],
+      runsBySong: { 'weak-song': [savedWeakRun] },
+      archiveBySong: {},
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText('Mid and Floor Tom Signals')).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('home-lane-evidence')).toHaveTextContent(
+      '28-day time-decayed hit / (hit + miss) signal · 7-day half-life.',
+    );
+    expect(screen.getByTestId('kit-hotspot-tom2')).toHaveTextContent(
+      '20% · 10',
+    );
+    fireEvent.click(screen.getByTestId('home-start-practice'));
+
+    const opened = await screen.findByTestId('song-view-stub');
+
+    expect(opened).toHaveAttribute('data-song-id', 'supported-route');
+    expect(opened.getAttribute('data-search')).toContain('gameMode=practice');
+  });
+
+  it('shows Home lane accuracy as a dated decayed signal with counts and a supported trend', async () => {
+    const view = mountSongListView();
+    const nowMs = Date.now();
+    const run = (ageDays: number, hits: number, misses: number) => ({
+      completedAt: new Date(nowMs - ageDays * 86_400_000).toISOString(),
+      totalHits: hits,
+      totalMisses: misses,
+      totalWrong: 0,
+      overallAccuracy: hits / (hits + misses),
+      laneAccuracy: [
+        {
+          element: 'tom2' as const,
+          hits,
+          misses,
+          accuracy: hits / (hits + misses),
+        },
+      ],
+      laneBias: [],
+      wrongHitCounts: [],
+      timingBias: {
+        meanMs: 0,
+        medianMs: 0,
+        spreadMs: 0,
+        earlyCount: 0,
+        lateCount: 0,
+        onTimeCount: 0,
+        sampleCount: 0,
+      },
+      mode: 'practice' as const,
+    });
+    const earlier = run(18, 8, 2);
+    const latest = run(3, 10, 0);
+
+    await waitFor(() =>
+      expect(view.sentChannels()).toContain('load-all-practice-runs'),
+    );
+    view.emit('load-all-practice-runs', {
+      runs: [earlier, latest],
+      runsBySong: { 'signal-song': [earlier, latest] },
+      archiveBySong: {},
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-lane-evidence')).toHaveTextContent(
+        '20 raw scored hits or misses across 1 observed lanes · 1 lane with 8+ samples.',
+      ),
+    );
+    expect(screen.getByTestId('kit-hotspot-tom2')).toHaveTextContent(
+      '96% · 20',
+    );
+    expect(screen.getByTestId('kit-hotspot-tom2')).toHaveTextContent('↑ 20 pp');
+    expect(screen.getByTestId('home-lane-evidence')).toHaveTextContent(
+      'Trend compares raw accuracy in the newest 14 days with the preceding 14 when both have 8+ samples.',
+    );
+  });
+
+  it('starts the same recommendation from the exact Home kit command', async () => {
+    const view = mountSongListView({
+      settings: {
+        inputMappings: {
+          keyboard: {
+            kick: ['keyboard:KeyK'],
+            crash: ['keyboard:KeyC'],
+          },
+        },
+      },
+    });
+
+    view.loadSongs([makeListSong('song-a', { liked: true })]);
+
+    let now = 1000;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+
+    try {
+      for (const code of ['KeyK', 'KeyC', 'KeyK', 'KeyC']) {
+        view.typeKey(code);
+        now += 180;
+      }
+    } finally {
+      clock.mockRestore();
+    }
+
+    const opened = await screen.findByTestId('song-view-stub');
+
+    expect(opened).toHaveAttribute('data-song-id', 'song-a');
+    expect(opened.getAttribute('data-search')).toContain('autoStart=1');
+  });
+
   it('requests the song list and stem-tool status on mount', () => {
     const view = setupSongListView();
 
@@ -46,6 +295,130 @@ describe('SongListView — loading the library', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'Your drum library' }),
     ).toBeInTheDocument();
+  });
+
+  it('names every library source visibly and exposes captured playlist counts', () => {
+    setupSongListView();
+
+    const sources = screen.getByRole('group', { name: 'Library source' });
+
+    expect(within(sources).getByTestId('mode-local')).toHaveTextContent(
+      'Local',
+    );
+    expect(within(sources).getByTestId('mode-drums')).toHaveTextContent(
+      'Drums',
+    );
+    expect(within(sources).getByTestId('mode-drums-count')).toHaveTextContent(
+      '13',
+    );
+    expect(within(sources).getByTestId('mode-favorites')).toHaveTextContent(
+      'Favorites',
+    );
+    expect(
+      within(sources).getByTestId('mode-favorites-count'),
+    ).toHaveTextContent('230');
+    expect(within(sources).getByTestId('mode-online')).toHaveTextContent(
+      'Online',
+    );
+  });
+
+  it('selects all 13 Drums candidates with honest metadata-only states', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([], 'Browser library');
+    view.loadLibraryCandidates({
+      yandex: {
+        drums: parseYandexPlaylistCandidates(yandexSource),
+        favorites: parseYandexPlaylistCandidates(yandexFavoritesSource),
+      },
+    });
+
+    expect(view.sentChannels()).toContain('load-library-candidates');
+    expect(screen.getByTestId('mode-drums')).toBeEnabled();
+    view.selectMode('drums');
+
+    const surface = screen.getByTestId('playlist-candidate-surface');
+    const rows = within(surface).getAllByTestId(
+      /^library-candidate-(?:[1-9]|1[0-3])$/,
+    );
+    const expectedTitles = [
+      'Pendant que les champs brûlent',
+      'Natural Villain',
+      'Loyal',
+      'Made To Love',
+      'Help Is On The Way (Maybe Midnight)',
+      'Heat Waves',
+      'What I Like About You',
+      'Sanctuary',
+      'Wantchya',
+      'Can’t Use Me',
+      'UNSTOPPABLE Cover',
+      'Niten Doraku',
+      'Low',
+    ];
+
+    expect(rows).toHaveLength(13);
+
+    expectedTitles.forEach((title, index) => {
+      expect(within(rows[index]).getByText(title)).toBeInTheDocument();
+    });
+    expect(
+      within(surface).getAllByText('Metadata only · needs local audio + chart'),
+    ).toHaveLength(11);
+    expect(
+      within(screen.getByTestId('library-candidate-6')).getByText(
+        'Unavailable · reference only',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('library-candidate-6')).toHaveAttribute(
+      'data-practice-status',
+      'unavailable',
+    );
+    expect(within(surface).queryAllByRole('button')).toHaveLength(0);
+    expect(screen.getByText('13 results')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('song-search'), {
+      target: { value: 'living in fiction' },
+    });
+
+    expect(
+      within(surface).getAllByTestId(/^library-candidate-(?:[1-9]|1[0-3])$/),
+    ).toHaveLength(1);
+    expect(within(surface).getByText('Heat Waves')).toBeInTheDocument();
+    expect(
+      within(surface).queryByText('Natural Villain'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('1 result')).toBeInTheDocument();
+  });
+
+  it('selects Favorites and makes a private-only row non-actionable', () => {
+    const view = setupSongListView();
+    const favorites = parseYandexPlaylistCandidates(yandexFavoritesSource);
+    const privateTrack = favorites.tracks[87];
+
+    view.loadSongs([], 'Browser library');
+    view.loadLibraryCandidates({
+      yandex: {
+        drums: parseYandexPlaylistCandidates(yandexSource),
+        favorites,
+      },
+    });
+    view.selectMode('favorites');
+
+    fireEvent.change(screen.getByTestId('song-search'), {
+      target: { value: privateTrack.title },
+    });
+
+    const surface = screen.getByTestId('playlist-candidate-surface');
+
+    expect(
+      screen.getByText('230 metadata candidates · not playable yet'),
+    ).toBeInTheDocument();
+    expect(within(surface).getByText(privateTrack.title)).toBeInTheDocument();
+    expect(
+      within(surface).getByText('Private · metadata only'),
+    ).toBeInTheDocument();
+    expect(within(surface).queryAllByRole('button')).toHaveLength(0);
   });
 
   it('keeps filters and add-music controls on a wrapping toolbar with width floors', () => {
@@ -1013,7 +1386,7 @@ describe('SongListView — Lessons surface', () => {
     view.selectView('lessons');
 
     expect(screen.getByTestId('lesson-progress-summary')).toHaveTextContent(
-      '1 of 1 unlocked · 2⭐ earned',
+      '1 of 1 unlocked · 2 earned',
     );
 
     const card = screen.getByTestId('lesson-continue-card');
@@ -1042,7 +1415,7 @@ describe('SongListView — Lessons surface', () => {
     const locked = screen.getByTestId('lesson-item-01.02');
 
     expect(locked).toHaveAttribute('data-locked', 'true');
-    expect(within(locked).getByText('Earn 12 more ⭐')).toBeInTheDocument();
+    expect(within(locked).getByText('Earn 12 more stars')).toBeInTheDocument();
   });
 
   it('shows an honest message instead of a dead click on a locked lesson', () => {

@@ -2,9 +2,14 @@ import { RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { App } from 'antd';
 import { Difficulty, parseChartFile } from 'scan-chart';
 import { ChartParser } from '../../chart-parser/parser';
-import { renderMusic } from '../../chart-parser/renderer';
+import { renderMusic, SheetMusicLayout } from '../../chart-parser/renderer';
 import { ParsedChart, RenderData } from '../../chart-parser/types';
 import { SHEET_MUSIC_COLORS } from '../constants';
+
+const FLOW_SHEET_MUSIC_COLORS = {
+  note: '#f8f5ef',
+  stave: 'rgba(248, 245, 239, 0.64)',
+};
 
 interface UseSheetMusicParams {
   fileData: Buffer | undefined;
@@ -16,6 +21,7 @@ interface UseSheetMusicParams {
   showBarNumbers: boolean;
   enableColors: boolean;
   showTempo: boolean;
+  layout?: SheetMusicLayout;
 }
 
 interface UseSheetMusicResult {
@@ -35,6 +41,7 @@ export function useSheetMusic({
   showBarNumbers,
   enableColors,
   showTempo,
+  layout = 'classic',
 }: UseSheetMusicParams): UseSheetMusicResult {
   const { notification } = App.useApp();
   const vexflowContainerRef = useRef<HTMLDivElement>(null);
@@ -81,13 +88,14 @@ export function useSheetMusic({
       renderMusic(
         vexflowContainerRef.current,
         parsedMidi,
-        SHEET_MUSIC_COLORS,
+        layout === 'flow' ? FLOW_SHEET_MUSIC_COLORS : SHEET_MUSIC_COLORS,
         showBarNumbers,
         enableColors,
         showTempo,
+        layout,
       ),
     );
-  }, [parsedMidi, showBarNumbers, enableColors, showTempo]);
+  }, [parsedMidi, showBarNumbers, enableColors, showTempo, layout]);
 
   return {
     chart,

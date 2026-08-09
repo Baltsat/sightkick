@@ -23,7 +23,7 @@ export type MappingElement = {
   icon: IconDefinition;
 };
 
-export type LibraryMode = 'local' | 'online';
+export type LibraryMode = 'local' | 'drums' | 'favorites' | 'online';
 
 /** Which top-level surface of the library the user is looking at. */
 export type LibraryView = 'songs' | 'lessons';

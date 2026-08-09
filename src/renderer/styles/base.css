@@ -39,7 +39,8 @@ body {
   height: 100vh;
   padding: 0;
   margin: 0;
-  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-family: 'Instrument Sans Variable', 'Instrument Sans', system-ui,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

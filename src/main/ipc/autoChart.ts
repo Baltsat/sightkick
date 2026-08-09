@@ -107,6 +107,14 @@ export interface SightkickRuntime {
   pythonPath?: string;
 }
 
+export interface FfmpegRuntimeCandidateOptions {
+  isPackaged: boolean;
+  resourcesPath: string;
+  appPath: string;
+  platform?: NodeJS.Platform;
+  architecture?: string;
+}
+
 export interface AutoChartRunner {
   run: (
     payloadPath: string,
@@ -457,6 +465,13 @@ function resolveOctaveRuntime(): OctaveRuntime {
   }
 
   const canonicalCacheDir = fs.realpathSync(cacheDir);
+  const ffmpegPath = resolveDrumrollFfmpegPath();
+
+  if (!ffmpegPath) {
+    throw new Error(
+      'OCTAVE charting requires Drumroll FFmpeg, SK_FFMPEG, or ffmpeg on PATH',
+    );
+  }
 
   return {
     pythonPath: path.join(
@@ -472,7 +487,7 @@ function resolveOctaveRuntime(): OctaveRuntime {
     workerPath: path.join(resources, 'resources', 'strum', 'strum_worker.py'),
     cacheDir: canonicalCacheDir,
     sourceDir: path.join(canonicalCacheDir, 'strum-source'),
-    ffmpegDir: path.join(resources, 'node_modules', 'ffmpeg-static'),
+    ffmpegDir: path.dirname(ffmpegPath),
   };
 }
 
@@ -673,6 +688,48 @@ function executableOnPath(name: string): string | undefined {
   return undefined;
 }
 
+export function drumrollFfmpegRuntimeCandidates({
+  isPackaged,
+  resourcesPath,
+  appPath,
+  platform = process.platform,
+  architecture = process.arch,
+}: FfmpegRuntimeCandidateOptions): string[] {
+  if (platform !== 'darwin' || architecture !== 'arm64') {
+    return [];
+  }
+
+  if (isPackaged) {
+    return [path.join(resourcesPath, 'ffmpeg-runtime', 'bin', 'ffmpeg')];
+  }
+
+  return [
+    path.join(
+      appPath,
+      'node_modules',
+      '.cache',
+      'drumroll-ffmpeg',
+      'macos-arm64',
+      'bin',
+      'ffmpeg',
+    ),
+  ];
+}
+
+function resolveDrumrollFfmpegPath(): string | undefined {
+  const ffmpegName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+
+  return [
+    process.env.SK_FFMPEG,
+    ...drumrollFfmpegRuntimeCandidates({
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      appPath: app.getAppPath(),
+    }),
+    executableOnPath(ffmpegName),
+  ].find(executableFile);
+}
+
 export function validateSightkickRuntime(
   runtime: Partial<SightkickRuntime>,
 ): SightkickRuntime {
@@ -688,7 +745,7 @@ export function validateSightkickRuntime(
 
   if (!ffmpegPath) {
     throw new Error(
-      'The Drumroll ffmpeg runtime is missing; reinstall Drumroll before creating a chart',
+      'The Drumroll FFmpeg runtime is unavailable; reinstall Drumroll, set SK_FFMPEG, or add ffmpeg to PATH before creating a chart',
     );
   }
 
@@ -715,34 +772,7 @@ export function validateSightkickRuntime(
 }
 
 function preflightSightkickRuntime(): SightkickRuntime {
-  const ffmpegName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
-  const packagedFfmpeg = [
-    path.join(process.resourcesPath, 'ffmpeg-static', ffmpegName),
-    path.join(
-      process.resourcesPath,
-      'node_modules',
-      'ffmpeg-static',
-      ffmpegName,
-    ),
-    path.join(
-      process.resourcesPath,
-      'app.asar.unpacked',
-      'node_modules',
-      'ffmpeg-static',
-      ffmpegName,
-    ),
-  ];
-  const developmentFfmpeg = path.join(
-    app.getAppPath(),
-    'node_modules',
-    'ffmpeg-static',
-    ffmpegName,
-  );
-  const ffmpegPath = [
-    process.env.SK_FFMPEG,
-    ...(app.isPackaged ? packagedFfmpeg : [developmentFfmpeg]),
-    executableOnPath(ffmpegName),
-  ].find(executableFile);
+  const ffmpegPath = resolveDrumrollFfmpegPath();
   const uvPath = executableFile(process.env.SK_UV) ?? executableOnPath('uv');
   const pythonName = process.platform === 'win32' ? 'python.exe' : 'python3';
   const pythonPath = executableOnPath(pythonName);

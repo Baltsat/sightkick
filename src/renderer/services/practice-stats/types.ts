@@ -1,6 +1,15 @@
 import { Difficulty } from 'scan-chart';
 import { InputMapping } from '../../../types';
 import { GameMode } from '../../types';
+import type {
+  TutorIntervention,
+  TutorRecoveryAttempt,
+  TutorSettings,
+} from '../tutor/types';
+
+export const PRACTICE_RUN_SCHEMA_VERSION = 2;
+
+export const SCORING_POLICY_VERSION = 'judge-resolved-v2';
 
 /**
  * A drum-kit lane a hit record can be attributed to. Deliberately narrower
@@ -68,6 +77,67 @@ export interface TimingBiasStats {
   sampleCount: number;
 }
 
+export interface PracticeRunContext {
+  sessionId: string;
+  schemaVersion: number;
+  appVersion: string;
+  scoringPolicyVersion: string;
+  startedAt: string;
+  chartRevision: string;
+  deviceId?: string;
+  deviceName?: string;
+  inputLatencyMs: number;
+  inputMapping: InputMapping;
+}
+
+export interface TutorRunEvidence {
+  settings: TutorSettings;
+  interventions: TutorIntervention[];
+  recoveryAttempts: TutorRecoveryAttempt[];
+}
+
+/**
+ * Optional compact learning evidence stamped by a chart-aware caller. It is
+ * deliberately separate from raw hit records: older summaries did not carry
+ * enough immutable bar/skill context to recreate it later, so consumers must
+ * treat an absent value as unavailable rather than infer a trouble bar.
+ */
+export interface RunLearningEvidenceCount {
+  troubleCount?: number;
+  recoveryCleanCount?: number;
+  recoveryRetryCount?: number;
+  recoveryDeferredCount?: number;
+}
+
+export interface RunLearningEvidence {
+  /** Controlled curriculum/Coach skill tags when the caller has them. */
+  skills?: Record<string, RunLearningEvidenceCount>;
+  /** One-based chart bar numbers when the chart revision and bar mapping exist. */
+  bars?: Record<string, RunLearningEvidenceCount>;
+}
+
+/**
+ * Compact, deterministic Coach evidence produced while the full hit records
+ * for a newly finished run are still available. This is intentionally an
+ * evidence summary rather than a reconstructed Coach card: old summaries do
+ * not gain this field and consumers must not invent it for them.
+ */
+export interface PersistedCoachFindingEvidence {
+  id: string;
+  kind: string;
+  severity: 'high' | 'medium' | 'low';
+  skillTag: string;
+  sampleCount: number;
+  barStart?: number;
+  barEnd?: number;
+  lane?: KitElement;
+  slowSpeed?: number;
+  actualElement?: KitElement;
+  expectedElement?: KitElement;
+  /** Present only when the exact finding has an authored supported route. */
+  remediationLessonId?: string;
+}
+
 /**
  * Everything computed for one completed run. `completedAt` is supplied by
  * the caller (an ISO timestamp) — this module never touches the clock, so
@@ -114,6 +184,14 @@ export interface RunSummary {
    * only living in-memory) so achievements/stats can use it later without
    * SongView having to re-derive it. */
   bestStreak?: number;
+  /** Versioned, immutable context for reconstructing and migrating a run. */
+  context?: PracticeRunContext;
+  /** Practice-only intervention evidence captured before any rewind. */
+  tutor?: TutorRunEvidence;
+  /** Exact skill/bar evidence, only on runs where a chart-aware caller saved it. */
+  learningEvidence?: RunLearningEvidence;
+  /** Deterministic Coach/remediation evidence captured at run completion. */
+  coachEvidence?: PersistedCoachFindingEvidence[];
 }
 
 export interface RunTrendPoint {

@@ -39,42 +39,42 @@ export const alpha = (color: string, value: number) => {
   return `rgba(${r}, ${g}, ${b}, ${value})`;
 };
 
-const accent = '#d54b30';
-const accentBright = '#ff5a3c';
-const accentHover = lighten(accent, 0.14);
-const accentDeep = darken(accent, 0.16);
-const accentText = lighten(accent, 0.15);
+const accent = '#f73586';
+const accentBright = '#ff684f';
+const accentHover = lighten(accent, 0.12);
+const accentDeep = darken(accent, 0.22);
+const accentText = darken(accent, 0.25);
 
 export const themedark = {
   color: {
-    bg: '#141517',
-    surface: '#1c1d20',
-    surfaceRaised: '#232428',
-    surfaceSunken: '#0e0f11',
-    headerGradient: 'linear-gradient(180deg, #232428, #191a1d)',
+    bg: '#f8f5ef',
+    surface: '#ffffff',
+    surfaceRaised: '#eee8dc',
+    surfaceSunken: '#e4ddd0',
+    headerGradient: 'linear-gradient(180deg, #ffffff, #eee8dc)',
 
-    border: 'rgba(255,255,255,0.07)',
-    borderSoft: 'rgba(255,255,255,0.04)',
-    divider: 'rgba(255,255,255,0.05)',
-    fill: 'rgba(255,255,255,0.04)',
-    fillStrong: 'rgba(255,255,255,0.10)',
+    border: 'rgba(17,23,34,0.14)',
+    borderSoft: 'rgba(17,23,34,0.08)',
+    divider: 'rgba(17,23,34,0.10)',
+    fill: 'rgba(17,23,34,0.055)',
+    fillStrong: 'rgba(17,23,34,0.11)',
 
-    text: '#f2ede1',
-    textBody: '#e6e0d3',
-    textMuted: '#9c9484',
-    textFaint: '#8a8474',
-    textDim: '#857f70',
-    textDimmer: '#847e6f',
+    text: '#111722',
+    textBody: '#1b2430',
+    textMuted: '#526172',
+    textFaint: '#667588',
+    textDim: '#748195',
+    textDimmer: '#8490a1',
 
-    star: 'rgb(232, 183, 58)',
-    starPerfect: '#d8dde6',
+    star: '#ffad2f',
+    starPerfect: '#56d8f2',
 
     accent,
     accentBright,
     accentHover,
     accentDeep,
     accentText,
-    accentInk: '#1a160f',
+    accentInk: '#111722',
     accentGradient: `linear-gradient(145deg, ${accentHover}, ${accentDeep})`,
     accentGradientFade: `linear-gradient(90deg, ${alpha(
       accent,
@@ -83,20 +83,20 @@ export const themedark = {
     accentSoftBg: alpha(accent, 0.08),
     accentSoftBorder: alpha(accent, 0.22),
 
-    paper: '#ece3d0',
-    ink: '#1c1a14',
-    inkSoft: '#4a463c',
+    paper: '#eee8dc',
+    ink: '#111722',
+    inkSoft: '#536274',
 
-    green: '#1f8a4c',
-    orange: '#E8641A',
-    blue: '#1b6fc0',
-    yellow: '#C8930F',
-    red: '#c62828',
+    green: '#16885b',
+    orange: '#e95d37',
+    blue: '#247eae',
+    yellow: '#c27a10',
+    red: '#ce3f54',
   },
 
   font: {
     display: "'Newsreader', Georgia, serif",
-    ui: "'Space Grotesk', system-ui, sans-serif", // labels, body, numbers
+    ui: "'Instrument Sans Variable', 'Instrument Sans', system-ui, sans-serif", // labels, body, numbers
     weight: { regular: 400, medium: 500, semibold: 600, bold: 700 },
   },
 
@@ -126,11 +126,11 @@ export const themedark = {
 
   shadow: {
     frame:
-      '0 40px 90px -30px rgba(40,30,10,0.55), 0 0 0 1px rgba(255,255,255,0.04)',
-    star: 'drop-shadow(rgba(232, 183, 58, 0.45) 0px 3px 8px)',
-    starPerfect: 'drop-shadow(0 3px 10px rgba(196,210,230,0.55))',
+      '0 40px 90px -30px rgba(17,23,34,0.18), 0 0 0 1px rgba(255,255,255,0.72)',
+    star: 'drop-shadow(rgba(255, 173, 47, 0.45) 0px 3px 8px)',
+    starPerfect: 'drop-shadow(0 3px 10px rgba(86,216,242,0.5))',
     panel:
-      '0 40px 90px -30px rgba(40,30,10,0.55), 0 0 0 1px rgba(255,255,255,0.05)',
+      '0 40px 90px -30px rgba(17,23,34,0.18), 0 0 0 1px rgba(255,255,255,0.72)',
     accentButton: `0 12px 32px -6px ${alpha(
       accent,
       0.6,
@@ -138,22 +138,22 @@ export const themedark = {
     accentChip: `0 6px 16px -4px ${alpha(accent, 0.5)}`,
     accentSoft: `0 6px 6px -6px ${alpha(accent, 0.5)}`,
     paper:
-      'inset 0 1px 0 rgba(255,255,255,0.6), 0 18px 40px -20px rgba(0,0,0,0.6)',
-    floatLabel: '0 8px 20px rgba(0,0,0,0.4)',
+      'inset 0 1px 0 rgba(255,255,255,0.9), 0 18px 40px -20px rgba(17,23,34,0.22)',
+    floatLabel: '0 8px 20px rgba(17,23,34,0.16)',
   },
 
   space: { xs: 4, sm: 8, md: 14, lg: 22, xl: 26, xxl: 40 },
 
   control: {
     toggleOn: accent,
-    toggleOffTrack: 'rgba(255,255,255,0.10)',
+    toggleOffTrack: 'rgba(17,23,34,0.16)',
     toggleKnobOn: '#ffffff',
-    toggleKnobOff: '#7a7466',
-    sliderTrack: 'rgba(255,255,255,0.08)',
+    toggleKnobOff: '#ffffff',
+    sliderTrack: 'rgba(17,23,34,0.12)',
     sliderFill: `linear-gradient(90deg, ${accentDeep}, ${accent})`,
-    sliderFillMuted: 'rgba(255,255,255,0.18)',
+    sliderFillMuted: 'rgba(17,23,34,0.18)',
     sliderThumb: '#ffffff',
-    iconButtonBg: 'rgba(255,255,255,0.05)',
+    iconButtonBg: 'rgba(17,23,34,0.055)',
     iconButtonActiveBg: alpha(accent, 0.14),
     iconButtonActiveBorder: alpha(accent, 0.28),
   },

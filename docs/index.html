@@ -1,496 +1,328 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SightKick – Learn drums by playing real songs | Free electronic drum kit game</title>
-  <meta name="description" content="Free drum practice game: sheet music for thousands of songs, mute the drum track, play along on your electronic drum kit, and get scored in real time. macOS, Windows, and Linux.">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://sightkick.dev/">
-  <meta property="og:title" content="SightKick – Learn drums by playing real songs">
-  <meta property="og:description" content="Free drum practice game: sheet music for thousands of songs, mute the drum track, and play along on your electronic drum kit.">
-  <meta property="og:image" content="https://cdn.sightkick.dev/images/hero.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="SightKick – Learn drums by playing real songs">
-  <meta name="twitter:description" content="Free drum practice game: sheet music for thousands of songs, mute the drum track, and play along on your electronic drum kit.">
-  <meta name="twitter:image" content="https://cdn.sightkick.dev/images/hero.png">
-  <link rel="canonical" href="https://sightkick.dev/">
-  <link rel="icon" href="https://cdn.sightkick.dev/images/sightkick-logo.png">
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "SightKick",
-    "alternateName": ["Sidekick Drums", "SightKick Drums"],
-    "description": "A free drum practice game. Renders thousands of community songs as standard sheet music: mute the recorded drums, plug in your electronic drum kit, and get scored on accuracy in real time.",
-    "applicationCategory": "MusicApplication",
-    "operatingSystem": "macOS, Windows, Linux",
-    "featureList": [
-      "Drum sheet music rendered from community song charts",
-      "Multi-stem audio mixer with per-track volume control",
-      "AI-powered drum track separation from mixed audio",
-      "MIDI electronic drum kit support with real-time hit detection and scoring",
-      "Practice mode with section looping and playback speed control (0.3x to 2x)",
-      "Multiple playhead modes: cursor, measure, or off",
-      "In-app song search and download from Enchor library",
-      "Color-coded notation by drum piece"
-    ],
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "USD"
-    },
-    "url": "https://sightkick.dev/",
-    "downloadUrl": "https://github.com/tonygoldcrest/sightkick/releases",
-    "softwareVersion": "latest",
-    "license": "https://opensource.org/licenses/MIT",
-    "author": {
-      "@type": "Person",
-      "name": "Anton Korolkov"
-    }
-  }
-  </script>
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "mainEntity": [
-      {
-        "@type": "Question",
-        "name": "Does it work with my drum kit?",
-        "acceptedAnswer": { "@type": "Answer", "text": "If your kit can send MIDI, it works. Most electronic kits from Roland, Alesis, Yamaha, Donner and the like have a USB port on the module that does exactly that. Plug it into your computer, map each pad in settings by hitting it, and you're set. Acoustic kits work too if they have triggers and a module." }
-      },
-      {
-        "@type": "Question",
-        "name": "Is it actually free?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Yes. SightKick is open source under the MIT license. No account, no subscription, no locked songs. There's a Ko-fi if you want to support the project, but that's optional." }
-      },
-      {
-        "@type": "Question",
-        "name": "Where do the songs come from?",
-        "acceptedAnswer": { "@type": "Answer", "text": "From Enchor, a community library of songs charted for rhythm games. You search and download right inside the app. The charts are made by fans, so quality varies, but for well-known songs they're usually solid." }
-      },
-      {
-        "@type": "Question",
-        "name": "Do I need to know how to read sheet music?",
-        "acceptedAnswer": { "@type": "Answer", "text": "No. The notes are color-coded by drum, a cheat sheet stays on screen, and the cursor shows you where you are. You end up learning to read drum notation as a side effect of playing." }
-      },
-      {
-        "@type": "Question",
-        "name": "Can I try it without a drum kit?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Map the keyboard instead of pads and give it a go. It won't do much for your drumming, but it shows you how everything works before you commit to dragging your kit next to the computer." }
-      },
-      {
-        "@type": "Question",
-        "name": "How is it different from Melodics or Drumeo?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Those are lesson platforms with subscriptions, and they're good at teaching technique. SightKick doesn't teach; it's a practice game. You pick songs you actually like and play them until the score stops being embarrassing." }
-      },
-      {
-        "@type": "Question",
-        "name": "What do I need to run it?",
-        "acceptedAnswer": { "@type": "Answer", "text": "A Mac (Apple Silicon or Intel), a Windows PC (x64), or a Linux machine (AppImage). The optional drum-track separation runs on Apple Silicon and Windows only." }
-      }
-    ]
-  }
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111722" />
+    <link rel="canonical" href="https://drumroll.pages.dev/" />
+    <link rel="icon" href="favicon.png" />
+    <title>Drumroll — Practice that listens back</title>
+    <meta
+      name="description"
+      content="Drumroll is a hands-free drum-learning game for electronic kits: Flow notation, adaptive practice, a 170-exercise Journey, and evidence-backed coaching."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Drumroll — Practice that listens back" />
+    <meta
+      property="og:description"
+      content="A bright, focused drum-learning game for an electronic kit."
+    />
+    <meta
+      property="og:image"
+      content="https://drumroll.pages.dev/og-home.jpg"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image"
+      content="https://drumroll.pages.dev/og-home.jpg"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600;6..72,700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!--
+  THESIS: A real kit session gets one decisive next action, not another practice dashboard.
+  OWN-WORLD: Daybreak pearl, deep ink, amber, coral, magenta, cyan, exact product captures and editorial type.
+  STORY: See the kit, understand the learning loop, then take the verified desktop release.
+  FIRST VIEWPORT: Monumental promise at left, current cockpit capture at right, local desktop release below.
+  FORM: Editorial studio tour, position 1: proof before promise, seed drumroll-daybreak-site-20260809.
+  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md.
+  -->
 
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-  </symbol>
-  <symbol id="i-github" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
-  </symbol>
-  <symbol id="i-kofi" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.494 3.346-.93 1.78.564 2.312 2.335 2.312 2.335s.42 1.1-.467 1.943zm4.87.439c-.175 0-.35-.046-.508-.143.547-1.316.41-2.898-.166-3.985h.674c1.082 0 1.962.879 1.962 1.962 0 1.082-.88 1.961-1.962 1.961v.205z"/>
-  </symbol>
-  <symbol id="i-discord" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
-  </symbol>
-  <symbol id="i-apple" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.73M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-  </symbol>
-  <symbol id="i-windows" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M3 5.557l7.357-1.002.004 7.097-7.354.042L3 5.557zm7.354 6.913l.006 7.107-7.354-1.012v-6.136l7.348.041zm.892-8.046L21.001 3v8.562l-9.755.077V4.424zm9.758 8.113l-.003 8.523-9.755-1.378-.014-7.161 9.772.016z"/>
-  </symbol>
-  <symbol id="i-linux" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12.008 2c-2.09 0-3.32 1.83-3.32 4.02 0 .78.14 1.5.3 2.2.13.56-.02 1.05-.42 1.57-1.03 1.35-2.4 3.03-3 4.86-.32.98-.48 2.03-.03 2.9-.28.3-.47.68-.47 1.12 0 .5.24.9.6 1.2.3.24.66.4 1.05.5.5.14 1.02.26 1.4.62.5.48 1.17.9 2.03.9.6 0 1.13-.24 1.55-.6.42.36.95.6 1.55.6.86 0 1.53-.42 2.03-.9.38-.36.9-.48 1.4-.62.4-.1.75-.26 1.05-.5.36-.3.6-.7.6-1.2 0-.44-.19-.82-.47-1.12.45-.87.29-1.92-.03-2.9-.6-1.83-1.97-3.51-3-4.86-.4-.52-.55-1.01-.42-1.57.16-.7.3-1.42.3-2.2C15.328 3.83 14.098 2 12.008 2zm-1.32 3.2c.36 0 .66.36.66.8 0 .12-.02.23-.06.33-.12-.06-.26-.1-.4-.1-.28 0-.53.14-.68.34-.1-.16-.18-.36-.18-.57 0-.44.3-.8.66-.8zm2.64 0c.36 0 .66.36.66.8 0 .21-.08.41-.18.57-.15-.2-.4-.34-.68-.34-.14 0-.28.04-.4.1-.04-.1-.06-.21-.06-.33 0-.44.3-.8.66-.8zm-1.32 2.1c.86 0 1.6.4 2.06.72.28.2.26.5-.04.66l-1.5.8c-.32.18-.72.18-1.04 0l-1.5-.8c-.3-.16-.32-.46-.04-.66.46-.32 1.2-.72 2.06-.72z"/>
-  </symbol>
-  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="20 6 9 17 4 12"/>
-  </symbol>
-</svg>
+    <header class="site-header">
+      <a class="wordmark" href="#top" aria-label="Drumroll home"
+        >Drumroll<span>Daybreak Arena</span></a
+      >
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-controls="site-nav"
+        aria-expanded="false"
+      >
+        Menu
+      </button>
+      <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+        <a href="#practice">Practice</a>
+        <a href="#journey">Journey</a>
+        <a href="#coach">Coach</a>
+        <a class="nav-download" href="#download">Get Drumroll</a>
+      </nav>
+    </header>
 
-<nav>
-  <a href="#" class="nav-brand">
-    <img src="https://cdn.sightkick.dev/images/sightkick-logo.png" alt="SightKick">
-    <span class="nav-brand-name">SightKick</span>
-  </a>
-  <div class="nav-links">
-    <a href="#features" class="nav-link">Features</a>
-    <a href="#workflow" class="nav-link">How it works</a>
-    <a href="#faq" class="nav-link">FAQ</a>
-    <a href="https://ko-fi.com/tonygoldcrest" target="_blank" rel="noopener" class="nav-link">
-      <svg class="icon" width="14" height="14"><use href="#i-kofi"/></svg>Support
-    </a>
-    <a href="https://github.com/tonygoldcrest/sightkick" target="_blank" rel="noopener" class="nav-link">
-      <svg class="icon" width="14" height="14"><use href="#i-github"/></svg>GitHub<span id="gh-stars" class="gh-stars" hidden></span>
-    </a>
-    <a href="https://github.com/tonygoldcrest/sightkick/releases" class="nav-cta">
-      <svg class="icon" width="13" height="13"><use href="#i-download"/></svg>Download
-    </a>
-  </div>
-</nav>
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="hero-kicker">Practice that listens back.</p>
+          <h1 id="hero-title">
+            Sit down.<br />Hit the cue.<br /><em>Keep playing.</em>
+          </h1>
+          <p class="hero-deck">
+            Drumroll is a hands-free drum-learning game for an electronic kit.
+            It holds the session together while your playing shows what comes
+            next.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#download"
+              >Get the desktop release</a
+            >
+            <a class="button button-text" href="#practice"
+              >See the practice loop</a
+            >
+          </div>
+          <p class="hero-proof">
+            Public preview: Drumroll 1.2.0-kb.2 for Apple Silicon macOS,
+            Developer ID signed and Apple notarized.
+          </p>
+        </div>
+        <figure class="hero-proof-image media-frame media-frame-hero">
+          <img
+            src="design-qa/daybreak-arena/implementation-home.png"
+            alt="The current Drumroll home cockpit with a drum kit, song context, kit-lane accuracy, and a play action."
+          />
+          <figcaption>
+            Current desktop cockpit. The kit is the controller.
+          </figcaption>
+        </figure>
+      </section>
 
-<section class="hero">
-  <div class="hero-inner">
-    <div class="hero-content">
-      <h1 class="hero-title">Learn drums by playing <em>real songs</em></h1>
-      <p class="hero-sub">
-        Sheet music for thousands of songs. Mute the drum track, play along on your electronic drum kit, and beat your best score.
+      <section class="intro-band" aria-labelledby="intro-title">
+        <p class="section-index">The promise</p>
+        <div>
+          <h2 id="intro-title">
+            Practice lives in the music, not in the menu.
+          </h2>
+          <p>
+            Start with a clear goal. Let Flow notation keep the next notes in
+            view. In Practice, Drumroll can return to a safe checkpoint after a
+            material pattern of misses; in Perform, it records one uninterrupted
+            pass.
+          </p>
+        </div>
+      </section>
+
+      <section
+        class="practice-section"
+        id="practice"
+        aria-labelledby="practice-title"
+      >
+        <div class="section-heading section-heading-wide">
+          <p class="section-index">The practice loop</p>
+          <h2 id="practice-title">Make the next bar legible.</h2>
+          <p>
+            Flow keeps the playhead fixed while the chart moves. Practice
+            controls let you choose speed, notation, loops, checkpoint recovery,
+            and lives without losing the musical thread.
+          </p>
+        </div>
+        <figure class="media-frame media-frame-wide practice-capture">
+          <img
+            src="design-qa/daybreak-arena/implementation-flow-playing.png"
+            alt="Drumroll Flow notation in a live Practice session with colored drum notes and a fixed playhead."
+          />
+          <figcaption>
+            Current Flow notation in a Drumroll Practice session.
+          </figcaption>
+        </figure>
+        <div class="sequence" aria-label="Drumroll practice sequence">
+          <article>
+            <span>01</span>
+            <h3>Choose a reachable challenge.</h3>
+            <p>
+              The next-practice selector balances prerequisites, recent mastery,
+              kit-lane weakness, speed, spacing, and variety.
+            </p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>Stay in the phrase.</h3>
+            <p>
+              When a material trouble window is resolved, Practice can recover
+              to the latest safe musical checkpoint and lower the pace.
+            </p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>Return with evidence.</h3>
+            <p>
+              A successful recovery releases the player back into the original
+              path in bounded speed steps.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section
+        class="journey-section"
+        id="journey"
+        aria-labelledby="journey-title"
+      >
+        <div class="journey-copy">
+          <p class="section-index">The method</p>
+          <h2 id="journey-title">A route through 170 playable exercises.</h2>
+          <p>
+            Fundamentals, rudiments, coordination, grooves, fills, and musical
+            applications are arranged as a Journey. Each lesson carries its real
+            title, prerequisite state, skill focus, tempo, and mastery rule.
+          </p>
+          <a class="inline-link" href="#download"
+            >Take the next lesson on desktop</a
+          >
+        </div>
+        <figure class="media-frame journey-capture">
+          <img
+            src="design-qa/daybreak-arena/implementation-journey.png"
+            alt="The current Drumroll Journey showing the Foundations season and Lesson 01.01 as the next exercise."
+          />
+          <figcaption>
+            Current Journey view with the Foundations season.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="coach-section" id="coach" aria-labelledby="coach-title">
+        <div class="coach-art">
+          <figure class="media-frame coach-capture">
+            <img
+              src="design-qa/daybreak-arena/implementation-coach.png"
+              alt="Drumroll's practice coach explaining a saved run and the evidence it has available."
+            />
+            <figcaption>
+              Coach reports what a saved run actually contains.
+            </figcaption>
+          </figure>
+        </div>
+        <div class="coach-copy">
+          <p class="section-index">The evidence</p>
+          <h2 id="coach-title">Advice is only as good as the run behind it.</h2>
+          <p>
+            Drumroll turns saved hit records, resolved misses, wrong-pad hits,
+            timing offsets, speed, streaks, and recovery attempts into a next
+            useful rep. If bar-level history is absent, Coach says so rather
+            than inventing a weak bar.
+          </p>
+          <details>
+            <summary>What a saved session can explain</summary>
+            <p>
+              Session mode and configuration, score and streak, lane summaries,
+              timing, wrong-pad hits, resolved misses, recovery summaries,
+              checkpoints, and life events. Full hit records enable exact
+              trouble bars and targeted loops for new runs.
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <section class="platform-section" aria-labelledby="platform-title">
+        <p class="section-index">Built for the kit</p>
+        <h2 id="platform-title">Your drums remain the fastest way forward.</h2>
+        <div class="platform-grid">
+          <p>
+            <strong>Ready cue</strong> starts an eligible session with the fixed
+            four-hit kick–crash–kick–crash command after a short silence.
+          </p>
+          <p>
+            <strong>Practice</strong> protects learning quality with checkpoint
+            recovery and repeatable focused loops.
+          </p>
+          <p>
+            <strong>Perform</strong> protects continuity with one canonical,
+            uninterrupted pass.
+          </p>
+        </div>
+        <p class="platform-note">
+          Keyboard and pointer controls remain available for setup and
+          accessibility. Local files, native MIDI, and the full practice setup
+          are desktop-first.
+        </p>
+      </section>
+
+      <section
+        class="download-section"
+        id="download"
+        aria-labelledby="download-title"
+      >
+        <div class="download-copy">
+          <p class="section-index">The desktop release</p>
+          <h2 id="download-title">Bring the studio to the kit.</h2>
+          <p>
+            Drumroll 1.2.0-kb.2 is the Apple Silicon macOS preview. The public
+            artifact is Developer ID signed, Apple notarized, and published with
+            a reproducible SHA-256 checksum.
+          </p>
+        </div>
+        <div class="download-action">
+          <a
+            id="desktop-download"
+            class="button button-primary button-download"
+            href="https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.2/Drumroll-1.2.0-kb.2-arm64.dmg"
+            >Download Drumroll for Apple Silicon</a
+          >
+          <p>
+            Notarized DMG ·
+            <a
+              href="https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.2/SHA256SUMS.txt"
+              >verify SHA-256</a
+            >
+          </p>
+        </div>
+      </section>
+
+      <section class="faq-section" aria-labelledby="faq-title">
+        <p class="section-index">Clear boundaries</p>
+        <h2 id="faq-title">What Drumroll can say today.</h2>
+        <div class="faq-list">
+          <details>
+            <summary>Does it require an electronic drum kit?</summary>
+            <p>
+              Drumroll is designed around MIDI input from an electronic kit.
+              Keyboard and pointer controls remain available for setup and
+              accessibility.
+            </p>
+          </details>
+          <details>
+            <summary>Will Coach always show trouble bars?</summary>
+            <p>
+              No. Exact trouble bars and targeted loops require a saved run with
+              full hit records. Summary-only runs can still report their
+              recorded accuracy, timing, lane, wrong-hit, speed, and date.
+            </p>
+          </details>
+          <details>
+            <summary>Is a browser version offered here?</summary>
+            <p>
+              Yes. The shared learning surface is available at
+              <a href="https://drumroll.pages.dev">drumroll.pages.dev</a>.
+              Native MIDI, local files, and the complete kit-first setup remain
+              desktop capabilities.
+            </p>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="wordmark" href="#top">Drumroll<span>Daybreak Arena</span></a>
+      <p>
+        A focused, evidence-backed practice game for an electronic drum kit.
       </p>
-    </div>
+      <a href="#download">Get the desktop release</a>
+    </footer>
 
-    <div class="hero-screenshot">
-      <video
-        src="https://cdn.sightkick.dev/videos/sightkick-demo.mp4"
-        poster="https://cdn.sightkick.dev/images/hero.png"
-        autoplay
-        muted
-        loop
-        playsinline
-      ></video>
-    </div>
-  </div>
-
-  <div class="hero-actions">
-    <div class="hero-actions-row">
-      <a id="hero-btn-mac" href="https://github.com/tonygoldcrest/sightkick/releases/latest" class="btn-primary">
-        <svg class="icon" width="15" height="15"><use href="#i-download"/></svg>Download for macOS
-      </a>
-      <a id="hero-btn-win" href="https://github.com/tonygoldcrest/sightkick/releases/latest" class="btn-secondary">
-        <svg class="icon" width="15" height="15"><use href="#i-download"/></svg>Download for Windows
-      </a>
-      <a id="hero-btn-linux" href="https://github.com/tonygoldcrest/sightkick/releases/latest" class="btn-secondary">
-        <svg class="icon" width="15" height="15"><use href="#i-download"/></svg>Download for Linux
-      </a>
-    </div>
-    <div class="hero-actions-row">
-      <a href="https://discord.gg/kwBx9VZt3" target="_blank" rel="noopener" class="btn-ghost">
-        <svg class="icon" width="20" height="20"><use href="#i-discord"/></svg>Join on Discord
-      </a>
-      <a href="https://github.com/tonygoldcrest/sightkick" target="_blank" rel="noopener" class="btn-ghost">
-        <svg class="icon" width="20" height="20"><use href="#i-github"/></svg>View source
-      </a>
-      <a href="https://ko-fi.com/tonygoldcrest" target="_blank" rel="noopener" class="btn-ghost">
-        <svg class="icon" width="20" height="20"><use href="#i-kofi"/></svg>Support the project
-      </a>
-    </div>
-  </div>
-</section>
-
-<section class="features" id="features">
-  <div class="features-inner">
-    <div class="features-header">
-      <h2 class="section-title">Features</h2>
-    </div>
-    <div class="features-grid">
-
-      <div class="feat">
-        <div class="feat-header">
-          <div class="feat-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-          </div>
-          <div class="feat-title">Music notation</div>
-        </div>
-        <div class="feat-body">Every song is shown as standard drum notation (the same format you'd find in a printed drum chart) so you practice reading and playing actual parts.</div>
-      </div>
-
-      <div class="feat">
-        <div class="feat-header">
-          <div class="feat-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          </div>
-          <div class="feat-title">Thousands of songs</div>
-        </div>
-        <div class="feat-body">Search and download straight from the <a href="https://www.enchor.us/" target="_blank" rel="noopener">Enchor</a> community library, all with drum charts. The charts aren't always perfect, but they're usually close enough. Most come in several difficulties, from Easy to Expert.</div>
-      </div>
-
-      <div class="feat">
-        <div class="feat-header">
-          <div class="feat-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="5" x2="20" y2="21"/><circle cx="7" cy="5" r="2" fill="currentColor" stroke="none"/><line x1="17" y1="5" x2="4" y2="21"/><circle cx="17" cy="5" r="2" fill="currentColor" stroke="none"/></svg>
-          </div>
-          <div class="feat-title">E-kit support</div>
-        </div>
-        <div class="feat-body">Plug in your e-drums, set up the mapping in settings and play along. Hit the notes and aim for a perfect score.</div>
-      </div>
-
-      <div class="feat">
-        <div class="feat-header">
-          <div class="feat-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          </div>
-          <div class="feat-title">Multi-stem mixer</div>
-        </div>
-        <div class="feat-body">When a song comes with separate tracks, set the level of each one (drums, bass, guitar, vocals) and mute the recorded drums to play along.</div>
-      </div>
-
-      <div class="feat">
-        <div class="feat-header">
-          <div class="feat-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-          </div>
-          <div class="feat-title">Drum-track separation</div>
-        </div>
-        <div class="feat-body">When a song is one mixed file, SightKick can split the recorded drums out into their own track so you can mute them. Available on Apple Silicon and Windows.</div>
-      </div>
-
-      <div class="feat">
-        <div class="feat-header">
-          <div class="feat-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-          </div>
-          <div class="feat-title">Practice mode</div>
-        </div>
-        <div class="feat-body">Select the measures that are giving you trouble, loop them, and slow playback down as far as 0.3x. Scoring is off in practice, so you can flail until it clicks.</div>
-      </div>
-
-    </div>
-  </div>
-</section>
-
-<section class="workflow" id="workflow">
-  <div class="workflow-inner">
-
-    <div class="workflow-header">
-      <h2 class="section-title">How to start playing</h2>
-    </div>
-
-    <div class="steps">
-
-      <div class="step">
-        <div class="step-text">
-          <div class="step-num-row">
-            <span class="step-num">1</span>
-            <h3 class="step-title">Set up your song library</h3>
-          </div>
-          <p class="step-body">Open settings and pick the folder where your songs will be downloaded.</p>
-        </div>
-        <div class="step-image">
-          <img src="https://cdn.sightkick.dev/images/select-folder.png" alt="Song library setup" loading="lazy">
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-text">
-          <div class="step-num-row">
-            <span class="step-num">2</span>
-            <h3 class="step-title">Download your first song</h3>
-          </div>
-          <p class="step-body">Press the globe to search <a href="https://www.enchor.us/" target="_blank" rel="noopener">Enchor</a>, download a song, then press the folder button to switch back to your library.</p>
-        </div>
-        <div class="step-image">
-          <img src="https://cdn.sightkick.dev/images/download-song.png" alt="Song search" loading="lazy">
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-text">
-          <div class="step-num-row">
-            <span class="step-num">3</span>
-            <h3 class="step-title">Map your drum kit</h3>
-          </div>
-          <p class="step-body">Plug in your e-drums, press Listen, and hit each pad to map it. Some pads can send a different signal from each area, like the head and the rim, so map them all to the same drum. No kit? Use the keyboard to try it out.</p>
-        </div>
-        <div class="step-image">
-          <img src="https://cdn.sightkick.dev/images/map-kit.png" alt="Drum kit mapping" loading="lazy">
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-text">
-          <div class="step-num-row">
-            <span class="step-num">4</span>
-            <h3 class="step-title">Play through the song</h3>
-          </div>
-          <p class="step-body">Open the song you downloaded, hit play, and go for your best score. A handy cheat sheet stays on screen so you never lose track of which color is which drum.</p>
-        </div>
-        <div class="step-image">
-          <img src="https://cdn.sightkick.dev/images/play-song.png" alt="Sheet music playback" loading="lazy">
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-text">
-          <div class="step-num-row">
-            <span class="step-num">5</span>
-            <h3 class="step-title">See how you did</h3>
-          </div>
-          <p class="step-body">Every hit is scored as you play. Finish the song to see your stars and accuracy, then play it again to improve.</p>
-        </div>
-        <div class="step-image">
-          <img src="https://cdn.sightkick.dev/images/get-scored.png" alt="Score summary" loading="lazy">
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="legend">
-  <div class="legend-inner">
-    <div class="legend-header">
-      <h2 class="section-title">Color-coded by drum</h2>
-      <p class="section-body">Each note is colored by the part of the kit it belongs to, which makes passages easier to read. On by default; turn it off in Settings.</p>
-    </div>
-    <div class="legend-chips">
-      <div class="chip-row">
-        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="1" y1="1" x2="11" y2="11" stroke="#c79019" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="1" x2="1" y2="11" stroke="#c79019" stroke-width="2" stroke-linecap="round"/></svg>
-        <span class="chip-label">Hi-hat</span>
-      </div>
-      <div class="chip-row">
-        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="1" y1="1" x2="11" y2="11" stroke="#1f6fb2" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="1" x2="1" y2="11" stroke="#1f6fb2" stroke-width="2" stroke-linecap="round"/></svg>
-        <span class="chip-label">Ride</span>
-      </div>
-      <div class="chip-row">
-        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="1" y1="1" x2="11" y2="11" stroke="#2f8f5b" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="1" x2="1" y2="11" stroke="#2f8f5b" stroke-width="2" stroke-linecap="round"/></svg>
-        <span class="chip-label">Crash</span>
-      </div>
-      <div class="chip-row">
-        <span class="chip-dot" style="background:#cf3b2e"></span>
-        <span class="chip-label">Snare</span>
-      </div>
-      <div class="chip-row">
-        <span class="chip-dot" style="background:#c79019"></span>
-        <span class="chip-label">High tom</span>
-      </div>
-      <div class="chip-row">
-        <span class="chip-dot" style="background:#1f6fb2"></span>
-        <span class="chip-label">Mid tom</span>
-      </div>
-      <div class="chip-row">
-        <span class="chip-dot" style="background:#2f8f5b"></span>
-        <span class="chip-label">Floor tom</span>
-      </div>
-      <div class="chip-row">
-        <span class="chip-dot" style="background:#e0651c"></span>
-        <span class="chip-label">Kick</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="faq" id="faq">
-  <div class="faq-inner">
-    <div class="faq-header">
-      <h2 class="section-title">FAQ</h2>
-    </div>
-    <div class="faq-list">
-
-      <details class="faq-item">
-        <summary>Does it work with my drum kit?</summary>
-        <p class="faq-body">If your kit can send MIDI, it works. Most electronic kits from Roland, Alesis, Yamaha, Donner and the like have a USB port on the module that does exactly that. Plug it into your computer, map each pad in settings by hitting it, and you're set. Acoustic kits work too if they have triggers and a module.</p>
-      </details>
-
-      <details class="faq-item">
-        <summary>Is it actually free?</summary>
-        <p class="faq-body">Yes. SightKick is open source under the MIT license. No account, no subscription, no locked songs. There's a <a href="https://ko-fi.com/tonygoldcrest" target="_blank" rel="noopener">Ko-fi</a> if you want to support the project, but that's optional.</p>
-      </details>
-
-      <details class="faq-item">
-        <summary>Where do the songs come from?</summary>
-        <p class="faq-body">From <a href="https://www.enchor.us/" target="_blank" rel="noopener">Enchor</a>, a community library of songs charted for rhythm games. You search and download right inside the app. The charts are made by fans, so quality varies, but for well-known songs they're usually solid.</p>
-      </details>
-
-      <details class="faq-item">
-        <summary>Do I need to know how to read sheet music?</summary>
-        <p class="faq-body">No. The notes are color-coded by drum, a cheat sheet stays on screen, and the cursor shows you where you are. You end up learning to read drum notation as a side effect of playing.</p>
-      </details>
-
-      <details class="faq-item">
-        <summary>Can I try it without a drum kit?</summary>
-        <p class="faq-body">Yes. Map the keyboard instead of pads and give it a go. It won't do much for your drumming, but it shows you how everything works before you commit to dragging your kit next to the computer.</p>
-      </details>
-
-      <details class="faq-item">
-        <summary>How is it different from Melodics or Drumeo?</summary>
-        <p class="faq-body">Those are lesson platforms with subscriptions, and they're good at teaching technique. SightKick doesn't teach; it's a practice game. You pick songs you actually like and play them until the score stops being embarrassing. There's a <a href="alternatives.html">longer comparison here</a>.</p>
-      </details>
-
-      <details class="faq-item">
-        <summary>What do I need to run it?</summary>
-        <p class="faq-body">A Mac (Apple Silicon or Intel), a Windows PC (x64), or a Linux machine (AppImage). The optional drum-track separation runs on Apple Silicon and Windows only.</p>
-      </details>
-
-    </div>
-  </div>
-</section>
-
-<section class="download" id="download">
-  <div class="download-inner">
-    <h2 class="download-title">Download SightKick</h2>
-    <p class="download-sub">Free and open source, no account needed.<br>Works on macOS, Windows, and Linux.</p>
-    <div class="platform-buttons">
-
-      <a id="dl-mac-arm" href="https://github.com/tonygoldcrest/sightkick/releases" class="platform-btn">
-        <svg class="icon" width="26" height="26"><use href="#i-apple"/></svg>
-        <span class="platform-btn-info">
-          macOS
-          <span class="platform-btn-sub">Apple Silicon</span>
-        </span>
-      </a>
-
-      <a id="dl-mac-x64" href="https://github.com/tonygoldcrest/sightkick/releases" class="platform-btn">
-        <svg class="icon" width="26" height="26"><use href="#i-apple"/></svg>
-        <span class="platform-btn-info">
-          macOS
-          <span class="platform-btn-sub">Intel</span>
-        </span>
-      </a>
-
-      <a id="dl-win" href="https://github.com/tonygoldcrest/sightkick/releases" class="platform-btn">
-        <svg class="icon" width="26" height="26"><use href="#i-windows"/></svg>
-        <span class="platform-btn-info">
-          Windows
-          <span class="platform-btn-sub">x64</span>
-        </span>
-      </a>
-
-      <a id="dl-linux" href="https://github.com/tonygoldcrest/sightkick/releases" class="platform-btn">
-        <svg class="icon" width="26" height="26"><use href="#i-linux"/></svg>
-        <span class="platform-btn-info">
-          Linux
-          <span class="platform-btn-sub">AppImage</span>
-        </span>
-      </a>
-
-    </div>
-    <p class="download-note">
-      All releases at <a href="https://github.com/tonygoldcrest/sightkick/releases" target="_blank" rel="noopener">github.com/tonygoldcrest/sightkick/releases</a>
-    </p>
-  </div>
-</section>
-
-<footer>
-  <div class="footer-brand">
-    <img src="https://cdn.sightkick.dev/images/sightkick-logo.png" alt="">
-    <span class="footer-name">SightKick</span>
-    <span class="footer-copy">MIT License, Anton Korolkov</span>
-  </div>
-  <div class="footer-links">
-    <a href="alternatives.html" class="footer-link">vs Melodics &amp; Drumeo</a>
-    <a href="https://github.com/tonygoldcrest/sightkick" class="footer-link" target="_blank" rel="noopener">GitHub</a>
-    <a href="https://github.com/tonygoldcrest/sightkick/releases" class="footer-link" target="_blank" rel="noopener">Releases</a>
-    <a href="https://www.enchor.us/" class="footer-link" target="_blank" rel="noopener">Enchor</a>
-  </div>
-</footer>
-
-<script src="main.js"></script>
-</body>
+    <script src="main.js"></script>
+  </body>
 </html>

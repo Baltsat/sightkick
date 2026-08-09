@@ -53,6 +53,10 @@ export function masteryTimeline({
       songDifficulties,
       chartTotalNotes,
       globalLaneAccuracy: aggregateLaneAccuracy(allRunsSoFar),
+      // A timeline point answers "what did the evidence say on this date?";
+      // pinning decay to the point avoids replaying old points through
+      // today's clock.
+      nowMs: Date.parse(run.completedAt),
     });
 
     return {
@@ -83,6 +87,18 @@ export function projectMasteryTrend(
   targetDate?: string,
 ): MasteryTrendProjection {
   if (timeline.length < MIN_POINTS_FOR_PROJECTION) {
+    return { slopePerDay: 0, projectedMasteryDate: null };
+  }
+
+  // Evidence confidence naturally rises during the first few runs. That is
+  // useful to display, but it is not proof the player is improving. A flat
+  // underlying accuracy series therefore has no performance trend to
+  // project, even if retention confidence made the visible mastery ring rise.
+  const accuracyRange =
+    Math.max(...timeline.map((point) => point.accuracy)) -
+    Math.min(...timeline.map((point) => point.accuracy));
+
+  if (accuracyRange === 0) {
     return { slopePerDay: 0, projectedMasteryDate: null };
   }
 

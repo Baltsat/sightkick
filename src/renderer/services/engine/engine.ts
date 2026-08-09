@@ -25,6 +25,7 @@ import {
   LoopRegion,
   MissHandler,
   PlaybackSnapshot,
+  ResolvedJudgementHandler,
 } from './types';
 
 const KIT_ELEMENT_NAMES = new Set<string>(Object.keys(ELEMENT_TO_KEYS));
@@ -57,6 +58,7 @@ export class Engine {
   // `judge.rewindTo`.
   private missListeners = new Set<MissHandler>();
   private resetListeners = new Set<() => void>();
+  private runEndingListeners = new Set<() => boolean>();
   private onEndedCb: (
     score: ScoreData,
     practiceSummary: RunSummary,
@@ -71,7 +73,9 @@ export class Engine {
   private inputUnsub: () => void;
   private hitUnsub: () => void;
   private falseHitUnsub: () => void;
+  private judgementUnsub: () => void;
   private runRecords: HitRecord[] = [];
+  private suppressJudgementResolution = false;
 
   constructor(options: EngineOptions) {
     this.onEndedCb = options.onEnded;
@@ -157,6 +161,23 @@ export class Engine {
         verdict: 'wrong',
       });
     });
+    this.judgementUnsub = this.judge.onJudgement((judgement) => {
+      if (
+        judgement.verdict !== 'miss' ||
+        judgement.expectedTick === undefined ||
+        !isKitElement(judgement.expectedElement)
+      ) {
+        return;
+      }
+
+      this.runRecords.push({
+        tick: judgement.expectedTick,
+        timeSeconds: this.timeSecondsForTick(judgement.expectedTick),
+        deltaMs: 0,
+        element: judgement.expectedElement,
+        verdict: 'miss',
+      });
+    });
   }
 
   get timeStore(): TimeStore {
@@ -181,6 +202,11 @@ export class Engine {
     return this.judge.onFalseHit(listener);
   }
 
+  /** Final Judge outcomes for adaptive practice and evidence capture. */
+  onJudgement(listener: ResolvedJudgementHandler): () => void {
+    return this.judge.onJudgement(listener);
+  }
+
   /** See `MissHandler`'s doc comment in types.ts. */
   onMiss(listener: MissHandler): () => void {
     this.missListeners.add(listener);
@@ -199,6 +225,19 @@ export class Engine {
 
     return () => {
       this.resetListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Synchronous pre-commit handshake after every chart head has a final
+   * Judge outcome. Return false when an adaptive recovery restarted the
+   * transport; Engine then preserves the run and does not open Results.
+   */
+  onRunEnding(listener: () => boolean): () => void {
+    this.runEndingListeners.add(listener);
+
+    return () => {
+      this.runEndingListeners.delete(listener);
     };
   }
 
@@ -261,15 +300,15 @@ export class Engine {
   }
 
   setLoopRegion(region: LoopRegion | undefined): void {
-    this.transport.setLoopRegion(region);
+    this.withAdministrativeSeek(() => this.transport.setLoopRegion(region));
   }
 
   play(): void {
-    this.transport.play();
+    this.withAdministrativeSeek(() => this.transport.play());
   }
 
   playFromTick(tick: number): void {
-    this.transport.playFromTick(tick);
+    this.withAdministrativeSeek(() => this.transport.playFromTick(tick));
   }
 
   pause(): void {
@@ -281,7 +320,7 @@ export class Engine {
   }
 
   seekSeconds(seconds: number): void {
-    this.transport.seekSeconds(seconds);
+    this.withAdministrativeSeek(() => this.transport.seekSeconds(seconds));
   }
 
   setStemVolume(name: string, gain: number): void {
@@ -309,6 +348,15 @@ export class Engine {
     );
 
     this.judge.setTick(tick);
+
+    if (
+      !isSeek &&
+      !this.suppressJudgementResolution &&
+      this.transport.getSnapshot().isPlaying
+    ) {
+      this.judge.resolveThrough(tick);
+    }
+
     this.renderer.render(chartTime, tick, isSeek);
   }
 
@@ -318,6 +366,7 @@ export class Engine {
     this.inputUnsub();
     this.hitUnsub();
     this.falseHitUnsub();
+    this.judgementUnsub();
     this.transport.dispose();
   }
 
@@ -344,7 +393,21 @@ export class Engine {
     // a loop only ever contributes its *last* pass's hits/misses to the
     // summary below — honest evidence of the most recent attempt, not a
     // growing tally that rewards repetition over accuracy.
-    const records = [...this.runRecords, ...this.deriveMisses()];
+    this.judge.resolveAll();
+
+    if ([...this.runEndingListeners].some((listener) => !listener())) {
+      return;
+    }
+
+    const liveMisses = new Set(
+      this.runRecords
+        .filter((record) => record.verdict === 'miss')
+        .map((record) => `${record.tick}:${record.element}`),
+    );
+    const unresolvedMisses = this.deriveMisses().filter(
+      (record) => !liveMisses.has(`${record.tick}:${record.element}`),
+    );
+    const records = [...this.runRecords, ...unresolvedMisses];
     const practiceSummary = summarizeRun(records, new Date().toISOString());
 
     this.runRecords = [];
@@ -358,6 +421,24 @@ export class Engine {
       practiceSummary,
       records,
     );
+  }
+
+  private withAdministrativeSeek(action: () => void): void {
+    const previous = this.suppressJudgementResolution;
+
+    this.suppressJudgementResolution = true;
+
+    try {
+      action();
+    } finally {
+      this.suppressJudgementResolution = previous;
+    }
+  }
+
+  private timeSecondsForTick(tick: number): number {
+    return this.chart
+      ? ticksToSeconds(tick, this.chart.resolution, this.chart.tempos)
+      : 0;
   }
 
   private totalNotes(): number {

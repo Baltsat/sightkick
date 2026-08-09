@@ -1,30 +1,48 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*-kb.*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Exact prerelease tag for the verified artifact
+        required: true
+        default: v1.2.0-kb.2
+        type: string
+      publish:
+        description: Publish the already verified artifacts to GitHub Releases
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
 
+concurrency:
+  group: drumroll-release-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
 jobs:
   release-mac-arm64:
-    runs-on: macos-14
+    # GitHub's pinned macos-26 label is Apple Silicon; macos-14 entered
+    # deprecation in July 2026 and is no longer a durable release lane.
+    runs-on: macos-26
     env:
       GH_TOKEN: ${{ github.token }}
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
     steps:
-      - name: Check out release tag
+      - name: Check out the selected commit
         uses: actions/checkout@v4
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: yarn
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
 
       - name: Enable Corepack
         run: corepack enable
@@ -32,11 +50,50 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Verify tag matches package version
-        if: startsWith(github.ref, 'refs/tags/')
-        run: node -e 'const p=require("./package.json");if(process.env.GITHUB_REF_NAME!==`v${p.version}`)throw new Error(`tag ${process.env.GITHUB_REF_NAME} does not match package version ${p.version}`)'
+      - name: Verify release toolchain and version contract
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          [[ "$(uname -m)" == "arm64" ]] || { echo "::error::The release must run on Apple Silicon"; exit 1; }
+          node - <<'NODE'
+          const pkg = require('./package.json');
+          const expectedTag = `v${pkg.version}`;
+          if (process.env.RELEASE_TAG !== expectedTag) {
+            throw new Error(`release tag ${process.env.RELEASE_TAG} does not match ${expectedTag}`);
+          }
+          if (pkg.build.mac.bundleShortVersion !== '1.2.0') {
+            throw new Error('CFBundleShortVersionString must be 1.2.0');
+          }
+          if (pkg.build.mac.bundleVersion !== '1.2.2') {
+            throw new Error('CFBundleVersion must be 1.2.2');
+          }
+          if (pkg.build.mac.forceCodeSigning !== true) {
+            throw new Error('forceCodeSigning must remain enabled');
+          }
+          if (pkg.build.mac.notarize !== true) {
+            throw new Error('electron-builder notarization must remain explicitly enabled');
+          }
+          if (pkg.build.mac.minimumSystemVersion !== '12.0') {
+            throw new Error('The macOS deployment floor must remain 12.0');
+          }
+          if (pkg.build.artifactName !== '${productName}-${version}-${arch}.${ext}') {
+            throw new Error('Artifact naming must preserve the full prerelease version');
+          }
+          if (JSON.stringify(pkg.build.mac.target.arch) !== JSON.stringify(['arm64'])) {
+            throw new Error('This release lane must package Apple Silicon only');
+          }
+          const expectedBinaries = [
+            'Contents/Resources/ffmpeg-runtime/bin/ffmpeg',
+            'Contents/Resources/ffmpeg-runtime/bin/ffprobe',
+          ];
+          if (JSON.stringify(pkg.build.mac.binaries) !== JSON.stringify(expectedBinaries)) {
+            throw new Error('Both FFmpeg runtime executables must remain in the explicit signing set');
+          }
+          NODE
+          [[ "$(yarn wrangler --version)" == "4.120.0" ]] || { echo "::error::Wrangler must be pinned to 4.120.0"; exit 1; }
+          uv --version
 
-      - name: Configure optional signing
+      - name: Require signing and notarization credentials
         env:
           SIGNING_CSC_LINK: ${{ secrets.CSC_LINK }}
           SIGNING_CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
@@ -44,34 +101,88 @@ jobs:
           SIGNING_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           SIGNING_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          if [[ -n "$SIGNING_CSC_LINK" ]]; then echo "CSC_LINK=$SIGNING_CSC_LINK" >> "$GITHUB_ENV"; fi
-          if [[ -n "$SIGNING_CSC_KEY_PASSWORD" ]]; then echo "CSC_KEY_PASSWORD=$SIGNING_CSC_KEY_PASSWORD" >> "$GITHUB_ENV"; fi
-          if [[ -n "$SIGNING_APPLE_ID" ]]; then echo "APPLE_ID=$SIGNING_APPLE_ID" >> "$GITHUB_ENV"; fi
-          if [[ -n "$SIGNING_APPLE_APP_SPECIFIC_PASSWORD" ]]; then echo "APPLE_APP_SPECIFIC_PASSWORD=$SIGNING_APPLE_APP_SPECIFIC_PASSWORD" >> "$GITHUB_ENV"; fi
-          if [[ -n "$SIGNING_APPLE_TEAM_ID" ]]; then echo "APPLE_TEAM_ID=$SIGNING_APPLE_TEAM_ID" >> "$GITHUB_ENV"; fi
+          [[ -n "$SIGNING_CSC_LINK" ]] || { echo "::error::CSC_LINK is required"; exit 1; }
+          [[ -n "$SIGNING_CSC_KEY_PASSWORD" ]] || { echo "::error::CSC_KEY_PASSWORD is required"; exit 1; }
+          [[ -n "$SIGNING_APPLE_ID" ]] || { echo "::error::APPLE_ID is required"; exit 1; }
+          [[ -n "$SIGNING_APPLE_APP_SPECIFIC_PASSWORD" ]] || { echo "::error::APPLE_APP_SPECIFIC_PASSWORD is required"; exit 1; }
+          [[ -n "$SIGNING_APPLE_TEAM_ID" ]] || { echo "::error::APPLE_TEAM_ID is required"; exit 1; }
+          echo "Release credentials are present; unsigned publication is disabled."
 
-      - name: Report signing mode
+      - name: Verify source and web function
         run: |
-          if [[ -n "$CSC_LINK" && -n "$APPLE_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" && -n "$APPLE_TEAM_ID" ]]; then
-            echo "signed and notarized macOS release"
-          else
-            echo "::notice::Apple signing secrets are incomplete; publishing an unsigned macOS release"
-          fi
+          yarn typecheck
+          yarn lint
+          yarn test
+          yarn web:functions:check
+          uv lock --check --project resources/transcriber
 
-      - name: Type check
-        run: yarn typecheck
+      - name: Build, sign, and notarize without publishing
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          yarn package:prepare:mac
+          yarn verify:ffmpeg:mac
+          yarn verify:ffmpeg:transcriber
+          yarn electron-builder build --mac --arm64 --publish never
+          yarn release:stage-ffmpeg-source release/build
 
-      - name: Build and publish
-        run: yarn build && yarn electron-builder build --mac --arm64 --publish always
+      - name: Verify unpacked application and read-only disk image
+        run: |
+          yarn release:verify:mac release/build/mac-arm64/Drumroll.app
+          shopt -s nullglob
+          disk_images=(release/build/*.dmg)
+          shopt -u nullglob
+          [[ "${#disk_images[@]}" -eq 1 ]] || { echo "::error::Expected exactly one DMG"; exit 1; }
+          [[ "${disk_images[0]}" == 'release/build/Drumroll-1.2.0-kb.2-arm64.dmg' ]] || { echo "::error::Unexpected DMG name: ${disk_images[0]}"; exit 1; }
+          yarn release:verify:mac "${disk_images[0]}"
 
-      - name: Upload workflow artifacts
+      - name: Generate and verify SHA256SUMS.txt
+        run: yarn release:checksums release/build
+
+      - name: Upload verified workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: sightkick-macos-arm64-${{ github.ref_name }}
+          name: drumroll-macos-arm64-${{ inputs.release_tag }}
           path: |
             release/build/*.dmg
             release/build/*.dmg.blockmap
             release/build/*.zip
             release/build/*.zip.blockmap
             release/build/*-mac.yml
+            release/build/ffmpeg-8.1.2.tar.xz
+            release/build/SHA256SUMS.txt
+            distribution-integrity.json
+            THIRD_PARTY_NOTICES.md
           if-no-files-found: error
+
+      - name: Publish verified prerelease
+        if: ${{ inputs.publish }}
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          shopt -s nullglob
+          release_assets=(
+            release/build/*.dmg
+            release/build/*.dmg.blockmap
+            release/build/*.zip
+            release/build/*.zip.blockmap
+            release/build/*-mac.yml
+            release/build/ffmpeg-8.1.2.tar.xz
+            release/build/SHA256SUMS.txt
+          )
+          shopt -u nullglob
+          [[ "${#release_assets[@]}" -ge 4 ]] || { echo "::error::Verified release assets are incomplete"; exit 1; }
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${release_assets[@]}" --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              "${release_assets[@]}" \
+              --target "$GITHUB_SHA" \
+              --title "Drumroll ${RELEASE_TAG#v}" \
+              --notes-file docs/release-notes-1.2.0-kb.2.md \
+              --prerelease
+          fi

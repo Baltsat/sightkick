@@ -28,6 +28,7 @@ import {
   applyOfficialMetadata,
   canonicalizeYoutubeUrl,
   createSkEventReader,
+  drumrollFfmpegRuntimeCandidates,
   fetchOfficialYoutubeMetadata,
   parseSkEventLine,
   parseWorkerLine,
@@ -479,7 +480,7 @@ describe('auto-chart source and worker protocol', () => {
         uvPath,
         dataDir: root,
       }),
-    ).toThrow('ffmpeg runtime is missing');
+    ).toThrow('FFmpeg runtime is unavailable');
     expect(() =>
       validateSightkickRuntime({ runnerPath, ffmpegPath, dataDir: root }),
     ).toThrow('uv or Python 3.12+');
@@ -491,6 +492,40 @@ describe('auto-chart source and worker protocol', () => {
         dataDir: root,
       }),
     ).toMatchObject({ runnerPath, ffmpegPath, uvPath, dataDir: root });
+  });
+
+  it('resolves only the packaged or cached Apple Silicon LGPL runtime', () => {
+    expect(
+      drumrollFfmpegRuntimeCandidates({
+        isPackaged: true,
+        resourcesPath: '/Applications/Drumroll.app/Contents/Resources',
+        appPath: '/Applications/Drumroll.app/Contents/Resources/app.asar',
+        platform: 'darwin',
+        architecture: 'arm64',
+      }),
+    ).toEqual([
+      '/Applications/Drumroll.app/Contents/Resources/ffmpeg-runtime/bin/ffmpeg',
+    ]);
+    expect(
+      drumrollFfmpegRuntimeCandidates({
+        isPackaged: false,
+        resourcesPath: '/repo/resources',
+        appPath: '/repo',
+        platform: 'darwin',
+        architecture: 'arm64',
+      }),
+    ).toEqual([
+      '/repo/node_modules/.cache/drumroll-ffmpeg/macos-arm64/bin/ffmpeg',
+    ]);
+    expect(
+      drumrollFfmpegRuntimeCandidates({
+        isPackaged: true,
+        resourcesPath: 'C:\\resources',
+        appPath: 'C:\\app',
+        platform: 'win32',
+        architecture: 'x64',
+      }),
+    ).toEqual([]);
   });
 
   it('parses only structured OCTAVE worker events', () => {

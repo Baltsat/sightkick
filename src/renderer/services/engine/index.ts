@@ -13,4 +13,7 @@ export type {
   NotePos,
   PlaybackSnapshot,
   PlaybackState,
+  ResolvedJudgement,
+  ResolvedJudgementHandler,
+  ResolvedJudgementVerdict,
 } from './types';

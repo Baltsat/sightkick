@@ -113,7 +113,7 @@ function run(speed: number, accuracy: number): StoredPracticeRun {
 }
 
 describe('analyzePracticeRuns', () => {
-  it('ranks trouble bars, pattern cliffs, limb drift, speed loss, and pad confusions', () => {
+  it('ranks trouble bars, pattern cliffs, lane evidence, speed loss, and pad confusions', () => {
     const result = analyzePracticeRuns({
       chart,
       runs: [run(0.7, 0.94), run(1, 0.58)],
@@ -132,7 +132,7 @@ describe('analyzePracticeRuns', () => {
           evidence: expect.objectContaining({ barStart: 2 }),
         }),
         expect.objectContaining({
-          kind: 'limb-weakness',
+          kind: 'lane-weakness',
           evidence: expect.objectContaining({ lane: 'kick', meanMs: 44 }),
         }),
         expect.objectContaining({ kind: 'speed-sensitivity' }),
@@ -152,5 +152,75 @@ describe('analyzePracticeRuns', () => {
       analyzedRuns: 0,
       findings: [],
     });
+  });
+
+  it('requires repeated unambiguous wrong-pad pairs before naming a pad transition', () => {
+    const paired: StoredPracticeRun = {
+      summary: summary(1, 0.5),
+      records: [
+        { tick: 0, deltaMs: 0, element: 'snare', verdict: 'miss' },
+        { tick: 0, deltaMs: 0, element: 'tom1', verdict: 'wrong' },
+        { tick: 240, deltaMs: 0, element: 'snare', verdict: 'miss' },
+        { tick: 240, deltaMs: 0, element: 'tom1', verdict: 'wrong' },
+      ],
+    };
+    const singleOrAmbiguous: StoredPracticeRun = {
+      summary: summary(1, 0.5),
+      records: [
+        { tick: 0, deltaMs: 0, element: 'snare', verdict: 'miss' },
+        { tick: 0, deltaMs: 0, element: 'hihat', verdict: 'miss' },
+        { tick: 0, deltaMs: 0, element: 'tom1', verdict: 'wrong' },
+      ],
+    };
+
+    expect(
+      analyzePracticeRuns({ chart, runs: [singleOrAmbiguous] }).findings.some(
+        (finding) => finding.kind === 'pad-confusion',
+      ),
+    ).toBe(false);
+    expect(analyzePracticeRuns({ chart, runs: [paired] }).findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'pad-confusion',
+          evidence: expect.objectContaining({
+            actualElement: 'tom1',
+            expectedElement: 'snare',
+            matchedWrongPadPairs: 2,
+          }),
+          reason: expect.objectContaining({
+            code: 'repeated-unambiguous-wrong-pad-pairs',
+          }),
+        }),
+      ]),
+    );
+  });
+
+  it('describes a measured lane, not an unobserved limb or technique', () => {
+    const result = analyzePracticeRuns({
+      chart,
+      runs: [
+        {
+          summary: summary(1, 1),
+          records: Array.from({ length: 4 }, (_, index) => ({
+            tick: 3840 + index * 240,
+            deltaMs: -44,
+            element: 'kick' as const,
+            verdict: 'hit' as const,
+          })),
+        },
+      ],
+    });
+    const lane = result.findings.find(
+      (finding) => finding.kind === 'lane-weakness',
+    );
+
+    expect(lane).toMatchObject({
+      title: 'kick lane records early hits around 120 BPM',
+      summary: expect.stringContaining('Recorded kick lane'),
+      reason: { code: 'lane-accuracy-or-timing' },
+    });
+    expect(`${lane?.title} ${lane?.summary}`).not.toMatch(
+      /limb|hand|rebound|technique|dynamics|reading/i,
+    );
   });
 });

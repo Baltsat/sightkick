@@ -88,17 +88,12 @@ export function useEngine({
   const { inputLatencyMs } = useInput();
   const onEndedRef = useRef(onEnded);
   const isDevRef = useRef(isDev);
-  const playerRef = useRef(player);
   const [fallbackTimeStore] = useState(() => new TimeStore());
   const [engine, setEngine] = useState<Engine | undefined>(undefined);
 
   useEffect(() => {
     onEndedRef.current = onEnded;
   }, [onEnded]);
-
-  useEffect(() => {
-    playerRef.current = player;
-  }, [player]);
 
   useEffect(() => {
     isDevRef.current = isDev;
@@ -109,7 +104,7 @@ export function useEngine({
     const instance = new Engine({
       trackData,
       isDev: isDevRef.current,
-      player: playerRef.current,
+      player,
       subscribeInput: inputBus.subscribe,
       onEnded: (score, practiceSummary, records) =>
         onEndedRef.current(score, practiceSummary, records),
@@ -128,7 +123,7 @@ export function useEngine({
       instance.dispose();
       setEngine(undefined);
     };
-  }, [trackData, notification]);
+  }, [trackData, notification, player]);
 
   useEffect(() => {
     engine?.setContext({

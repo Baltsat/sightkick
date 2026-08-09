@@ -76,6 +76,64 @@ describe('opening a song', () => {
 
     expect(screen.getByText('hard')).toBeInTheDocument();
   });
+
+  it('switches the same chart between continuous Flow and Classic notation', async () => {
+    const view = setupSongView({
+      settings: { practiceNotationLayout: 'flow' },
+    });
+
+    await view.loadSong();
+
+    const flowNotation = screen.getByTestId('flow-notation');
+    const flowHud = screen.getByTestId('flow-viewport-hud');
+
+    expect(flowNotation).toBeInTheDocument();
+    expect(flowNotation).toHaveAttribute('data-presentation-zoom', '1.50');
+    expect(flowNotation).toHaveStyle({ zoom: '1.5' });
+    expect(flowHud).toHaveAttribute('data-mode', 'perform');
+    expect(within(flowHud).getByText('Master of Puppets')).toBeInTheDocument();
+    expect(within(flowHud).getByText('Metallica')).toBeInTheDocument();
+    expect(within(flowHud).getByText('Perform flow')).toBeInTheDocument();
+    expect(
+      within(flowNotation).queryByRole('heading', {
+        name: 'Master of Puppets',
+      }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('notation-flow-toggle')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    fireEvent.click(screen.getByTestId('notation-classic-toggle'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('flow-notation')).not.toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('flow-viewport-hud')).not.toBeInTheDocument();
+    expect(screen.getByTestId('notation-classic-toggle')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(
+      JSON.parse(
+        window.localStorage.getItem('settings.practiceNotationLayout') ?? '""',
+      ),
+    ).toBe('classic');
+  });
+
+  it('opens Coach from a Home deep link without consuming any loop params', async () => {
+    const view = setupSongView({ route: '/song-1?coachOpen=1' });
+
+    await view.loadSong();
+
+    await waitFor(() => {
+      expect(view.ipc.sent).toContainEqual({
+        channel: 'load-practice-runs',
+        args: ['song-1'],
+      });
+    });
+    expect(screen.getByText('AI practice coach')).toBeInTheDocument();
+  });
 });
 
 describe('playing with count-in', () => {
@@ -592,6 +650,55 @@ describe('keyboard transport shortcuts', () => {
     await view.pressKey('ArrowUp');
 
     expect(screen.getByText('Speed locked in Perform')).toBeInTheDocument();
+  });
+
+  it('recreates the default 1x player when the same song switches from slowed Practice to Perform', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      settings: { countIn: false },
+      keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+    });
+
+    await view.loadSong();
+    await view.pressKey('ArrowDown');
+    await view.pressKey('ArrowDown');
+    await view.pressKey('ArrowDown');
+    expect((screen.getByRole('spinbutton') as HTMLInputElement).value).toBe(
+      '0.7',
+    );
+
+    view.navigate('/song-1?gameMode=perform');
+
+    await waitFor(() =>
+      expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('play-toggle')).not.toBeDisabled(),
+    );
+
+    view.clickPlay();
+    await view.pressKey('KeyJ');
+    expect(view.startedSources().length).toBeGreaterThan(0);
+    await view.finishSong();
+
+    await waitFor(() =>
+      expect(
+        view.ipc.sent.some((entry) => entry.channel === 'save-practice-run'),
+      ).toBe(true),
+    );
+
+    const payload = view.ipc.sent.find(
+      (entry) => entry.channel === 'save-practice-run',
+    )?.args[0];
+
+    expect(payload).toEqual(
+      expect.objectContaining({
+        summary: expect.objectContaining({
+          mode: 'perform',
+          playbackSpeed: 1,
+        }),
+      }),
+    );
   });
 
   it('ignores the shortcuts while a text input has focus', async () => {

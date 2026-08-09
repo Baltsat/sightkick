@@ -221,6 +221,42 @@ describe('loadAllPracticeRuns', () => {
 
     expect(lastReply(event, 'load-all-practice-runs')!.args[0]).toEqual({
       runs: [runA, runB, runC],
+      runsBySong: { 'song-1': [runA, runB], 'song-2': [runC] },
+      archiveBySong: {},
+    });
+  });
+
+  it('exposes compact archive evidence additively by song', () => {
+    const archive = {
+      schemaVersion: 1,
+      days: {
+        '2023-01-01': { date: '2023-01-01', runCount: 4 },
+      },
+    };
+
+    storeHolder.current = makeStore({
+      practiceRuns: { 'song-1': [fakeRun()] },
+      practiceRunArchive: { 'song-1': archive },
+    });
+
+    const event = makeEvent();
+
+    loadAllPracticeRuns(event as never);
+
+    expect(lastReply(event, 'load-all-practice-runs')!.args[0]).toEqual({
+      runs: [expect.any(Object)],
+      runsBySong: { 'song-1': [expect.any(Object)] },
+      archiveBySong: {
+        'song-1': {
+          ...archive,
+          days: {
+            '2023-01-01': {
+              ...archive.days['2023-01-01'],
+              historicalDetailState: 'historical-detail-unavailable',
+            },
+          },
+        },
+      },
     });
   });
 
@@ -233,6 +269,8 @@ describe('loadAllPracticeRuns', () => {
 
     expect(lastReply(event, 'load-all-practice-runs')!.args[0]).toEqual({
       runs: [],
+      runsBySong: {},
+      archiveBySong: {},
     });
   });
 });

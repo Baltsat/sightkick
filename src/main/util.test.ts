@@ -415,6 +415,38 @@ describe('toSong', () => {
         toSong(stored({ sk_lesson_id: '18.02', sk_next: '' })).lesson?.next,
       ).toBeUndefined();
     });
+
+    it('parses authored recommendation metadata without inventing technique sensing', () => {
+      const song = toSong(
+        stored({
+          sk_lesson_id: '07.03',
+          sk_prerequisite_ids: '07.02',
+          sk_target_lanes: 'tom2:0.6,tom3:0.4,not-a-lane:1',
+          sk_bpm_start: '60',
+          sk_bpm_target: '80',
+          sk_dose_rule: 'Four focused repeats.',
+          sk_mastery_rule: 'Three clean passes.',
+          sk_cue: 'Keep the notes even.',
+          sk_assessment_boundary:
+            'MIDI assesses timing and pad choice; sticking/form cue is not assessed.',
+        }),
+      );
+
+      expect(song.lesson).toMatchObject({
+        prerequisiteIds: ['07.02'],
+        targetLanes: [
+          { element: 'tom2', weight: 0.6 },
+          { element: 'tom3', weight: 0.4 },
+        ],
+        bpmStart: 60,
+        bpmTarget: 80,
+        doseRule: 'Four focused repeats.',
+        masteryRule: 'Three clean passes.',
+        cue: 'Keep the notes even.',
+        assessmentBoundary:
+          'MIDI assesses timing and pad choice; sticking/form cue is not assessed.',
+      });
+    });
   });
 });
 
@@ -494,6 +526,17 @@ describe('resolveAssetFilePath', () => {
     const url = toAssetUrl('/library/My Song/drums.ogg');
 
     expect(resolveAssetFilePath(url, undefined)).toBeUndefined();
+  });
+
+  it('allows files from either the selected library or the private lesson library', () => {
+    const url = toAssetUrl('/profile/Drumroll Lessons/Lesson 01/song.ogg');
+
+    expect(
+      resolveAssetFilePath(url, [
+        '/music/Selected Library',
+        '/profile/Drumroll Lessons',
+      ]),
+    ).toBe('/profile/Drumroll Lessons/Lesson 01/song.ogg');
   });
 });
 

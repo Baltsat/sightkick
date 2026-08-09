@@ -63,6 +63,7 @@ function render(
   showBarNumbers?: boolean,
   enableColors?: boolean,
   showTempo?: boolean,
+  layout?: 'classic' | 'flow',
 ) {
   return renderMusic(
     target.current ?? undefined,
@@ -71,6 +72,7 @@ function render(
     showBarNumbers,
     enableColors,
     showTempo,
+    layout,
   );
 }
 
@@ -189,6 +191,19 @@ describe('renderMusic', () => {
     expect(data[2].yOffset).toBeGreaterThan(data[1].yOffset);
     expect(data[2].yOffset).toBe(data[3].yOffset);
     expect(data[2].stave.getX()).toBe(0);
+  });
+
+  it('lays every measure on one continuous system in Flow layout', () => {
+    const div = container();
+    const measures = Array.from({ length: 4 }, (_, index) =>
+      measure(quarters, { hasClef: index === 0, sigChange: index === 0 }),
+    );
+    const data = render(ref(div), song(measures), true, true, true, 'flow');
+
+    expect(data.map(({ yOffset }) => yOffset)).toEqual([0, 0, 0, 0]);
+    expect(data[0].stave.getX()).toBe(0);
+    expect(data[3].stave.getX()).toBeGreaterThan(data[2].stave.getX());
+    expect(div.children).toHaveLength(1);
   });
 
   it('colours note heads with the per-drum colour when enabled', () => {

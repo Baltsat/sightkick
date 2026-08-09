@@ -148,6 +148,39 @@ describe('rescanSongs', () => {
     expect(songs.existing.liked).toBe(true);
   });
 
+  it('keeps app-private lessons in the renderer reply after rescanning a selected library', async () => {
+    writeSong(library, 'Personal Song');
+
+    const privateRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'drumroll-private-lessons-'),
+    );
+    const lessonDir = writeSong(privateRoot, 'Lesson 01.01');
+
+    storeHolder.current = makeStore({
+      songs: {
+        'lesson:01.01': {
+          id: 'lesson:01.01',
+          dir: lessonDir,
+          name: 'Lesson 01.01',
+        },
+      },
+    });
+
+    const event = makeEvent();
+
+    await rescanSongs(event as never, true);
+
+    const final = lastReply(event, 'rescan-songs')!.args[0] as {
+      songs: { id: string; name: string }[];
+    };
+
+    expect(final.songs.map((song) => song.name).sort()).toEqual([
+      'Lesson 01.01',
+      'Personal Song',
+    ]);
+    fs.rmSync(privateRoot, { recursive: true, force: true });
+  });
+
   it('drops a stale entry whose folder was renamed and picks up the new folder', async () => {
     // Reproduces the "renamed lesson folder" scenario: 07.04 gets renamed
     // and its song.ini content changes with it (a real re-chart, not just

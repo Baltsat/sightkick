@@ -13,6 +13,7 @@ export function useInputConfig(isOpen: boolean) {
   const {
     setSelectedDevice,
     selectedDevice,
+    inputReadiness,
     inputMapping,
     controlMapping,
     assignControl,
@@ -40,12 +41,8 @@ export function useInputConfig(isOpen: boolean) {
   const refreshDevices = useCallback(() => {
     inputBus.listDevices().then((list) => {
       setDevices(list);
-
-      if (selectedDevice && !list.some((d) => d.id === selectedDevice.id)) {
-        setSelectedDevice(null);
-      }
     });
-  }, [selectedDevice, setSelectedDevice]);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) {
@@ -115,6 +112,7 @@ export function useInputConfig(isOpen: boolean) {
     devices,
     selectedDeviceId: selectedDevice?.id,
     selectedDeviceName: selectedDevice?.name,
+    inputReadiness,
     onSelectDevice: (id: string | undefined) => {
       setSelectedDevice(devices.find((device) => device.id === id) ?? null);
     },

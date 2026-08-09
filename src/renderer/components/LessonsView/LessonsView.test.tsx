@@ -58,7 +58,7 @@ function makeLessonSong(
   return makeSong({
     id,
     dir: `/music/SightKick Method - Lesson ${lessonExtra.id ?? '01.01'}`,
-    name: `Lesson ${lessonExtra.id ?? '01.01'}`,
+    name: lessonExtra.title ?? `Lesson ${lessonExtra.id ?? '01.01'}`,
     lesson: makeLesson({ id, ...lessonExtra }),
     ...songExtra,
   });
@@ -155,7 +155,7 @@ describe('LessonsView — empty state', () => {
 });
 
 describe('LessonsView — chain progress header', () => {
-  it('keeps the exact "N of M unlocked · K⭐ earned" summary text', () => {
+  it('keeps the exact N of M unlocked and K-star-earned summary', () => {
     const progress = makeMixedProgress();
 
     render(
@@ -164,8 +164,13 @@ describe('LessonsView — chain progress header', () => {
     );
 
     expect(screen.getByTestId('lesson-progress-summary')).toHaveTextContent(
-      `${progress.unlockedCount} of ${progress.totalLessons} unlocked · ${progress.totalStars}⭐ earned`,
+      `${progress.unlockedCount} of ${progress.totalLessons} unlocked · ${progress.totalStars} earned`,
     );
+    expect(
+      within(screen.getByTestId('lesson-progress-summary')).getByLabelText(
+        'stars',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('exposes a stable scroll-root testid (distinct from the Songs list, which also scrolls)', () => {
@@ -332,6 +337,56 @@ describe('LessonsView — seasons', () => {
     );
   });
 
+  it('uses the accessible season rail to move the spatial studio to any mounted season', () => {
+    const progress = makeMixedProgress();
+
+    render(
+      <LessonsView progress={progress} onPlay={vi.fn()} onRescan={vi.fn()} />,
+      { wrapper },
+    );
+
+    const rail = screen.getByTestId('lesson-season-rail');
+
+    expect(
+      within(rail).getByRole('button', { name: 'Season 3: Grooves' }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('lesson-season-stage')).toHaveAttribute(
+      'data-selected-season-state',
+      'active',
+    );
+    expect(screen.getByTestId('journey-world-marker')).toHaveTextContent(
+      'World tour · stop 02ReadingCurrent stage',
+    );
+    expect(
+      screen.getByTestId('season-rail-state-Foundations'),
+    ).toHaveTextContent('Mastered');
+    expect(screen.getByTestId('season-rail-state-Grooves')).toHaveTextContent(
+      'Locked',
+    );
+
+    fireEvent.click(screen.getByTestId('season-rail-Grooves'));
+
+    expect(screen.getByTestId('season-card-Grooves')).toHaveAttribute(
+      'data-featured',
+      'true',
+    );
+    expect(screen.getByTestId('season-card-Grooves')).toHaveAttribute(
+      'data-expanded',
+      'true',
+    );
+    expect(screen.getByTestId('season-card-Reading')).toHaveAttribute(
+      'data-featured',
+      'false',
+    );
+    expect(screen.getByTestId('lesson-season-stage')).toHaveAttribute(
+      'data-selected-season-state',
+      'locked',
+    );
+    expect(screen.getByTestId('journey-world-marker')).toHaveTextContent(
+      'World tour · stop 03GroovesVenue locked',
+    );
+  });
+
   it('reports stars earned over possible for each season', () => {
     const progress = makeMixedProgress();
 
@@ -342,7 +397,7 @@ describe('LessonsView — seasons', () => {
 
     // Foundations: two exercises at 5 stars each = 10 / 10.
     expect(screen.getByTestId('season-stars-Foundations')).toHaveTextContent(
-      '10 / 10⭐',
+      '10 / 10 ·',
     );
   });
 });
@@ -378,7 +433,7 @@ describe('LessonsView — path nodes', () => {
     );
   });
 
-  it('applies a reduced-motion-safe pulse class only to the next-up node', () => {
+  it('marks only the next-up node for reduced-motion-safe CSS emphasis', () => {
     const progress = makeMixedProgress();
 
     render(
@@ -386,15 +441,20 @@ describe('LessonsView — path nodes', () => {
       { wrapper },
     );
 
-    expect(screen.getByTestId('lesson-item-02.02')).toHaveClass(
-      'motion-safe:animate-pulse',
+    expect(screen.getByTestId('lesson-item-02.02')).toHaveAttribute(
+      'data-node-state',
+      'next-up',
     );
-    expect(screen.getByTestId('lesson-item-01.01')).not.toHaveClass(
+    expect(screen.getByTestId('lesson-item-01.01')).not.toHaveAttribute(
+      'data-node-state',
+      'next-up',
+    );
+    expect(screen.getByTestId('lesson-item-02.02')).not.toHaveClass(
       'motion-safe:animate-pulse',
     );
   });
 
-  it('greys out a locked node with data-locked and an "Earn N more" hint', () => {
+  it('greys out a locked node with data-locked and an Earn N more stars hint', () => {
     const progress = makeMixedProgress();
 
     render(
@@ -405,7 +465,9 @@ describe('LessonsView — path nodes', () => {
     const locked = screen.getByTestId('lesson-item-02.03');
 
     expect(locked).toHaveAttribute('data-locked', 'true');
-    expect(within(locked).getByText('Earn 25 more ⭐')).toBeInTheDocument();
+    expect(locked).toHaveClass('daybreak-lesson-node--locked');
+    expect(locked).not.toHaveClass('opacity-65');
+    expect(within(locked).getByText('Earn 25 more stars')).toBeInTheDocument();
   });
 
   it('shows an honest "locked" notification instead of a dead click, and never calls onPlay', () => {

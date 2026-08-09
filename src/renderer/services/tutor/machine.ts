@@ -1,0 +1,487 @@
+import { clamp } from 'es-toolkit';
+import { ResolvedJudgement } from '../engine';
+import { planRecoveryRegion } from './checkpoints';
+import {
+  detectTutorTrigger,
+  isCleanRecovery,
+  isRepeatableBarFailure,
+  summarizeTutorWindow,
+} from './detector';
+import {
+  DEFAULT_TUTOR_SETTINGS,
+  TutorChartPlan,
+  TutorCommand,
+  TutorEvent,
+  TutorRecovery,
+  TutorRecoveryAttempt,
+  TutorSettings,
+  TutorState,
+  TutorTransition,
+} from './types';
+
+function speedToTenth(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function normalizeFailedRecoveryAttemptLimit(value: number): number {
+  return Number.isFinite(value)
+    ? Math.max(1, Math.trunc(value))
+    : DEFAULT_TUTOR_SETTINGS.maximumFailedRecoveryAttempts;
+}
+
+function nextId(state: TutorState, prefix: string): string {
+  return `${prefix}:${state.nextSequence}`;
+}
+
+function clearJudgements(
+  source: TutorState['judgementsByMeasure'],
+  startMeasure: number,
+  endMeasure: number,
+): TutorState['judgementsByMeasure'] {
+  const next = { ...source };
+
+  for (let index = startMeasure; index <= endMeasure; index += 1) {
+    delete next[index];
+  }
+
+  return next;
+}
+
+function snapshotJudgements(
+  source: TutorState['judgementsByMeasure'],
+  startMeasure: number,
+  endMeasure: number,
+): readonly Readonly<ResolvedJudgement>[] {
+  const snapshot: Readonly<ResolvedJudgement>[] = [];
+
+  for (let index = startMeasure; index <= endMeasure; index += 1) {
+    (source[index] ?? []).forEach((judgement) => {
+      snapshot.push(Object.freeze({ ...judgement }));
+    });
+  }
+
+  return Object.freeze(snapshot);
+}
+
+export function createTutorState(
+  settings: Partial<TutorSettings> = {},
+): TutorState {
+  const mergedSettings = { ...DEFAULT_TUTOR_SETTINGS, ...settings };
+  const resolvedSettings = {
+    ...mergedSettings,
+    maximumFailedRecoveryAttempts: normalizeFailedRecoveryAttemptLimit(
+      mergedSettings.maximumFailedRecoveryAttempts,
+    ),
+  };
+
+  return {
+    phase: resolvedSettings.enabled ? 'observing' : 'off',
+    settings: resolvedSettings,
+    targetSpeed: 1,
+    currentSpeed: 1,
+    livesRemaining: resolvedSettings.startingLives,
+    judgementsByMeasure: {},
+    barFailureHistory: {},
+    interventions: [],
+    recoveryAttempts: [],
+    nextSequence: 1,
+    lastCompletedMeasure: -1,
+    ignoreTriggersThroughMeasure: -1,
+  };
+}
+
+function recordJudgement(
+  state: TutorState,
+  event: Extract<TutorEvent, { type: 'judgement' }>,
+): TutorState {
+  const { judgement } = event;
+  const measureIndex = judgement.measureIndex;
+
+  if (measureIndex === undefined) {
+    return state;
+  }
+
+  const existing = state.judgementsByMeasure[measureIndex] ?? [];
+
+  if (existing.some((item) => item.id === judgement.id)) {
+    return state;
+  }
+
+  return {
+    ...state,
+    judgementsByMeasure: {
+      ...state.judgementsByMeasure,
+      [measureIndex]: [...existing, judgement],
+    },
+  };
+}
+
+function recordBarFailure(
+  state: TutorState,
+  chart: TutorChartPlan,
+  completedMeasure: number,
+): TutorState {
+  const stats = summarizeTutorWindow(
+    chart,
+    state.judgementsByMeasure,
+    completedMeasure,
+    completedMeasure,
+  );
+
+  if (!isRepeatableBarFailure(stats, state.settings)) {
+    return state;
+  }
+
+  return {
+    ...state,
+    barFailureHistory: {
+      ...state.barFailureHistory,
+      [completedMeasure]: (state.barFailureHistory[completedMeasure] ?? 0) + 1,
+    },
+  };
+}
+
+function beginRecovery(
+  state: TutorState,
+  chart: TutorChartPlan,
+  completedMeasure: number,
+): TutorTransition {
+  // Same-bar evidence belongs to the reducer, not the component. It is reset
+  // by `start`, so a fresh canonical run never inherits a prior attempt.
+  const observedState = recordBarFailure(state, chart, completedMeasure);
+  const triggerId = nextId(observedState, 'trigger');
+  const trigger = detectTutorTrigger(
+    chart,
+    observedState.judgementsByMeasure,
+    completedMeasure,
+    observedState.settings,
+    triggerId,
+    observedState.barFailureHistory,
+  );
+
+  if (!trigger) {
+    return { state: observedState, commands: [] };
+  }
+
+  const triggerJudgements = snapshotJudgements(
+    observedState.judgementsByMeasure,
+    trigger.stats.startMeasure,
+    trigger.stats.endMeasure,
+  );
+  const livesRemaining = observedState.settings.livesEnabled
+    ? Math.max(0, observedState.livesRemaining - 1)
+    : observedState.livesRemaining;
+  const materialFailure: TutorCommand = {
+    type: 'material-failure',
+    trigger,
+    livesRemaining,
+  };
+
+  if (!observedState.settings.autoRewind) {
+    const intervention = {
+      id: nextId(
+        {
+          ...observedState,
+          nextSequence: observedState.nextSequence + 1,
+        },
+        'intervention',
+      ),
+      trigger,
+      triggerJudgements,
+      startedAtSpeed: observedState.currentSpeed,
+      livesRemaining,
+    };
+
+    return {
+      state: {
+        ...observedState,
+        livesRemaining,
+        interventions: [...observedState.interventions, intervention],
+        nextSequence: observedState.nextSequence + 2,
+        ignoreTriggersThroughMeasure: trigger.stats.endMeasure,
+        judgementsByMeasure: clearJudgements(
+          observedState.judgementsByMeasure,
+          trigger.stats.startMeasure,
+          trigger.stats.endMeasure,
+        ),
+      },
+      commands: [materialFailure],
+    };
+  }
+
+  const region = planRecoveryRegion(
+    chart,
+    trigger.stats.startMeasure,
+    trigger.stats.endMeasure,
+    observedState.settings,
+  );
+
+  if (!region) {
+    return { state: observedState, commands: [materialFailure] };
+  }
+
+  const recovery: TutorRecovery = {
+    id: nextId(
+      {
+        ...observedState,
+        nextSequence: observedState.nextSequence + 1,
+      },
+      'recovery',
+    ),
+    trigger,
+    region,
+    repetition: 1,
+    cleanRepetitions: 0,
+  };
+  const intervention = {
+    id: nextId(
+      {
+        ...observedState,
+        nextSequence: observedState.nextSequence + 2,
+      },
+      'intervention',
+    ),
+    trigger,
+    triggerJudgements,
+    region,
+    startedAtSpeed: observedState.currentSpeed,
+    livesRemaining,
+  };
+  const nextState: TutorState = {
+    ...observedState,
+    phase: 'recovering',
+    livesRemaining,
+    recovery,
+    interventions: [...observedState.interventions, intervention],
+    nextSequence: observedState.nextSequence + 3,
+    judgementsByMeasure: clearJudgements(
+      observedState.judgementsByMeasure,
+      region.startMeasure,
+      region.endMeasure,
+    ),
+  };
+
+  return {
+    state: nextState,
+    commands: [
+      materialFailure,
+      {
+        type: 'begin-recovery',
+        recovery,
+        speed: observedState.currentSpeed,
+      },
+    ],
+  };
+}
+
+function finishRecoveryAttempt(
+  state: TutorState,
+  chart: TutorChartPlan,
+): TutorTransition {
+  const recovery = state.recovery;
+
+  if (!recovery) {
+    return { state, commands: [] };
+  }
+
+  const stats = summarizeTutorWindow(
+    chart,
+    state.judgementsByMeasure,
+    recovery.region.startMeasure,
+    recovery.region.endMeasure,
+  );
+  const clean = isCleanRecovery(stats, state.settings);
+  const priorFailedAttempts = state.recoveryAttempts.filter(
+    (attempt) =>
+      attempt.recoveryId === recovery.id &&
+      (attempt.result === 'retry' || attempt.result === 'deferred'),
+  ).length;
+  const failedAttempts = priorFailedAttempts + (clean ? 0 : 1);
+  const shouldDefer =
+    !clean && failedAttempts >= state.settings.maximumFailedRecoveryAttempts;
+  const judgements = snapshotJudgements(
+    state.judgementsByMeasure,
+    recovery.region.startMeasure,
+    recovery.region.endMeasure,
+  );
+  const attempt: TutorRecoveryAttempt = {
+    id: nextId(state, 'attempt'),
+    recoveryId: recovery.id,
+    repetition: recovery.repetition,
+    speed: state.currentSpeed,
+    result: clean ? 'clean' : shouldDefer ? 'deferred' : 'retry',
+    ...(shouldDefer
+      ? { deferralReason: 'maximum-failed-attempts' as const }
+      : {}),
+    stats,
+    judgements,
+  };
+  const attempts = [...state.recoveryAttempts, attempt];
+  const cleanRepetitions = clean ? recovery.cleanRepetitions + 1 : 0;
+  let nextSpeed = state.currentSpeed;
+
+  if (!clean) {
+    nextSpeed = speedToTenth(
+      clamp(
+        state.currentSpeed - state.settings.speedStep,
+        state.settings.minimumSpeed,
+        state.targetSpeed,
+      ),
+    );
+  } else if (
+    cleanRepetitions >= state.settings.requiredCleanRepetitions &&
+    state.currentSpeed < state.targetSpeed
+  ) {
+    nextSpeed = speedToTenth(
+      Math.min(
+        state.targetSpeed,
+        state.currentSpeed + state.settings.speedStep,
+      ),
+    );
+  }
+
+  const hasEarnedRelease =
+    clean &&
+    cleanRepetitions >= state.settings.requiredCleanRepetitions &&
+    state.currentSpeed >= state.targetSpeed;
+
+  if (hasEarnedRelease || shouldDefer) {
+    const nextState: TutorState = {
+      ...state,
+      phase: 'observing',
+      currentSpeed: state.targetSpeed,
+      recovery: undefined,
+      recoveryAttempts: attempts,
+      nextSequence: state.nextSequence + 1,
+      ignoreTriggersThroughMeasure: recovery.region.endMeasure,
+      judgementsByMeasure: clearJudgements(
+        state.judgementsByMeasure,
+        recovery.region.startMeasure,
+        recovery.region.endMeasure,
+      ),
+    };
+
+    return {
+      state: nextState,
+      commands: [
+        {
+          type: 'resume-main',
+          recoveryId: recovery.id,
+          speed: state.targetSpeed,
+          reason: shouldDefer ? 'maximum-failed-attempts' : 'clean-repetitions',
+          ...(shouldDefer
+            ? {
+                failedAttempts,
+                maximumFailedAttempts:
+                  state.settings.maximumFailedRecoveryAttempts,
+              }
+            : {}),
+          resumeMeasure: recovery.region.resumeMeasure,
+          resumeTick: recovery.region.resumeTick,
+          attempt,
+        },
+      ],
+    };
+  }
+
+  const nextRecovery: TutorRecovery = {
+    ...recovery,
+    repetition: recovery.repetition + 1,
+    cleanRepetitions:
+      cleanRepetitions >= state.settings.requiredCleanRepetitions &&
+      nextSpeed > state.currentSpeed
+        ? 0
+        : cleanRepetitions,
+  };
+  const nextState: TutorState = {
+    ...state,
+    currentSpeed: nextSpeed,
+    recovery: nextRecovery,
+    recoveryAttempts: attempts,
+    nextSequence: state.nextSequence + 1,
+    judgementsByMeasure: clearJudgements(
+      state.judgementsByMeasure,
+      recovery.region.startMeasure,
+      recovery.region.endMeasure,
+    ),
+  };
+
+  return {
+    state: nextState,
+    commands: [
+      {
+        type: 'repeat-recovery',
+        recovery: nextRecovery,
+        speed: nextSpeed,
+        attempt,
+      },
+    ],
+  };
+}
+
+export function transitionTutor(
+  state: TutorState,
+  event: TutorEvent,
+  chart: TutorChartPlan,
+): TutorTransition {
+  if (event.type === 'stop') {
+    return {
+      state: { ...state, phase: 'off', recovery: undefined },
+      commands: [],
+    };
+  }
+
+  if (event.type === 'start') {
+    const targetSpeed = speedToTenth(clamp(event.targetSpeed, 0.3, 2));
+
+    return {
+      state: {
+        ...createTutorState(state.settings),
+        phase: state.settings.enabled ? 'observing' : 'off',
+        targetSpeed,
+        currentSpeed: targetSpeed,
+      },
+      commands: [],
+    };
+  }
+
+  if (state.phase === 'off') {
+    return { state, commands: [] };
+  }
+
+  if (event.type === 'song-complete') {
+    return {
+      state: { ...state, phase: 'complete', recovery: undefined },
+      commands: [{ type: 'session-complete' }],
+    };
+  }
+
+  if (event.type === 'judgement') {
+    return { state: recordJudgement(state, event), commands: [] };
+  }
+
+  const completedState = {
+    ...state,
+    lastCompletedMeasure: Math.max(
+      state.lastCompletedMeasure,
+      event.measureIndex,
+    ),
+  };
+
+  if (
+    completedState.phase === 'recovering' &&
+    completedState.recovery &&
+    event.measureIndex >= completedState.recovery.region.endMeasure
+  ) {
+    return finishRecoveryAttempt(completedState, chart);
+  }
+
+  if (
+    completedState.phase === 'observing' &&
+    event.measureIndex > completedState.ignoreTriggersThroughMeasure
+  ) {
+    return beginRecovery(completedState, chart, event.measureIndex);
+  }
+
+  return { state: completedState, commands: [] };
+}

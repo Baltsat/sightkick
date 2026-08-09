@@ -9,12 +9,15 @@ import {
   JudgeHitHandler,
   NoteEntry,
   NotePos,
+  ResolvedJudgement,
+  ResolvedJudgementHandler,
 } from './types';
 import {
   ACCENT_VALUE_THRESHOLD,
   ELEMENT_TO_KEYS,
   GHOST_VALUE_THRESHOLD,
   HIT_TOLERANCE_SECONDS,
+  KEY_TO_ELEMENT,
 } from './constants';
 import { keyPrefix } from './helpers';
 import { lowerBound } from '../../helpers';
@@ -31,6 +34,10 @@ export class Judge {
   private falseHitTicks: number[] = [];
   private hitListeners = new Set<JudgeHitHandler>();
   private falseHitListeners = new Set<JudgeFalseHitHandler>();
+  private judgementListeners = new Set<ResolvedJudgementHandler>();
+  private resolvedMisses = new Map<number, Set<string>>();
+  private nextResolveIndex = 0;
+  private wrongJudgementSequence = 0;
   private latencyMs = 0;
 
   setContext(context: JudgeContext): void {
@@ -71,6 +78,14 @@ export class Judge {
     }
 
     this.falseHitTicks = this.falseHitTicks.filter((t) => t < tick);
+
+    for (const missTick of this.resolvedMisses.keys()) {
+      if (missTick >= tick) {
+        this.resolvedMisses.delete(missTick);
+      }
+    }
+
+    this.nextResolveIndex = this.firstNoteAtOrAfter(tick);
     this.currentTick = tick;
   }
 
@@ -90,6 +105,14 @@ export class Judge {
     };
   }
 
+  onJudgement(listener: ResolvedJudgementHandler): () => void {
+    this.judgementListeners.add(listener);
+
+    return () => {
+      this.judgementListeners.delete(listener);
+    };
+  }
+
   isHit(tick: number, prefix: string): boolean {
     return this.hits.get(tick)?.has(prefix) ?? false;
   }
@@ -106,6 +129,9 @@ export class Judge {
     this.hits.clear();
     this.hitTotal = 0;
     this.falseHitTicks = [];
+    this.resolvedMisses.clear();
+    this.nextResolveIndex = 0;
+    this.wrongJudgementSequence = 0;
   }
 
   private buildNoteIndex(): void {
@@ -121,6 +147,7 @@ export class Judge {
 
     index.sort((a, b) => a.tick - b.tick);
     this.noteIndex = index;
+    this.nextResolveIndex = 0;
   }
 
   private firstNoteAtOrAfter(tick: number): number {
@@ -156,6 +183,105 @@ export class Judge {
     }
 
     return undefined;
+  }
+
+  private containingMeasureIndex(tick: number): number | undefined {
+    const firstAfter = lowerBound(
+      this.measures.length,
+      (index) => this.measures[index].startTick > tick,
+    );
+    const index = firstAfter - 1;
+    const candidate = this.measures[index];
+
+    if (candidate && tick >= candidate.startTick && tick < candidate.endTick) {
+      return index;
+    }
+
+    return undefined;
+  }
+
+  private emitJudgement(judgement: ResolvedJudgement): void {
+    this.judgementListeners.forEach((listener) => listener(judgement));
+  }
+
+  private noteJudgementId(tick: number, prefix: string): string {
+    return `note:${tick}:${prefix}`;
+  }
+
+  /**
+   * Resolve expected note heads whose normal late-hit window has closed.
+   * Call this only for ordinary playback progress, never an administrative
+   * seek. `rawTick` is the uncompensated transport position; latency is
+   * applied here in the same direction as it is in handleInput.
+   */
+  resolveThrough(rawTick: number): void {
+    const chart = this.chart;
+
+    if (!chart) {
+      return;
+    }
+
+    const compensatedTick = this.compensateLatency(rawTick, chart);
+    const currentTimeSeconds = ticksToSeconds(
+      compensatedTick,
+      chart.resolution,
+      chart.tempos,
+    );
+    const cutoffSeconds = currentTimeSeconds - HIT_TOLERANCE_SECONDS;
+
+    this.resolveUntil(cutoffSeconds, chart);
+  }
+
+  /** Resolve the chart tail before the run-complete evidence snapshot. */
+  resolveAll(): void {
+    if (!this.chart) {
+      return;
+    }
+
+    this.resolveUntil(Number.POSITIVE_INFINITY, this.chart);
+  }
+
+  private resolveUntil(cutoffSeconds: number, chart: ParsedChart): void {
+    while (this.nextResolveIndex < this.noteIndex.length) {
+      const entry = this.noteIndex[this.nextResolveIndex];
+      const expectedTimeSeconds = ticksToSeconds(
+        entry.tick,
+        chart.resolution,
+        chart.tempos,
+      );
+
+      if (expectedTimeSeconds > cutoffSeconds) {
+        break;
+      }
+
+      entry.note.notes.map(keyPrefix).forEach((prefix) => {
+        if (
+          this.isHit(entry.tick, prefix) ||
+          this.resolvedMisses.get(entry.tick)?.has(prefix)
+        ) {
+          return;
+        }
+
+        let prefixes = this.resolvedMisses.get(entry.tick);
+
+        if (!prefixes) {
+          prefixes = new Set();
+          this.resolvedMisses.set(entry.tick, prefixes);
+        }
+
+        prefixes.add(prefix);
+        this.emitJudgement({
+          id: this.noteJudgementId(entry.tick, prefix),
+          verdict: 'miss',
+          expectedTick: entry.tick,
+          expectedElement: KEY_TO_ELEMENT[prefix],
+          measureIndex: entry.pos.measureIdx,
+          scoreable: true,
+        });
+      });
+
+      this.nextResolveIndex += 1;
+    }
   }
 
   private isInSilentRegion(tick: number): boolean {
@@ -227,6 +353,15 @@ export class Judge {
     };
 
     this.falseHitListeners.forEach((listener) => listener(record));
+    this.wrongJudgementSequence += 1;
+    this.emitJudgement({
+      id: `wrong:${this.wrongJudgementSequence}`,
+      verdict: 'wrong',
+      actualTick: tick,
+      actualElement: record.element,
+      measureIndex: this.containingMeasureIndex(tick),
+      scoreable,
+    });
   }
 
   handleInput({ controlId, value }: InputEvent): void {
@@ -344,5 +479,19 @@ export class Judge {
         velocity: value,
       }),
     );
+    newPrefixes.forEach((prefix) => {
+      this.emitJudgement({
+        id: this.noteJudgementId(hit.tick, prefix),
+        verdict: 'hit',
+        expectedTick: hit.tick,
+        actualTick: tick,
+        expectedElement: KEY_TO_ELEMENT[prefix],
+        actualElement: this.resolveElement(controlId),
+        measureIndex: pos.measureIdx,
+        deltaMs: (currentTimeS - expectedTimeS) * 1000,
+        velocity: value,
+        scoreable: true,
+      });
+    });
   }
 }

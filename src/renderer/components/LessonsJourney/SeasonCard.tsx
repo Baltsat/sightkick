@@ -4,6 +4,7 @@ import {
   faCheck,
   faChevronDown,
   faLock,
+  faStar,
 } from '@fortawesome/free-solid-svg-icons';
 import { Progress } from 'antd';
 import { cn } from '../../cn';
@@ -22,6 +23,8 @@ export interface SeasonCardProps {
   progress: LessonProgress;
   /** Whether this is the season the "where am I" pointer is currently in. */
   isCurrent: boolean;
+  /** Whether this season is the spatial scene currently chosen from the rail. */
+  isFeatured: boolean;
   onPlay: (entry: LessonEntry) => void;
   onLockedClick: (entry: LessonEntry) => void;
 }
@@ -42,6 +45,7 @@ export function SeasonCard({
   seasonNumber,
   progress,
   isCurrent,
+  isFeatured,
   onPlay,
   onLockedClick,
 }: SeasonCardProps) {
@@ -50,44 +54,50 @@ export function SeasonCard({
   const { earned, possible, masteredCount } = seasonStars(group);
   const donePercent = Math.round((masteredCount / group.entries.length) * 100);
   const pathId = `lesson-path-${group.unit}`;
+  // Rail selection always presents a usable path. The manual open/close state
+  // still controls unfeatured seasons, preserving the old DOM/test contract.
+  const isPathExpanded = expanded || isFeatured;
 
   return (
     <section
       data-testid={`season-card-${group.unit}`}
       data-season-state={state}
-      data-expanded={expanded ? 'true' : 'false'}
+      data-expanded={isPathExpanded ? 'true' : 'false'}
+      data-featured={isFeatured ? 'true' : 'false'}
       className={cn(
-        'rounded-2xl border bg-surface p-4 motion-safe:transition-shadow motion-safe:duration-700',
-        state === 'locked' && 'border-border-soft opacity-70',
-        state === 'active' && 'border-accent-soft-border shadow-accent-soft',
-        state === 'completed' && 'border-accent-soft-border shadow-accent-chip',
+        'daybreak-season-card motion-safe:transition-opacity motion-safe:duration-500',
+        isFeatured && 'daybreak-season-card--featured',
+        state === 'locked' && 'opacity-85',
       )}
     >
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
-        aria-expanded={expanded}
+        aria-expanded={isPathExpanded}
         aria-controls={pathId}
         data-testid={`season-toggle-${group.unit}`}
-        className="flex w-full items-center gap-3.5 rounded-xl border-0 bg-transparent p-0 text-left cursor-pointer"
+        className="daybreak-season-card__masthead flex items-center gap-3.5 text-left cursor-pointer"
       >
         <div
           data-testid={`season-ring-${group.unit}`}
           data-percent={donePercent}
-          className="shrink-0"
+          className="daybreak-season-progress ml-3.5 shrink-0"
         >
           <Progress
             type="circle"
             percent={donePercent}
             size={52}
             showInfo={false}
-            strokeColor="var(--color-accent)"
-            trailColor="var(--color-fill-strong)"
+            strokeColor="#f73586"
+            railColor="rgba(17, 23, 34, 0.1)"
           />
         </div>
 
-        <div className="min-w-0 grow">
-          <div className="mb-0.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-text">
+        <div className="min-w-0 grow py-3.5">
+          <div
+            className="daybreak-season-state mb-0.5 flex text-[11px] font-semibold uppercase tracking-[0.16em]"
+            data-state={state}
+          >
             <span>Season {String(seasonNumber).padStart(2, '0')}</span>
             {state === 'locked' && (
               <FontAwesomeIcon
@@ -101,18 +111,19 @@ export function SeasonCard({
             )}
           </div>
           <h3
-            className="truncate font-display text-lg font-semibold leading-tight text-text-body"
+            className="truncate font-display text-xl font-semibold leading-tight text-[#111722]"
             data-testid={`lesson-group-${group.unit}`}
             title={group.unit}
           >
             {group.unit}
           </h3>
           <div
-            className="mt-0.5 text-xs text-text-muted"
+            className="mt-0.5 text-xs text-[#53606d]"
             data-testid={`season-stars-${group.unit}`}
           >
-            {earned} / {possible}⭐ · {masteredCount}/{group.entries.length}{' '}
-            exercises mastered
+            {earned} / {possible}{' '}
+            <FontAwesomeIcon icon={faStar} aria-label="stars" /> ·{' '}
+            {masteredCount}/{group.entries.length} exercises mastered
           </div>
         </div>
 
@@ -120,13 +131,19 @@ export function SeasonCard({
           icon={faChevronDown}
           aria-hidden="true"
           className={cn(
-            'shrink-0 text-text-dim motion-safe:transition-transform motion-safe:duration-200',
-            expanded && 'rotate-180',
+            'mr-3.5 shrink-0 text-[#53606d] motion-safe:transition-transform motion-safe:duration-200',
+            isPathExpanded && 'rotate-180',
           )}
         />
       </button>
 
-      <div id={pathId} className={cn(!expanded && 'hidden')}>
+      <div
+        id={pathId}
+        className={cn(
+          'daybreak-season-card__body',
+          !isPathExpanded && 'hidden',
+        )}
+      >
         <LessonPath
           unit={group.unit}
           entries={group.entries}

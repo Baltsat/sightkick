@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { App as AntdApp } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 import { Song } from '../../../types';
@@ -81,6 +81,65 @@ describe('ScoreSummary', () => {
     expect(onCoach).toHaveBeenCalledOnce();
   });
 
+  it('shows a visible countdown and automatically starts the next Practice task', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const onNextSong = vi.fn();
+      const { modal } = renderSummary({
+        onNextSong,
+        nextLabel: 'Next practice',
+        autoContinueEnabled: true,
+        autoContinueSeconds: 3,
+        practiceSummary: multiLaneRunFixture(),
+      });
+
+      expect(modal.getByTestId('score-auto-continue')).toHaveTextContent(
+        'Next practice starts in 3s',
+      );
+
+      for (let second = 0; second < 3; second += 1) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1000);
+        });
+      }
+
+      await act(async () => Promise.resolve());
+
+      expect(onNextSong).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('lets the player cancel auto-continue without leaving the result', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const onNextSong = vi.fn();
+      const { modal } = renderSummary({
+        onNextSong,
+        nextLabel: 'Next practice',
+        autoContinueEnabled: true,
+        autoContinueSeconds: 3,
+        practiceSummary: multiLaneRunFixture(),
+      });
+
+      fireEvent.click(modal.getByTestId('score-auto-continue-cancel'));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+
+      expect(onNextSong).not.toHaveBeenCalled();
+      expect(
+        modal.queryByTestId('score-auto-continue'),
+      ).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('drops the star/accuracy chrome for a Practice run (no scoreData) and shows the practice stats instead', () => {
     const summary: ReturnType<typeof multiLaneRunFixture> = {
       ...multiLaneRunFixture(),
@@ -143,6 +202,8 @@ describe('ScoreSummary', () => {
         totalStars: 0,
         achievements: undefined,
         laneAccuracy: undefined,
+        recentLaneSignals: undefined,
+        latestRun: undefined,
         loadAchievements: vi.fn(),
         recordRun: vi.fn(),
         ...overrides,

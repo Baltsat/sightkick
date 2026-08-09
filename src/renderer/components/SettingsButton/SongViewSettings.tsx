@@ -17,6 +17,7 @@ interface Props {
   volumeSliders?: ReactNode[];
   clickControls?: ReactNode;
   masterVolumeControl?: ReactNode;
+  tutorControls?: ReactNode;
 }
 
 export function SongViewSettings({
@@ -26,6 +27,7 @@ export function SongViewSettings({
   gameMode,
   clickControls,
   masterVolumeControl,
+  tutorControls,
 }: Props) {
   const {
     playheadStyle,
@@ -64,6 +66,13 @@ export function SongViewSettings({
       )}
 
       <Divider />
+
+      {gameMode === 'practice' && tutorControls ? (
+        <>
+          {tutorControls}
+          <Divider />
+        </>
+      ) : null}
 
       {gameMode !== 'practice' && (
         <>

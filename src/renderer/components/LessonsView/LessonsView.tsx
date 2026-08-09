@@ -1,13 +1,21 @@
+import { useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowsRotate } from '@fortawesome/free-solid-svg-icons';
 import { App, Button, Progress } from 'antd';
-import { currentSeasonInfo, HeaderStrip, SeasonCard } from '../LessonsJourney';
+import {
+  currentSeasonInfo,
+  HeaderStrip,
+  SeasonCard,
+  seasonState,
+} from '../LessonsJourney';
 import {
   LESSON_METHOD_DISPLAY_NAME,
   LessonEntry,
   LessonProgress,
   lockedHint,
 } from '../../hooks/useLessons';
+import journeyStudio from '../../assets/daybreak/journey-studio.png';
+import '../LessonsJourney/daybreak-journey.css';
 
 export interface LessonsViewProps {
   progress: LessonProgress;
@@ -38,11 +46,33 @@ export function LessonsView({
   // instead of leaving everything collapsed.
   const currentUnit =
     currentSeasonInfo(progress)?.group.unit ?? groups[groups.length - 1]?.unit;
+  const [selectedUnit, setSelectedUnit] = useState(currentUnit);
+  const visibleUnit = useMemo(
+    () =>
+      groups.some((group) => group.unit === selectedUnit)
+        ? selectedUnit
+        : currentUnit,
+    [currentUnit, groups, selectedUnit],
+  );
+  const visibleSeasonIndex = Math.max(
+    0,
+    groups.findIndex((group) => group.unit === visibleUnit),
+  );
+  const visibleGroup = groups[visibleSeasonIndex];
+  const visibleState = visibleGroup ? seasonState(visibleGroup) : 'active';
+  const visibleStateLabel =
+    visibleState === 'completed'
+      ? 'Season mastered'
+      : visibleState === 'locked'
+      ? 'Venue locked'
+      : 'Current stage';
   const handleLockedClick = (entry: LessonEntry) => {
+    const readableHint = lockedHint(entry).replaceAll('\u2b50', 'stars');
+
     notification.info({
       title: 'This lesson is locked',
-      description: `${lockedHint(entry)} across your lessons to unlock “${
-        entry.lesson.title
+      description: `${readableHint} across your lessons to unlock “${
+        entry.song.name || entry.lesson.title
       }.”`,
       placement: 'bottomRight',
     });
@@ -90,13 +120,85 @@ export function LessonsView({
 
   return (
     <div
-      className="h-full w-full overflow-y-auto"
+      className="daybreak-journey-root h-full w-full overflow-y-auto"
       data-testid="lessons-scroll-root"
     >
-      <div className="mx-auto flex w-full max-w-360 flex-col gap-4 px-5 py-4">
+      <div className="daybreak-journey-shell mx-auto flex w-full flex-col gap-4 px-4 py-4 sm:px-5">
         <HeaderStrip progress={progress} onPlay={onPlay} />
 
-        <div className="flex flex-col gap-5 pb-4">
+        <nav
+          className="daybreak-season-rail"
+          aria-label="Lesson seasons"
+          data-testid="lesson-season-rail"
+        >
+          {groups.map((group, index) => {
+            const state = seasonState(group);
+            const isSelected = group.unit === visibleUnit;
+
+            return (
+              <button
+                key={group.unit}
+                type="button"
+                className="daybreak-season-tab"
+                data-testid={`season-rail-${group.unit}`}
+                data-selected={isSelected ? 'true' : 'false'}
+                data-season-state={state}
+                aria-current={isSelected ? 'step' : undefined}
+                aria-label={`Season ${index + 1}: ${group.unit}`}
+                onClick={() => setSelectedUnit(group.unit)}
+              >
+                <span aria-hidden="true">
+                  {String(index + 1).padStart(2, '0')} ·{' '}
+                </span>
+                {group.unit}
+                <span
+                  className="daybreak-season-tab__state"
+                  data-state={state}
+                  data-testid={`season-rail-state-${group.unit}`}
+                  aria-hidden="true"
+                >
+                  {state === 'completed'
+                    ? 'Mastered'
+                    : state === 'locked'
+                    ? 'Locked'
+                    : 'Live'}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div
+          className="daybreak-journey-stage pb-2"
+          style={{
+            backgroundImage: `url(${journeyStudio})`,
+          }}
+          data-testid="lesson-season-stage"
+          data-selected-season-state={visibleState}
+        >
+          <div
+            className="daybreak-journey-stage__atmosphere"
+            aria-hidden="true"
+          >
+            <span className="daybreak-journey-stage__beam daybreak-journey-stage__beam--amber" />
+            <span className="daybreak-journey-stage__beam daybreak-journey-stage__beam--magenta" />
+            <span className="daybreak-journey-stage__beam daybreak-journey-stage__beam--cyan" />
+          </div>
+          {visibleGroup && (
+            <div
+              className="daybreak-journey-stage__tour-marker"
+              data-state={visibleState}
+              data-testid="journey-world-marker"
+              aria-hidden="true"
+            >
+              <span>
+                World tour · stop{' '}
+                {String(visibleSeasonIndex + 1).padStart(2, '0')}
+              </span>
+              <strong>{visibleGroup.unit}</strong>
+              <small>{visibleStateLabel}</small>
+            </div>
+          )}
           {groups.map((group, index) => (
             <SeasonCard
               key={group.unit}
@@ -104,6 +206,7 @@ export function LessonsView({
               seasonNumber={index + 1}
               progress={progress}
               isCurrent={group.unit === currentUnit}
+              isFeatured={group.unit === visibleUnit}
               onPlay={onPlay}
               onLockedClick={handleLockedClick}
             />

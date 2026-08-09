@@ -24,11 +24,34 @@ export interface MasteryTerm {
   weight: number;
   /** value * weight, 0..1. */
   contribution: number;
+  /** Whether this value is measured from a meaningful denominator. */
+  evidenceState?: 'measured' | 'insufficient';
+}
+
+export interface MasteryEvidenceWindow {
+  windowDays: number;
+  sampleCount: number;
+  /** Age of the newest/oldest usable sample relative to the supplied clock. */
+  newestSampleAgeDays?: number;
+  oldestSampleAgeDays?: number;
+}
+
+export interface MasteryEvidence {
+  /** The injected evaluation clock, so all scores are reproducible. */
+  evaluatedAtMs: number;
+  recent: MasteryEvidenceWindow;
+  retention: MasteryEvidenceWindow;
+  /** Unknown means the chart denominator has not been supplied. */
+  coverage: 'measured' | 'unknown' | 'insufficient';
 }
 
 export interface MasteryBreakdown {
-  /** 0..100, rounded. `sum(term.contribution) * 100`. */
+  /** 0..100 long-term mastery, discounted when retention evidence is thin. */
   mastery: number;
+  /** 0..100 current readiness from the short, time-decayed evidence window. */
+  recentReadiness: number;
+  /** 0..100 retained mastery from the longer time-decayed evidence window. */
+  longTermMastery: number;
   accuracy: MasteryTerm;
   consistency: MasteryTerm;
   speedFactor: MasteryTerm;
@@ -40,6 +63,7 @@ export interface MasteryBreakdown {
    * the UI say "based on N runs" honestly instead of implying certainty
    * the input data doesn't have. */
   runsConsidered: number;
+  evidence: MasteryEvidence;
 }
 
 /** Per-lane hit/miss share, used both to describe a song's own lane

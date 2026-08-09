@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MidiDevice, MidiMessageType } from '../../types';
 import { installIpcMock, IpcMock } from '../hooks/test-support';
-import { MidiSource } from './midi-source';
+import { MIDI_DEVICE_LIST_TIMEOUT_MS, MidiSource } from './midi-source';
 import { InputEvent } from './types';
 
 describe('MidiSource', () => {
@@ -66,5 +66,53 @@ describe('MidiSource', () => {
       { id: 'midi:Kit', name: 'Kit', sourceId: 'midi', port: 1 },
     ]);
     expect(ipc.sent).toContainEqual({ channel: 'midi-device-list', args: [] });
+  });
+
+  it('shares an in-flight enumeration instead of stacking IPC listeners', async () => {
+    const source = new MidiSource();
+    const first = source.listDevices();
+    const second = source.listDevices();
+
+    expect(second).toBe(first);
+    expect(ipc.onceCount('midi-device-list')).toBe(1);
+    expect(
+      ipc.sent.filter((message) => message.channel === 'midi-device-list'),
+    ).toHaveLength(1);
+
+    ipc.emit('midi-device-list', [{ name: 'Pad', port: 0 }]);
+
+    await expect(first).resolves.toEqual([
+      { id: 'midi:Pad', name: 'Pad', sourceId: 'midi', port: 0 },
+    ]);
+    expect(ipc.onceCount('midi-device-list')).toBe(0);
+  });
+
+  it('releases a pending enumeration when the source stops', async () => {
+    const source = new MidiSource();
+    const stop = source.start(() => {});
+    const devices = source.listDevices();
+
+    expect(ipc.onceCount('midi-device-list')).toBe(1);
+    stop();
+
+    await expect(devices).resolves.toEqual([]);
+    expect(ipc.onceCount('midi-device-list')).toBe(0);
+  });
+
+  it('bounds an unanswered enumeration instead of retaining its listener', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const source = new MidiSource();
+      const devices = source.listDevices();
+
+      expect(ipc.onceCount('midi-device-list')).toBe(1);
+      await vi.advanceTimersByTimeAsync(MIDI_DEVICE_LIST_TIMEOUT_MS);
+
+      await expect(devices).resolves.toEqual([]);
+      expect(ipc.onceCount('midi-device-list')).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

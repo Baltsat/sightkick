@@ -192,6 +192,7 @@ export function useMastery(
     allRuns,
     songDifficulties,
     chartTotalNotes,
+    nowMs: new Date().getTime(),
   });
   const timeline = masteryTimeline({
     goal,

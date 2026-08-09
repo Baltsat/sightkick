@@ -1,0 +1,161 @@
+.drumroll-tutor-hud {
+  --tutor-signal: var(--color-cyan);
+  position: absolute;
+  inset-inline: clamp(1rem, 3vw, 3rem);
+  bottom: clamp(1rem, 2.4vw, 2rem);
+  z-index: 16;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.9rem;
+  min-height: 4.5rem;
+  padding: 0.8rem 1rem;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px
+    color-mix(in srgb, var(--tutor-signal) 24%, #172033 18%);
+  backdrop-filter: blur(18px) saturate(1.18);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.drumroll-tutor-hud::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--tutor-signal) 35%,
+    color-mix(in srgb, var(--tutor-signal) 28%, white) 65%,
+    transparent
+  );
+  transform-origin: left;
+}
+
+.drumroll-tutor-hud[data-tone='warning'] {
+  --tutor-signal: var(--color-orange);
+}
+
+.drumroll-tutor-hud[data-tone='recovery'] {
+  --tutor-signal: var(--color-magenta);
+}
+
+.drumroll-tutor-hud[data-tone='success'] {
+  --tutor-signal: var(--color-green);
+}
+
+.drumroll-tutor-hud[data-tone='recovery']::after {
+  animation: drumroll-tutor-scan 1.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.drumroll-tutor-hud__signal {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  color: var(--tutor-signal);
+  background: color-mix(in srgb, var(--tutor-signal) 13%, transparent);
+  border-radius: 50%;
+  filter: drop-shadow(
+    0 4px 9px color-mix(in srgb, var(--tutor-signal) 45%, transparent)
+  );
+}
+
+.drumroll-tutor-hud__copy {
+  min-width: 0;
+  font-family: var(--font-ui);
+}
+
+.drumroll-tutor-hud__copy strong,
+.drumroll-tutor-hud__copy span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drumroll-tutor-hud__copy strong {
+  font-size: 0.93rem;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.drumroll-tutor-hud__copy span {
+  margin-top: 0.18rem;
+  color: color-mix(in srgb, var(--color-text) 72%, var(--tutor-signal));
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.drumroll-tutor-hud__telemetry {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  color: color-mix(in srgb, var(--color-text) 78%, var(--tutor-signal));
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.drumroll-tutor-hud__speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--tutor-signal);
+}
+
+.drumroll-tutor-hud__lives {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.24rem;
+}
+
+.drumroll-tutor-hud__lives [data-active='true'] {
+  color: var(--color-red);
+  filter: drop-shadow(
+    0 2px 5px color-mix(in srgb, var(--color-red) 42%, transparent)
+  );
+}
+
+.drumroll-tutor-hud__lives [data-active='false'] {
+  color: color-mix(in srgb, var(--color-text-faint) 42%, transparent);
+}
+
+@keyframes drumroll-tutor-scan {
+  0% {
+    transform: scaleX(0.12);
+    opacity: 0.55;
+  }
+
+  70%,
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 900px) {
+  .drumroll-tutor-hud {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .drumroll-tutor-hud__telemetry {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    padding-left: 3.65rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drumroll-tutor-hud[data-tone='recovery']::after {
+    animation: none;
+  }
+}

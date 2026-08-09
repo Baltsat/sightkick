@@ -66,6 +66,20 @@ export interface SongData {
   sk_unit?: string;
   sk_lesson_title?: string;
   sk_skills?: string;
+  /** Comma-separated authored lesson IDs which must be mastered first. */
+  sk_prerequisite_ids?: string;
+  /** Comma-separated, weighted kit-lane targets (`kick:0.5,snare:0.5`). */
+  sk_target_lanes?: string;
+  /** Authored BPM floor and destination for a lesson tempo ladder. */
+  sk_bpm_start?: string;
+  sk_bpm_target?: string;
+  /** Short, displayable practice dose and completion contract. */
+  sk_dose_rule?: string;
+  sk_mastery_rule?: string;
+  /** The authored musical/sticking cue — guidance, never sensor output. */
+  sk_cue?: string;
+  /** Explicit capability boundary paired with authored technique cues. */
+  sk_assessment_boundary?: string;
 }
 
 export interface Song {
@@ -108,6 +122,35 @@ export interface SongLessonInfo {
   title: string;
   /** Curriculum tags used to match coaching findings to focused practice. */
   skills?: string[];
+  /** Authored IDs that must be mastered before this lesson is reachable. */
+  prerequisiteIds?: string[];
+  /** The kit lanes this exercise intentionally trains, with normalized demand. */
+  targetLanes?: LessonTargetLane[];
+  /** Tempo ladder endpoints from the authored curriculum, in BPM. */
+  bpmStart?: number;
+  bpmTarget?: number;
+  /** A concrete dose the player can follow before judging the result. */
+  doseRule?: string;
+  /** The authored rule that marks the lesson complete. */
+  masteryRule?: string;
+  /** A short authored cue. This is instruction, not observed technique. */
+  cue?: string;
+  /** Always states exactly what the MIDI system can and cannot assess. */
+  assessmentBoundary?: string;
+}
+
+export interface LessonTargetLane {
+  element:
+    | 'kick'
+    | 'snare'
+    | 'hihat'
+    | 'ride'
+    | 'crash'
+    | 'tom1'
+    | 'tom2'
+    | 'tom3';
+  /** Relative hit demand; values are normalized at generation time. */
+  weight: number;
 }
 
 export interface ScoreData {
@@ -449,6 +492,80 @@ export interface IpcMyMusicError {
 }
 
 export type IpcMyMusicReply = IpcMyMusicResponse | IpcMyMusicError;
+
+/**
+ * A source-list row is discovery metadata only. It is never an audio stream,
+ * a chart, or a claim that the track can be practised in Drumroll.
+ */
+export type LibrarySourceAvailability = 'available' | 'unavailable' | 'private';
+
+export type LibraryCandidateLocalStatus = 'candidate' | 'reference';
+
+export type LibrarySourceReferenceStatus =
+  | 'stable-link'
+  | 'not-visible'
+  | 'private-only';
+
+export type LibraryCandidatePracticeStatus =
+  | 'needs-local-chart'
+  | 'unavailable';
+
+export interface YandexPlaylistSource {
+  id: string;
+  name: string;
+  url: string;
+  capturedOn: string;
+  capturedAt: string;
+  captureMethod: 'authenticated-visible-dom';
+  captureSurface: 'Yandex Music playlist track rows';
+  metadataScope: string;
+  rightsScope: 'metadata-only';
+}
+
+export interface YandexPlaylistCompleteness {
+  declaredTrackCount: number;
+  renderedTrackCount: number;
+  stableSourceTrackUrlCount: number;
+  noVisibleStableSourceTrackUrlOrdinals: number[];
+  privateOnlyOrdinals: number[];
+}
+
+export interface YandexPlaylistIntegrity {
+  canonicalization: string;
+  canonicalSha256: string;
+}
+
+export interface YandexPlaylistCandidate {
+  /** Stable source ID; intentionally not a Song ID and never playable. */
+  id: string;
+  ordinal: number;
+  title: string;
+  artists: string[];
+  durationSeconds: number | null;
+  sourceTrackUrl: string | null;
+  sourceAvailability: LibrarySourceAvailability;
+  sourceReferenceStatus: LibrarySourceReferenceStatus;
+  localStatus: LibraryCandidateLocalStatus;
+  practiceStatus: LibraryCandidatePracticeStatus;
+}
+
+export interface YandexPlaylistCandidateCollection {
+  schemaVersion: 2;
+  source: 'yandex-music';
+  playlist: YandexPlaylistSource;
+  completeness: YandexPlaylistCompleteness;
+  integrity: YandexPlaylistIntegrity;
+  tracks: YandexPlaylistCandidate[];
+}
+
+export interface YandexLibraryCandidateSources {
+  drums: YandexPlaylistCandidateCollection;
+  favorites: YandexPlaylistCandidateCollection;
+}
+
+export interface IpcLibraryCandidatesResponse {
+  yandex: YandexLibraryCandidateSources;
+}
 
 export interface StorageSchema {
   songs: {

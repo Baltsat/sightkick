@@ -56,6 +56,42 @@ function fakeRecord(tick = 0): HitRecord {
   };
 }
 
+function emptyArchive() {
+  return { schemaVersion: 1, days: {} };
+}
+
+function evidenceSummary(index: number, completedAt: string): RunSummary {
+  return {
+    ...fakeSummary((index + 1) / 100),
+    completedAt,
+    totalHits: index + 10,
+    totalMisses: index + 2,
+    totalWrong: index + 1,
+    laneAccuracy: [
+      {
+        element: 'snare',
+        hits: index + 4,
+        misses: index + 1,
+        accuracy: (index + 4) / (index + 5),
+      },
+    ],
+    laneBias: [{ element: 'snare', meanMs: index - 5, sampleCount: index + 4 }],
+    timingBias: {
+      meanMs: index - 5,
+      medianMs: index - 4,
+      spreadMs: index + 2,
+      earlyCount: index + 1,
+      lateCount: 1,
+      onTimeCount: 2,
+      sampleCount: index + 4,
+    },
+    wrongHitCounts: [{ element: 'kick', count: index + 1 }],
+    bestStreak: index + 6,
+    mode: 'practice',
+    difficulty: 'hard',
+  };
+}
+
 describe('savePracticeRun', () => {
   it('appends the run and persists it under the song id', () => {
     storeHolder.current = makeStore({});
@@ -70,6 +106,7 @@ describe('savePracticeRun', () => {
       songId: 'song-1',
       runs: [summary],
       fullRuns: [],
+      archive: emptyArchive(),
     });
   });
 
@@ -99,6 +136,42 @@ describe('savePracticeRun', () => {
         ],
       },
     ]);
+  });
+
+  it('round-trips versioned run context without changing legacy summary fields', () => {
+    storeHolder.current = makeStore({});
+
+    const summary: RunSummary = {
+      ...fakeSummary(0.75),
+      mode: 'practice',
+      context: {
+        sessionId: 'run-v2',
+        schemaVersion: 2,
+        appVersion: '1.2.0-kb.1',
+        scoringPolicyVersion: 'judge-resolved-v2',
+        startedAt: '2026-08-01T00:00:00.000Z',
+        chartRevision: 'song-1:expert:v1',
+        deviceId: 'yamaha-dtx402',
+        deviceName: 'Yamaha DTX402',
+        inputLatencyMs: 12,
+        inputMapping: { snare: ['midi:38'], kick: ['midi:36'] },
+      },
+    };
+
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary,
+      records: [fakeRecord(480)],
+    });
+
+    const event = makeEvent();
+
+    loadPracticeRuns(event as never, 'song-1');
+
+    expect(lastReply(event, 'load-practice-runs')!.args[0]).toMatchObject({
+      runs: [summary],
+      fullRuns: [{ summary }],
+    });
   });
 
   it('caps full-resolution history independently at thirty runs', () => {
@@ -165,17 +238,22 @@ describe('savePracticeRun', () => {
     expect(storeHolder.current.get('practiceRuns.song-2')).toHaveLength(1);
   });
 
-  it('caps stored runs at MAX_STORED_RUNS_PER_SONG, dropping the oldest', () => {
+  it('archives every evicted summary without losing its statistical evidence', () => {
     const existing = Array.from({ length: MAX_STORED_RUNS_PER_SONG }, (_, i) =>
-      fakeSummary(i),
+      evidenceSummary(i, '2024-01-05T12:00:00.000Z'),
     );
 
     storeHolder.current = makeStore({
       practiceRuns: { 'song-1': existing },
     });
 
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary: evidenceSummary(50, '2026-08-01T12:00:00.000Z'),
+    });
+
     const event = makeEvent();
-    const newest = fakeSummary(999);
+    const newest = evidenceSummary(51, '2026-08-02T12:00:00.000Z');
 
     savePracticeRun(event as never, { songId: 'song-1', summary: newest });
 
@@ -184,9 +262,139 @@ describe('savePracticeRun', () => {
     ) as RunSummary[];
 
     expect(stored).toHaveLength(MAX_STORED_RUNS_PER_SONG);
-    // the oldest run (accuracy 0) was dropped, newest is now last
-    expect(stored[0].overallAccuracy).toBe(1);
+    expect(stored[0]).toEqual(existing[2]);
     expect(stored[stored.length - 1]).toEqual(newest);
+
+    const archive = storeHolder.current.get('practiceRunArchive.song-1') as {
+      schemaVersion: number;
+      days: Record<
+        string,
+        {
+          runCount: number;
+          totalHits: number;
+          totalMisses: number;
+          totalWrong: number;
+          overallAccuracySum: number;
+          bestStreak: number;
+          timing: { sampleCount: number; totalDeltaMs: number };
+          lanes: Record<
+            string,
+            { hits: number; misses: number; totalDeltaMs: number }
+          >;
+          wrongHits: Record<string, number>;
+          modes: Record<string, number>;
+          difficulties: Record<string, number>;
+        }
+      >;
+    };
+    const archivedDay = archive.days['2024-01-05'];
+    const evicted = existing.slice(0, 2);
+
+    expect(archive.schemaVersion).toBe(1);
+    expect(archivedDay).toMatchObject({
+      runCount: 2,
+      totalHits: evicted[0].totalHits + evicted[1].totalHits,
+      totalMisses: evicted[0].totalMisses + evicted[1].totalMisses,
+      totalWrong: evicted[0].totalWrong + evicted[1].totalWrong,
+      overallAccuracySum:
+        evicted[0].overallAccuracy + evicted[1].overallAccuracy,
+      bestStreak: evicted[1].bestStreak,
+      timing: {
+        sampleCount:
+          evicted[0].timingBias.sampleCount + evicted[1].timingBias.sampleCount,
+        totalDeltaMs:
+          evicted[0].timingBias.meanMs * evicted[0].timingBias.sampleCount +
+          evicted[1].timingBias.meanMs * evicted[1].timingBias.sampleCount,
+      },
+      lanes: {
+        snare: {
+          hits:
+            evicted[0].laneAccuracy[0].hits + evicted[1].laneAccuracy[0].hits,
+          misses:
+            evicted[0].laneAccuracy[0].misses +
+            evicted[1].laneAccuracy[0].misses,
+          totalDeltaMs:
+            evicted[0].laneBias[0].meanMs * evicted[0].laneBias[0].sampleCount +
+            evicted[1].laneBias[0].meanMs * evicted[1].laneBias[0].sampleCount,
+        },
+      },
+      wrongHits: { kick: 3 },
+      modes: { practice: 2 },
+      difficulties: { hard: 2 },
+    });
+    expect(stored.length + archivedDay.runCount).toBe(52);
+
+    const loadEvent = makeEvent();
+
+    loadPracticeRuns(loadEvent as never, 'song-1');
+
+    expect(lastReply(loadEvent, 'load-practice-runs')!.args[0]).toMatchObject({
+      songId: 'song-1',
+      runs: stored,
+      archive: {
+        schemaVersion: 1,
+        days: { '2024-01-05': { runCount: 2 } },
+      },
+    });
+  });
+
+  it('folds multiple evictions on the same day into one deterministic bucket', () => {
+    const existing = Array.from({ length: MAX_STORED_RUNS_PER_SONG }, (_, i) =>
+      evidenceSummary(i, '2021-11-09T09:00:00.000Z'),
+    );
+
+    storeHolder.current = makeStore({
+      practiceRuns: { 'song-1': existing },
+    });
+
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary: evidenceSummary(50, '2026-08-01T12:00:00.000Z'),
+    });
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary: evidenceSummary(51, '2026-08-02T12:00:00.000Z'),
+    });
+
+    const archive = storeHolder.current.get('practiceRunArchive.song-1') as {
+      days: Record<string, { runCount: number; totalHits: number }>;
+    };
+
+    expect(Object.keys(archive.days)).toEqual(['2021-11-09']);
+    expect(archive.days['2021-11-09']).toMatchObject({
+      runCount: 2,
+      totalHits: existing[0].totalHits + existing[1].totalHits,
+    });
+  });
+
+  it('keeps separate, chronologically ordered archive buckets across years', () => {
+    const existing = Array.from({ length: MAX_STORED_RUNS_PER_SONG }, (_, i) =>
+      evidenceSummary(i, '2026-01-01T12:00:00.000Z'),
+    );
+
+    existing[0] = evidenceSummary(0, '2020-02-29T12:00:00.000Z');
+    existing[1] = evidenceSummary(1, '2024-12-31T12:00:00.000Z');
+    storeHolder.current = makeStore({
+      practiceRuns: { 'song-1': existing },
+    });
+
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary: evidenceSummary(50, '2026-08-01T12:00:00.000Z'),
+    });
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary: evidenceSummary(51, '2026-08-02T12:00:00.000Z'),
+    });
+
+    const archive = storeHolder.current.get('practiceRunArchive.song-1') as {
+      days: Record<string, { runCount: number }>;
+    };
+
+    expect(Object.keys(archive.days)).toEqual(['2020-02-29', '2024-12-31']);
+    expect(Object.values(archive.days).map(({ runCount }) => runCount)).toEqual(
+      [1, 1],
+    );
   });
 
   it('replies with an error when songId is missing', () => {
@@ -206,7 +414,7 @@ describe('savePracticeRun', () => {
 });
 
 describe('loadPracticeRuns', () => {
-  it('replies with the stored run history for the song', () => {
+  it('loads legacy electron-store histories with an empty versioned archive', () => {
     const runs = [fakeSummary(0.5), fakeSummary(0.75)];
 
     storeHolder.current = makeStore({ practiceRuns: { 'song-1': runs } });
@@ -219,6 +427,7 @@ describe('loadPracticeRuns', () => {
       songId: 'song-1',
       runs,
       fullRuns: [],
+      archive: emptyArchive(),
     });
   });
 
@@ -233,6 +442,7 @@ describe('loadPracticeRuns', () => {
       songId: 'song-1',
       runs: [],
       fullRuns: [],
+      archive: emptyArchive(),
     });
   });
 

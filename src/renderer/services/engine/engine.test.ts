@@ -10,7 +10,7 @@ import {
 } from '../../../chart-parser/types';
 import { InputEvent } from '../../input/types';
 import { Engine } from './engine';
-import { EngineContext } from './types';
+import { EngineContext, ResolvedJudgement } from './types';
 
 vi.mock('../click-track/metronome', () => ({
   renderClickBuffers: vi.fn(() => ({ downbeat: {}, beat: {} })),
@@ -610,6 +610,119 @@ describe('Engine', () => {
 
     expect(hasClass(n0, 'vf-note-missed')).toBe(true);
     expect(missed).toEqual([0]);
+  });
+
+  it('does not emit an authoritative miss judgement for a forward seek', async () => {
+    const n0 = staveNote(['c/5']);
+    const n1 = staveNote(['d/5']);
+    const { engine } = await setup({
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [rendered(0, n0), rendered(960, n1)],
+          [
+            { tick: 0, isRest: false, notes: ['c/5'] } as Note,
+            { tick: 960, isRest: false, notes: ['d/5'] } as Note,
+          ],
+        ),
+      ],
+    });
+    const judgements: ResolvedJudgement[] = [];
+
+    engine.onJudgement((judgement) => judgements.push(judgement));
+    engine.playFromTick(0);
+    engine.seekSeconds(1.1);
+
+    expect(judgements).toEqual([]);
+  });
+
+  it('emits a resolved miss during ordinary play and stores it once', async () => {
+    const note = staveNote(['c/5']);
+    const { engine, onEnded, player } = await setup({
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [rendered(480, note)],
+          [{ tick: 480, isRest: false, notes: ['c/5'] } as Note],
+        ),
+      ],
+    });
+    const judgements: ResolvedJudgement[] = [];
+
+    engine.onJudgement((judgement) => judgements.push(judgement));
+    engine.playFromTick(0);
+    engine.timeStore.set(0.61);
+
+    expect(judgements).toEqual([
+      expect.objectContaining({
+        id: 'note:480:c/5',
+        verdict: 'miss',
+        expectedTick: 480,
+        expectedElement: 'snare',
+      }),
+    ]);
+
+    player.onEnded();
+    expect(onEnded).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ totalMisses: 1 }),
+      expect.arrayContaining([
+        expect.objectContaining({
+          tick: 480,
+          element: 'snare',
+          verdict: 'miss',
+        }),
+      ]),
+    );
+  });
+
+  it('finalizes tail judgements before notifying tutor and SongView run listeners', async () => {
+    const note = staveNote(['c/5']);
+    const { engine, onEnded, player } = await setup({
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [rendered(1440, note)],
+          [{ tick: 1440, isRest: false, notes: ['c/5'] } as Note],
+        ),
+      ],
+    });
+    const order: string[] = [];
+
+    engine.onJudgement(() => order.push('judgement'));
+    engine.onRunEnding(() => {
+      order.push('run-ending');
+
+      return true;
+    });
+    onEnded.mockImplementation(() => order.push('song-view'));
+    player.onEnded();
+
+    expect(order).toEqual(['judgement', 'run-ending', 'song-view']);
+  });
+
+  it('defers the immutable summary when a run-ending listener starts recovery', async () => {
+    const { engine, onEnded, player } = await setup({
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [],
+          [{ tick: 1440, isRest: false, notes: ['c/5'] } as Note],
+        ),
+      ],
+    });
+    const off = engine.onRunEnding(() => false);
+
+    player.onEnded();
+    expect(onEnded).not.toHaveBeenCalled();
+
+    off();
+    player.onEnded();
+    expect(onEnded).toHaveBeenCalledTimes(1);
   });
 
   it('does not fire onMiss when a seek rewinds the active note backward', async () => {

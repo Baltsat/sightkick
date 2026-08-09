@@ -1,13 +1,35 @@
 import type { ElectronHandler } from '../../preload';
 import type { Channels } from '../../preload';
+import type { Difficulty } from 'scan-chart';
 import type {
   IpcAutoChartJob,
   IpcCreateAutoChartRequest,
+  IpcLibraryCandidatesResponse,
   IpcUpdateSongPayload,
   MidiMessage,
   Song,
 } from '../../types';
+import {
+  parseYandexPlaylistCandidates,
+  YANDEX_DRUMS_SOURCE_FILE,
+  YANDEX_FAVORITES_SOURCE_FILE,
+} from '../../library-sources/yandex';
 import type { PlatformAdapter } from '../types';
+import type {
+  HitRecord,
+  PracticeRunArchive,
+  PracticeRunArchiveBySong,
+  RunSummary,
+  StoredHitRecord,
+  StoredPracticeRun,
+} from '../../renderer/services/practice-stats';
+import {
+  archiveRunSummaries,
+  emptyPracticeRunArchive,
+  MAX_RECENT_FULL_PRACTICE_RUNS_PER_SONG,
+  MAX_RECENT_PRACTICE_SUMMARIES_PER_SONG,
+  readPracticeRunArchive,
+} from '../../renderer/services/practice-stats';
 import { webCapabilities } from './capabilities';
 import {
   finalizeArchiveSong,
@@ -41,6 +63,44 @@ interface UpstreamJob {
 const SCORE_KEY = 'drumroll.web.song-overrides';
 const RUNS_KEY = 'drumroll.web.practice-runs';
 const DAYS_KEY = 'drumroll.web.practice-days';
+const GOALS_KEY = 'drumroll.web.goals';
+const MAX_STORED_GOALS = 50;
+
+interface WebGoal {
+  id: string;
+  songId: string;
+  difficulty: Difficulty;
+  targetDate?: string;
+  createdAt: string;
+  isPrimary: boolean;
+}
+
+interface SaveWebGoalPayload {
+  id?: string;
+  songId: string;
+  difficulty: Difficulty;
+  targetDate?: string;
+  isPrimary?: boolean;
+}
+
+interface WebPracticeRun {
+  summary: RunSummary;
+  /** Undefined means this is a legacy summary-only record. */
+  records?: StoredHitRecord[];
+}
+
+/**
+ * The web adapter previously stored a bare song-to-runs map. Keep reading
+ * that shape, but write this single versioned envelope so adding archive
+ * evidence cannot partially succeed separately from the retained summaries.
+ */
+interface WebPracticeHistory {
+  schemaVersion: 1;
+  runs: Record<string, WebPracticeRun[]>;
+  archiveBySong: PracticeRunArchiveBySong;
+}
+
+const WEB_PRACTICE_HISTORY_SCHEMA_VERSION = 1 as const;
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -52,6 +112,253 @@ function readJson<T>(key: string, fallback: T): T {
 
 function writeJson(key: string, value: unknown): void {
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+function isDifficulty(value: unknown): value is Difficulty {
+  return (
+    value === 'easy' ||
+    value === 'medium' ||
+    value === 'hard' ||
+    value === 'expert'
+  );
+}
+
+function isWebGoal(value: unknown): value is WebGoal {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const goal = value as Partial<WebGoal>;
+
+  return (
+    typeof goal.id === 'string' &&
+    Boolean(goal.id) &&
+    typeof goal.songId === 'string' &&
+    Boolean(goal.songId) &&
+    isDifficulty(goal.difficulty) &&
+    (goal.targetDate === undefined || typeof goal.targetDate === 'string') &&
+    typeof goal.createdAt === 'string' &&
+    Boolean(goal.createdAt) &&
+    typeof goal.isPrimary === 'boolean'
+  );
+}
+
+function readGoals(): WebGoal[] {
+  const raw = readJson<unknown>(GOALS_KEY, []);
+
+  return Array.isArray(raw)
+    ? raw.filter(isWebGoal).slice(-MAX_STORED_GOALS)
+    : [];
+}
+
+function storeGoals(goals: WebGoal[]): WebGoal[] {
+  const capped = goals.slice(-MAX_STORED_GOALS);
+
+  writeJson(GOALS_KEY, capped);
+
+  return capped;
+}
+
+function createGoalId(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+
+  const random = new Uint32Array(4);
+
+  if (typeof globalThis.crypto?.getRandomValues === 'function') {
+    globalThis.crypto.getRandomValues(random);
+  } else {
+    for (let index = 0; index < random.length; index += 1) {
+      random[index] = Math.floor(Math.random() * 0x1_0000_0000);
+    }
+  }
+
+  return `web-goal-${Date.now().toString(36)}-${[...random]
+    .map((part) => part.toString(36))
+    .join('-')}`;
+}
+
+function withPrimarySetTo(goals: WebGoal[], id: string): WebGoal[] {
+  return goals.map((goal) => ({ ...goal, isPrimary: goal.id === id }));
+}
+
+function saveWebGoal(payload: SaveWebGoalPayload): WebGoal[] {
+  if (!payload?.songId) {
+    throw new Error('songId is required');
+  }
+
+  if (!isDifficulty(payload.difficulty)) {
+    throw new Error('difficulty is required');
+  }
+
+  const existing = readGoals();
+  const existingIndex = payload.id
+    ? existing.findIndex(({ id }) => id === payload.id)
+    : -1;
+  const isFirstGoalEver = existing.length === 0 && existingIndex === -1;
+  const resolvedIsPrimary = payload.isPrimary ?? isFirstGoalEver;
+  let next: WebGoal[];
+
+  if (existingIndex >= 0) {
+    next = [...existing];
+    next[existingIndex] = {
+      ...existing[existingIndex],
+      songId: payload.songId,
+      difficulty: payload.difficulty,
+      targetDate: payload.targetDate,
+    };
+  } else {
+    next = [
+      ...existing,
+      {
+        id: createGoalId(),
+        songId: payload.songId,
+        difficulty: payload.difficulty,
+        targetDate: payload.targetDate,
+        createdAt: new Date().toISOString(),
+        isPrimary: false,
+      },
+    ];
+  }
+
+  const targetId =
+    existingIndex >= 0 ? existing[existingIndex].id : next[next.length - 1].id;
+
+  return storeGoals(
+    resolvedIsPrimary ? withPrimarySetTo(next, targetId) : next,
+  );
+}
+
+function deleteWebGoal(id: string): WebGoal[] {
+  if (!id) {
+    throw new Error('id is required');
+  }
+
+  return storeGoals(readGoals().filter((goal) => goal.id !== id));
+}
+
+function setPrimaryWebGoal(id: string): WebGoal[] {
+  if (!id) {
+    throw new Error('id is required');
+  }
+
+  const existing = readGoals();
+
+  if (!existing.some((goal) => goal.id === id)) {
+    throw new Error(`no stored goal with id ${id}`);
+  }
+
+  return storeGoals(withPrimarySetTo(existing, id));
+}
+
+function compactRecord(record: HitRecord): StoredHitRecord {
+  return {
+    tick: record.tick,
+    deltaMs: record.deltaMs,
+    element: record.element,
+    verdict: record.verdict,
+    ...(record.velocity === undefined ? {} : { velocity: record.velocity }),
+  };
+}
+
+function isWebPracticeRun(value: unknown): value is WebPracticeRun {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'summary' in value &&
+    typeof (value as { summary?: unknown }).summary === 'object'
+  );
+}
+
+/**
+ * The first web release stored an array of RunSummary values. Read those
+ * records unchanged as summary-only evidence, while new entries carry the
+ * compact full hit history used by the desktop Coach.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readWebPracticeRuns(raw: unknown): Record<string, WebPracticeRun[]> {
+  if (!isRecord(raw)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(raw).flatMap(([songId, entries]) =>
+      Array.isArray(entries)
+        ? [
+            [
+              songId,
+              entries.map((entry) =>
+                isWebPracticeRun(entry)
+                  ? entry
+                  : { summary: entry as RunSummary },
+              ),
+            ],
+          ]
+        : [],
+    ),
+  );
+}
+
+function readArchiveBySong(raw: unknown): PracticeRunArchiveBySong {
+  if (!isRecord(raw)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(raw).map(([songId, archive]) => [
+      songId,
+      readPracticeRunArchive(archive),
+    ]),
+  );
+}
+
+function readPracticeHistory(): WebPracticeHistory {
+  const raw = readJson<unknown>(RUNS_KEY, {});
+
+  if (
+    isRecord(raw) &&
+    raw.schemaVersion === WEB_PRACTICE_HISTORY_SCHEMA_VERSION &&
+    isRecord(raw.runs)
+  ) {
+    return {
+      schemaVersion: WEB_PRACTICE_HISTORY_SCHEMA_VERSION,
+      runs: readWebPracticeRuns(raw.runs),
+      archiveBySong: readArchiveBySong(raw.archiveBySong),
+    };
+  }
+
+  return {
+    schemaVersion: WEB_PRACTICE_HISTORY_SCHEMA_VERSION,
+    runs: readWebPracticeRuns(raw),
+    archiveBySong: {},
+  };
+}
+
+function writePracticeHistory(history: WebPracticeHistory): void {
+  writeJson(RUNS_KEY, history);
+}
+
+function responseForRuns(
+  songId: string,
+  entries: WebPracticeRun[],
+  archive: PracticeRunArchive = emptyPracticeRunArchive(),
+) {
+  const fullRuns: StoredPracticeRun[] = entries.flatMap((entry) =>
+    entry.records === undefined
+      ? []
+      : [{ summary: entry.summary, records: entry.records }],
+  );
+
+  return {
+    songId,
+    runs: entries.map(({ summary }) => summary),
+    fullRuns: fullRuns.slice(-MAX_RECENT_FULL_PRACTICE_RUNS_PER_SONG),
+    archive,
+  };
 }
 
 function nextFrame(callback: () => void): void {
@@ -66,6 +373,7 @@ export class WebPlatform implements PlatformAdapter {
   private listeners = new Map<Channels, Set<Listener>>();
   private midi = new WebMidiBridge();
   private manifest?: Promise<LessonManifest>;
+  private yandexCandidates?: Promise<IpcLibraryCandidatesResponse>;
   private pending = new Map<string, PendingImport>();
   private wakeLock?: { release: () => Promise<void> };
 
@@ -119,10 +427,19 @@ export class WebPlatform implements PlatformAdapter {
       'load-song-list': 'load-song-list',
       'load-song': 'load-song',
       'rescan-songs': 'rescan-songs',
+      'load-library-candidates': 'load-library-candidates',
       'search-youtube': 'search-youtube',
       'select-import-song': 'select-import-song',
       'import-song': 'import-song',
       'export-pdf': 'export-pdf',
+      'save-practice-run': 'save-practice-run',
+      'load-practice-runs': 'load-practice-runs',
+      'load-all-practice-runs': 'load-all-practice-runs',
+      'record-practice-day': 'record-practice-day',
+      'load-goals': 'load-goals',
+      'save-goal': 'save-goal',
+      'delete-goal': 'delete-goal',
+      'set-primary-goal': 'set-primary-goal',
     };
     const reply = replyByRequest[channel];
 
@@ -141,6 +458,29 @@ export class WebPlatform implements PlatformAdapter {
     });
 
     return this.manifest;
+  }
+
+  private loadYandexCandidates(): Promise<IpcLibraryCandidatesResponse> {
+    this.yandexCandidates ??= Promise.all([
+      this.loadYandexCandidateSource(YANDEX_DRUMS_SOURCE_FILE),
+      this.loadYandexCandidateSource(YANDEX_FAVORITES_SOURCE_FILE),
+    ]).then(([drums, favorites]) => ({ yandex: { drums, favorites } }));
+
+    return this.yandexCandidates;
+  }
+
+  private async loadYandexCandidateSource(
+    sourceFile: string,
+  ): Promise<IpcLibraryCandidatesResponse['yandex']['drums']> {
+    const response = await fetch(`/library-sources/${sourceFile}`);
+
+    if (!response.ok) {
+      throw new Error(
+        `Yandex playlist source failed to load (${response.status}).`,
+      );
+    }
+
+    return parseYandexPlaylistCandidates(await response.json());
   }
 
   private applyOverrides(song: Song): Song {
@@ -244,13 +584,57 @@ export class WebPlatform implements PlatformAdapter {
     this.emit('update-song', next);
   }
 
-  private saveRun(payload: { songId: string; summary: unknown }): void {
-    const runs = readJson<Record<string, unknown[]>>(RUNS_KEY, {});
-    const next = [...(runs[payload.songId] ?? []), payload.summary].slice(-50);
+  private saveRun(payload: {
+    songId: string;
+    summary: RunSummary;
+    records?: HitRecord[];
+  }): void {
+    const history = readPracticeHistory();
+    const allEntries = [
+      ...(history.runs[payload.songId] ?? []),
+      {
+        summary: payload.summary,
+        ...(payload.records === undefined
+          ? {}
+          : { records: payload.records.map(compactRecord) }),
+      },
+    ];
+    const firstRetainedIndex = Math.max(
+      0,
+      allEntries.length - MAX_RECENT_PRACTICE_SUMMARIES_PER_SONG,
+    );
+    const evicted = allEntries.slice(0, firstRetainedIndex);
+    const retained = allEntries.slice(firstRetainedIndex);
+    const fullResolutionIndexes = retained
+      .map((entry, index) => (entry.records === undefined ? -1 : index))
+      .filter((index) => index >= 0);
+    const recordsToTrim = Math.max(
+      0,
+      fullResolutionIndexes.length - MAX_RECENT_FULL_PRACTICE_RUNS_PER_SONG,
+    );
 
-    runs[payload.songId] = next;
-    writeJson(RUNS_KEY, runs);
-    this.emit('save-practice-run', { songId: payload.songId, runs: next });
+    for (const index of fullResolutionIndexes.slice(0, recordsToTrim)) {
+      delete retained[index].records;
+    }
+
+    const archive = archiveRunSummaries(
+      history.archiveBySong[payload.songId] ?? emptyPracticeRunArchive(),
+      evicted.map(({ summary }) => summary),
+    );
+    const nextHistory: WebPracticeHistory = {
+      ...history,
+      runs: { ...history.runs, [payload.songId]: retained },
+      archiveBySong:
+        evicted.length === 0
+          ? history.archiveBySong
+          : { ...history.archiveBySong, [payload.songId]: archive },
+    };
+
+    writePracticeHistory(nextHistory);
+    this.emit(
+      'save-practice-run',
+      responseForRuns(payload.songId, retained, archive),
+    );
   }
 
   private recordPracticeDay(payload: {
@@ -451,6 +835,11 @@ export class WebPlatform implements PlatformAdapter {
 
         break;
 
+      case 'load-library-candidates':
+        this.emit('load-library-candidates', await this.loadYandexCandidates());
+
+        break;
+
       case 'load-song':
         await this.loadSong(String(args[0]));
 
@@ -470,27 +859,49 @@ export class WebPlatform implements PlatformAdapter {
         break;
 
       case 'save-practice-run':
-        this.saveRun(args[0] as { songId: string; summary: unknown });
+        this.saveRun(
+          args[0] as {
+            songId: string;
+            summary: RunSummary;
+            records?: HitRecord[];
+          },
+        );
 
         break;
 
       case 'load-practice-runs': {
         const id = String(args[0]);
-        const runs = readJson<Record<string, unknown[]>>(RUNS_KEY, {});
+        const history = readPracticeHistory();
 
-        this.emit('load-practice-runs', { songId: id, runs: runs[id] ?? [] });
+        this.emit(
+          'load-practice-runs',
+          responseForRuns(
+            id,
+            history.runs[id] ?? [],
+            history.archiveBySong[id] ?? emptyPracticeRunArchive(),
+          ),
+        );
 
         break;
       }
 
-      case 'load-all-practice-runs':
+      case 'load-all-practice-runs': {
+        const history = readPracticeHistory();
+        const runsBySong = Object.fromEntries(
+          Object.entries(history.runs).map(([songId, entries]) => [
+            songId,
+            entries.map(({ summary }) => summary),
+          ]),
+        );
+
         this.emit('load-all-practice-runs', {
-          runs: Object.values(
-            readJson<Record<string, unknown[]>>(RUNS_KEY, {}),
-          ).flat(),
+          runs: Object.values(runsBySong).flat(),
+          runsBySong,
+          archiveBySong: history.archiveBySong,
         });
 
         break;
+      }
 
       case 'load-practice-days':
         this.emit('load-practice-days', {
@@ -508,6 +919,32 @@ export class WebPlatform implements PlatformAdapter {
             minutes: number;
           },
         );
+
+        break;
+
+      case 'load-goals':
+        this.emit('load-goals', { goals: readGoals() });
+
+        break;
+
+      case 'save-goal':
+        this.emit('save-goal', {
+          goals: saveWebGoal(args[0] as SaveWebGoalPayload),
+        });
+
+        break;
+
+      case 'delete-goal':
+        this.emit('delete-goal', {
+          goals: deleteWebGoal(String(args[0] ?? '')),
+        });
+
+        break;
+
+      case 'set-primary-goal':
+        this.emit('set-primary-goal', {
+          goals: setPrimaryWebGoal(String(args[0] ?? '')),
+        });
 
         break;
 

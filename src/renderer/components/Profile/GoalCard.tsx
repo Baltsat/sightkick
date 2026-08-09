@@ -137,6 +137,38 @@ export function GoalCard({
         </div>
       </div>
 
+      <div
+        className="rounded-xl bg-fill px-3 py-2 text-xs leading-relaxed text-text-muted"
+        data-testid="mastery-evidence-window"
+      >
+        <div>
+          <strong className="text-text">Recent readiness:</strong>{' '}
+          {breakdown.recentReadiness}% from{' '}
+          {breakdown.evidence.recent.sampleCount} run
+          {breakdown.evidence.recent.sampleCount === 1 ? '' : 's'} in the last{' '}
+          {breakdown.evidence.recent.windowDays} days
+          {breakdown.evidence.recent.oldestSampleAgeDays !== undefined
+            ? ` (oldest ${Math.round(
+                breakdown.evidence.recent.oldestSampleAgeDays,
+              )}d ago)`
+            : ''}
+          .
+        </div>
+        <div>
+          <strong className="text-text">Long-term mastery:</strong>{' '}
+          {breakdown.longTermMastery}% from{' '}
+          {breakdown.evidence.retention.sampleCount} retained run
+          {breakdown.evidence.retention.sampleCount === 1 ? '' : 's'} in the
+          last {breakdown.evidence.retention.windowDays} days.
+        </div>
+        {breakdown.evidence.coverage !== 'measured' && (
+          <div data-testid="mastery-coverage-unknown">
+            Chart coverage is {breakdown.evidence.coverage}: the chart total is
+            not available, so no full-coverage claim is made.
+          </div>
+        )}
+      </div>
+
       {needleLine && (
         <div
           className="rounded-xl border border-accent-soft-border bg-accent-soft-bg px-4 py-2.5 text-sm text-text-body"

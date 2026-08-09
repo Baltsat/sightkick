@@ -9,7 +9,10 @@ import {
 } from 'react';
 import { cn } from '../../cn';
 import { Measure, RenderData } from '../../../chart-parser/types';
+import { ParsedChart } from '../../../chart-parser/types';
+import { SheetMusicLayout } from '../../../chart-parser/renderer';
 import { Engine } from '../../services/engine';
+import { TimeStore } from '../../services/time-store';
 import { Song } from '../../../types';
 import { Reference } from './Reference';
 import { GameMode, PracticeRange } from '../../types';
@@ -18,6 +21,7 @@ import { faRepeat, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { IconButton } from '../IconButton';
 import { getScrollParent } from '../../services/engine/helpers';
 import { autoScrollSpeed } from './helpers';
+import { ContinuousNotationCamera } from '../ContinuousNotation';
 
 export interface SheetMusicProps {
   engine: Engine | undefined;
@@ -34,6 +38,10 @@ export interface SheetMusicProps {
   enableColors: boolean;
   showReference: boolean;
   zoom: number;
+  layout?: SheetMusicLayout;
+  timeStore?: TimeStore;
+  chart?: ParsedChart | null;
+  delaySeconds?: number;
 }
 
 export function SheetMusic({
@@ -51,6 +59,10 @@ export function SheetMusic({
   showReference,
   enableColors,
   zoom,
+  layout = 'classic',
+  timeStore,
+  chart,
+  delaySeconds = 0,
 }: SheetMusicProps) {
   const cursorRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -285,9 +297,29 @@ export function SheetMusic({
     handleMeasureMouseDown,
     handleMeasureMouseEnter,
   ]);
+  const isFlow = layout === 'flow';
+  // Flow is viewed from the kit rather than at reading distance. Give the
+  // same score a distance-readable presentation boost while preserving the user's zoom
+  // control and its 2x ceiling; Classic keeps the exact requested value.
+  const presentationZoom = isFlow ? Math.min(2, zoom * 1.5) : zoom;
 
   return (
-    <div ref={wrapperRef} className="min-w-max" style={{ zoom }}>
+    <div
+      ref={wrapperRef}
+      className={cn('min-w-max', isFlow && 'drumroll-flow-notation')}
+      style={{ zoom: presentationZoom }}
+      data-testid={isFlow ? 'flow-notation' : undefined}
+      data-presentation-zoom={isFlow ? presentationZoom.toFixed(2) : undefined}
+    >
+      {isFlow && timeStore && chart && (
+        <ContinuousNotationCamera
+          notationRef={wrapperRef}
+          timeStore={timeStore}
+          chart={chart}
+          renderData={renderData}
+          delaySeconds={delaySeconds}
+        />
+      )}
       {gameMode === 'practice' && isLooping && practiceRange && (
         <div className="fixed top-35 ml-10 bg-bg rounded-md z-100 px-4 py-3 flex items-center gap-2">
           <div className="text-accent bg-accent-soft-bg p-2 border border-accent-soft-border rounded-md w-10 h-10 flex items-center justify-center">
@@ -309,14 +341,23 @@ export function SheetMusic({
           />
         </div>
       )}
-      <div className="flex flex-col items-center min-w-max bg-paper rounded-[11px] p-10">
-        <h1 className="my-0 mx-auto text-4xl text-ink font-semibold">
-          {songData.name}
-        </h1>
-        <div className="ml-auto text-[15px] italic font-bold flex flex-col items-end text-ink">
-          <div>Music by {songData.artist}</div>
-          <div>Arranged by {songData.charter}</div>
-        </div>
+      <div
+        className={cn(
+          'flex flex-col items-center min-w-max',
+          isFlow ? 'drumroll-flow-stage' : 'bg-paper rounded-[11px] p-10',
+        )}
+      >
+        {!isFlow && (
+          <>
+            <h1 className="my-0 mx-auto text-4xl text-ink font-semibold">
+              {songData.name}
+            </h1>
+            <div className="ml-auto text-[15px] italic font-bold flex flex-col items-end text-ink">
+              <div>Music by {songData.artist}</div>
+              <div>Arranged by {songData.charter}</div>
+            </div>
+          </>
+        )}
         <div className="min-w-max relative z-0">
           <div
             ref={vexflowContainerRef}

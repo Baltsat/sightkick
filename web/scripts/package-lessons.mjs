@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import {
   cpSync,
+  copyFileSync,
   mkdtempSync,
   mkdirSync,
   readdirSync,
@@ -17,8 +18,29 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, '../..');
 const generatedRoot = mkdtempSync(path.join(tmpdir(), 'drumroll-lessons-'));
 const libraryRoot = path.join(repoRoot, 'web/public/library');
+const librarySourcesRoot = path.join(repoRoot, 'web/public/library-sources');
+const yandexSourceFiles = [
+  'yandex-drums-2026-08-09.json',
+  'yandex-favorites-2026-08-10.json',
+];
 const maxPagesFileBytes = 25 * 1024 * 1024;
-const ffmpegDir = path.join(repoRoot, 'node_modules/ffmpeg-static');
+const cachedFfmpegDir = path.join(
+  repoRoot,
+  'node_modules',
+  '.cache',
+  'drumroll-ffmpeg',
+  'macos-arm64',
+  'bin',
+);
+const requestedFfmpegDir = process.env.DRUMROLL_FFMPEG_DIR;
+const ffmpegName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+const ffmpegDir = [requestedFfmpegDir, cachedFfmpegDir].find(
+  (candidate) =>
+    candidate &&
+    statSync(path.join(candidate, ffmpegName), {
+      throwIfNoEntry: false,
+    })?.isFile(),
+);
 const expectedLessonCount = 170;
 
 function parseIni(raw) {
@@ -70,7 +92,9 @@ try {
       stdio: 'inherit',
       env: {
         ...process.env,
-        PATH: `${ffmpegDir}:${process.env.PATH ?? ''}`,
+        PATH: [ffmpegDir, process.env.PATH]
+          .filter(Boolean)
+          .join(path.delimiter),
       },
     },
   );
@@ -143,6 +167,26 @@ try {
             .split(',')
             .map((skill) => skill.trim())
             .filter(Boolean),
+          prerequisiteIds: (ini.sk_prerequisite_ids || '')
+            .split(',')
+            .map((id) => id.trim())
+            .filter(Boolean),
+          targetLanes: (ini.sk_target_lanes || '')
+            .split(',')
+            .flatMap((entry) => {
+              const [element, rawWeight] = entry.trim().split(':');
+              const weight = Number(rawWeight);
+
+              return element && Number.isFinite(weight) && weight > 0
+                ? [{ element, weight }]
+                : [];
+            }),
+          bpmStart: Number(ini.sk_bpm_start) || undefined,
+          bpmTarget: Number(ini.sk_bpm_target) || undefined,
+          doseRule: ini.sk_dose_rule || undefined,
+          masteryRule: ini.sk_mastery_rule || undefined,
+          cue: ini.sk_cue || undefined,
+          assessmentBoundary: ini.sk_assessment_boundary || undefined,
         },
       },
       chart: `${base}/notes.mid`,
@@ -161,8 +205,20 @@ try {
     path.join(libraryRoot, 'manifest.json'),
     `${JSON.stringify(manifest, null, 2)}\n`,
   );
+  mkdirSync(librarySourcesRoot, { recursive: true });
+  yandexSourceFiles.forEach((sourceFile) => {
+    copyFileSync(
+      path.join(repoRoot, 'resources/library-sources', sourceFile),
+      path.join(librarySourcesRoot, sourceFile),
+    );
+  });
   console.log(
-    JSON.stringify({ lessonCount: lessons.length, totalBytes, maxFileBytes }),
+    JSON.stringify({
+      lessonCount: lessons.length,
+      totalBytes,
+      maxFileBytes,
+      librarySourceFiles: yandexSourceFiles,
+    }),
   );
 } finally {
   rmSync(generatedRoot, { recursive: true, force: true });

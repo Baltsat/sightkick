@@ -32,6 +32,7 @@ interface UsePracticeSessionParams {
   delaySeconds: number;
   isEnded: boolean;
   onExit: () => void;
+  initialPlaybackSpeed?: number;
 }
 
 interface UsePracticeSessionResult {
@@ -55,11 +56,14 @@ export function usePracticeSession({
   delaySeconds,
   isEnded,
   onExit,
+  initialPlaybackSpeed = 1,
 }: UsePracticeSessionParams): UsePracticeSessionResult {
   const [focusIndex, setFocusIndex] = useState<number>();
   const [loopAnchor, setLoopAnchor] = useState<number>();
   const [practiceRange, setPracticeRange] = useState<PracticeRange>();
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [playbackSpeed, setPlaybackSpeed] = useState(() =>
+    clamp(initialPlaybackSpeed, MIN_SPEED, MAX_SPEED),
+  );
   // Looping used to default to on, which (combined with no practice range
   // selected looping the whole song) meant a practice run's onEnded never
   // fired - no ScoreSummary, no saved analytics, just a silent infinite

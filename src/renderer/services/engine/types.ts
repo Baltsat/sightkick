@@ -78,6 +78,32 @@ export interface FalseHitRecord {
 
 export type JudgeFalseHitHandler = (record: FalseHitRecord) => void;
 
+export type ResolvedJudgementVerdict = 'hit' | 'miss' | 'wrong';
+
+/**
+ * One authoritative scoring outcome from Judge.
+ *
+ * A hit is final as soon as Judge accepts it. A miss is final only after the
+ * normal hit-tolerance window closes. A wrong outcome mirrors Judge's
+ * scoreability rule, so consumers can ignore warm-up taps in silent regions.
+ * GameRenderer miss flashes are intentionally not part of this contract.
+ */
+export interface ResolvedJudgement {
+  /** Stable for chart note-head outcomes; unique per emitted wrong hit. */
+  id: string;
+  verdict: ResolvedJudgementVerdict;
+  expectedTick?: number;
+  actualTick?: number;
+  expectedElement?: InputElement;
+  actualElement?: InputElement;
+  measureIndex?: number;
+  deltaMs?: number;
+  velocity?: number;
+  scoreable: boolean;
+}
+
+export type ResolvedJudgementHandler = (judgement: ResolvedJudgement) => void;
+
 export interface JudgeContext {
   chart: ParsedChart | undefined;
   measures: Measure[];

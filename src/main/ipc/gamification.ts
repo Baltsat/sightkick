@@ -1,7 +1,12 @@
 import { IpcMainEvent } from 'electron';
-import type { RunSummary } from '../../renderer/services/practice-stats';
+import type {
+  PracticeRunArchiveBySong,
+  RunSummary,
+} from '../../renderer/services/practice-stats';
 import type { DayRollup, PracticeDays } from '../../renderer/services/streaks';
 import { appState } from '../AppState';
+import { PRACTICE_RUN_ARCHIVE_STORE_KEY } from './practiceStats';
+import { readPracticeRunArchive } from '../../renderer/services/practice-stats';
 
 /**
  * Daily-rollup and cross-song-run storage for the gamification feature.
@@ -51,6 +56,9 @@ export interface IpcLoadPracticeDaysResponse {
 
 export interface IpcLoadAllPracticeRunsResponse {
   runs: RunSummary[];
+  runsBySong: Record<string, RunSummary[]>;
+  /** Compact per-song evidence for history older than recent summary caps. */
+  archiveBySong: PracticeRunArchiveBySong;
 }
 
 function toErrorMessage(error: unknown): string {
@@ -130,8 +138,10 @@ export function loadPracticeDays(event: IpcMainEvent): void {
  * Flattens every song's stored run history into one array, for
  * achievements that need to look across the whole library (Perfect 10,
  * Full Kit) rather than one song at a time. Reads the same
- * `practiceRuns` store key `practiceStats.ts` already maintains - no new
- * run storage, per the "no new heavy storage" brief.
+ * `practiceRuns` store key `practiceStats.ts` already maintains, plus its
+ * compact archive surface for older history. Existing `runs`/`runsBySong`
+ * fields remain recent detailed summaries so old consumers retain identical
+ * behaviour; archive evidence is additive for Profile/Coach consumers.
  */
 export function loadAllPracticeRuns(event: IpcMainEvent): void {
   try {
@@ -140,8 +150,22 @@ export function loadAllPracticeRuns(event: IpcMainEvent): void {
         | Record<string, RunSummary[]>
         | undefined) ?? {};
     const runs = Object.values(bySong).flat();
+    const rawArchiveBySong =
+      (appState.store.get(PRACTICE_RUN_ARCHIVE_STORE_KEY) as
+        | Record<string, unknown>
+        | undefined) ?? {};
+    const archiveBySong: PracticeRunArchiveBySong = Object.fromEntries(
+      Object.entries(rawArchiveBySong).map(([songId, archive]) => [
+        songId,
+        readPracticeRunArchive(archive),
+      ]),
+    );
 
-    event.reply('load-all-practice-runs', { runs });
+    event.reply('load-all-practice-runs', {
+      runs,
+      runsBySong: bySong,
+      archiveBySong,
+    });
   } catch (error) {
     event.reply('load-all-practice-runs', { error: toErrorMessage(error) });
   }

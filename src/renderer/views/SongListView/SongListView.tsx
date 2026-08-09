@@ -7,13 +7,9 @@ import {
   useState,
 } from 'react';
 import { Button, Drawer, Modal, Spin, Tooltip } from 'antd';
+import { Difficulty } from 'scan-chart';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faBullseye,
-  faGraduationCap,
-  faMusic,
-  faPlay,
-} from '@fortawesome/free-solid-svg-icons';
+import { faMusic, faPlay } from '@fortawesome/free-solid-svg-icons';
 import {
   Outlet,
   useNavigate,
@@ -40,24 +36,36 @@ import { useStemTools } from '../../hooks/useStemTools';
 import { useSongList } from '../../hooks/useSongList';
 import { useDownload } from '../../hooks/useDownload';
 import { useSongFilter } from '../../hooks/useSongFilter';
+import { useLibraryCandidates } from '../../hooks/useLibraryCandidates';
 import { useInputControls } from '../../hooks/useInputControls';
 import { useGameModeSelector } from '../../hooks/useGameModeSelector';
 import {
   highestAvailableDifficulty,
   isLessonSong,
   LessonEntry,
+  LESSON_MASTERED_STARS,
   useLessonAutoRescan,
   useLessons,
 } from '../../hooks/useLessons';
 import { calculateAccuracy, getStarRating } from '../../scoring';
 import { Stars } from '../../components/Stars';
-import { LibraryView } from '../../types';
 import { last7Dates, useGamification } from '../../hooks/useGamification';
 import { GamificationHeaderStrip } from '../../components/GamificationHeaderStrip';
 import { StatsPanel } from '../../components/StatsPanel';
 import { localDateKey } from '../../services/streaks';
-import { IconButton } from '../../components/IconButton';
 import { SaveGoalInput, SetGoalModal, useGoals } from '../../components/Goals';
+import { AppShell, ArenaView } from '../../components/AppShell';
+import { HomeCockpit } from '../../components/HomeCockpit';
+import {
+  PracticeCandidate,
+  PracticeHistoryEntry,
+  recommendNextPractice,
+} from '../../services/next-practice';
+import { PracticeOutletContext } from '../practice-context';
+import {
+  filterLibraryCandidates,
+  LibraryCandidateList,
+} from '../../components/LibraryCandidateList';
 import {
   nextDifficulty,
   nextSongIndex,
@@ -72,6 +80,43 @@ import {
 // it ships in its own chunk that only loads the first time a player opens
 // the Profile drawer, not on every app launch.
 const ProfileView = lazy(() => import('../../components/Profile'));
+const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard', 'expert'];
+
+function candidateDifficulty(
+  song: Song,
+  selected: Difficulty,
+): Difficulty | undefined {
+  if (!song.drumDifficulties || song.drumDifficulties.length === 0) {
+    return selected;
+  }
+
+  if (song.drumDifficulties.includes(selected)) {
+    return selected;
+  }
+
+  return [...DIFFICULTIES]
+    .reverse()
+    .find((difficulty) => song.drumDifficulties?.includes(difficulty));
+}
+
+function appendCompletedRun(
+  history: PracticeHistoryEntry[],
+  completedRun: PracticeHistoryEntry | undefined,
+): PracticeHistoryEntry[] {
+  if (!completedRun) {
+    return history;
+  }
+
+  const sessionId = completedRun.summary.context?.sessionId;
+  const exists = history.some(
+    (entry) =>
+      entry.candidateId === completedRun.candidateId &&
+      sessionId !== undefined &&
+      entry.summary.context?.sessionId === sessionId,
+  );
+
+  return exists ? history : [...history, completedRun];
+}
 
 export function SongListView() {
   const { currentPath, difficulty, setDifficulty } = useApp();
@@ -134,6 +179,19 @@ export function SongListView() {
     onlineLoading,
     loadMore,
   } = useSongFilter(songList, difficulty);
+  const libraryCandidates = useLibraryCandidates();
+  const yandexSources = libraryCandidates.candidates?.yandex;
+  const isYandexMode = libraryMode === 'drums' || libraryMode === 'favorites';
+  const candidateSource =
+    libraryMode === 'drums'
+      ? yandexSources?.drums
+      : libraryMode === 'favorites'
+      ? yandexSources?.favorites
+      : undefined;
+  const filteredLibraryCandidates = useMemo(
+    () => filterLibraryCandidates(candidateSource?.tracks ?? [], nameFilter),
+    [candidateSource?.tracks, nameFilter],
+  );
   const { downloadingIds, handleDownload } = useDownload(
     onlineResults,
     addSong,
@@ -143,26 +201,118 @@ export function SongListView() {
   );
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [focusedSortIndex, setFocusedSortIndex] = useState(0);
-  const sortAvailable = libraryMode !== 'online';
+  const sortAvailable = libraryMode === 'local';
   const [prevNameFilter, setPrevNameFilter] = useState(nameFilter);
   const [prevLibraryMode, setPrevLibraryMode] = useState(libraryMode);
   const [prevSort, setPrevSort] = useState(sort);
   const [prevSortAvailable, setPrevSortAvailable] = useState(sortAvailable);
   const gameModeSelector = useGameModeSelector();
-  const [view, setView] = useState<LibraryView>('songs');
+  const [view, setView] = useState<ArenaView>('home');
   const [myMusicOpen, setMyMusicOpen] = useState(false);
+  const [recommendationNowMs] = useState(() => Date.now());
   // The Lessons unlock chain always looks at every lesson song, regardless
   // of the app's globally selected difficulty tab — lesson charts only ever
   // carry an Expert drum track, so filtering by difficulty here would hide
   // the whole curriculum whenever the tab isn't set to Expert.
   const lessonProgress = useLessons(songList);
+  const practiceCandidates = useMemo<PracticeCandidate[]>(() => {
+    const lessonState = new Map(
+      lessonProgress.entries.map((entry, index) => [
+        entry.song.id,
+        { entry, index },
+      ]),
+    );
+    const finalLessonIndex = Math.max(1, lessonProgress.entries.length - 1);
+
+    return songList.flatMap<PracticeCandidate>((song) => {
+      const targetDifficulty = candidateDifficulty(song, difficulty);
+
+      if (!targetDifficulty) {
+        return [];
+      }
+
+      const lesson = lessonState.get(song.id);
+
+      if (lesson) {
+        return [
+          {
+            id: song.id,
+            title: lesson.entry.lesson.title,
+            kind: 'lesson' as const,
+            difficulty: targetDifficulty,
+            available: true,
+            unlocked: lesson.entry.unlocked,
+            sequence: lesson.index,
+            skills: lesson.entry.lesson.skills,
+            curriculumId: lesson.entry.lesson.id,
+            prerequisiteIds: lesson.entry.lesson.prerequisiteIds,
+            targetLanes: lesson.entry.lesson.targetLanes,
+            bpmStart: lesson.entry.lesson.bpmStart,
+            bpmTarget: lesson.entry.lesson.bpmTarget,
+            doseRule: lesson.entry.lesson.doseRule,
+            masteryRule: lesson.entry.lesson.masteryRule,
+            cue: lesson.entry.lesson.cue,
+            assessmentBoundary: lesson.entry.lesson.assessmentBoundary,
+            challengeLevel: 0.12 + (lesson.index / finalLessonIndex) * 0.76,
+            mastered: lesson.entry.bestStars >= LESSON_MASTERED_STARS,
+            availableDifficulties: song.drumDifficulties,
+            chartTotalNotes: song.scoreData?.[targetDifficulty]?.totalNotes,
+          },
+        ];
+      }
+
+      return [
+        {
+          id: song.id,
+          title: song.name,
+          kind: 'song' as const,
+          difficulty: targetDifficulty,
+          available: true,
+          liked: song.liked,
+          targetSpeed: 1,
+          availableDifficulties: song.drumDifficulties,
+          chartTotalNotes: song.scoreData?.[targetDifficulty]?.totalNotes,
+        },
+      ];
+    });
+  }, [difficulty, lessonProgress.entries, songList]);
+  const practiceHistory = useMemo<PracticeHistoryEntry[]>(
+    () =>
+      Object.entries(gamification.runsBySong ?? {}).flatMap(
+        ([candidateId, runs]) =>
+          runs.map((summary) => ({ candidateId, summary })),
+      ),
+    [gamification.runsBySong],
+  );
+  const persistedCoachEvidence = useMemo(
+    () => practiceHistory.flatMap(({ summary }) => summary.coachEvidence ?? []),
+    [practiceHistory],
+  );
+  const nextPractice = useMemo(
+    () =>
+      recommendNextPractice({
+        candidates: practiceCandidates,
+        history: practiceHistory,
+        coachEvidence: persistedCoachEvidence,
+        weakLanes: gamification.laneAccuracy,
+        nowMs: recommendationNowMs,
+        limit: 5,
+      }),
+    [
+      gamification.laneAccuracy,
+      practiceCandidates,
+      practiceHistory,
+      persistedCoachEvidence,
+      recommendationNowMs,
+    ],
+  );
   const rescanLibrary = useCallback(() => {
     window.electron.ipcRenderer.sendMessage('rescan-songs', false);
   }, []);
 
   useLessonAutoRescan({
     songList,
-    isLessonsTabActive: view === 'lessons',
+    isLessonsTabActive: view === 'journey',
     totalLessons: lessonProgress.totalLessons,
     isScanning: scanProgress !== undefined,
     rescan: rescanLibrary,
@@ -182,6 +332,17 @@ export function SongListView() {
   const songsWithProgress = librarySongs.filter(
     (song) => song.scoreData?.[difficulty] !== undefined,
   ).length;
+  const { loadAchievements } = gamification;
+
+  // Home and Coach expose saved lane analytics on their first paint. The
+  // request is intentionally scoped to those surfaces: the detailed Songs
+  // library remains as light as it was before the cockpit existed.
+  useEffect(() => {
+    if (view === 'home' || view === 'coach') {
+      loadAchievements();
+    }
+  }, [loadAchievements, view]);
+
   const handleSongImported = useCallback(
     (song: Song) => {
       addSong(song);
@@ -255,6 +416,47 @@ export function SongListView() {
 
     play(entry.song.id);
   };
+  const startRecommendedPractice = useCallback(
+    (completedRun?: PracticeHistoryEntry) => {
+      const result = recommendNextPractice({
+        candidates: practiceCandidates,
+        history: appendCompletedRun(practiceHistory, completedRun),
+        coachEvidence: [
+          ...persistedCoachEvidence,
+          ...(completedRun?.summary.coachEvidence ?? []),
+        ],
+        nowMs: Date.now(),
+        limit: 5,
+      });
+      const recommendation = result.recommendation;
+
+      if (!recommendation) {
+        setView('songs');
+
+        return;
+      }
+
+      if (recommendation.candidate.difficulty !== difficulty) {
+        setDifficulty(recommendation.candidate.difficulty);
+      }
+
+      const params = new URLSearchParams({
+        gameMode: 'practice',
+        autoStart: '1',
+        practiceSpeed: recommendation.suggestedSpeed.toFixed(1),
+      });
+
+      navigate(`/${recommendation.candidate.id}?${params.toString()}`);
+    },
+    [
+      difficulty,
+      navigate,
+      persistedCoachEvidence,
+      practiceCandidates,
+      practiceHistory,
+      setDifficulty,
+    ],
+  );
 
   useEffect(() => {
     const lessonId = searchParams.get('coachLesson');
@@ -326,300 +528,285 @@ export function SongListView() {
     !songOpen && !gameModeSelector.isOpen && view === 'songs',
   );
 
+  const openHomeCoach = () => {
+    const coachSong =
+      songList.find(
+        (song) => song.id === nextPractice.recommendation?.candidate.id,
+      ) ??
+      librarySongs.find((song) => song.id === gamification.latestRun?.songId) ??
+      continuedSong ??
+      librarySongs[0];
+
+    if (!coachSong) {
+      setView('songs');
+
+      return;
+    }
+
+    navigate(`/${coachSong.id}?gameMode=practice&coachOpen=1`);
+  };
+
   return (
     <StemToolsProvider value={stemTools}>
       {gameModeSelector.element}
 
-      <div className="h-screen flex flex-col bg-bg">
-        <header
-          className="border-b border-divider px-5 py-4 z-10 flex flex-col gap-4"
-          style={{ background: 'var(--gradient-header)' }}
-        >
-          <div className="mx-auto flex w-full max-w-360 items-center justify-between gap-6">
-            <div className="min-w-0">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
-                Practice space
-              </div>
-              <h1 className="font-display text-3xl font-semibold leading-tight tracking-[-0.02em] text-text">
-                Your drum library
-              </h1>
-              <p className="mt-1 text-sm text-text-muted">
-                {librarySongs.length}{' '}
-                {librarySongs.length === 1 ? 'song' : 'songs'} ·{' '}
-                {songsWithProgress} with progress on {difficulty}
-              </p>
-            </div>
-
-            <GamificationHeaderStrip
-              isLoaded={gamification.isLoaded}
-              streak={gamification.streak}
-              todayXp={gamification.todayXp}
-              goalXp={gamification.goalXp}
-              goalOption={gamification.goalOption}
-              onChangeGoal={gamification.setGoalOption}
-              weekActivity={gamification.weekActivity}
-              totalStars={gamification.totalStars}
-              onOpenStats={() => {
-                gamification.loadAchievements();
-                setIsStatsOpen(true);
-              }}
-            />
-
-            <Tooltip title="Your mastery goal and progress">
-              <IconButton
-                data-testid="open-profile-button"
-                aria-label="Open your profile"
-                size="lg"
-                icon={faBullseye}
-                onClick={() => {
-                  // Mirrors onOpenStats above: achievements aren't loaded
-                  // eagerly on mount, so the Profile's achievements chip
-                  // would read undefined/0 forever unless the stats drawer
-                  // happened to be opened first.
-                  gamification.loadAchievements();
-                  setIsProfileOpen(true);
-                }}
-              />
-            </Tooltip>
-
-            {view === 'songs' &&
-              libraryMode === 'local' &&
-              continuedSong &&
-              continuedScore && (
-                <section
-                  className="flex min-w-0 max-w-xl grow items-center gap-3 rounded-2xl border border-accent-soft-border bg-accent-soft-bg p-2.5 shadow-accent-soft"
-                  data-testid="continue-practicing"
-                  aria-labelledby="continue-practicing-title"
-                >
-                  <img
-                    src={continuedSong.albumCover ?? appIcon}
-                    alt=""
-                    className="size-16 shrink-0 rounded-xl object-cover outline outline-1 -outline-offset-1 outline-white/10"
-                    onError={(event) => {
-                      event.currentTarget.src = appIcon;
-                    }}
-                  />
-                  <div className="min-w-0 grow">
-                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-accent-text">
-                      Continue practicing
-                    </div>
-                    <h2
-                      id="continue-practicing-title"
-                      className="truncate font-display text-xl font-semibold leading-tight text-text-body"
-                      title={continuedSong.name}
-                    >
-                      {continuedSong.name}
-                    </h2>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-text-muted">
-                      <Stars
-                        rating={getStarRating(continuedScore)}
-                        perfect={continuedAccuracy === 1}
-                        size="xs"
-                        className="gap-1"
-                      />
-                      <span className="tabular-nums">
-                        {Math.round((continuedAccuracy ?? 0) * 100)}% best
-                      </span>
-                    </div>
-                  </div>
-                  <Button
-                    type="primary"
-                    size="large"
-                    className="min-h-11 shrink-0"
-                    icon={<FontAwesomeIcon icon={faPlay} />}
-                    aria-label={`Play ${continuedSong.name}`}
-                    onClick={() => play(continuedSong.id)}
-                  >
-                    Play
-                  </Button>
-                </section>
-              )}
-          </div>
-
-          <div
-            className="mx-auto flex w-full max-w-360 flex-col gap-3"
-            data-testid="library-toolbar"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div
-                className="flex shrink-0 items-center gap-1 rounded-xl border border-border-soft bg-surface p-1"
-                role="tablist"
-                aria-label="Library view"
-              >
-                <Button
-                  type={view === 'songs' ? 'primary' : 'default'}
-                  data-testid="view-songs"
-                  role="tab"
-                  aria-selected={view === 'songs'}
-                  onClick={() => setView('songs')}
-                >
-                  Songs
-                </Button>
-                <Button
-                  type={view === 'lessons' ? 'primary' : 'default'}
-                  data-testid="view-lessons"
-                  role="tab"
-                  aria-selected={view === 'lessons'}
-                  icon={<FontAwesomeIcon icon={faGraduationCap} />}
-                  onClick={() => setView('lessons')}
-                >
-                  Lessons
-                  {lessonProgress.totalLessons > 0 &&
-                    ` · ${lessonProgress.unlockedCount}/${lessonProgress.totalLessons}`}
-                </Button>
-              </div>
-              <SettingsButton page="song-list" scanPercent={scanPercent} />
-            </div>
-
-            {view === 'songs' && (
-              <div
-                className="flex min-w-0 flex-wrap items-center gap-3"
-                data-testid="library-song-controls"
-              >
-                <SongFilter
-                  className="w-full"
-                  nameFilter={nameFilter}
-                  onChangeFilter={setNameFilter}
-                  difficulty={difficulty}
-                  setDifficulty={setDifficulty}
-                  filteredSongsCount={
-                    libraryMode === 'online' && onlineTotal !== undefined
-                      ? onlineTotal
-                      : filteredSongList.length
-                  }
-                  libraryMode={libraryMode}
-                  onChangeLibraryMode={setLibraryMode}
-                />
-                <div
-                  className="flex min-w-fit shrink-0 flex-wrap items-center gap-2 rounded-2xl bg-fill p-1.5 *:shrink-0"
-                  data-testid="add-music-actions"
-                  aria-label="Add music"
-                >
-                  <span className="px-2 text-xs font-semibold uppercase tracking-[0.12em] text-text-faint">
-                    Add music
-                  </span>
-                  <SongSearch disabled={currentPath === null} />
-                  <SongImport
-                    disabled={currentPath === null}
-                    onImported={handleSongImported}
-                  />
-                  <Tooltip
-                    title={
-                      currentPath === null
-                        ? 'Select a library folder first'
-                        : 'Add songs from your YouTube Music Liked playlist'
-                    }
-                  >
-                    <Button
-                      icon={<FontAwesomeIcon icon={faMusic} />}
-                      size="large"
-                      data-testid="my-music-trigger"
-                      disabled={currentPath === null}
-                      onClick={() => setMyMusicOpen(true)}
-                    >
-                      My Music
-                    </Button>
-                  </Tooltip>
-                  <AutoChart
-                    disabled={currentPath === null}
-                    onImported={handleSongImported}
-                  />
-                </div>
-                <SortButton
-                  sort={sort}
-                  disabled={!sortAvailable}
-                  onSortChange={setSort}
-                  isOpen={isSortOpen}
-                  onOpenChange={setIsSortOpen}
-                  focusedIndex={isSortOpen ? focusedSortIndex : undefined}
-                />
-              </div>
-            )}
-          </div>
-          <SplittingQueue
-            splittingIds={splittingIds}
-            splitProgress={splitProgress}
-            songList={songList}
-          />
-        </header>
-
-        <Modal
-          open={myMusicOpen}
-          onCancel={() => setMyMusicOpen(false)}
-          footer={null}
-          width={640}
-        >
-          <MyMusic
-            librarySongs={librarySongs}
-            disabled={currentPath === null}
-          />
-        </Modal>
-
-        <Drawer
-          title="Your practice stats"
-          open={isStatsOpen}
-          onClose={() => setIsStatsOpen(false)}
-          destroyOnClose
-        >
-          <StatsPanel
+      <AppShell
+        view={view}
+        onViewChange={setView}
+        statusSlot={
+          <GamificationHeaderStrip
+            isLoaded={gamification.isLoaded}
             streak={gamification.streak}
-            weeklyXp={weeklyXp}
+            todayXp={gamification.todayXp}
             goalXp={gamification.goalXp}
+            goalOption={gamification.goalOption}
+            onChangeGoal={gamification.setGoalOption}
+            weekActivity={gamification.weekActivity}
             totalStars={gamification.totalStars}
-            laneAccuracy={gamification.laneAccuracy ?? []}
-            achievements={gamification.achievements}
+            onOpenStats={() => {
+              gamification.loadAchievements();
+              setIsStatsOpen(true);
+            }}
           />
-        </Drawer>
+        }
+        settingsSlot={
+          <SettingsButton page="song-list" scanPercent={scanPercent} />
+        }
+        onOpenProfile={() => {
+          gamification.loadAchievements();
+          setIsProfileOpen(true);
+        }}
+      >
+        {view === 'home' && (
+          <HomeCockpit
+            surface="home"
+            songList={songList}
+            difficulty={difficulty}
+            lessonProgress={lessonProgress}
+            gamification={gamification}
+            recommendation={nextPractice.recommendation}
+            onStartRecommended={() => startRecommendedPractice()}
+            onOpenSongs={() => setView('songs')}
+            onOpenJourney={() => setView('journey')}
+            onOpenCoach={openHomeCoach}
+          />
+        )}
 
-        <Drawer
-          title="Your profile"
-          open={isProfileOpen}
-          onClose={() => setIsProfileOpen(false)}
-          width={480}
-          destroyOnClose
-        >
-          <Suspense
-            fallback={
-              <div className="flex min-h-64 items-center justify-center">
-                <Spin size="large" />
-              </div>
-            }
+        {view === 'coach' && (
+          <HomeCockpit
+            surface="coach"
+            songList={songList}
+            difficulty={difficulty}
+            lessonProgress={lessonProgress}
+            gamification={gamification}
+            recommendation={nextPractice.recommendation}
+            onStartRecommended={() => startRecommendedPractice()}
+            onOpenSongs={() => setView('songs')}
+            onOpenJourney={() => setView('journey')}
+            onOpenCoach={openHomeCoach}
+          />
+        )}
+
+        {view === 'journey' && (
+          <LessonsView
+            progress={lessonProgress}
+            onPlay={playLesson}
+            scanPercent={scanPercent}
+            onRescan={rescanLibrary}
+          />
+        )}
+
+        {view === 'songs' && (
+          <section
+            className="flex h-full min-h-0 flex-col"
+            id="library-content"
           >
-            <ProfileView
-              songList={librarySongs}
-              goals={goals.goals}
-              isGoalsLoaded={goals.isLoaded}
-              onSaveGoal={goals.saveGoal}
-              onSetPrimaryGoal={goals.setPrimaryGoal}
-              gamification={gamification}
-            />
-          </Suspense>
-        </Drawer>
+            <header className="border-b border-divider bg-surface-raised/76 px-5 py-5">
+              <div className="mx-auto flex w-full max-w-360 flex-col gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
+                      Practice library
+                    </div>
+                    <h1 className="font-display text-3xl font-semibold leading-tight tracking-[-0.02em] text-text">
+                      Your drum library
+                    </h1>
+                    <p className="mt-1 text-sm text-text-muted">
+                      {isYandexMode
+                        ? `${
+                            candidateSource?.tracks.length ?? 0
+                          } metadata candidates · not playable yet`
+                        : `${librarySongs.length} ${
+                            librarySongs.length === 1 ? 'song' : 'songs'
+                          } · ${songsWithProgress} with progress on ${difficulty}`}
+                    </p>
+                  </div>
 
-        <SetGoalModal
-          open={isSetGoalOpen}
-          onClose={() => setIsSetGoalOpen(false)}
-          songList={librarySongs}
-          initialSongId={goalModalSongId}
-          isFirstGoal={goals.goals.length === 0}
-          onSave={(input: SaveGoalInput) => goals.saveGoal(input)}
-        />
+                  {libraryMode === 'local' &&
+                    continuedSong &&
+                    continuedScore && (
+                      <section
+                        className="flex min-w-0 max-w-xl items-center gap-3 rounded-2xl border border-accent-soft-border bg-accent-soft-bg p-2.5 shadow-accent-soft"
+                        data-testid="continue-practicing"
+                        aria-labelledby="continue-practicing-title"
+                      >
+                        <img
+                          src={continuedSong.albumCover ?? appIcon}
+                          alt=""
+                          className="size-16 shrink-0 rounded-xl object-cover outline outline-1 -outline-offset-1 outline-white/10"
+                          onError={(event) => {
+                            event.currentTarget.src = appIcon;
+                          }}
+                        />
+                        <div className="min-w-0 grow">
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-accent-text">
+                            Continue practicing
+                          </div>
+                          <h2
+                            id="continue-practicing-title"
+                            className="truncate font-display text-xl font-semibold leading-tight text-text-body"
+                            title={continuedSong.name}
+                          >
+                            {continuedSong.name}
+                          </h2>
+                          <div className="mt-1 flex items-center gap-2 text-xs text-text-muted">
+                            <Stars
+                              rating={getStarRating(continuedScore)}
+                              perfect={continuedAccuracy === 1}
+                              size="xs"
+                              className="gap-1"
+                            />
+                            <span className="tabular-nums">
+                              {Math.round((continuedAccuracy ?? 0) * 100)}% best
+                            </span>
+                          </div>
+                        </div>
+                        <Button
+                          type="primary"
+                          size="large"
+                          className="min-h-11 shrink-0"
+                          icon={<FontAwesomeIcon icon={faPlay} />}
+                          aria-label={`Play ${continuedSong.name}`}
+                          onClick={() => play(continuedSong.id)}
+                        >
+                          Play
+                        </Button>
+                      </section>
+                    )}
+                </div>
 
-        <main
-          id="library-content"
-          className="relative grow overflow-hidden w-full flex"
-        >
-          {view === 'lessons' ? (
-            <LessonsView
-              progress={lessonProgress}
-              onPlay={playLesson}
-              scanPercent={scanPercent}
-              onRescan={rescanLibrary}
-            />
-          ) : (
-            <div className="relative mx-auto flex w-full max-w-360 grow flex-col overflow-hidden bg-bg">
-              {filteredSongList.length > 0 ||
-              (libraryMode === 'online' && onlineLoading) ? (
+                <div
+                  className="flex flex-col gap-3"
+                  data-testid="library-toolbar"
+                >
+                  <div
+                    className="flex min-w-0 flex-wrap items-center gap-3"
+                    data-testid="library-song-controls"
+                  >
+                    <SongFilter
+                      className="w-full"
+                      nameFilter={nameFilter}
+                      onChangeFilter={setNameFilter}
+                      difficulty={difficulty}
+                      setDifficulty={setDifficulty}
+                      filteredSongsCount={
+                        isYandexMode
+                          ? filteredLibraryCandidates.length
+                          : libraryMode === 'online' &&
+                            onlineTotal !== undefined
+                          ? onlineTotal
+                          : filteredSongList.length
+                      }
+                      libraryMode={libraryMode}
+                      onChangeLibraryMode={setLibraryMode}
+                    />
+                    <div
+                      className="flex min-w-fit shrink-0 flex-wrap items-center gap-2 rounded-2xl bg-fill p-1.5 *:shrink-0"
+                      data-testid="add-music-actions"
+                      aria-label="Add music"
+                    >
+                      <span className="px-2 text-xs font-semibold uppercase tracking-[0.12em] text-text-faint">
+                        Add music
+                      </span>
+                      <SongSearch disabled={currentPath === null} />
+                      <SongImport
+                        disabled={currentPath === null}
+                        onImported={handleSongImported}
+                      />
+                      <Tooltip
+                        title={
+                          currentPath === null
+                            ? 'Select a library folder first'
+                            : 'Add songs from your YouTube Music Liked playlist'
+                        }
+                      >
+                        <Button
+                          icon={<FontAwesomeIcon icon={faMusic} />}
+                          size="large"
+                          data-testid="my-music-trigger"
+                          disabled={currentPath === null}
+                          onClick={() => setMyMusicOpen(true)}
+                        >
+                          My Music
+                        </Button>
+                      </Tooltip>
+                      <AutoChart
+                        disabled={currentPath === null}
+                        onImported={handleSongImported}
+                      />
+                    </div>
+                    <SortButton
+                      sort={sort}
+                      disabled={!sortAvailable}
+                      onSortChange={setSort}
+                      isOpen={isSortOpen}
+                      onOpenChange={setIsSortOpen}
+                      focusedIndex={isSortOpen ? focusedSortIndex : undefined}
+                    />
+                  </div>
+                </div>
+                <SplittingQueue
+                  splittingIds={splittingIds}
+                  splitProgress={splitProgress}
+                  songList={songList}
+                />
+              </div>
+            </header>
+
+            <div className="relative mx-auto flex min-h-0 w-full max-w-360 grow flex-col overflow-hidden bg-bg">
+              {isYandexMode ? (
+                !libraryCandidates.isLoaded ? (
+                  <div
+                    className="m-auto flex min-h-40 items-center justify-center"
+                    data-testid="playlist-candidate-loading"
+                  >
+                    <Spin size="large" />
+                  </div>
+                ) : libraryCandidates.error ? (
+                  <div
+                    className="m-auto max-w-lg px-6 text-center text-sm text-red"
+                    role="alert"
+                    data-testid="playlist-candidate-error"
+                  >
+                    The playlist source could not be loaded:{' '}
+                    {libraryCandidates.error}
+                  </div>
+                ) : candidateSource ? (
+                  <LibraryCandidateList
+                    source={candidateSource}
+                    tracks={filteredLibraryCandidates}
+                    query={nameFilter}
+                  />
+                ) : (
+                  <div
+                    className="m-auto max-w-lg px-6 text-center text-sm text-red"
+                    role="alert"
+                  >
+                    The playlist source returned no collection.
+                  </div>
+                )
+              ) : filteredSongList.length > 0 ||
+                (libraryMode === 'online' && onlineLoading) ? (
                 <>
                   {libraryMode === 'online' &&
                     nameFilter.trim() &&
@@ -672,19 +859,86 @@ export function SongListView() {
                   onBrowseOnline={() => setLibraryMode('online')}
                 />
               )}
-            </div>
-          )}
 
-          {view === 'songs' && libraryMode === 'online' && onlineLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/10 pointer-events-none z-10">
+              {libraryMode === 'online' && onlineLoading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/10 pointer-events-none">
+                  <Spin size="large" />
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+      </AppShell>
+
+      <Modal
+        open={myMusicOpen}
+        onCancel={() => setMyMusicOpen(false)}
+        footer={null}
+        width={640}
+      >
+        <MyMusic librarySongs={librarySongs} disabled={currentPath === null} />
+      </Modal>
+
+      <Drawer
+        title="Your practice stats"
+        open={isStatsOpen}
+        onClose={() => setIsStatsOpen(false)}
+        destroyOnHidden
+      >
+        <StatsPanel
+          streak={gamification.streak}
+          weeklyXp={weeklyXp}
+          goalXp={gamification.goalXp}
+          totalStars={gamification.totalStars}
+          laneAccuracy={gamification.laneAccuracy ?? []}
+          achievements={gamification.achievements}
+        />
+      </Drawer>
+
+      <Drawer
+        title="Your profile"
+        open={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        size={480}
+        destroyOnHidden
+      >
+        <Suspense
+          fallback={
+            <div className="flex min-h-64 items-center justify-center">
               <Spin size="large" />
             </div>
-          )}
-        </main>
+          }
+        >
+          <ProfileView
+            songList={librarySongs}
+            goals={goals.goals}
+            isGoalsLoaded={goals.isLoaded}
+            onSaveGoal={goals.saveGoal}
+            onSetPrimaryGoal={goals.setPrimaryGoal}
+            gamification={gamification}
+          />
+        </Suspense>
+      </Drawer>
 
-        <div className="fixed inset-0 pointer-events-none z-100">
-          <Outlet context={gamification} />
-        </div>
+      <SetGoalModal
+        open={isSetGoalOpen}
+        onClose={() => setIsSetGoalOpen(false)}
+        songList={librarySongs}
+        initialSongId={goalModalSongId}
+        isFirstGoal={goals.goals.length === 0}
+        onSave={(input: SaveGoalInput) => goals.saveGoal(input)}
+      />
+
+      <div className="fixed inset-0 pointer-events-none z-100">
+        <Outlet
+          context={
+            {
+              gamification,
+              recommendation: nextPractice.recommendation,
+              continuePractice: startRecommendedPractice,
+            } satisfies PracticeOutletContext
+          }
+        />
       </div>
     </StemToolsProvider>
   );

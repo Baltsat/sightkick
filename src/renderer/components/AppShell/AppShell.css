@@ -1,0 +1,296 @@
+.arena-shell {
+  min-height: 100vh;
+  display: flex;
+  color: var(--color-text);
+  background: radial-gradient(
+      circle at 78% -8%,
+      rgb(86 216 242 / 18%),
+      transparent 31rem
+    ),
+    radial-gradient(
+      circle at 15% 106%,
+      rgb(247 53 134 / 11%),
+      transparent 36rem
+    ),
+    var(--color-bg);
+}
+
+.arena-shell__rail {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  width: 13.25rem;
+  flex: 0 0 13.25rem;
+  flex-direction: column;
+  padding: 1.4rem 0.8rem 1.25rem;
+  border-right: 1px solid var(--color-border);
+  background: linear-gradient(
+      180deg,
+      rgb(255 255 255 / 66%),
+      rgb(238 232 220 / 77%)
+    ),
+    var(--color-warm-paper);
+  box-shadow: 1.5rem 0 5rem rgb(17 23 34 / 6%);
+}
+
+.arena-shell__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.45rem 0.55rem 1.4rem;
+  border: 0;
+  color: var(--color-ink);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.arena-shell__brand strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.arena-shell__brand small {
+  display: block;
+  margin-top: 0.26rem;
+  color: var(--color-ink-soft);
+  font-size: 0.57rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.arena-shell__brand-mark {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border: 1px solid rgb(247 53 134 / 32%);
+  border-radius: 0.8rem;
+  color: var(--color-magenta);
+  background: linear-gradient(
+      145deg,
+      rgb(247 53 134 / 13%),
+      rgb(255 173 47 / 22%)
+    ),
+    var(--color-pearl);
+  box-shadow: 0 0.5rem 1.4rem rgb(247 53 134 / 14%);
+}
+
+.arena-shell__nav {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.arena-shell__nav-item {
+  display: flex;
+  min-height: 2.85rem;
+  align-items: center;
+  gap: 0.72rem;
+  padding: 0.62rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 0.85rem;
+  color: var(--color-ink-soft);
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.arena-shell__nav-item:hover {
+  border-color: rgb(247 53 134 / 20%);
+  color: var(--color-ink);
+  background: rgb(255 255 255 / 58%);
+  transform: translateX(2px);
+}
+
+.arena-shell__nav-item--active {
+  border-color: rgb(247 53 134 / 24%);
+  color: var(--color-ink);
+  background: linear-gradient(
+      90deg,
+      rgb(247 53 134 / 15%),
+      rgb(255 173 47 / 17%)
+    ),
+    rgb(255 255 255 / 68%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 76%);
+}
+
+.arena-shell__nav-item--active svg {
+  color: var(--color-magenta);
+  filter: drop-shadow(0 0 0.35rem rgb(247 53 134 / 38%));
+}
+
+.arena-shell__rail-note {
+  margin: auto 0.6rem 0.1rem;
+  color: color-mix(in srgb, var(--color-ink-soft) 74%, transparent);
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-style: italic;
+  line-height: 1.25;
+}
+
+.arena-shell__workspace {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.arena-shell__topbar {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  min-height: 5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem clamp(1rem, 2.1vw, 2rem);
+  border-bottom: 1px solid var(--color-border);
+  background: rgb(248 245 239 / 81%);
+  box-shadow: 0 0.6rem 2.5rem rgb(17 23 34 / 5%);
+  backdrop-filter: blur(18px);
+}
+
+.arena-shell__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.48rem;
+  color: var(--color-ink-soft);
+  font-size: 0.64rem;
+  font-weight: 750;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.arena-shell__sun {
+  color: var(--color-amber);
+  filter: drop-shadow(0 0 0.4rem rgb(255 173 47 / 68%));
+}
+
+.arena-shell__actions,
+.arena-shell__status {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.arena-shell__profile {
+  display: flex;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid rgb(247 53 134 / 25%);
+  border-radius: 999px;
+  color: var(--color-ink);
+  background: linear-gradient(145deg, #fff, var(--color-warm-paper));
+  box-shadow: 0 0.6rem 1.6rem rgb(247 53 134 / 11%);
+  cursor: pointer;
+}
+
+.arena-shell__profile-label {
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.arena-shell__profile:hover {
+  color: var(--color-magenta);
+  border-color: var(--color-magenta);
+}
+
+.arena-shell__content {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .arena-shell {
+    display: block;
+  }
+
+  .arena-shell__rail {
+    position: sticky;
+    top: 0;
+    display: flex;
+    width: 100%;
+    min-height: auto;
+    flex: initial;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.55rem 0.7rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .arena-shell__brand {
+    padding: 0.28rem;
+  }
+
+  .arena-shell__brand small,
+  .arena-shell__rail-note,
+  .arena-shell__nav-item span {
+    display: none;
+  }
+
+  .arena-shell__nav {
+    display: flex;
+    flex: 1;
+    justify-content: flex-end;
+  }
+
+  .arena-shell__nav-item {
+    width: 2.55rem;
+    min-height: 2.55rem;
+    justify-content: center;
+    padding: 0.5rem;
+  }
+
+  .arena-shell__topbar {
+    min-height: 4.1rem;
+  }
+}
+
+@media (max-width: 620px) {
+  .arena-shell__eyebrow,
+  .arena-shell__status {
+    display: none;
+  }
+
+  .arena-shell__topbar {
+    justify-content: flex-end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arena-shell__nav-item {
+    transition: none;
+  }
+
+  .arena-shell__nav-item:hover {
+    transform: none;
+  }
+}

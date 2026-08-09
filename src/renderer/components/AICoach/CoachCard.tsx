@@ -1,5 +1,5 @@
 import { Button, Tag } from 'antd';
-import { CoachFinding, lessonForSkill } from '../../services/coach';
+import { CoachFinding, remediationForFinding } from '../../services/coach';
 import { Measure } from '../../../chart-parser/types';
 import { StoredHitRecord } from '../../services/practice-stats';
 import { MiniNotation } from './MiniNotation';
@@ -26,7 +26,7 @@ export function CoachCard({
   onTrainSkill,
 }: Props) {
   const { barStart, barEnd, slowSpeed } = finding.evidence;
-  const lesson = lessonForSkill(finding.skillTag);
+  const remediation = remediationForFinding(finding);
   const rampStart = slowSpeed ?? 0.7;
 
   return (
@@ -65,14 +65,27 @@ export function CoachCard({
             {rampStart}x
           </Button>
         )}
-        <Button
-          data-testid="coach-train-skill"
-          onClick={() => onTrainSkill(lesson.id)}
-        >
-          Train the skill · {lesson.id}
-        </Button>
+        {remediation.status === 'available' && (
+          <Button
+            data-testid="coach-train-skill"
+            onClick={() => onTrainSkill(remediation.lessonId)}
+          >
+            Train the skill · {remediation.lessonId}
+          </Button>
+        )}
       </div>
-      <div className="text-xs text-text-faint">Method: {lesson.title}</div>
+      {remediation.status === 'available' ? (
+        <div className="text-xs text-text-faint">
+          Method: {remediation.lessonTitle}
+        </div>
+      ) : (
+        <div
+          className="text-xs text-text-faint"
+          data-testid="coach-unsupported-route"
+        >
+          {remediation.detail}
+        </div>
+      )}
     </article>
   );
 }

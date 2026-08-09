@@ -1,19 +1,33 @@
 import { IpcMainEvent } from 'electron';
 import type {
+  PracticeRunArchive,
   HitRecord,
   RunSummary,
   StoredHitRecord,
   StoredPracticeRun,
 } from '../../renderer/services/practice-stats';
+import {
+  archiveRunSummaries,
+  MAX_RECENT_FULL_PRACTICE_RUNS_PER_SONG,
+  MAX_RECENT_PRACTICE_SUMMARIES_PER_SONG,
+  readPracticeRunArchive,
+} from '../../renderer/services/practice-stats';
 import { appState } from '../AppState';
 
-/** Keep only the most recent N runs per song, oldest dropped first. */
-export const MAX_STORED_RUNS_PER_SONG = 50;
+/** Keep recent, individually inspectable summaries; older evidence is archived. */
+export const MAX_STORED_RUNS_PER_SONG = MAX_RECENT_PRACTICE_SUMMARIES_PER_SONG;
 
-export const MAX_STORED_FULL_RUNS_PER_SONG = 30;
+/** Full hit records remain bounded independently of summary/archive retention. */
+export const MAX_STORED_FULL_RUNS_PER_SONG =
+  MAX_RECENT_FULL_PRACTICE_RUNS_PER_SONG;
 
 const storeKey = (songId: string) => `practiceRuns.${songId}`;
 const detailsStoreKey = (songId: string) => `practiceRunDetails.${songId}`;
+
+export const PRACTICE_RUN_ARCHIVE_STORE_KEY = 'practiceRunArchive';
+
+const archiveStoreKey = (songId: string) =>
+  `${PRACTICE_RUN_ARCHIVE_STORE_KEY}.${songId}`;
 
 export interface IpcSavePracticeRunPayload {
   songId: string;
@@ -25,6 +39,8 @@ export interface IpcPracticeRunsResponse {
   songId: string;
   runs: RunSummary[];
   fullRuns: StoredPracticeRun[];
+  /** Compact evidence for detailed summaries evicted by the retention cap. */
+  archive: PracticeRunArchive;
 }
 
 export interface IpcPracticeStatsError {
@@ -46,9 +62,11 @@ function compactRecord(record: HitRecord): StoredHitRecord {
 }
 
 /**
- * Appends one run summary to the song's stored history, capped to the last
- * `MAX_STORED_RUNS_PER_SONG` runs, and replies with the resulting list so
- * the caller can render immediately without a round-trip load.
+ * Appends one run summary to the song's detailed history. The latest
+ * `MAX_STORED_RUNS_PER_SONG` summaries remain individually inspectable;
+ * evicted summaries are folded into the versioned per-day archive, so the
+ * cap never discards run-count or aggregate statistical evidence. Full hit
+ * records retain their independent, bounded recent-history policy.
  */
 export function savePracticeRun(
   event: IpcMainEvent,
@@ -63,31 +81,49 @@ export function savePracticeRun(
 
     const existing =
       (appState.store.get(storeKey(songId)) as RunSummary[] | undefined) ?? [];
-    const next = [...existing, summary].slice(-MAX_STORED_RUNS_PER_SONG);
+    const allRuns = [...existing, summary];
+    const firstRetainedIndex = Math.max(
+      0,
+      allRuns.length - MAX_STORED_RUNS_PER_SONG,
+    );
+    const evicted = allRuns.slice(0, firstRetainedIndex);
+    const next = allRuns.slice(firstRetainedIndex);
+    const archive = archiveRunSummaries(
+      readPracticeRunArchive(appState.store.get(archiveStoreKey(songId))),
+      evicted,
+    );
     const existingFullRuns =
       (appState.store.get(detailsStoreKey(songId)) as
         | StoredPracticeRun[]
         | undefined) ?? [];
-    const fullRuns = records
-      ? [
-          ...existingFullRuns,
-          { summary, records: records.map(compactRecord) },
-        ].slice(-MAX_STORED_FULL_RUNS_PER_SONG)
-      : existingFullRuns;
+    const fullRuns =
+      records !== undefined
+        ? [
+            ...existingFullRuns,
+            { summary, records: records.map(compactRecord) },
+          ].slice(-MAX_STORED_FULL_RUNS_PER_SONG)
+        : existingFullRuns;
 
     appState.store.set(storeKey(songId), next);
 
-    if (records) {
+    if (evicted.length > 0) {
+      appState.store.set(archiveStoreKey(songId), archive);
+    }
+
+    if (records !== undefined) {
       appState.store.set(detailsStoreKey(songId), fullRuns);
     }
 
-    event.reply('save-practice-run', { songId, runs: next, fullRuns });
+    event.reply('save-practice-run', { songId, runs: next, fullRuns, archive });
   } catch (error) {
     event.reply('save-practice-run', { error: toErrorMessage(error) });
   }
 }
 
-/** Loads the stored run history for a song, oldest first, [] when none. */
+/**
+ * Loads recent, full-resolution history plus compact archive evidence for a
+ * song. Stores written before the archive feature read as an empty v1 archive.
+ */
 export function loadPracticeRuns(event: IpcMainEvent, songId: string): void {
   try {
     if (!songId) {
@@ -100,8 +136,11 @@ export function loadPracticeRuns(event: IpcMainEvent, songId: string): void {
       (appState.store.get(detailsStoreKey(songId)) as
         | StoredPracticeRun[]
         | undefined) ?? [];
+    const archive = readPracticeRunArchive(
+      appState.store.get(archiveStoreKey(songId)),
+    );
 
-    event.reply('load-practice-runs', { songId, runs, fullRuns });
+    event.reply('load-practice-runs', { songId, runs, fullRuns, archive });
   } catch (error) {
     event.reply('load-practice-runs', { error: toErrorMessage(error) });
   }

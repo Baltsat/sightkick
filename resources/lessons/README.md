@@ -1,20 +1,20 @@
-# SightKick Method — Lesson Library Generator
+# Drumroll Method — Lesson Library Generator
 
 A deterministic pipeline that turns `curriculum.yaml` (170 drumset exercises,
-hand-authored in this repo) into playable SightKick song folders: a chart
+hand-authored in this repo) into playable Drumroll song folders: a chart
 (`notes.mid`), a click track (`song.ogg`), an audible drum-pattern demo
 rendered from real (CC0) drum samples (`drums.ogg`), and metadata
 (`song.ini`).
 
 ## Inspiration and copyright
 
-The unit/lesson progression is inspired by the lesson order of a well-known
-beginner Hal Leonard drumset method book (grip/stroke basics → reading →
-coordination → 8th notes → toms → ties/rests/accents → strokes → fills →
-musical form → 16th notes → new rhythms → 16th-note fills → triplets → jazz
-→ shuffle → new meters → capstone tunes). Rudiments (single strokes,
-paradiddles) and standard beat vocabulary (rock backbeat, shuffle, jazz
-ride, waltz, 12/8) are traditional material, not the book's IP.
+The unit/lesson progression uses the broad topic order observed in a beginner
+drumset-method reference supplied for curriculum gap analysis (stroke basics →
+reading → coordination → eighth notes → toms → ties/rests/accents → fills →
+musical form → sixteenth notes → triplets → jazz/shuffle → new meters →
+capstone work). Rudiments (single strokes, paradiddles) and standard beat
+vocabulary (rock backbeat, shuffle, jazz ride, waltz, 12/8) are traditional
+material, not the reference's IP.
 
 No prose, engravings, or images from the book are reproduced anywhere in
 this directory. Every exercise title, coaching cue, and the specific note
@@ -38,8 +38,9 @@ the curriculum.
 10 units → 25 lessons → 170 exercises. The original 7 units / 18 lessons /
 118 exercises (17 lessons map 1:1 to the book's Lesson 1–17; the 18th,
 "Encore Repertoire", stands in for the book's two capstone song charts) are
-unchanged in content — every one of their titles, cues, tempos, and note
-patterns is byte-identical to before. Three new "Rudiment Gym" units (the
+the retained base. The three-tom repair intentionally re-authors 07.02–07.08
+and reinforces the T2 lane in 10.05, 18.01, and 18.02; all other pre-existing
+exercise content remains retained. Three new "Rudiment Gym" units (the
 Fundamentals/rudiments wing, see below) are interleaved between them, which
 is why the unit letters below aren't a plain A–J run and why lesson/exercise
 numbers shifted for everything at or after Lesson 3 (`04.01` is still the
@@ -62,6 +63,23 @@ chain itself is unaffected).
 | G    | New Meters & Capstones                 | 10        |
 
 Full lesson-by-lesson breakdown is in `curriculum.yaml` (`units[].lessons[]`).
+
+### Curriculum contract validation
+
+Run the checked-in curriculum validator after changing lesson content:
+
+```sh
+resources/lessons/.venv/bin/python3 resources/lessons/validate_curriculum.py
+```
+
+It renders every chart's `notes.mid` payload in memory and parses the emitted
+tom marker notes; it does not accept YAML lane text as proof that a generated
+chart contains a tom. In addition to the stable 170-exercise unlock chain, it
+enforces the three-tom gates in `docs/requirement-ledger.md` E4.04–E4.05:
+T2 appears in at least eight exercises (four in Lesson 7 and two later
+reinforcements), each tom has at least three isolated drills, both directions
+of the T1↔T2 and T2↔T3 moves are present, at least two full sweeps exist, and
+at least two all-three-tom groove contexts and two fill contexts remain.
 
 ### Rudiment Gym (the Fundamentals wing)
 
@@ -204,12 +222,11 @@ exercises instead of every permutation:
   (repeat-to-sign, first/second endings, coda jumps) has no representation
   in the flat, linear `mode: loop` chart format used here — that's a
   format limitation, not a content cut, and is out of scope until a
-  future chart format supports section jumps. 07.04 (now "Groove with a
-  Turnaround Tag", formerly "Second-Ending Turnaround") had the same gap:
-  its original cue promised a first/second-ending song-form move the
-  format can't render. The title and cue were corrected to describe what
-  the chart actually plays — one consistent turnaround tag every pass —
-  instead of overpromising navigation the loop format doesn't support.
+  future chart format supports section jumps. Lesson 07's former isolated
+  tom examples were subsequently replaced by a three-tom progression that
+  explicitly identifies T1/T2/T3, teaches both movement directions, then
+  transfers those moves into grooves and fills. The checked-in MIDI validator
+  above guards that coverage instead of relying on title text alone.
 
 The original book-inspired wing contains 118 exercises — comfortably
 inside the initial "expect 50–120" target while still touching every
@@ -267,9 +284,9 @@ version). Summary:
   `2`=p, `3`=mp, `4`=mf, `5`=f, `6`=ff; velocities 30/45/60/80/100/115)
   layered on top of the original binary `x`/`X`/`g` notation. Used only on
   the handful of exercises where the book gives a genuine multi-step
-  dynamic arc rather than a binary loud/soft contrast: 05.01, 05.05,
-  05.06, 09.04, 10.02 (the Lesson 10 capstone), and 18.01/18.02 (the two
-  Encore etudes). Every other exercise keeps the original binary
+  dynamic arc rather than a binary loud/soft contrast: 07.01, 11.04,
+  12.02 (the Lesson 10 capstone), and 25.01/25.02 (the two Encore etudes).
+  Every other exercise keeps the original binary
   dynamics. `f`/`ff` (100/115) clear the judge's
   `ACCENT_VALUE_THRESHOLD` (90) the same way `X` (115) always has, and
   `pp`/`p` (30/45) clear `GHOST_VALUE_THRESHOLD` (50) the same way `g`
@@ -306,7 +323,10 @@ Useful flags:
 - `--dry-run` — print what would be written without touching disk.
 
 `ffmpeg` must be on `PATH` (used to transcode both the generated click WAV
-and the generated drums WAV into small mono OGG files). The 10 one-shot
+and the generated drums WAV into compact stereo OGG files). The macOS release
+pipeline builds the pinned native-Vorbis runtime with
+`scripts/prepare-ffmpeg-runtime.sh`; direct callers may instead provide a
+compatible system FFmpeg. The 10 one-shot
 drum samples `drums.ogg` is rendered from are already vendored in
 `samples/` (see `samples/ATTRIBUTION.md`) — no network access is needed to
 run `generate.py` itself, only if you re-run `samples/_vendor_pipeline.py`
@@ -331,8 +351,8 @@ independent runs of the same exercise set — identical SHA-1s.
 `song.ogg`'s _audio content_ (its exact sample data, hence its duration)
 is equally deterministic — the click WAV is synthesized sample-by-sample
 from the same tick timeline as the MIDI. The final compressed `.ogg`
-container bytes can vary a few bytes run to run because libvorbis embeds
-a random Ogg stream serial number by default; this has no audible or
+container bytes can vary a few bytes run to run because the native Vorbis
+encoder embeds a random Ogg stream serial number by default; this has no audible or
 functional effect and doesn't change the file's duration.
 
 `drums.ogg` is deterministic the same way: no randomness or dithering
@@ -489,12 +509,14 @@ covered by the Rudiment Gym validation entry later in this section.
   across all 170 exercises. The splice/renumber pass was a full
   `yaml.safe_load` → rebuild → `yaml.safe_dump` round-trip (not a hand
   edit), so it was verified in layers:
-  - **Round-trip field preservation**: every one of the pre-existing 118
-    exercises' unchanged fields (`title`, `cue`, `time_signature`,
-    `bpm_slow`, `bpm_target`, `diff_drums`, `mode`, `bars`) were deep-
-    compared against the pre-splice file in original document order —
-    **118/118 byte-for-byte identical**; only `id`, `lesson`,
-    `stars_to_unlock`, `next`, and the new `skills` field changed.
+  - **Round-trip field preservation at splice time**: every one of the
+    pre-existing 118 exercises' unchanged fields (`title`, `cue`,
+    `time_signature`, `bpm_slow`, `bpm_target`, `diff_drums`, `mode`,
+    `bars`) was deep-compared against the pre-splice file in original
+    document order — **118/118 byte-for-byte identical**; only `id`,
+    `lesson`, `stars_to_unlock`, `next`, and the new `skills` field changed.
+    The later, deliberate E4.04 three-tom repair is documented in the
+    Curriculum contract validation section above.
   - Stale exercise-id cross-references embedded in `meta` prose (the
     `graded_dynamics`, `symbols.g`, and `symbols.o` blurbs, which name
     specific exercises like "09.04" or "18.01/18.02" by their old numbers)

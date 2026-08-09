@@ -29,6 +29,14 @@ export interface SheetMusicColors {
 
 export const TARGET_ROW_WIDTH = 1200;
 
+/**
+ * Classic notation uses short, readable systems. Flow deliberately keeps all
+ * measures on one horizontal system so the live playhead can travel through
+ * the chart without changing rows. It is still the exact same VexFlow score
+ * and RenderData contract — only the layout geometry changes.
+ */
+export type SheetMusicLayout = 'classic' | 'flow';
+
 const MAX_MEASURES_PER_ROW = 2;
 const MIN_MEASURE_WIDTH = 300;
 const MEASURE_TRAILING_PAD = 20;
@@ -52,6 +60,7 @@ export function renderMusic(
   showBarNumbers: boolean = true,
   enableColors: boolean = false,
   showTempo: boolean = true,
+  layout: SheetMusicLayout = 'classic',
 ): RenderData[] {
   if (!container) {
     return [];
@@ -59,19 +68,26 @@ export function renderMusic(
 
   container.replaceChildren();
 
-  const lineHeight = showBarNumbers ? 180 : 130;
+  const isFlow = layout === 'flow';
+  const lineHeight = isFlow ? 190 : showBarNumbers ? 180 : 130;
   const renderData: RenderData[] = [];
   const tempoLabels = dedupedTempoLabels(song.measures, showTempo);
   const widths = song.measures.map((measure, index) =>
     requiredMeasureWidth(measure, tempoLabels[index]),
   );
-  const rows = packRows(widths);
+  // Flow is intentionally a *single* system. Do not make this a visual
+  // approximation with translated rows: GameRenderer receives the VexFlow
+  // staves in this exact geometry, so hit/miss/wrong-hit and cursor math keep
+  // using their established DOM references.
+  const rows = isFlow
+    ? [song.measures.map((_, index) => index)]
+    : packRows(widths);
 
   rows.forEach((rowIndices, rowNum) => {
     const yOffset = rowNum * lineHeight;
     const rowMin = rowIndices.reduce((sum, index) => sum + widths[index], 0);
-    const rowWidth = Math.max(TARGET_ROW_WIDTH, rowMin);
-    const scale = rowMin > 0 ? rowWidth / rowMin : 1;
+    const rowWidth = isFlow ? rowMin : Math.max(TARGET_ROW_WIDTH, rowMin);
+    const scale = !isFlow && rowMin > 0 ? rowWidth / rowMin : 1;
     const rowEl = document.createElement('div');
 
     rowEl.style.position = 'relative';

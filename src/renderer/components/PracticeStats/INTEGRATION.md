@@ -147,6 +147,7 @@ private deriveMisses(): HitRecord[] {
    other behavior changes.
 
 3. **`engine/engine.ts`**:
+
    - `import { HitRecord, summarizeRun } from '../practice-stats';` and
      `import { KEY_TO_ELEMENT } from './constants';`
    - add `private runRecords: HitRecord[] = [];`

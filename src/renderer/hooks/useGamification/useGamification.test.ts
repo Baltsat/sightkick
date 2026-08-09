@@ -161,10 +161,11 @@ describe('achievements', () => {
     expect(result.current.achievements).toBeUndefined();
   });
 
-  it('laneAccuracy is undefined until the run cache loads, then aggregates every run', () => {
+  it('keeps lifetime laneAccuracy for Stats while exposing a separate recent Home signal', () => {
     const { result } = renderHook(() => useGamification([]));
 
     expect(result.current.laneAccuracy).toBeUndefined();
+    expect(result.current.recentLaneSignals).toBeUndefined();
 
     act(() => {
       result.current.loadAchievements();
@@ -190,6 +191,34 @@ describe('achievements', () => {
     expect(result.current.laneAccuracy).toEqual([
       { element: 'kick', hits: 8, misses: 1, accuracy: 8 / 9 },
     ]);
+    expect(result.current.recentLaneSignals).toEqual([
+      {
+        element: 'kick',
+        accuracy: 8 / 9,
+        sampleCount: 9,
+        runCount: 2,
+        evidenceState: 'measured',
+      },
+    ]);
+  });
+
+  it('keeps the newest run attached to its song for Home and Coach', () => {
+    const { result } = renderHook(() => useGamification([]));
+    const older = fakeRun({ completedAt: '2026-08-07T14:00:00.000Z' });
+    const newest = fakeRun({ completedAt: '2026-08-08T14:00:00.000Z' });
+
+    act(() => {
+      result.current.loadAchievements();
+      ipc.emit('load-all-practice-runs', {
+        runs: [older, newest],
+        runsBySong: { 'song-old': [older], 'song-new': [newest] },
+      });
+    });
+
+    expect(result.current.latestRun).toEqual({
+      songId: 'song-new',
+      summary: newest,
+    });
   });
 
   it('loadAchievements fetches every run and derives the full badge list', () => {

@@ -25,6 +25,7 @@ export type Channels =
   | 'auto-chart-remote-test'
   | 'search-youtube'
   | 'my-music-fetch'
+  | 'load-library-candidates'
   | 'check-stem-tools'
   | 'check-stem-tools-update'
   | 'download-stem-tools'

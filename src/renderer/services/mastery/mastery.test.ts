@@ -157,14 +157,14 @@ describe('computeAccuracyValue', () => {
     expect(computeAccuracyValue([])).toBe(0);
   });
 
-  it('takes the best full-speed accuracy, ignoring slower runs', () => {
+  it('uses a time-decayed full-speed average, ignoring slower runs', () => {
     const runs = [
       fakeRun({ overallAccuracy: 0.6, playbackSpeed: 1 }),
       fakeRun({ overallAccuracy: 0.95, playbackSpeed: 1 }),
       fakeRun({ overallAccuracy: 1, playbackSpeed: 0.7 }),
     ];
 
-    expect(computeAccuracyValue(runs)).toBe(0.95);
+    expect(computeAccuracyValue(runs)).toBeCloseTo(0.7772, 3);
   });
 
   it('is 0 when every run is below full speed', () => {
@@ -182,12 +182,12 @@ describe('computeConsistencyValue', () => {
     expect(computeConsistencyValue([])).toBe(0);
   });
 
-  it('is the median of the last 5 runs regardless of speed', () => {
+  it('is a time-decayed value over the last 5 runs regardless of speed', () => {
     const runs = [0.5, 0.6, 0.7, 0.8, 0.9].map((overallAccuracy) =>
       fakeRun({ overallAccuracy, playbackSpeed: 0.6 }),
     );
 
-    expect(computeConsistencyValue(runs)).toBe(0.7);
+    expect(computeConsistencyValue(runs)).toBeCloseTo(0.705, 3);
   });
 
   it('ignores runs older than the last 5', () => {
@@ -213,13 +213,13 @@ describe('computeSpeedFactorValue', () => {
     expect(computeSpeedFactorValue(runs)).toBe(0);
   });
 
-  it('takes the best speed among clean runs', () => {
+  it('uses time-decayed clean-speed evidence', () => {
     const runs = [
       fakeRun({ overallAccuracy: 0.95, playbackSpeed: 0.6 }),
       fakeRun({ overallAccuracy: 0.92, playbackSpeed: 0.8 }),
     ];
 
-    expect(computeSpeedFactorValue(runs)).toBeCloseTo(0.8);
+    expect(computeSpeedFactorValue(runs)).toBeCloseTo(0.7);
   });
 
   it('clamps at 1 even when played faster than 1.0x', () => {
@@ -264,16 +264,13 @@ describe('computeCoverageValue', () => {
     expect(computeCoverageValue(runs, 100)).toBe(0.5);
   });
 
-  it('falls back to the best-attempted count itself when the chart total is unknown', () => {
+  it('returns zero when the chart total is unknown rather than fabricating full coverage', () => {
     const runs = [
       fakeRun({ totalHits: 20, totalMisses: 5 }),
       fakeRun({ totalHits: 30, totalMisses: 10 }),
     ];
 
-    // Best attempted = 40; with no known denominator it reads as "fully
-    // covered relative to what's been attempted", not as 100% of a chart
-    // whose real size is unknown.
-    expect(computeCoverageValue(runs, undefined)).toBe(1);
+    expect(computeCoverageValue(runs, undefined)).toBe(0);
   });
 
   it('never exceeds 1 even if attempted counts (looped Practice) exceed the chart total', () => {
@@ -408,10 +405,9 @@ describe('worstMasteryTerm', () => {
       allRuns: [],
     });
 
-    // subReadiness has no global lane data at all here → 0, strictly the
-    // lowest alongside coverage's fallback-1 and accuracy's single-run 1 —
-    // subReadiness is uniquely 0.
-    expect(worstMasteryTerm(breakdown).key).toBe('subReadiness');
+    // Coverage is deliberately unknown without a chart total, so it is the
+    // most honest limiting term instead of silently reading as 100%.
+    expect(worstMasteryTerm(breakdown).key).toBe('coverage');
   });
 
   it('breaks ties toward the higher-weight term', () => {
@@ -420,5 +416,93 @@ describe('worstMasteryTerm', () => {
     // Every term is 0 with no runs at all — accuracy has the largest
     // weight, so it should win the tie-break.
     expect(worstMasteryTerm(breakdown).key).toBe('accuracy');
+  });
+});
+
+describe('time-decayed evidence contract', () => {
+  const CLOCK = Date.parse('2026-08-10T12:00:00.000Z');
+
+  it('does not let a lucky lifetime best dominate recent weak full-speed evidence', () => {
+    const runs = [
+      fakeRun({
+        completedAt: '2026-01-01T12:00:00.000Z',
+        overallAccuracy: 1,
+        playbackSpeed: 1,
+      }),
+      ...[1, 2, 3].map((day) =>
+        fakeRun({
+          completedAt: `2026-08-0${day}T12:00:00.000Z`,
+          overallAccuracy: 0.5,
+          playbackSpeed: 1,
+        }),
+      ),
+    ];
+    const breakdown = computeMastery({
+      goal: GOAL,
+      songRuns: runs,
+      allRuns: runs,
+      chartTotalNotes: 100,
+      nowMs: CLOCK,
+    });
+
+    expect(breakdown.accuracy.value).toBeCloseTo(0.5, 2);
+    expect(breakdown.recentReadiness).toBeLessThan(60);
+  });
+
+  it('exposes deterministic window ages/counts and separate readiness/mastery', () => {
+    const runs = [
+      fakeRun({
+        completedAt: '2026-07-31T12:00:00.000Z',
+        overallAccuracy: 0.9,
+        playbackSpeed: 1,
+      }),
+      fakeRun({
+        completedAt: '2026-08-09T12:00:00.000Z',
+        overallAccuracy: 0.7,
+        playbackSpeed: 1,
+      }),
+    ];
+    const breakdown = computeMastery({
+      goal: GOAL,
+      songRuns: runs,
+      allRuns: runs,
+      chartTotalNotes: 100,
+      nowMs: CLOCK,
+    });
+
+    expect(breakdown.evidence).toMatchObject({
+      evaluatedAtMs: CLOCK,
+      recent: {
+        windowDays: 28,
+        sampleCount: 2,
+        newestSampleAgeDays: 1,
+        oldestSampleAgeDays: 10,
+      },
+      retention: { windowDays: 120, sampleCount: 2 },
+      coverage: 'measured',
+    });
+    expect(breakdown.mastery).toBe(breakdown.longTermMastery);
+    expect(breakdown.recentReadiness).not.toBe(breakdown.longTermMastery);
+  });
+
+  it('marks missing chart totals as unknown coverage instead of full coverage', () => {
+    const breakdown = computeMastery({
+      goal: GOAL,
+      songRuns: [
+        fakeRun({
+          completedAt: '2026-08-09T12:00:00.000Z',
+          totalHits: 500,
+          totalMisses: 0,
+        }),
+      ],
+      allRuns: [],
+      nowMs: CLOCK,
+    });
+
+    expect(breakdown.coverage).toMatchObject({
+      value: 0,
+      evidenceState: 'insufficient',
+    });
+    expect(breakdown.evidence.coverage).toBe('unknown');
   });
 });

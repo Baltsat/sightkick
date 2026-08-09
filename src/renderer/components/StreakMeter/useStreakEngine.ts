@@ -36,11 +36,10 @@ export const INITIAL_STREAK_UI_STATE: StreakUiState = {
 };
 
 /**
- * Subscribes to one Engine's live judge/miss/reset events and turns them
- * into streak UI state, additively - it only ever calls the public
- * `onHit`/`onFalseHit`/`onMiss`/`onReset` subscription methods Engine
- * exposes (see `engine.ts`), never reaching into Judge/Transport/
- * GameRenderer internals.
+ * Subscribes to one Engine's final Judge outcomes and reset events and turns
+ * them into streak UI state. Renderer miss flashes are deliberately ignored:
+ * they can happen before the late-hit window closes and while scrubbing, so
+ * they are visual feedback rather than reliable evidence of a failed note.
  *
  * Meant to be called once per song view (in SongView) and the result
  * threaded down to `<StreakMeter>` and stamped onto the run summary at
@@ -77,34 +76,45 @@ export function useStreakEngine(engine: Engine | undefined): StreakUiState {
 
         return { ...prev, streak: state, shatterSeq: prev.shatterSeq + 1 };
       });
-    const offHit = engine.onHit((pos) => {
-      const noteId = `${pos.measureIdx}:${pos.noteIdx}`;
+    const offJudgement = engine.onJudgement((judgement) => {
+      if (judgement.verdict === 'hit' && judgement.expectedTick !== undefined) {
+        // All heads in a chord share an expected tick. Registering that tick
+        // once keeps the streak musical: one notated event is one step.
+        const noteId = `${judgement.measureIndex ?? 'unknown'}:${
+          judgement.expectedTick
+        }`;
 
-      setUi((prev) => {
-        const { state, stageUp } = registerHit(prev.streak, noteId);
+        setUi((prev) => {
+          const { state, stageUp } = registerHit(prev.streak, noteId);
 
-        if (!stageUp) {
-          return { ...prev, streak: state };
-        }
+          if (!stageUp) {
+            return { ...prev, streak: state };
+          }
 
-        return {
-          ...prev,
-          streak: state,
-          announceSeq: prev.announceSeq + 1,
-          announceStage: stageUp,
-        };
-      });
+          return {
+            ...prev,
+            streak: state,
+            announceSeq: prev.announceSeq + 1,
+            announceStage: stageUp,
+          };
+        });
+
+        return;
+      }
+
+      if (
+        judgement.verdict === 'miss' ||
+        (judgement.verdict === 'wrong' && judgement.scoreable)
+      ) {
+        applyFailure();
+      }
     });
-    const offFalseHit = engine.onFalseHit(applyFailure);
-    const offMiss = engine.onMiss(applyFailure);
     const offReset = engine.onReset(() =>
       setUi((prev) => ({ ...prev, streak: resetForSeek(prev.streak).state })),
     );
 
     return () => {
-      offHit();
-      offFalseHit();
-      offMiss();
+      offJudgement();
       offReset();
     };
   }, [engine]);

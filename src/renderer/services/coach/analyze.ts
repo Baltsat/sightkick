@@ -86,25 +86,36 @@ interface BarScore {
   measure: CoachMeasure;
   hits: number;
   misses: number;
+  wrong: number;
   accuracy: number;
 }
 
 function barScores(input: AnalyzeCoachInput): BarScore[] {
-  const counts = new Map<number, { hits: number; misses: number }>();
+  const counts = new Map<
+    number,
+    { hits: number; misses: number; wrong: number }
+  >();
 
   input.runs.forEach((run) => {
     run.records.forEach((record) => {
-      if (record.verdict === 'wrong') {
-        return;
-      }
-
       const measure = measureForTick(input.chart, record.tick);
 
       if (!measure) {
         return;
       }
 
-      const entry = counts.get(measure.index) ?? { hits: 0, misses: 0 };
+      const entry = counts.get(measure.index) ?? {
+        hits: 0,
+        misses: 0,
+        wrong: 0,
+      };
+
+      if (record.verdict === 'wrong') {
+        entry.wrong += 1;
+        counts.set(measure.index, entry);
+
+        return;
+      }
 
       entry[record.verdict === 'hit' ? 'hits' : 'misses'] += 1;
       counts.set(measure.index, entry);
@@ -169,7 +180,10 @@ function troubleBarFindings(scores: BarScore[]): CoachFinding[] {
             : `Bars ${start}–${end} need a loop`,
         summary: `${percent(accuracy)}% across ${
           hits + misses
-        } scored notes; ${misses} misses cluster here.`,
+        } resolved notes; ${misses} misses and ${cluster.reduce(
+          (sum, score) => sum + score.wrong,
+          0,
+        )} wrong hits cluster here.`,
         skillTag: measureSkill(
           cluster.find((score) => measureSkill(score.measure) !== 'timing')
             ?.measure ?? first,
@@ -179,6 +193,18 @@ function troubleBarFindings(scores: BarScore[]): CoachFinding[] {
           barEnd: end,
           accuracy,
           sampleCount: hits + misses,
+          hitCount: hits,
+          missCount: misses,
+          wrongHitCount: cluster.reduce((sum, score) => sum + score.wrong, 0),
+        },
+        reason: {
+          code: 'low-bar-accuracy' as const,
+          counts: {
+            samples: hits + misses,
+            hits,
+            misses,
+            wrongHits: cluster.reduce((sum, score) => sum + score.wrong, 0),
+          },
         },
       };
     })
@@ -246,6 +272,18 @@ function transitionFindings(scores: BarScore[]): CoachFinding[] {
             accuracy: score.accuracy,
             previousAccuracy: previous.accuracy,
             sampleCount: score.hits + score.misses,
+            hitCount: score.hits,
+            missCount: score.misses,
+            wrongHitCount: score.wrong,
+          },
+          reason: {
+            code: 'pattern-transition-accuracy-drop' as const,
+            counts: {
+              samples: score.hits + score.misses,
+              hits: score.hits,
+              misses: score.misses,
+              wrongHits: score.wrong,
+            },
           },
         },
       ];
@@ -267,7 +305,7 @@ interface LaneRegion {
   deltas: number[];
 }
 
-function limbFindings(input: AnalyzeCoachInput): CoachFinding[] {
+function laneWeaknessFindings(input: AnalyzeCoachInput): CoachFinding[] {
   const regions = new Map<string, LaneRegion>();
 
   input.runs.forEach((run) => {
@@ -308,7 +346,11 @@ function limbFindings(input: AnalyzeCoachInput): CoachFinding[] {
       }
 
       const direction =
-        bias < -8 ? 'rushes' : bias > 8 ? 'drags' : 'loses notes';
+        bias < -8
+          ? 'records early hits'
+          : bias > 8
+          ? 'records late hits'
+          : 'misses expected notes';
       const severity =
         accuracy < 0.65 || Math.abs(bias) >= 50
           ? ('high' as const)
@@ -316,13 +358,15 @@ function limbFindings(input: AnalyzeCoachInput): CoachFinding[] {
 
       return [
         {
-          id: `limb-${region.lane}-${region.bpm}`,
-          kind: 'limb-weakness' as const,
+          id: `lane-${region.lane}-${region.bpm}`,
+          kind: 'lane-weakness' as const,
           severity,
-          title: `${region.lane} ${direction} around ${region.bpm} BPM`,
-          summary: `${percent(accuracy)}% accuracy with ${Math.round(
+          title: `${region.lane} lane ${direction} around ${region.bpm} BPM`,
+          summary: `Recorded ${region.lane} lane: ${percent(
+            accuracy,
+          )}% accuracy and ${Math.round(
             bias,
-          )} ms average timing bias.`,
+          )} ms average timing bias across ${samples} resolved notes.`,
           skillTag:
             region.lane === 'kick'
               ? ('kick-independence' as const)
@@ -335,6 +379,16 @@ function limbFindings(input: AnalyzeCoachInput): CoachFinding[] {
             meanMs: bias,
             bpm: region.bpm,
             sampleCount: samples,
+            hitCount: region.hits,
+            missCount: region.misses,
+          },
+          reason: {
+            code: 'lane-accuracy-or-timing' as const,
+            counts: {
+              samples,
+              hits: region.hits,
+              misses: region.misses,
+            },
           },
         },
       ];
@@ -408,25 +462,56 @@ function speedFinding(runs: StoredPracticeRun[]): CoachFinding[] {
           (groups.get(best.slow.speed)?.length ?? 0) +
           (groups.get(best.fast.speed)?.length ?? 0),
       },
+      reason: {
+        code: 'speed-comparison',
+        counts: {
+          samples:
+            (groups.get(best.slow.speed)?.length ?? 0) +
+            (groups.get(best.fast.speed)?.length ?? 0),
+        },
+      },
     },
   ];
 }
 
-function closestMiss(
-  wrong: StoredHitRecord,
+interface WrongPadPair {
+  actual: KitElement;
+  expected: KitElement;
+}
+
+function unambiguousWrongPadPairs(
   records: StoredHitRecord[],
   tolerance: number,
-): StoredHitRecord | undefined {
-  return records
-    .filter(
-      (record) =>
-        record.verdict === 'miss' &&
+): WrongPadPair[] {
+  const misses = records
+    .map((record, index) => ({ record, index }))
+    .filter(({ record }) => record.verdict === 'miss');
+  const usedMisses = new Set<number>();
+
+  return records.flatMap((wrong) => {
+    if (wrong.verdict !== 'wrong') {
+      return [];
+    }
+
+    // Keep pairing one-to-one and reject an ambiguous chord/cluster. A wrong
+    // strike alone says nothing about which expected pad the player intended.
+    const candidates = misses.filter(
+      ({ record, index }) =>
+        !usedMisses.has(index) &&
         record.element !== wrong.element &&
         Math.abs(record.tick - wrong.tick) <= tolerance,
-    )
-    .sort(
-      (a, b) => Math.abs(a.tick - wrong.tick) - Math.abs(b.tick - wrong.tick),
-    )[0];
+    );
+
+    if (candidates.length !== 1) {
+      return [];
+    }
+
+    const [{ record: missed, index }] = candidates;
+
+    usedMisses.add(index);
+
+    return [{ actual: wrong.element, expected: missed.element }];
+  });
 }
 
 function confusionFindings(input: AnalyzeCoachInput): CoachFinding[] {
@@ -437,25 +522,17 @@ function confusionFindings(input: AnalyzeCoachInput): CoachFinding[] {
   const tolerance = Math.max(1, input.chart.resolution / 4);
 
   input.runs.forEach((run) => {
-    run.records
-      .filter((record) => record.verdict === 'wrong')
-      .forEach((wrong) => {
-        const missed = closestMiss(wrong, run.records, tolerance);
+    unambiguousWrongPadPairs(run.records, tolerance).forEach((match) => {
+      const key = `${match.actual}:${match.expected}`;
+      const pair = pairs.get(key) ?? {
+        actual: match.actual,
+        expected: match.expected,
+        count: 0,
+      };
 
-        if (!missed) {
-          return;
-        }
-
-        const key = `${wrong.element}:${missed.element}`;
-        const pair = pairs.get(key) ?? {
-          actual: wrong.element,
-          expected: missed.element,
-          count: 0,
-        };
-
-        pair.count += 1;
-        pairs.set(key, pair);
-      });
+      pair.count += 1;
+      pairs.set(key, pair);
+    });
   });
 
   return [...pairs.values()]
@@ -467,12 +544,24 @@ function confusionFindings(input: AnalyzeCoachInput): CoachFinding[] {
       kind: 'pad-confusion',
       severity: pair.count >= 5 ? 'high' : 'medium',
       title: `${pair.actual} is replacing ${pair.expected}`,
-      summary: `${pair.count} wrong-pad strikes line up with missed ${pair.expected} notes.`,
+      summary: `${pair.count} unambiguous wrong-pad strikes each pair with one missed ${pair.expected} note.`,
       skillTag: 'pad-accuracy',
       evidence: {
         actualElement: pair.actual,
         expectedElement: pair.expected,
         sampleCount: pair.count,
+        matchedWrongPadPairs: pair.count,
+        wrongHitCount: pair.count,
+        missCount: pair.count,
+      },
+      reason: {
+        code: 'repeated-unambiguous-wrong-pad-pairs',
+        counts: {
+          samples: pair.count,
+          wrongHits: pair.count,
+          misses: pair.count,
+          matchedWrongPadPairs: pair.count,
+        },
       },
     }));
 }
@@ -482,7 +571,7 @@ export function analyzePracticeRuns(input: AnalyzeCoachInput): CoachFindings {
   const findings = [
     ...troubleBarFindings(scores),
     ...transitionFindings(scores),
-    ...limbFindings(input),
+    ...laneWeaknessFindings(input),
     ...speedFinding(input.runs),
     ...confusionFindings(input),
   ]

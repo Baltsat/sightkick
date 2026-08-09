@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""SightKick Method lesson generator.
+"""Drumroll Method lesson generator.
 
 Deterministically turns resources/lessons/curriculum.yaml into playable
-SightKick song folders: notes.mid (PART DRUMS, expert difficulty),
+Drumroll lesson folders: notes.mid (PART DRUMS, expert difficulty),
 song.ogg (a synthesized click/metronome track), drums.ogg (a rendering of
 the exercise's own pattern using real drum one-shot samples, sample-
 accurately aligned with song.ogg), and song.ini.
@@ -152,8 +152,30 @@ LANE_SAMPLE = {
 # that drives notes.mid (0-127 MIDI velocity -> 0.0-1.0 amplitude scale)
 GAIN = {sym: vel / 127.0 for sym, vel in VELOCITY.items()}
 
+# Preserve the established on-disk folder and prefix so an upgrade never
+# duplicates or abandons an existing lesson library during the product rename.
 DEFAULT_OUT_DIR = Path.home() / "Music" / "SightKick"
 FOLDER_PREFIX = "SightKick Method - Lesson"
+
+# The lesson chart can assess a scored MIDI event's timing and mapped pad.
+# It cannot know which hand was used, stick height, rebound, grip, or form;
+# this exact boundary travels with every generated lesson rather than being
+# implied by an ambitious authored sticking cue.
+ASSESSMENT_BOUNDARY = (
+    "MIDI assesses timing and pad choice; sticking/form cue is not assessed."
+)
+
+LANE_TARGET_ELEMENT = {
+    "K": "kick",
+    "S": "snare",
+    "H": "hihat",
+    "O": "hihat",
+    "R": "ride",
+    "C": "crash",
+    "T1": "tom1",
+    "T2": "tom2",
+    "T3": "tom3",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -455,11 +477,19 @@ def wav_to_ogg(
             "-i",
             str(wav_path),
             "-ac",
-            "1",
+            "2",
             "-ar",
             str(sample_rate),
+            "-map_metadata",
+            "-1",
+            "-fflags",
+            "+bitexact",
             "-c:a",
-            "libvorbis",
+            "vorbis",
+            "-flags:a",
+            "+bitexact",
+            "-strict",
+            "experimental",
             "-b:a",
             bitrate,
             str(ogg_path),
@@ -579,14 +609,44 @@ def build_song_name(exercise: dict, title: str) -> str:
     return f"Lesson {lesson_num:02d}.{ex_num:02d} — {title}"
 
 
-def build_ini_text(exercise: dict, unit_name: str, song_length_ms: int) -> str:
+def _ini_value(value: object) -> str:
+    """Keep authored display copy in one safe song.ini value."""
+    return str(value).replace('"', "'").replace("\n", " ")
+
+
+def target_lanes_for(exercise: dict) -> str:
+    """Emit normalized authored chart demand as `kit-lane:weight` pairs."""
+    counts: dict[str, int] = {}
+    for bar in exercise["bars"]:
+        for lane, pattern in bar.items():
+            element = LANE_TARGET_ELEMENT.get(lane)
+            if not element:
+                continue
+            counts[element] = counts.get(element, 0) + sum(
+                1 for symbol in pattern if symbol != "."
+            )
+
+    total = sum(counts.values())
+    if total == 0:
+        return ""
+    return ",".join(
+        f"{element}:{count / total:.4f}" for element, count in sorted(counts.items())
+    )
+
+
+def build_ini_text(
+    exercise: dict,
+    unit_name: str,
+    song_length_ms: int,
+    prerequisite_ids: list[str],
+) -> str:
     name = build_song_name(exercise, exercise["title"])
     next_id = exercise.get("next") or ""
     lines = [
         "[song]",
-        f'name = "{name}"',
-        'artist = "SightKick Method"',
-        f'album = "{unit_name}"',
+        f'name = "{_ini_value(name)}"',
+        'artist = "Drumroll Method"',
+        f'album = "{_ini_value(unit_name)}"',
         "genre = Lesson",
         'charter = "Drumroll Method"',
         "auto_chart = False",
@@ -603,17 +663,28 @@ def build_ini_text(exercise: dict, unit_name: str, song_length_ms: int) -> str:
         f'sk_lesson_id = "{exercise["id"]}"',
         f"sk_stars_to_unlock = {exercise['stars_to_unlock']}",
         f'sk_next = "{next_id}"',
-        f'sk_unit = "{unit_name}"',
+        f'sk_unit = "{_ini_value(unit_name)}"',
         # The journey treats every generated exercise as a playable lesson
         # node, so its display title must be the exercise title rather than
         # the parent lesson heading (which would repeat across sibling nodes).
-        f'sk_lesson_title = "{exercise["title"]}"',
+        f'sk_lesson_title = "{_ini_value(exercise["title"])}"',
         # Comma-joined skill tags (see curriculum.yaml meta.skills_legend for
         # the controlled vocabulary) -- consumed by the AI-coach lane for
         # lesson-linking, not by the Lessons journey UI. Same additive/safe
         # contract as the other sk_ fields above: unknown ini fields are
         # ignored by the app's own parser.
         f'sk_skills = "{",".join(exercise.get("skills", []))}"',
+        # Learning-model contract. These are derived deterministically from
+        # authored curriculum data and are consumed by desktop and web, so a
+        # recommendation never has to guess at a lesson's ladder or cue.
+        f'sk_prerequisite_ids = "{",".join(prerequisite_ids)}"',
+        f'sk_target_lanes = "{target_lanes_for(exercise)}"',
+        f"sk_bpm_start = {exercise['bpm_slow']}",
+        f"sk_bpm_target = {exercise['bpm_target']}",
+        f'sk_dose_rule = "4 focused repeats from {exercise["bpm_slow"]} BPM toward {exercise["bpm_target"]} BPM."',
+        f'sk_mastery_rule = "3 clean passes at {exercise["bpm_target"]} BPM with at least 90% scored accuracy."',
+        f'sk_cue = "{_ini_value(exercise["cue"])}"',
+        f'sk_assessment_boundary = "{ASSESSMENT_BOUNDARY}"',
         "",
     ]
     return "\n".join(lines)
@@ -639,14 +710,19 @@ def folder_name_for(exercise: dict, unit_id: str) -> str:
 
 
 def generate_one(
-    unit: dict, lesson: dict, exercise: dict, out_dir: Path, dry_run: bool
+    unit: dict,
+    lesson: dict,
+    exercise: dict,
+    out_dir: Path,
+    dry_run: bool,
+    prerequisite_ids: list[str],
 ) -> Path:
     timeline = build_timeline(exercise)
     mid_bytes = build_notes_mid(exercise, timeline)
     song_length_ms = round(
         timeline.total_ticks / TICKS_PER_QUARTER * 60 / exercise["bpm_target"] * 1000
     )
-    ini_text = build_ini_text(exercise, unit["name"], song_length_ms)
+    ini_text = build_ini_text(exercise, unit["name"], song_length_ms, prerequisite_ids)
 
     folder = out_dir / folder_name_for(exercise, unit["id"])
     if dry_run:
@@ -691,12 +767,34 @@ def main() -> int:
 
     curriculum = load_curriculum(args.curriculum)
     only = set(args.only.split(",")) if args.only else None
+    all_exercises = list(iter_exercises(curriculum))
+    prerequisite_ids_by_exercise: dict[str, list[str]] = {}
+    previous_id: str | None = None
+    for _, _, exercise in all_exercises:
+        # `next` is the authored curriculum path. Preserve any authored
+        # explicit prerequisites while materializing the immediate authored
+        # predecessor for every generated lesson song.
+        explicit = exercise.get("prerequisite_ids")
+        if explicit is not None:
+            prerequisite_ids_by_exercise[exercise["id"]] = list(explicit)
+        else:
+            prerequisite_ids_by_exercise[exercise["id"]] = (
+                [previous_id] if previous_id is not None else []
+            )
+        previous_id = exercise["id"]
 
     n = 0
-    for unit, lesson, exercise in iter_exercises(curriculum):
+    for unit, lesson, exercise in all_exercises:
         if only is not None and exercise["id"] not in only:
             continue
-        folder = generate_one(unit, lesson, exercise, args.out_dir, args.dry_run)
+        folder = generate_one(
+            unit,
+            lesson,
+            exercise,
+            args.out_dir,
+            args.dry_run,
+            prerequisite_ids_by_exercise[exercise["id"]],
+        )
         n += 1
         print(f"[{n:3d}] {exercise['id']}  {folder.name}")
 
