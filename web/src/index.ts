@@ -35,7 +35,7 @@ function showLanding(): void {
       <section class="web-landing-copy">
         <p class="web-eyebrow">drum practice that reads the room</p>
         <h1>play the kit.<br />see the rhythm.</h1>
-        <p class="web-lede">Drumroll gives you 118 guided lessons, live notation, and scoring in Chrome. Connect a Web MIDI drum kit or start with your keyboard.</p>
+        <p class="web-lede">Drumroll gives you 170 guided exercises across 25 lessons, live notation, and scoring in Chrome. Connect a Web MIDI drum kit or start with your keyboard.</p>
         <div class="web-actions">
           <button type="button" data-testid="start-drumroll">start practicing</button>
           <a href="https://github.com/Baltsat/sightkick/releases/latest" target="_blank" rel="noreferrer">get the desktop app</a>
@@ -43,7 +43,7 @@ function showLanding(): void {
         <p class="web-fineprint">Your progress and imported charts stay in this browser. YouTube imports are limited to 3 per hour per IP.</p>
       </section>
       <section class="web-proof" aria-label="Drumroll web capabilities">
-        <div><strong>118</strong><span>original lessons</span></div>
+        <div><strong>170</strong><span>guided exercises</span></div>
         <div><strong>MIDI</strong><span>Chrome + HTTPS</span></div>
         <div><strong>local</strong><span>scores and imports</span></div>
       </section>

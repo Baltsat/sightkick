@@ -35,7 +35,7 @@ The shared hooks already probe auto-chart and stem-tool availability. Web replie
 
 ## lessons pipeline
 
-`web/scripts/package-lessons.mjs` creates an isolated temporary directory, runs the canonical lesson generator with Python 3.12 through `uv`, validates that exactly 118 folders were produced, and copies only those generated folders into `web/public/library`. It writes `manifest.json` with the parsed `song.ini` lesson chain, playable asset URLs, file lists, byte totals, and maximum-file size. The script fails if any file reaches Cloudflare Pages' 25 MiB per-file limit.
+`web/scripts/package-lessons.mjs` creates an isolated temporary directory, runs the canonical lesson generator with Python 3.12 through `uv`, validates that exactly 170 exercise folders were produced, and copies only those generated folders into `web/public/library`. It writes `manifest.json` with the parsed `song.ini` lesson chain, coaching-skill tags, playable asset URLs, file lists, byte totals, and maximum-file size. The script fails if any file reaches Cloudflare Pages' 25 MiB per-file limit.
 
 The generated library and `web/dist` are build artifacts and are ignored by git. A production build is:
 

@@ -9,6 +9,7 @@ const shotDir = path.join(repoRoot, 'scratchpad/web-shots');
 const baseUrl = process.argv[2] || 'http://127.0.0.1:8788';
 const systemChrome =
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const expectedLessonCount = 170;
 
 mkdirSync(shotDir, { recursive: true });
 
@@ -59,8 +60,13 @@ try {
   );
   const manifest = await manifestResponse.json();
 
-  if (manifest.lessonCount !== 118 || manifest.lessons.length !== 118) {
-    throw new Error(`Expected 118 lessons, got ${manifest.lessonCount}.`);
+  if (
+    manifest.lessonCount !== expectedLessonCount ||
+    manifest.lessons.length !== expectedLessonCount
+  ) {
+    throw new Error(
+      `Expected ${expectedLessonCount} lessons, got ${manifest.lessonCount}.`,
+    );
   }
 
   console.log('smoke: shared renderer');

@@ -372,6 +372,7 @@ describe('toSong', () => {
           sk_next: '04.03',
           sk_unit: 'Unit 4 — Sticking',
           sk_lesson_title: 'Right Hand Steady, Left Hand Answers',
+          sk_skills: ' hihat-timekeeping, kick-independence, timing ',
         }),
       );
 
@@ -381,6 +382,7 @@ describe('toSong', () => {
         next: '04.03',
         unit: 'Unit 4 — Sticking',
         title: 'Right Hand Steady, Left Hand Answers',
+        skills: ['hihat-timekeeping', 'kick-independence', 'timing'],
       });
     });
 

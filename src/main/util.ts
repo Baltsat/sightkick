@@ -36,6 +36,10 @@ export function parseLessonInfo(stored: SongData): SongLessonInfo | undefined {
   }
 
   const starsToUnlock = parseInt(stored.sk_stars_to_unlock ?? '', 10);
+  const skills = (stored.sk_skills ?? '')
+    .split(',')
+    .map((skill) => skill.trim())
+    .filter(Boolean);
 
   return {
     id: stored.sk_lesson_id,
@@ -43,6 +47,7 @@ export function parseLessonInfo(stored: SongData): SongLessonInfo | undefined {
     next: stored.sk_next || undefined,
     unit: stored.sk_unit ?? '',
     title: stored.sk_lesson_title ?? '',
+    ...(skills.length > 0 ? { skills } : {}),
   };
 }
 

@@ -19,6 +19,7 @@ const generatedRoot = mkdtempSync(path.join(tmpdir(), 'drumroll-lessons-'));
 const libraryRoot = path.join(repoRoot, 'web/public/library');
 const maxPagesFileBytes = 25 * 1024 * 1024;
 const ffmpegDir = path.join(repoRoot, 'node_modules/ffmpeg-static');
+const expectedLessonCount = 170;
 
 function parseIni(raw) {
   const values = {};
@@ -79,8 +80,10 @@ try {
     .map((entry) => entry.name)
     .sort();
 
-  if (folders.length !== 118) {
-    throw new Error(`Expected 118 generated lessons, got ${folders.length}.`);
+  if (folders.length !== expectedLessonCount) {
+    throw new Error(
+      `Expected ${expectedLessonCount} generated lessons, got ${folders.length}.`,
+    );
   }
 
   rmSync(libraryRoot, { recursive: true, force: true });
@@ -136,6 +139,10 @@ try {
           next: ini.sk_next || undefined,
           unit: ini.sk_unit || '',
           title: ini.sk_lesson_title || '',
+          skills: (ini.sk_skills || '')
+            .split(',')
+            .map((skill) => skill.trim())
+            .filter(Boolean),
         },
       },
       chart: `${base}/notes.mid`,

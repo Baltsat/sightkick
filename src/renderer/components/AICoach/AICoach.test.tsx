@@ -62,7 +62,7 @@ describe('AICoach', () => {
     fireEvent.click(screen.getByTestId('coach-train-skill'));
 
     expect(onPracticeBars).toHaveBeenCalledWith(4, 5, 0.7);
-    expect(onTrainSkill).toHaveBeenCalledWith('13.03');
+    expect(onTrainSkill).toHaveBeenCalledWith('18.03');
   });
 
   it('requests and renders optional Claude notes', async () => {

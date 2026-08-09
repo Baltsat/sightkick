@@ -211,12 +211,14 @@ exercises instead of every permutation:
   the chart actually plays — one consistent turnaround tag every pass —
   instead of overpromising navigation the loop format doesn't support.
 
-118 exercises is the result — comfortably inside the "expect 50–120"
-target while still touching every lesson, every meter (4/4, 3/4, 6/8,
-12/8, 2/2 cut time), every subdivision (8th, 16th, triplet, shuffle), and
-every technique (dynamics, ghost notes, cross-stick, tom fills, open
-hi-hat) the book introduces. A few notation gaps are worth calling out
-explicitly, all format/vocabulary limitations rather than content cuts:
+The original book-inspired wing contains 118 exercises — comfortably
+inside the initial "expect 50–120" target while still touching every
+lesson, every meter (4/4, 3/4, 6/8, 12/8, 2/2 cut time), every subdivision
+(8th, 16th, triplet, shuffle), and every technique (dynamics, ghost notes,
+cross-stick, tom fills, open hi-hat) the book introduces. The later
+Rudiment Gym addition brings the connected curriculum to 170 exercises;
+its validation is recorded below. A few notation gaps are worth calling
+out explicitly, all format/vocabulary limitations rather than content cuts:
 
 - **Flams** (a grace note landing almost simultaneously with its primary
   note) are not currently representable — the notation grid has no
@@ -418,7 +420,11 @@ pro-drums format has no distinct open-hat signal to target. The `o`
 symbol's audible distinction lives only in `drums.ogg` (a different
 sample), not in `notes.mid`.
 
-## Validation performed
+## Validation history
+
+The 117/118 figures below are retained as evidence from the original
+book-inspired curriculum milestones. The current 170-exercise end state is
+covered by the Rudiment Gym validation entry later in this section.
 
 - **Independent MIDI re-parse** (hand-written parser, not `generate.py`'s
   own writer) on 5 sample folders: confirms `PART DRUMS` track name,
@@ -551,10 +557,12 @@ These fields are also written into every generated `song.ini` as custom
 fields, so a Lessons UI (or the AI-coach lane) can read them without
 re-parsing `curriculum.yaml`: `sk_lesson_id`, `sk_stars_to_unlock`,
 `sk_next` (empty string for the last exercise), `sk_unit`, `sk_lesson_title`,
-and `sk_skills` (comma-joined tag list). Unknown `.ini` fields are ignored
-by the app's own parser, so this is additive and safe. These six field
-names are a contract with their respective consumers — don't rename them
-without updating all sides.
+and `sk_skills` (comma-joined tag list). `sk_lesson_title` is the unique
+exercise title shown on the journey node, not the parent lesson heading;
+otherwise sibling exercises would appear with duplicate names. Unknown
+`.ini` fields are ignored by the app's own parser, so this is additive and
+safe. These six field names are a contract with their respective consumers
+— don't rename them without updating all sides.
 
 ### Suggested progression UX
 

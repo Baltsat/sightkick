@@ -579,9 +579,7 @@ def build_song_name(exercise: dict, title: str) -> str:
     return f"Lesson {lesson_num:02d}.{ex_num:02d} — {title}"
 
 
-def build_ini_text(
-    exercise: dict, unit_name: str, lesson_name: str, song_length_ms: int
-) -> str:
+def build_ini_text(exercise: dict, unit_name: str, song_length_ms: int) -> str:
     name = build_song_name(exercise, exercise["title"])
     next_id = exercise.get("next") or ""
     lines = [
@@ -590,7 +588,7 @@ def build_ini_text(
         'artist = "SightKick Method"',
         f'album = "{unit_name}"',
         "genre = Lesson",
-        "charter = ",
+        'charter = "Drumroll Method"',
         "auto_chart = False",
         f"diff_drums = {exercise['diff_drums']}",
         "pro_drums = True",
@@ -606,7 +604,10 @@ def build_ini_text(
         f"sk_stars_to_unlock = {exercise['stars_to_unlock']}",
         f'sk_next = "{next_id}"',
         f'sk_unit = "{unit_name}"',
-        f'sk_lesson_title = "{lesson_name}"',
+        # The journey treats every generated exercise as a playable lesson
+        # node, so its display title must be the exercise title rather than
+        # the parent lesson heading (which would repeat across sibling nodes).
+        f'sk_lesson_title = "{exercise["title"]}"',
         # Comma-joined skill tags (see curriculum.yaml meta.skills_legend for
         # the controlled vocabulary) -- consumed by the AI-coach lane for
         # lesson-linking, not by the Lessons journey UI. Same additive/safe
@@ -645,7 +646,7 @@ def generate_one(
     song_length_ms = round(
         timeline.total_ticks / TICKS_PER_QUARTER * 60 / exercise["bpm_target"] * 1000
     )
-    ini_text = build_ini_text(exercise, unit["name"], lesson["name"], song_length_ms)
+    ini_text = build_ini_text(exercise, unit["name"], song_length_ms)
 
     folder = out_dir / folder_name_for(exercise, unit["id"])
     if dry_run:

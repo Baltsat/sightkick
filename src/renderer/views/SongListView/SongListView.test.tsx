@@ -950,11 +950,11 @@ describe('SongListView — lessons filter split', () => {
 
 describe('SongListView — Lessons surface', () => {
   it('opens a coach-recommended Method lesson directly in Practice mode', async () => {
-    const view = setupSongListView({ route: '/?coachLesson=13.03' });
+    const view = setupSongListView({ route: '/?coachLesson=18.03' });
 
     view.loadSongs([
       makeLessonSong('lesson-fill', {
-        id: '13.03',
+        id: '18.03',
         title: 'One-Bar 16th Fill A',
         starsToUnlock: 75,
       }),

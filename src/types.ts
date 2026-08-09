@@ -65,6 +65,7 @@ export interface SongData {
   sk_next?: string;
   sk_unit?: string;
   sk_lesson_title?: string;
+  sk_skills?: string;
 }
 
 export interface Song {
@@ -105,6 +106,8 @@ export interface SongLessonInfo {
   next?: string;
   unit: string;
   title: string;
+  /** Curriculum tags used to match coaching findings to focused practice. */
+  skills?: string[];
 }
 
 export interface ScoreData {
