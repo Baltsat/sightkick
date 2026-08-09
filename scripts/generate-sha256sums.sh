@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 output_dir="${1:-release/build}"
 
 if [[ ! -d "$output_dir" ]]; then
@@ -11,10 +12,42 @@ fi
 
 output_dir="$(cd "$output_dir" && pwd)"
 checksum_path="$output_dir/SHA256SUMS.txt"
+release_version="$(node -e \
+    'process.stdout.write(require(process.argv[1]).version)' \
+    "$repo_root/package.json")"
+artifact_prefix="Drumroll-$release_version-arm64"
+expected_artifact_names=(
+    "$artifact_prefix.dmg"
+    "$artifact_prefix.dmg.blockmap"
+    "$artifact_prefix.zip"
+    "$artifact_prefix.zip.blockmap"
+    'latest-mac.yml'
+    'ffmpeg-8.1.2.tar.xz'
+)
 artifacts=()
 
-while IFS= read -r artifact; do
+for artifact_name in "${expected_artifact_names[@]}"; do
+    artifact="$output_dir/$artifact_name"
+    if [[ ! -f "$artifact" ]]; then
+        echo "Missing required macOS distribution artifact: $artifact_name" >&2
+        exit 1
+    fi
     artifacts+=("$artifact")
+done
+
+while IFS= read -r artifact; do
+    artifact_name="${artifact##*/}"
+    is_expected=0
+    for expected_name in "${expected_artifact_names[@]}"; do
+        if [[ "$artifact_name" == "$expected_name" ]]; then
+            is_expected=1
+            break
+        fi
+    done
+    if [[ "$is_expected" -ne 1 ]]; then
+        echo "Unexpected macOS distribution artifact: $artifact_name" >&2
+        exit 1
+    fi
 done < <(
     find "$output_dir" -maxdepth 1 -type f \
         \( \
@@ -28,17 +61,16 @@ done < <(
         -print | LC_ALL=C sort
 )
 
-if [[ "${#artifacts[@]}" -eq 0 ]]; then
-    echo "No macOS distribution artifacts found in $output_dir" >&2
-    exit 1
-fi
-
 for artifact in "${artifacts[@]}"; do
     if [[ ! -s "$artifact" ]]; then
         echo "Empty distribution artifact: $artifact" >&2
         exit 1
     fi
 done
+
+node "$repo_root/scripts/finalize-macos-release-metadata.mjs" \
+    "$output_dir" \
+    --verify
 
 (
     cd "$output_dir"

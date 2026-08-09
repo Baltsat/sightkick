@@ -54,7 +54,6 @@ yarn electron-builder build \
     --publish never \
     --config.directories.output="$output_dir"
 yarn release:stage-ffmpeg-source "$output_dir"
-yarn release:verify:mac "$output_dir/mac-arm64/Drumroll.app"
 
 shopt -s nullglob
 disk_images=("$output_dir"/*.dmg)
@@ -69,6 +68,12 @@ if [[ "${disk_images[0]}" != "$expected_disk_image" ]]; then
     echo "Expected: $expected_disk_image" >&2
     exit 1
 fi
+
+yarn release:verify:mac "$output_dir/mac-arm64/Drumroll.app"
+"$repo_root/scripts/notarize-macos-dmg.sh" "$expected_disk_image"
+node "$repo_root/scripts/finalize-macos-release-metadata.mjs" \
+    "$output_dir" \
+    --write
 yarn release:verify:mac "$expected_disk_image"
 yarn release:checksums "$output_dir"
 

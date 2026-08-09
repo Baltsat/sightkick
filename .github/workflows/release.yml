@@ -76,6 +76,12 @@ jobs:
           if (pkg.build.mac.minimumSystemVersion !== '12.0') {
             throw new Error('The macOS deployment floor must remain 12.0');
           }
+          if (pkg.build.mac.identity !== 'Konstantin Baltsat (3BGK34ZGS6)') {
+            throw new Error('The release identity must remain pinned to the expected Developer ID certificate');
+          }
+          if (pkg.build.dmg.sign !== true) {
+            throw new Error('The final DMG must be signed before notarization');
+          }
           if (pkg.build.artifactName !== '${productName}-${version}-${arch}.${ext}') {
             throw new Error('Artifact naming must preserve the full prerelease version');
           }
@@ -106,17 +112,20 @@ jobs:
           [[ -n "$SIGNING_APPLE_ID" ]] || { echo "::error::APPLE_ID is required"; exit 1; }
           [[ -n "$SIGNING_APPLE_APP_SPECIFIC_PASSWORD" ]] || { echo "::error::APPLE_APP_SPECIFIC_PASSWORD is required"; exit 1; }
           [[ -n "$SIGNING_APPLE_TEAM_ID" ]] || { echo "::error::APPLE_TEAM_ID is required"; exit 1; }
+          [[ "$SIGNING_APPLE_TEAM_ID" == '3BGK34ZGS6' ]] || { echo "::error::APPLE_TEAM_ID does not match the expected release team"; exit 1; }
           echo "Release credentials are present; unsigned publication is disabled."
 
-      - name: Verify source and web function
+      - name: Verify source
         run: |
           yarn typecheck
           yarn lint
           yarn test
-          yarn web:functions:check
           uv lock --check --project resources/transcriber
 
-      - name: Build, sign, and notarize without publishing
+      - name: Verify release website build and browser smoke
+        run: yarn web:release:check
+
+      - name: Build, sign, notarize, and finalize without publishing
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
@@ -129,8 +138,10 @@ jobs:
           yarn verify:ffmpeg:transcriber
           yarn electron-builder build --mac --arm64 --publish never
           yarn release:stage-ffmpeg-source release/build
+          scripts/notarize-macos-dmg.sh release/build/Drumroll-1.2.0-kb.2-arm64.dmg
+          node scripts/finalize-macos-release-metadata.mjs release/build --write
 
-      - name: Verify unpacked application and read-only disk image
+      - name: Verify unpacked application and final disk image
         run: |
           yarn release:verify:mac release/build/mac-arm64/Drumroll.app
           shopt -s nullglob
@@ -148,11 +159,11 @@ jobs:
         with:
           name: drumroll-macos-arm64-${{ inputs.release_tag }}
           path: |
-            release/build/*.dmg
-            release/build/*.dmg.blockmap
-            release/build/*.zip
-            release/build/*.zip.blockmap
-            release/build/*-mac.yml
+            release/build/Drumroll-1.2.0-kb.2-arm64.dmg
+            release/build/Drumroll-1.2.0-kb.2-arm64.dmg.blockmap
+            release/build/Drumroll-1.2.0-kb.2-arm64.zip
+            release/build/Drumroll-1.2.0-kb.2-arm64.zip.blockmap
+            release/build/latest-mac.yml
             release/build/ffmpeg-8.1.2.tar.xz
             release/build/SHA256SUMS.txt
             distribution-integrity.json
@@ -164,20 +175,45 @@ jobs:
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          shopt -s nullglob
+          release_version="$(node -p 'require("./package.json").version')"
+          artifact_prefix="Drumroll-${release_version}-arm64"
           release_assets=(
-            release/build/*.dmg
-            release/build/*.dmg.blockmap
-            release/build/*.zip
-            release/build/*.zip.blockmap
-            release/build/*-mac.yml
-            release/build/ffmpeg-8.1.2.tar.xz
-            release/build/SHA256SUMS.txt
+            "release/build/${artifact_prefix}.dmg"
+            "release/build/${artifact_prefix}.dmg.blockmap"
+            "release/build/${artifact_prefix}.zip"
+            "release/build/${artifact_prefix}.zip.blockmap"
+            'release/build/latest-mac.yml'
+            'release/build/ffmpeg-8.1.2.tar.xz'
+            'release/build/SHA256SUMS.txt'
           )
-          shopt -u nullglob
-          [[ "${#release_assets[@]}" -ge 4 ]] || { echo "::error::Verified release assets are incomplete"; exit 1; }
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "${release_assets[@]}" --clobber
+
+          for release_asset in "${release_assets[@]}"; do
+            [[ -s "$release_asset" ]] || { echo "::error::Missing exact release asset: $release_asset"; exit 1; }
+          done
+
+          release_probe_error="$RUNNER_TEMP/drumroll-release-probe-error.txt"
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >/dev/null 2>"$release_probe_error"; then
+            echo "::error::Release $RELEASE_TAG already exists and is immutable"
+            exit 1
+          elif ! grep -q '(HTTP 404)' "$release_probe_error"; then
+            echo "::error::Could not safely prove that release $RELEASE_TAG is absent"
+            sed -n '1,80p' "$release_probe_error" >&2
+            exit 1
+          fi
+
+          tag_refs="$(git ls-remote --tags origin "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}")"
+          if [[ -n "$tag_refs" ]]; then
+            tag_commit="$(printf '%s\n' "$tag_refs" | awk '$2 ~ /\^\{\}$/ { print $1; exit }')"
+            if [[ -z "$tag_commit" ]]; then
+              tag_commit="$(printf '%s\n' "$tag_refs" | awk 'NR == 1 { print $1 }')"
+            fi
+            [[ "$tag_commit" == "$GITHUB_SHA" ]] || { echo "::error::Existing tag $RELEASE_TAG targets $tag_commit, not $GITHUB_SHA"; exit 1; }
+            gh release create "$RELEASE_TAG" \
+              "${release_assets[@]}" \
+              --verify-tag \
+              --title "Drumroll ${RELEASE_TAG#v}" \
+              --notes-file docs/release-notes-1.2.0-kb.2.md \
+              --prerelease
           else
             gh release create "$RELEASE_TAG" \
               "${release_assets[@]}" \

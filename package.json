@@ -28,7 +28,9 @@
     "verify:ffmpeg:mac": "node scripts/verify-ffmpeg-runtime.mjs",
     "verify:ffmpeg:transcriber": "SK_FFMPEG=./node_modules/.cache/drumroll-ffmpeg/macos-arm64/bin/ffmpeg SK_FFPROBE=./node_modules/.cache/drumroll-ffmpeg/macos-arm64/bin/ffprobe uv run --python 3.12 --with numpy==2.4.6 python scripts/verify-transcriber-ffmpeg-runtime.py",
     "web:functions:check": "scripts/check-web-functions.sh",
+    "web:release:check": "scripts/check-web-release.sh",
     "release:checksums": "scripts/generate-sha256sums.sh",
+    "release:metadata": "node scripts/finalize-macos-release-metadata.mjs",
     "release:stage-ffmpeg-source": "scripts/stage-ffmpeg-source.sh",
     "package:prepare": "yarn validate:yandex-library && yarn package:lesson-library && yarn build",
     "package:prepare:mac": "yarn prepare:ffmpeg:mac && yarn validate:yandex-library && yarn package:lesson-library && yarn distribution:integrity && yarn build",
@@ -175,6 +177,7 @@
       "bundleShortVersion": "1.2.0",
       "bundleVersion": "1.2.2",
       "minimumSystemVersion": "12.0",
+      "identity": "Konstantin Baltsat (3BGK34ZGS6)",
       "binaries": [
         "Contents/Resources/ffmpeg-runtime/bin/ffmpeg",
         "Contents/Resources/ffmpeg-runtime/bin/ffprobe"
@@ -204,6 +207,7 @@
       ]
     },
     "dmg": {
+      "sign": true,
       "contents": [
         {
           "x": 130,
@@ -238,13 +242,11 @@
         "from": "resources/transcriber",
         "to": "transcriber",
         "filter": [
-          "**/*",
-          "!.venv/**",
-          "!.uvtmp/**",
-          "!verify_out/**",
-          "!**/__pycache__/**",
-          "!**/*.pyc",
-          "!*.log"
+          "README.md",
+          "pyproject.toml",
+          "run.sh",
+          "uv.lock",
+          "sk_transcriber/*.py"
         ]
       },
       {

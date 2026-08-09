@@ -4,6 +4,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 target_path="${1:-$repo_root/release/build/mac-arm64/Drumroll.app}"
+dmg_path=""
 mount_dir=""
 mounted=0
 
@@ -23,9 +24,13 @@ if [[ "$target_path" == *.dmg ]]; then
         exit 1
     fi
 
-    target_path="$(cd "$(dirname "$target_path")" && pwd)/$(basename "$target_path")"
+    dmg_path="$(cd "$(dirname "$target_path")" && pwd)/$(basename "$target_path")"
+    if [[ "$(basename "$dmg_path")" != 'Drumroll-1.2.0-kb.2-arm64.dmg' ]]; then
+        echo "Unexpected disk image name: $dmg_path" >&2
+        exit 1
+    fi
     mount_dir="$(mktemp -d "${TMPDIR:-/tmp}/drumroll-dmg-verify.XXXXXX")"
-    hdiutil attach "$target_path" \
+    hdiutil attach "$dmg_path" \
         -readonly \
         -nobrowse \
         -mountpoint "$mount_dir" >/dev/null
@@ -33,7 +38,7 @@ if [[ "$target_path" == *.dmg ]]; then
 
     resolved_mount_dir="$(cd "$mount_dir" && pwd -P)"
     if ! mount | grep -F "on $resolved_mount_dir " | grep -q 'read-only'; then
-        echo "Disk image was not mounted read-only: $target_path" >&2
+        echo "Disk image was not mounted read-only: $dmg_path" >&2
         exit 1
     fi
 
@@ -41,7 +46,7 @@ if [[ "$target_path" == *.dmg ]]; then
     mounted_apps=("$mount_dir"/*.app)
     shopt -u nullglob
     if [[ "${#mounted_apps[@]}" -ne 1 ]]; then
-        echo "Expected exactly one application in $target_path; found ${#mounted_apps[@]}." >&2
+        echo "Expected exactly one application in $dmg_path; found ${#mounted_apps[@]}." >&2
         exit 1
     fi
     target_path="${mounted_apps[0]}"
@@ -307,6 +312,49 @@ for (const [fileName, sourcePath] of Object.entries(noticeSpecs)) {
   );
 }
 
+const transcriberRoot = path.join(resourcesPath, 'transcriber');
+const sourceTranscriberRoot = path.join(repoRoot, 'resources', 'transcriber');
+const expectedTranscriberPaths = [
+  'README.md',
+  'pyproject.toml',
+  'run.sh',
+  'sk_transcriber/__init__.py',
+  'sk_transcriber/__main__.py',
+  'sk_transcriber/audio_utils.py',
+  'sk_transcriber/beats.py',
+  'sk_transcriber/cli.py',
+  'sk_transcriber/difficulty.py',
+  'sk_transcriber/download.py',
+  'sk_transcriber/events.py',
+  'sk_transcriber/logging_setup.py',
+  'sk_transcriber/midi_writer.py',
+  'sk_transcriber/naming.py',
+  'sk_transcriber/separate.py',
+  'sk_transcriber/songini.py',
+  'sk_transcriber/tempo.py',
+  'sk_transcriber/transcribe.py',
+  'uv.lock',
+].sort((left, right) => left.localeCompare(right, 'en'));
+const packagedTranscriberPaths = walkFiles(transcriberRoot);
+assert(
+  JSON.stringify(packagedTranscriberPaths) ===
+    JSON.stringify(expectedTranscriberPaths),
+  `Packaged transcriber file set is not exact: ${packagedTranscriberPaths.join(', ')}`,
+);
+for (const relativePath of expectedTranscriberPaths) {
+  const packagedPath = path.join(transcriberRoot, relativePath);
+  const sourcePath = path.join(sourceTranscriberRoot, relativePath);
+  assert(fs.existsSync(sourcePath), `Missing source transcriber file: ${relativePath}`);
+  assert(
+    fs.readFileSync(packagedPath).equals(fs.readFileSync(sourcePath)),
+    `Packaged transcriber differs from source: ${relativePath}`,
+  );
+}
+assert(
+  (fs.statSync(path.join(transcriberRoot, 'run.sh')).mode & 0o111) !== 0,
+  'Packaged transcriber run.sh is not executable',
+);
+
 const thirdPartyNotice = fs.readFileSync(noticeSpecs['THIRD_PARTY_NOTICES.md'], 'utf8');
 [
   'https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz',
@@ -381,7 +429,7 @@ for (const entry of expectedFfmpegFiles) {
 
 console.log(
   `Verified ${lessonIds.size} lessons, ${expectedLessonFiles.length} lesson files, ` +
-    '13 Drums rows, 230 Favorites rows, notices, FFmpeg source inputs, hashes, and source equality.',
+    '13 Drums rows, 230 Favorites rows, the exact transcriber, notices, FFmpeg source inputs, hashes, and source equality.',
 );
 NODE
 
@@ -389,10 +437,17 @@ node "$repo_root/scripts/verify-ffmpeg-runtime.mjs" \
     "$resources_path/ffmpeg-runtime" \
     --packaged
 
+expected_authority='Developer ID Application: Konstantin Baltsat (3BGK34ZGS6)'
+expected_team_id='3BGK34ZGS6'
+
 codesign --verify --deep --strict --verbose=2 "$target_path"
 signature_details="$(codesign -dvvv --entitlements :- "$target_path" 2>&1)"
-if ! grep -q 'Authority=Developer ID Application' <<<"$signature_details"; then
-    echo "Drumroll is not signed with a Developer ID Application identity." >&2
+if ! grep -Fq "Authority=$expected_authority" <<<"$signature_details"; then
+    echo "Drumroll is not signed with the expected Developer ID Application identity." >&2
+    exit 1
+fi
+if ! grep -Fq "TeamIdentifier=$expected_team_id" <<<"$signature_details"; then
+    echo "Drumroll is not signed by the expected Apple Developer team." >&2
     exit 1
 fi
 if ! grep -Eq 'flags=.*runtime' <<<"$signature_details"; then
@@ -402,4 +457,27 @@ fi
 xcrun stapler validate "$target_path"
 spctl --assess --type execute --verbose=2 "$target_path"
 
-echo "Verified Drumroll $short_version ($build_version): exact bundle, curriculum, library sources, licenses, Developer ID signature, hardened runtime, stapled ticket, and Gatekeeper acceptance."
+if [[ -n "$dmg_path" ]]; then
+    codesign --verify --strict --verbose=2 "$dmg_path"
+    dmg_signature_details="$(codesign -dvvv "$dmg_path" 2>&1)"
+    if ! grep -Fq "Authority=$expected_authority" <<<"$dmg_signature_details"; then
+        echo "The DMG is not signed with the expected Developer ID Application identity." >&2
+        exit 1
+    fi
+    if ! grep -Fq "TeamIdentifier=$expected_team_id" <<<"$dmg_signature_details"; then
+        echo "The DMG is not signed by the expected Apple Developer team." >&2
+        exit 1
+    fi
+    xcrun stapler validate "$dmg_path"
+    spctl --assess \
+        --type open \
+        --context context:primary-signature \
+        --verbose=4 \
+        "$dmg_path"
+fi
+
+verified_artifacts='stapled app ticket'
+if [[ -n "$dmg_path" ]]; then
+    verified_artifacts='stapled app and disk image tickets'
+fi
+echo "Verified Drumroll $short_version ($build_version): exact bundle, curriculum, library sources, transcriber, licenses, expected Developer ID team, hardened runtime, $verified_artifacts, and Gatekeeper acceptance."
