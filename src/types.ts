@@ -231,17 +231,32 @@ export interface IpcErrorResponse {
   error: string;
 }
 
+export type CoachProvider = 'codex' | 'huggingface' | 'anthropic';
+
+export const DEFAULT_COACH_PROVIDER: CoachProvider = 'codex';
+
+export const DEFAULT_HUGGING_FACE_MODEL = 'meta-llama/Llama-3.3-70B-Instruct';
+
 export interface IpcCoachSettings {
+  provider: CoachProvider;
   apiKeyConfigured: boolean;
+  huggingFaceTokenConfigured: boolean;
+  huggingFaceModel: string;
 }
 
 export interface IpcSaveCoachSettingsRequest {
-  apiKey: string;
+  provider?: CoachProvider;
+  apiKey?: string;
+  huggingFaceToken?: string;
+  huggingFaceModel?: string;
 }
 
 export interface IpcCoachSettingsSaved {
   ok: boolean;
+  provider: CoachProvider;
   apiKeyConfigured: boolean;
+  huggingFaceTokenConfigured: boolean;
+  huggingFaceModel: string;
 }
 
 export interface IpcCoachingNotesResponse {

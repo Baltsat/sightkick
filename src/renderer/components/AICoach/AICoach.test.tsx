@@ -101,19 +101,111 @@ describe('AICoach', () => {
 });
 
 describe('CoachSettings', () => {
-  it('uses a masked API-key input and exposes only configured state', () => {
+  it('defaults to Codex with no credential fields shown', () => {
     render(
       <AntdApp>
         <CoachSettings />
       </AntdApp>,
     );
 
+    act(() => {
+      ipc.emit('coach-settings', {
+        provider: 'codex',
+        apiKeyConfigured: false,
+        huggingFaceTokenConfigured: false,
+        huggingFaceModel: 'meta-llama/Llama-3.3-70B-Instruct',
+      });
+    });
+
+    expect(screen.getByTestId('coach-codex-hint')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Anthropic API key')).toBeNull();
+    expect(screen.queryByLabelText('Hugging Face token')).toBeNull();
+  });
+
+  it('switching to Anthropic uses a masked API-key input and exposes only configured state', () => {
+    render(
+      <AntdApp>
+        <CoachSettings />
+      </AntdApp>,
+    );
+
+    act(() => {
+      ipc.emit('coach-settings', {
+        provider: 'codex',
+        apiKeyConfigured: false,
+        huggingFaceTokenConfigured: false,
+        huggingFaceModel: 'meta-llama/Llama-3.3-70B-Instruct',
+      });
+    });
+
+    fireEvent.click(screen.getByText('Anthropic'));
+
+    expect(ipc.sent).toContainEqual({
+      channel: 'save-coach-settings',
+      args: [{ provider: 'anthropic' }],
+    });
+
     const input = screen.getByLabelText('Anthropic API key');
 
     expect(input).toHaveAttribute('type', 'password');
     act(() => {
-      ipc.emit('coach-settings', { apiKeyConfigured: true });
+      ipc.emit('coach-settings-saved', {
+        ok: true,
+        provider: 'anthropic',
+        apiKeyConfigured: true,
+        huggingFaceTokenConfigured: false,
+        huggingFaceModel: 'meta-llama/Llama-3.3-70B-Instruct',
+      });
     });
     expect(input).toHaveAttribute('placeholder', 'API key saved');
+  });
+
+  it('switching to Hugging Face shows a masked token field and a visible model field', () => {
+    render(
+      <AntdApp>
+        <CoachSettings />
+      </AntdApp>,
+    );
+
+    act(() => {
+      ipc.emit('coach-settings', {
+        provider: 'codex',
+        apiKeyConfigured: false,
+        huggingFaceTokenConfigured: false,
+        huggingFaceModel: 'meta-llama/Llama-3.3-70B-Instruct',
+      });
+    });
+
+    fireEvent.click(screen.getByText('Hugging Face'));
+
+    const token = screen.getByLabelText('Hugging Face token');
+    const model = screen.getByLabelText('Hugging Face model');
+
+    expect(token).toHaveAttribute('type', 'password');
+    expect(model).toHaveValue('meta-llama/Llama-3.3-70B-Instruct');
+
+    fireEvent.change(token, { target: { value: 'hf_secret' } });
+    fireEvent.click(screen.getByText('Save token'));
+
+    expect(ipc.sent).toContainEqual({
+      channel: 'save-coach-settings',
+      args: [{ huggingFaceToken: 'hf_secret' }],
+    });
+    expect(JSON.stringify(ipc.sent)).toContain('hf_secret');
+
+    act(() => {
+      ipc.emit('coach-settings-saved', {
+        ok: true,
+        provider: 'huggingface',
+        apiKeyConfigured: false,
+        huggingFaceTokenConfigured: true,
+        huggingFaceModel: 'meta-llama/Llama-3.3-70B-Instruct',
+      });
+    });
+
+    expect(screen.getByLabelText('Hugging Face token')).toHaveAttribute(
+      'placeholder',
+      'Token saved',
+    );
   });
 });
