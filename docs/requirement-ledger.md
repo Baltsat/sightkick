@@ -1,6 +1,6 @@
 # Drumroll requirement and proof ledger
 
-Last reconciled: 2026-08-10, atomic legacy-profile migration proof
+Last reconciled: 2026-08-10, notarized installed-app acceptance proof
 
 This is the release contract for the Drumroll redesign. It maps the active
 session into sequential epochs and requires evidence, not implementation
@@ -30,14 +30,14 @@ learner studies support that claim.
 
 ## Release-wide rules
 
-| ID   | Requirement                                                                     | State   | Evidence / remaining gate                                                                                                      |
-| ---- | ------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| R.01 | English product UI, technical copy, docs, release notes, and work updates.      | passed  | User-facing copy scan is English; original Yandex track/artist names remain source data.                                       |
-| R.02 | Work autonomously and resolve normal implementation choices from this contract. | passed  | Nine gated epochs and bounded implementation lanes are recorded; no routine product choice is waiting on the user.             |
-| R.03 | Preserve `~/box`, unrelated worktrees, and real user data.                      | passed  | Product work stayed inside this repo; QA uses isolated or copied profiles and never rewrites the live profile.                 |
-| R.04 | One canonical tree with bounded agent lanes and independent verification.       | passed  | Learning, release, and visual lanes finished; root reran the integrated gates.                                                 |
-| R.05 | Close only after every intent is passed or has a narrow outside blocker.        | partial | Fresh final transcript/artifact audit remains Epoch 9.                                                                         |
-| R.06 | Use real data and honest availability/proof language.                           | passed  | Legacy summaries, insufficient evidence, unavailable media, metadata-only sources, and offline fallbacks have explicit states. |
+| ID   | Requirement                                                                     | State   | Evidence / remaining gate                                                                                                                                                             |
+| ---- | ------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R.01 | English product UI, technical copy, docs, release notes, and work updates.      | passed  | User-facing copy scan is English; original Yandex track/artist names remain source data.                                                                                              |
+| R.02 | Work autonomously and resolve normal implementation choices from this contract. | passed  | Nine gated epochs and bounded implementation lanes are recorded; no routine product choice is waiting on the user.                                                                    |
+| R.03 | Preserve `~/box`, unrelated worktrees, and real user data.                      | passed  | Product work stayed inside this repo. A recoverable pre-kb.2 backup precedes the one-time atomic live-profile upgrade; scored history, practice days, and library path are unchanged. |
+| R.04 | One canonical tree with bounded agent lanes and independent verification.       | passed  | Learning, release, and visual lanes finished; root reran the integrated gates.                                                                                                        |
+| R.05 | Close only after every intent is passed or has a narrow outside blocker.        | partial | Fresh final transcript/artifact audit remains Epoch 9.                                                                                                                                |
+| R.06 | Use real data and honest availability/proof language.                           | passed  | Legacy summaries, insufficient evidence, unavailable media, metadata-only sources, and offline fallbacks have explicit states.                                                        |
 
 ## Epoch 1 — Product truth and evidence recovery
 
@@ -50,15 +50,15 @@ learner studies support that claim.
 
 ## Epoch 2 — Kit readiness and hands-free control
 
-| ID    | Requirement                                                                   | State   | Evidence / remaining gate                                                                                     |
-| ----- | ----------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
-| E2.01 | Treat Yamaha DTX402 as the primary kit while preserving generic MIDI support. | partial | Mapping, velocity, reconnect, and generic-source tests pass; the physical DTX402 is currently disconnected.   |
-| E2.02 | Reconnect the remembered or sole safe device and recover after disconnect.    | partial | Deterministic input tests pass; five real cable cycles remain physical proof.                                 |
-| E2.03 | Make setup, permissions, mapping, latency, and kit-ready state clear.         | partial | UI/source proof passes; clean physical first-run remains external.                                            |
-| E2.04 | Start with one Home Play action and a state-gated ready gesture.              | passed  | Fixed four-hit recognition, quiet-window cancellation, Home prompt, and pointer/keyboard fallback tests pass. |
-| E2.05 | Support safe kit gestures for start, pause/resume, retry/continue, and end.   | passed  | State-gated recognizer and integration tests pass; command strikes are excluded from scoring.                 |
-| E2.06 | Keep judge, tutor, persistence, and deterministic Coach usable offline.       | passed  | Local adapters and offline fallbacks are covered by renderer/main/web tests.                                  |
-| E2.07 | Preserve reduced motion, contrast, focus, keyboard, and pointer fallbacks.    | partial | Source and headless proof pass; signed packaged-app walkthrough remains Epoch 8.                              |
+| ID    | Requirement                                                                   | State   | Evidence / remaining gate                                                                                                                                                 |
+| ----- | ----------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E2.01 | Treat Yamaha DTX402 as the primary kit while preserving generic MIDI support. | partial | Mapping, velocity, reconnect, and generic-source tests pass; the physical DTX402 is currently disconnected.                                                               |
+| E2.02 | Reconnect the remembered or sole safe device and recover after disconnect.    | partial | Deterministic input tests pass; five real cable cycles remain physical proof.                                                                                             |
+| E2.03 | Make setup, permissions, mapping, latency, and kit-ready state clear.         | partial | UI/source proof passes; clean physical first-run remains external.                                                                                                        |
+| E2.04 | Start with one Home Play action and a state-gated ready gesture.              | passed  | Fixed four-hit recognition, quiet-window cancellation, Home prompt, and pointer/keyboard fallback tests pass.                                                             |
+| E2.05 | Support safe kit gestures for start, pause/resume, retry/continue, and end.   | passed  | State-gated recognizer and integration tests pass; command strikes are excluded from scoring.                                                                             |
+| E2.06 | Keep judge, tutor, persistence, and deterministic Coach usable offline.       | passed  | Local adapters and offline fallbacks are covered by renderer/main/web tests.                                                                                              |
+| E2.07 | Preserve reduced motion, contrast, focus, keyboard, and pointer fallbacks.    | passed  | Source/headless gates pass, and the signed installed app exposes labelled controls, keyboard/pointer fallbacks, and non-color state copy throughout the acceptance route. |
 
 ## Epoch 3 — Autonomous Practice and Perform
 
@@ -99,22 +99,22 @@ learner studies support that claim.
 | E5.04 | Represent every supplied Drums playlist row.                                                                           | passed  | Timestamped metadata-only manifest contains 13 rows and 11 stable source URLs, including the two unavailable-link rows.                                                        |
 | E5.05 | Represent all authenticated Yandex Favorites read-only.                                                                | passed  | Timestamped manifest contains 230 rows and 211 stable source URLs.                                                                                                             |
 | E5.06 | Keep metadata-only, candidate, reviewed-chart, authorized-audio, and playable states distinct.                         | passed  | Candidate loader/UI never launches a metadata-only source; validators enforce availability and provenance.                                                                     |
-| E5.07 | Bundle/bootstrap all lessons on a clean desktop install.                                                               | partial | Packaging integrity is green; signed clean-profile installation is Epoch 8.                                                                                                    |
+| E5.07 | Bundle/bootstrap all lessons on a clean desktop install.                                                               | passed  | The signed installed app exposes 170 Journey exercises across 10 seasons; the package contains 170 folders and 681 lesson files.                                               |
 | E5.08 | Validate pedagogy and technique limits independently.                                                                  | partial | Curriculum semantics and bounded claims pass automated review; human drum-teacher/learner retention and transfer study remains outside proof.                                  |
 | E5.09 | Upgrade the former 118-lesson profile without losing or misassigning evidence.                                         | passed  | Fresh copied-profile boots produce 170 unique active lessons, 112 personal songs, and seven readable retired exercises; the second boot preserves an identical config SHA-256. |
 
 ## Epoch 6 — Premium app world and gameplay craft
 
-| ID    | Requirement                                                                                               | State   | Evidence / remaining gate                                                                                             |
-| ----- | --------------------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- |
-| E6.01 | Use the bright Daybreak direction with premium glow rather than the dim brown World Tour cast.            | passed  | Side-by-side Home/Journey/Flow/Coach comparisons and one-time Impeccable review pass the selected direction.          |
-| E6.02 | Make Home a dramatic interactive kit cockpit with one dominant Play and granular Songs/Profile access.    | passed  | Current source and rendered proof show the kit, recommendation, named navigation, recent evidence, and hit state.     |
-| E6.03 | Provide left-to-right Flow with a fixed playhead and synchronized Classic alternative.                    | passed  | Flow is enlarged 1.5x for one-to-two-metre viewing; mode, seek, speed, loop, and camera tests pass.                   |
-| E6.04 | Teach T1/T2/T3 with color plus non-color identity.                                                        | passed  | Stable lane position/label and yellow/blue/green styling are implemented; curriculum contains tom-heavy proof charts. |
-| E6.05 | Communicate anticipation, verdict, streak, danger, recovery, and completion without decorative ambiguity. | partial | Source/headless states pass; packaged motion/interaction capture remains Epoch 8.                                     |
-| E6.06 | Keep the drumstick pointer bounded and preserve focus/accessibility.                                      | passed  | Pointer is limited to suitable surfaces; visible keyboard focus remains.                                              |
-| E6.07 | Remove dead, stale, clipped, and developer-only surfaces.                                                 | partial | Core empty/sparse/rich states pass; final packaged viewport matrix remains Epoch 8.                                   |
-| E6.08 | Make results explain the weakest evidence and launch remediation quickly.                                 | passed  | Result/Coach actions use persisted supported findings and one-action retry/continue/lesson paths.                     |
+| ID    | Requirement                                                                                               | State  | Evidence / remaining gate                                                                                                                                             |
+| ----- | --------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E6.01 | Use the bright Daybreak direction with premium glow rather than the dim brown World Tour cast.            | passed | Side-by-side Home/Journey/Flow/Coach comparisons and one-time Impeccable review pass the selected direction.                                                          |
+| E6.02 | Make Home a dramatic interactive kit cockpit with one dominant Play and granular Songs/Profile access.    | passed | Current source and rendered proof show the kit, recommendation, named navigation, recent evidence, and hit state.                                                     |
+| E6.03 | Provide left-to-right Flow with a fixed playhead and synchronized Classic alternative.                    | passed | Flow is enlarged 1.5x for one-to-two-metre viewing; mode, seek, speed, loop, and camera tests pass.                                                                   |
+| E6.04 | Teach T1/T2/T3 with color plus non-color identity.                                                        | passed | Stable lane position/label and yellow/blue/green styling are implemented; curriculum contains tom-heavy proof charts.                                                 |
+| E6.05 | Communicate anticipation, verdict, streak, danger, recovery, and completion without decorative ambiguity. | passed | Signed-app Flow capture shows the fixed playhead, hit/miss verdicts, three lives, adaptive speed change, checkpoint return, and explicit kit-command copy.            |
+| E6.06 | Keep the drumstick pointer bounded and preserve focus/accessibility.                                      | passed | Pointer is limited to suitable surfaces; visible keyboard focus remains.                                                                                              |
+| E6.07 | Remove dead, stale, clipped, and developer-only surfaces.                                                 | passed | Final installed-app matrix covers Home, Local/Drums/Favorites Songs, Journey, Flow, Classic, settings, Coach, and Profile without clipped core controls or dead CTAs. |
+| E6.08 | Make results explain the weakest evidence and launch remediation quickly.                                 | passed | Result/Coach actions use persisted supported findings and one-action retry/continue/lesson paths.                                                                     |
 
 ## Epoch 7 — Original product site and shared web app
 
@@ -128,15 +128,15 @@ learner studies support that claim.
 
 ## Epoch 8 — Signed package, install, and public release
 
-| ID    | Requirement                                                                  | State            | Evidence / remaining gate                                                                                                                                   |
-| ----- | ---------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| E8.01 | Rebuild the full integrated tree and distribution inputs.                    | passed           | Typecheck, lint, 1,557 tests across 132 files, desktop/web builds, curriculum, Yandex, Cloudflare Functions, FFmpeg, transcriber, and integrity gates pass. |
-| E8.02 | Build a fresh Apple Silicon package without overwriting the previous output. | missing          | Credentialed `release:build:mac:api-key` run is next.                                                                                                       |
-| E8.03 | Sign with Developer ID and hardened runtime.                                 | missing          | Final `codesign --deep --strict` and authority/runtime readback required.                                                                                   |
-| E8.04 | Notarize, staple, and pass Gatekeeper.                                       | missing          | Apple Accepted result, stapler validation, and `spctl` acceptance required.                                                                                 |
-| E8.05 | Smoke-test clean and copied-real profiles without mutating live data.        | missing          | Packaged Home/Songs/Journey/Practice/Coach/Profile flow and 170/13/230 counts required.                                                                     |
-| E8.06 | Publish DMG/source/checksum, verify a clean download, then deploy the site.  | missing          | Exact public HTTP, SHA-256, release, production manifest, and deployment readback required.                                                                 |
-| E8.07 | Prove the complete zero-touch loop on the physical Yamaha DTX402.            | external-blocker | The kit is disconnected; real ready → play → recovery → pause/resume → result → continue/end remains physical proof.                                        |
+| ID    | Requirement                                                                  | State            | Evidence / remaining gate                                                                                                                                                                              |
+| ----- | ---------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| E8.01 | Rebuild the full integrated tree and distribution inputs.                    | passed           | Typecheck, lint, 1,557 tests across 132 files, desktop/web builds, curriculum, Yandex, Cloudflare Functions, FFmpeg, transcriber, and integrity gates pass.                                            |
+| E8.02 | Build a fresh Apple Silicon package without overwriting the previous output. | passed           | Fresh immutable output is `release/kb2-final-5b77e86`; earlier outputs remain untouched.                                                                                                               |
+| E8.03 | Sign with Developer ID and hardened runtime.                                 | passed           | Independent readback confirms `Developer ID Application: Konstantin Baltsat (3BGK34ZGS6)`, Team ID `3BGK34ZGS6`, strict nested-code validity, and runtime version.                                     |
+| E8.04 | Notarize, staple, and pass Gatekeeper.                                       | passed           | Apple accepted app and DMG notarization; both tickets validate, both Gatekeeper assessments accept, and the separately signed/stapled DMG submission is `d0a5019e-aaac-441b-8e89-f5e4a466b123`.        |
+| E8.05 | Smoke-test clean and copied-real profiles without mutating live data.        | passed           | The final DMG-installed `/Applications/Drumroll.app` passed Home/Songs/Journey/Flow/Classic/settings/Coach/Profile QA with 170/13/230 counts; the live scored run and daily evidence stayed unchanged. |
+| E8.06 | Publish DMG/source/checksum, verify a clean download, then deploy the site.  | missing          | Exact public HTTP, SHA-256, release, production manifest, and deployment readback required.                                                                                                            |
+| E8.07 | Prove the complete zero-touch loop on the physical Yamaha DTX402.            | external-blocker | The kit is disconnected; real ready → play → recovery → pause/resume → result → continue/end remains physical proof.                                                                                   |
 
 ## Epoch 9 — Independent closure
 
@@ -148,10 +148,12 @@ learner studies support that claim.
 
 ## Current release verdict
 
-The integrated source is locally green, and the real copied-profile migration
-is deterministic across two boots without touching the live profile. The core
-tutor, learning, curriculum, library, and visual-system requirements are
-implemented. Release closure is still **pending** the credentialed package,
-packaged-app QA, public readback, and fresh independent artifact audit.
-Physical DTX402 and human learning-efficacy validation remain explicit outside
-proof rather than being guessed.
+The integrated source is locally green, the profile migration is deterministic
+across two copied-profile boots, and the recoverably backed-up live profile has
+now passed the one-time upgrade without changing its scored practice evidence.
+The final Apple Silicon app and DMG are Developer ID signed, Apple-notarized,
+stapled, Gatekeeper-accepted, checksum-verified, installed, and exercised across
+the complete core route. Release closure is still **pending** exact GitHub
+download readback, production Cloudflare deployment/readback, and fresh
+independent artifact audits. Physical DTX402 and human learning-efficacy
+validation remain explicit outside proof rather than being guessed.

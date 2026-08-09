@@ -56,7 +56,13 @@ validated camera-based review path.
 
 ## Distribution proof
 
-The public release is only considered valid when its Developer ID signature,
-Apple notarization ticket, Gatekeeper assessment, packaged 170-lesson manifest,
-Yandex metadata manifests, and published SHA-256 all pass the release verifier.
-The final checksum is published beside the downloadable artifact.
+The final Apple Silicon app and DMG are signed with Developer ID Application
+`Konstantin Baltsat (3BGK34ZGS6)`, use the hardened runtime, are accepted by
+Apple notarization, carry valid stapled tickets, and pass Gatekeeper. The DMG
+was separately notarized under submission
+`d0a5019e-aaac-441b-8e89-f5e4a466b123`; metadata and blockmaps were regenerated
+from its final stapled bytes. The package contains all 170 lessons and both
+Yandex metadata manifests. `SHA256SUMS.txt` covers exactly the six intended
+distribution inputs and passes independent verification. Public release proof
+additionally requires downloading those immutable assets from GitHub and
+repeating the checksum and trust gates on the downloaded bytes.

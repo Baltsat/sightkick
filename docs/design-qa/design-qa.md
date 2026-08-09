@@ -8,8 +8,8 @@ This QA run compares the supplied product references with the current
 implementation at the same desktop state and viewport. A screenshot alone is
 not counted as proof: every accepted desktop surface has a side-by-side
 comparison image, and the marketing site also has desktop and mobile captures.
-The final packaged application must repeat the core interaction smoke test
-before this document can pass.
+The final packaged application repeats the core interaction smoke test against
+the real upgraded profile. It does not complete or save a synthetic run.
 
 The source reference set is preserved under
 `docs/design-qa/2026-08-09-epoch5/ref-*.{jpg,png}`. The UNKNW capture used only
@@ -21,8 +21,8 @@ does not copy its imagery, text, layout, or brand system.
 
 ### Home — interactive kit cockpit
 
-Reference and implementation:
-`docs/design-qa/2026-08-09-epoch5/compare-home-polished.png`
+Reference and final installed implementation:
+`docs/design-qa/2026-08-09-epoch5/47-reference-vs-final-installed-home.png`
 
 - **Passed:** one dominant Play target remains physically attached to the
   bass drum.
@@ -51,8 +51,8 @@ Reference and implementation:
 
 ### Practice — left-to-right Flow notation
 
-Reference and implementation:
-`docs/design-qa/2026-08-09-epoch5/compare-flow-polished.png`
+Reference and final installed implementation:
+`docs/design-qa/2026-08-09-epoch5/48-reference-vs-final-practice-flow.png`
 
 - **Passed:** notation advances horizontally through a stable playhead.
 - **Passed:** miss markers, the active note, tempo, Flow/Classic switch, loop,
@@ -90,9 +90,29 @@ Reference and implementation:
 All filenames in the table are relative to
 `docs/design-qa/2026-08-09-epoch5/`.
 
-The earlier Songs capture is retained for history but is not accepted as final
-proof because it predates the complete 13-row Drums and 230-row Favorites
-integration. The final packaged-app run must replace it.
+## Final notarized installed-app matrix
+
+The following captures come from `/Applications/Drumroll.app` installed from
+the final separately signed and notarized DMG. They use the real upgraded
+profile and preserve its existing scored run; playback QA exits before a
+synthetic result can be saved.
+
+| Surface                 | Evidence                                          | Acceptance result                                                                                                                   |
+| ----------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Home                    | `37-final-installed-home-real-profile.png`        | Californication recommendation restored at Medium; 28-day time-decayed lane evidence is labelled with counts and confidence limits. |
+| Local Songs             | `38-final-installed-songs-local.png`              | 112 personal songs, real metadata, availability and progress states.                                                                |
+| Yandex Drums            | `39-final-installed-yandex-drums.png`             | All 13 playlist rows represented as honest metadata candidates.                                                                     |
+| Yandex Favorites        | `40-final-installed-yandex-favorites.png`         | All 230 authenticated Favorites represented as honest metadata candidates.                                                          |
+| Journey                 | `41-final-installed-journey-170.png`              | 170 exercises across 10 seasons with prerequisite locks and mastery copy.                                                           |
+| Practice Flow ready     | `42-final-installed-practice-flow-ready.png`      | Horizontal Flow, fixed playhead, visible lanes, speed, loop, lives, and ready cue.                                                  |
+| Practice Classic ready  | `43-final-installed-practice-classic-ready.png`   | Synchronized Classic alternative retains the same tutor/game state.                                                                 |
+| Adaptive tutor settings | `44-final-installed-adaptive-tutor-settings.png`  | Tutor listening, smart rewind, lives, auto-continue, and kit controls are explicit independent toggles.                             |
+| Coach                   | `45-final-installed-coach-real-profile.png`       | Advice cites Tom 2 evidence from 31 samples across one real run.                                                                    |
+| Profile                 | `46-final-installed-profile-archived-history.png` | Per-drum evidence and seven retired curriculum records remain readable.                                                             |
+| Flow live               | `49-final-installed-practice-flow-live.png`       | Miss feedback, glow, live streak/lives, adaptive 0.8→0.7→0.6 pacing, checkpoint recovery, and kit pause copy are visible.           |
+
+All filenames in this table are relative to
+`docs/design-qa/2026-08-09-epoch5/`.
 
 ## System and accessibility checks
 
@@ -107,8 +127,8 @@ integration. The final packaged-app run must replace it.
   resolved without adding a third family.
 - **Passed:** the fixed drumstick cursor is limited to suitable mouse surfaces;
   keyboard focus remains a standard visible fallback.
-- **Pending packaged proof:** clean-profile desktop navigation, core CTA,
-  Flow/Classic state retention, reduced-motion state, and final Songs counts.
+- **Passed packaged proof:** final desktop navigation, core CTA, Flow/Classic
+  state, labelled fallbacks, and 112/13/230 Songs source counts.
 
 ## Tooling qualifications
 
@@ -122,4 +142,5 @@ integration. The final packaged-app run must replace it.
 
 ## Final gate
 
-Final result: **pending packaged-app interaction and release readback**.
+Final installed-app result: **passed**. Public-site visual and release readback
+remain release gates rather than desktop-design gates.
