@@ -1,6 +1,6 @@
 # Drumroll requirement and proof ledger
 
-Last reconciled: 2026-08-10, kb.4 source-candidate gate
+Last reconciled: 2026-08-10, kb.4 published-artifact closure
 
 This is the release contract for the Drumroll redesign. It maps the active
 session into sequential epochs and requires evidence, not implementation
@@ -30,14 +30,14 @@ learner studies support that claim.
 
 ## Release-wide rules
 
-| ID   | Requirement                                                                     | State   | Evidence / remaining gate                                                                                                                                                                                                                  |
-| ---- | ------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| R.01 | English product UI, technical copy, docs, release notes, and work updates.      | passed  | User-facing copy scan is English; original Yandex track/artist names remain source data.                                                                                                                                                   |
-| R.02 | Work autonomously and resolve normal implementation choices from this contract. | passed  | Nine gated epochs and bounded implementation lanes are recorded; no routine product choice is waiting on the user.                                                                                                                         |
-| R.03 | Preserve `~/box`, unrelated worktrees, and real user data.                      | passed  | Product work stayed inside this repo. The pre-kb.3 live-profile backup and post-QA file are byte-identical at SHA-256 `8eca08d0db32a4a6512b33475085793e7f6c434314d5a9c2a1f9f59e7ee8d554`; scored history and personal songs are unchanged. |
-| R.04 | One canonical tree with bounded agent lanes and independent verification.       | partial | The independent kb.3 audits found four P1s; kb.4 source remediations are integrated and final-artifact reruns remain.                                                                                                                      |
-| R.05 | Close only after every intent is passed or has a narrow outside blocker.        | partial | Exact kb.4 package, public deployment, and fresh Epoch 9 audits remain.                                                                                                                                                                    |
-| R.06 | Use real data and honest availability/proof language.                           | passed  | Legacy summaries, insufficient evidence, unavailable media, metadata-only sources, and offline fallbacks have explicit states.                                                                                                             |
+| ID   | Requirement                                                                     | State  | Evidence / remaining gate                                                                                                                                                                                                                  |
+| ---- | ------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R.01 | English product UI, technical copy, docs, release notes, and work updates.      | passed | User-facing copy scan is English; original Yandex track/artist names remain source data.                                                                                                                                                   |
+| R.02 | Work autonomously and resolve normal implementation choices from this contract. | passed | Nine gated epochs and bounded implementation lanes are recorded; no routine product choice is waiting on the user.                                                                                                                         |
+| R.03 | Preserve `~/box`, unrelated worktrees, and real user data.                      | passed | Product work stayed inside this repo. The pre-kb.3 live-profile backup and post-QA file are byte-identical at SHA-256 `8eca08d0db32a4a6512b33475085793e7f6c434314d5a9c2a1f9f59e7ee8d554`; scored history and personal songs are unchanged. |
+| R.04 | One canonical tree with bounded agent lanes and independent verification.       | passed | The kb.4 source, visual, and release-artifact lanes all returned zero P0/P1 after the independent contrast and deployment-provenance findings were fixed.                                                                                  |
+| R.05 | Close only after every intent is passed or has a narrow outside blocker.        | passed | Exact package, clean download, installation, public deployment, and final independent audits pass; only physical-kit behavior and longitudinal learning efficacy remain outside evidence.                                                  |
+| R.06 | Use real data and honest availability/proof language.                           | passed | Legacy summaries, insufficient evidence, unavailable media, metadata-only sources, and offline fallbacks have explicit states.                                                                                                             |
 
 ## Epoch 1 — Product truth and evidence recovery
 
@@ -105,53 +105,56 @@ learner studies support that claim.
 
 ## Epoch 6 — Premium app world and gameplay craft
 
-| ID    | Requirement                                                                                               | State   | Evidence / remaining gate                                                                                                                                  |
-| ----- | --------------------------------------------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| E6.01 | Use the bright Daybreak direction with premium glow rather than the dim brown World Tour cast.            | passed  | Side-by-side Home/Journey/Flow/Coach comparisons and one-time Impeccable review pass the selected direction.                                               |
-| E6.02 | Make Home a dramatic interactive kit cockpit with one dominant Play and granular Songs/Profile access.    | passed  | Current source and rendered proof show the kit, recommendation, named navigation, recent evidence, and hit state.                                          |
-| E6.03 | Provide left-to-right Flow with a fixed playhead and synchronized Classic alternative.                    | passed  | Flow is enlarged 1.65x for one-to-two-metre viewing; mode, seek, speed, loop, and camera tests pass.                                                       |
-| E6.04 | Teach T1/T2/T3 with color plus non-color identity.                                                        | passed  | Stable lane position/label and yellow/blue/green styling are implemented; curriculum contains tom-heavy proof charts.                                      |
-| E6.05 | Communicate anticipation, verdict, streak, danger, recovery, and completion without decorative ambiguity. | passed  | Signed-app Flow capture shows the fixed playhead, hit/miss verdicts, three lives, adaptive speed change, checkpoint return, and explicit kit-command copy. |
-| E6.06 | Keep the drumstick pointer bounded and preserve focus/accessibility.                                      | passed  | Pointer is limited to suitable surfaces; visible keyboard focus remains.                                                                                   |
-| E6.07 | Remove dead, stale, clipped, and developer-only surfaces.                                                 | partial | kb.4 source proof closes the Tutor/reference collision; exact installed-app and public-surface acceptance remain Epoch 8 gates.                            |
-| E6.08 | Make results explain the weakest evidence and launch remediation quickly.                                 | passed  | Result/Coach actions use persisted supported findings and one-action retry/continue/lesson paths.                                                          |
+| ID    | Requirement                                                                                               | State  | Evidence / remaining gate                                                                                                                                  |
+| ----- | --------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E6.01 | Use the bright Daybreak direction with premium glow rather than the dim brown World Tour cast.            | passed | Side-by-side Home/Journey/Flow/Coach comparisons and one-time Impeccable review pass the selected direction.                                               |
+| E6.02 | Make Home a dramatic interactive kit cockpit with one dominant Play and granular Songs/Profile access.    | passed | Current source and rendered proof show the kit, recommendation, named navigation, recent evidence, and hit state.                                          |
+| E6.03 | Provide left-to-right Flow with a fixed playhead and synchronized Classic alternative.                    | passed | Flow is enlarged 1.65x for one-to-two-metre viewing; mode, seek, speed, loop, and camera tests pass.                                                       |
+| E6.04 | Teach T1/T2/T3 with color plus non-color identity.                                                        | passed | Stable lane position/label and yellow/blue/green styling are implemented; curriculum contains tom-heavy proof charts.                                      |
+| E6.05 | Communicate anticipation, verdict, streak, danger, recovery, and completion without decorative ambiguity. | passed | Signed-app Flow capture shows the fixed playhead, hit/miss verdicts, three lives, adaptive speed change, checkpoint return, and explicit kit-command copy. |
+| E6.06 | Keep the drumstick pointer bounded and preserve focus/accessibility.                                      | passed | Pointer is limited to suitable surfaces; visible keyboard focus remains.                                                                                   |
+| E6.07 | Remove dead, stale, clipped, and developer-only surfaces.                                                 | passed | The exact installed app and public site reproduce the corrected warm-paper Flow strip, complete eight-lane key, dark musical ink, and unclipped Tutor HUD. |
+| E6.08 | Make results explain the weakest evidence and launch remediation quickly.                                 | passed | Result/Coach actions use persisted supported findings and one-action retry/continue/lesson paths.                                                          |
 
 ## Epoch 7 — Original product site and shared web app
 
-| ID    | Requirement                                                                                | State   | Evidence / remaining gate                                                                                                                                                                  |
-| ----- | ------------------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| E7.01 | Tell an original, editorial Drumroll story inspired by UNKNW craft rather than copying it. | passed  | Public Chrome acceptance and `65-unknw-reference-vs-public-kb3-landing.jpg` confirm shared editorial ambition but distinct bright palette, imagery, copy, structure, and product identity. |
-| E7.02 | Demonstrate the real Play → ready cue → adaptive Practice → recovery → progress loop.      | passed  | Every site claim maps to implemented/tested behavior and current product imagery.                                                                                                          |
-| E7.03 | Share the core renderer while stating browser/native limits honestly.                      | passed  | Browser capability tests retain lessons/Web MIDI/local progress while hiding unsupported folder, My Music, YouTube search, and chart-creation controls.                                    |
-| E7.04 | Use one public Drumroll identity while preserving internal compatibility identifiers.      | passed  | Public UI/metadata/release copy is Drumroll; `org.sk.SightKick`, library prefix, protocol, and upstream repo remain documented compatibility boundaries.                                   |
-| E7.05 | Deploy the final 170-lesson build and verify every public claim.                           | partial | The historical kb.3 site is live. A clean-HEAD kb.4 deployment with direct Chrome readback remains the release gate.                                                                       |
+| ID    | Requirement                                                                                | State  | Evidence / remaining gate                                                                                                                                                                         |
+| ----- | ------------------------------------------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E7.01 | Tell an original, editorial Drumroll story inspired by UNKNW craft rather than copying it. | passed | Public Chrome acceptance and `65-unknw-reference-vs-public-kb3-landing.jpg` confirm shared editorial ambition but distinct bright palette, imagery, copy, structure, and product identity.        |
+| E7.02 | Demonstrate the real Play → ready cue → adaptive Practice → recovery → progress loop.      | passed | Every site claim maps to implemented/tested behavior and current product imagery.                                                                                                                 |
+| E7.03 | Share the core renderer while stating browser/native limits honestly.                      | passed | Browser capability tests retain lessons/Web MIDI/local progress while hiding unsupported folder, My Music, YouTube search, and chart-creation controls.                                           |
+| E7.04 | Use one public Drumroll identity while preserving internal compatibility identifiers.      | passed | Public UI/metadata/release copy is Drumroll; `org.sk.SightKick`, library prefix, protocol, and upstream repo remain documented compatibility boundaries.                                          |
+| E7.05 | Deploy the final 170-lesson build and verify every public claim.                           | passed | Production deployment `52d7ce9d-bb6d-46b7-b99e-ae87424281cb` reports Source `f3e1656`; Chrome readback confirms the kb.4 DMG/checksum links, 170 lessons, current Flow image, and browser limits. |
 
 ## Epoch 8 — Signed package, install, and public release
 
-| ID    | Requirement                                                                  | State            | Evidence / remaining gate                                                                                                                                   |
-| ----- | ---------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| E8.01 | Rebuild the full integrated tree and distribution inputs.                    | passed           | Typecheck, lint, 1,592 tests across 135 files, desktop/web builds, curriculum, Yandex, Cloudflare Functions, FFmpeg, transcriber, and integrity gates pass. |
-| E8.02 | Build a fresh Apple Silicon package without overwriting the previous output. | missing          | A new immutable kb.4 output must be built from the frozen source commit; all kb.2/kb.3 outputs remain untouched.                                            |
-| E8.03 | Sign with Developer ID and hardened runtime.                                 | missing          | Exact kb.4 nested-code signature, runtime, entitlements, and Team ID readback required.                                                                     |
-| E8.04 | Notarize, staple, and pass Gatekeeper.                                       | missing          | Exact kb.4 app and DMG Apple acceptance, stapled-ticket, and Gatekeeper proof required.                                                                     |
-| E8.05 | Smoke-test clean and copied-real profiles without mutating live data.        | missing          | Exact kb.4 installed Home/library/Journey/Practice/Coach/Profile route and before/after profile hash required.                                              |
-| E8.06 | Publish DMG/source/checksum, verify a clean download, then deploy the site.  | missing          | Immutable kb.4 release, 7/7 clean-download replay, full downloaded-DMG verification, and clean-HEAD Pages source/readback required.                         |
-| E8.07 | Prove the complete zero-touch loop on the physical Yamaha DTX402.            | external-blocker | The kit is disconnected; real ready → play → recovery → pause/resume → result → continue/end remains physical proof.                                        |
+| ID    | Requirement                                                                  | State            | Evidence / remaining gate                                                                                                                                                              |
+| ----- | ---------------------------------------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E8.01 | Rebuild the full integrated tree and distribution inputs.                    | passed           | Typecheck, lint, 1,592 tests across 135 files, desktop/web builds, curriculum, Yandex, Cloudflare Functions, FFmpeg, transcriber, and integrity gates pass.                            |
+| E8.02 | Build a fresh Apple Silicon package without overwriting the previous output. | passed           | `release/kb4-final-460b31b` was built from accepted app-source commit `460b31b`; prior release outputs and the pre-final installed app remain recoverable.                             |
+| E8.03 | Sign with Developer ID and hardened runtime.                                 | passed           | The exact app and nested code pass signature validation, hardened-runtime checks, entitlements, and Team ID `3BGK34ZGS6` readback.                                                     |
+| E8.04 | Notarize, staple, and pass Gatekeeper.                                       | passed           | Apple submission `fb0fafb4-c0af-493e-9830-e57a4dd06656` is Accepted; both app and DMG tickets validate and both Gatekeeper assessments pass.                                           |
+| E8.05 | Smoke-test clean and copied-real profiles without mutating live data.        | passed           | `/Applications/Drumroll.app` passes the full verifier and real-window Home/Flow acceptance; live profile and backup remain byte-identical at SHA-256 `8eca08d0…`.                      |
+| E8.06 | Publish DMG/source/checksum, verify a clean download, then deploy the site.  | passed           | `v1.2.0-kb.4` publishes exactly seven assets; all remote digests match, `/tmp/drumroll-kb4-clean.tC7DEh` replays every checksum and the full DMG verifier, and Pages source is sealed. |
+| E8.07 | Prove the complete zero-touch loop on the physical Yamaha DTX402.            | external-blocker | macOS now detects the active Yamaha USB device and the installed app reports `DTX Drums ready`; the user's live play session is the remaining end-to-end recovery/pause/result proof.  |
 
 ## Epoch 9 — Independent closure
 
-| ID    | Requirement                                                                          | State   | Evidence / remaining gate                                                                        |
-| ----- | ------------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------ |
-| E9.01 | Run fresh product, design, technical, and transcript audits against final artifacts. | missing | Independent reviewers must inspect the signed build, public site, and this ledger after Epoch 8. |
-| E9.02 | Close every P0/P1 and triage each P2.                                                | partial | First audit findings were fixed or converted to explicit artifact/physical gates; rerun remains. |
-| E9.03 | Report proof states precisely and retain external limits.                            | partial | Final handoff must separate source, package, notarization, public, and physical-device proof.    |
+| ID    | Requirement                                                                          | State  | Evidence / remaining gate                                                                                                                                                          |
+| ----- | ------------------------------------------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E9.01 | Run fresh product, design, technical, and transcript audits against final artifacts. | passed | Independent source, design, and final release-artifact reviewers inspected the exact source, installed app, clean DMG, public site, and live-profile hashes.                       |
+| E9.02 | Close every P0/P1 and triage each P2.                                                | passed | Final independent verdicts are zero P0/P1. Release metadata now names exact commit `460b31b`; the remaining unsigned annotated tag note does not weaken Apple-signed binary proof. |
+| E9.03 | Report proof states precisely and retain external limits.                            | passed | Release notes and this ledger distinguish source, signed package, notarization, installation, public deployment, physical-kit proof, and efficacy limits.                          |
 
 ## Current release verdict
 
-The kb.4 source candidate is green and closes the four P1 defects found after
-kb.3: finite reconnects, hidden readiness, the Tutor/reference collision, and
-unconfigured browser charting/provenance claims. Release closure remains
-**pending** a fresh signed/notarized kb.4 package, installed-app acceptance,
-immutable public release, clean-HEAD site deployment, and independent Epoch 9
-reruns. Physical DTX402 cable proof and human learning-efficacy validation
-remain explicit outside proof rather than being guessed.
+Drumroll `1.2.0-kb.4` is green at source, visual, package, notarization,
+installation, clean-download, public-deployment, and independent-audit gates.
+The GitHub tag peels exactly to app-source commit `460b31b`; the public site is
+sealed to web-source commit `f3e1656`; the installed build is `1.2.4`; and all
+final reviewers report zero P0/P1. The connected Yamaha DTX device and exact
+native port are now Ready in the installed app. The user's active play session
+remains the honest proof for physical latency, mappings, kit gestures, and the
+complete zero-touch recovery loop. Longitudinal learning efficacy and
+injury-safety limits remain external rather than being inferred from software
+tests.
