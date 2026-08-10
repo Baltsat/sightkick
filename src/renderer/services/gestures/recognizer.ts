@@ -8,6 +8,20 @@ import {
 
 export const DRUM_GESTURES: DrumGestureDefinition[] = [
   {
+    // Starting from the kit needs to be as simple as pressing the pedal, but
+    // it must still be intentional. The silence and velocity gate prevent a
+    // stray low-velocity kick during setup from launching a run.
+    id: 'kit-command-start-kick',
+    surfaces: ['home', 'ready'],
+    elements: ['kick'],
+    action: 'start',
+    windowMs: 0,
+    quietBeforeMs: 900,
+    minimumGapMs: 0,
+    maximumGapMs: 0,
+    minimumVelocity: 56,
+  },
+  {
     id: 'kit-command-start',
     surfaces: ['home', 'ready'],
     elements: ['kick', 'crash', 'kick', 'crash'],
@@ -113,11 +127,12 @@ function canStart(
 }
 
 /**
- * Recognize only an exact, ordered four-strike command after a deliberate
- * silence. Any quiet strike, wrong lane, extra strike, reversed order, or
- * timing violation cancels the candidate. Normal playing therefore cannot
- * satisfy a command merely because the required lanes happened somewhere in
- * a rolling window.
+ * Recognize an exact, ordered kit command after a deliberate silence.
+ * One-hit commands complete on the triggering hit; multi-hit commands still
+ * require the full ordered signature. Any quiet strike, wrong lane, extra
+ * strike, reversed order, or timing violation cancels the candidate. Normal
+ * playing therefore cannot satisfy a command merely because the required
+ * lanes happened somewhere in a rolling window.
  */
 export function recognizeDrumGesture(
   state: DrumGestureState,
@@ -179,6 +194,23 @@ export function recognizeDrumGesture(
   const started = surfaceDefinitions.some((definition) =>
     canStart(definition, hit, state.lastHitTimeMs),
   );
+  const completed = surfaceDefinitions.find(
+    (definition) =>
+      definition.elements.length === 1 &&
+      canStart(definition, hit, state.lastHitTimeMs),
+  );
+
+  if (completed) {
+    return {
+      state: {
+        recentHits: [],
+        cooldownUntilMs: hit.timeMs + COOLDOWN_MS,
+        lastHitTimeMs: hit.timeMs,
+      },
+      action: completed.action,
+      gestureId: completed.id,
+    };
+  }
 
   return {
     state: {

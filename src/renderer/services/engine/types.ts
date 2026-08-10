@@ -31,6 +31,10 @@ export interface EngineContext {
   countInEnabled: boolean;
   minDurationSeconds: number;
   mapping: InputMapping;
+  /** Mode-specific nearest-note window. Defaults to the Perform contract. */
+  hitToleranceSeconds?: number;
+  /** Practice may advance past consumed heads when matching dense repeats. */
+  preferUnhitNotes?: boolean;
 }
 
 export interface EngineSettings {
@@ -108,29 +112,26 @@ export interface JudgeContext {
   chart: ParsedChart | undefined;
   measures: Measure[];
   mapping: InputMapping;
+  hitToleranceSeconds?: number;
+  preferUnhitNotes?: boolean;
 }
 
 export type IsHit = (tick: number, prefix: string) => boolean;
 
+/** Whether Judge has authoritatively closed the late-hit window for a head. */
+export type IsMissed = (tick: number, prefix: string) => boolean;
+
 /**
- * Fired when GameRenderer resolves a passed, unhit note-key as a miss
- * during a forward walk of the active note (see `colorNote`'s
- * `flashMisses` branch in game-renderer.ts - the same moment it flashes
- * `MISS_CLASS`). This is the engine's only "a note just got missed, live"
- * signal; it inherits that spot's existing semantics as-is rather than
- * inventing stricter rules GameRenderer itself doesn't follow:
- *
- * - A late-but-still-in-tolerance hit that lands just after the *next*
- *   note has already activated on a dense chart can still arrive after
- *   this fires - the visual layer already accepts that trade-off (see
- *   `paintHit` clearing `MISSED_CLASS`).
- * - A forward seek (scrubbing ahead) fires this for whatever it skips
- *   over, same as normal playback would - GameRenderer's first internal
- *   render pass on a seek can't tell "fast-forwarded" apart from "played
- *   through fast". A *backward* seek never fires it (the walk runs in
- *   reverse, which is never treated as a pass-through).
+ * Fired only for Judge's final miss outcome, after the active mode's late-hit
+ * window has closed. Administrative seeks never emit it.
  */
 export type MissHandler = (tick: number) => void;
+
+/** Fires only when Transport naturally reaches an authored loop boundary. */
+export type LoopRestartHandler = () => void;
+
+/** Fires synchronously before Transport moves the authored playhead. */
+export type SeekStartHandler = () => void;
 
 export interface GameRendererContext {
   chart: ParsedChart | undefined;
@@ -197,4 +198,6 @@ export interface TransportOptions {
   onEnded: () => void;
   onError: () => void;
   onSeek?: (tick: number) => void;
+  onSeekStart?: SeekStartHandler;
+  onLoopRestart?: LoopRestartHandler;
 }

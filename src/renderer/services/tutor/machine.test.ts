@@ -280,6 +280,7 @@ describe('tutor machine', () => {
   it('requires two clean repetitions before resuming the main song', () => {
     let { state } = beginFailedSession();
     const region = state.recovery?.region;
+    const recoveryId = state.recovery?.id;
 
     expect(region).toBeDefined();
     state = addCleanRegion(
@@ -324,6 +325,13 @@ describe('tutor machine', () => {
       resumeTick: 300,
     });
     expect(second.state.recoveryAttempts).toHaveLength(2);
+    expect(second.state.lastRecoveryOutcome).toEqual({
+      recoveryId,
+      status: 'mastered',
+      startMeasure: region?.startMeasure,
+      endMeasure: region?.endMeasure,
+      cleanRepetitions: 2,
+    });
   });
 
   it('slows after a failed recovery, then rebuilds clean speed in steps', () => {
@@ -415,8 +423,12 @@ describe('tutor machine', () => {
     expect(deferred.state).toMatchObject({
       phase: 'observing',
       currentSpeed: 1,
+      livesRemaining: 3,
       recovery: undefined,
       ignoreTriggersThroughMeasure: end,
+      lastRecoveryOutcome: {
+        status: 'deferred',
+      },
     });
     expect(deferred.state.recoveryAttempts).toHaveLength(2);
     expect(deferred.state.recoveryAttempts.at(-1)).toMatchObject({

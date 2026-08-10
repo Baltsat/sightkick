@@ -6,7 +6,7 @@ on:
       release_tag:
         description: Exact prerelease tag for the verified artifact
         required: true
-        default: v1.2.0-kb.2
+        default: v1.2.0-kb.5
         type: string
       publish:
         description: Publish the already verified artifacts to GitHub Releases
@@ -64,8 +64,16 @@ jobs:
           if (pkg.build.mac.bundleShortVersion !== '1.2.0') {
             throw new Error('CFBundleShortVersionString must be 1.2.0');
           }
-          if (pkg.build.mac.bundleVersion !== '1.2.2') {
-            throw new Error('CFBundleVersion must be 1.2.2');
+          const versionMatch = /^(\d+)\.(\d+)\.(\d+)-kb\.(\d+)$/.exec(pkg.version);
+          if (!versionMatch) {
+            throw new Error('The package version must use the x.y.z-kb.n release format');
+          }
+          const expectedBuildVersion = `${versionMatch[1]}.${versionMatch[2]}.${versionMatch[4]}`;
+          if (pkg.build.mac.bundleVersion !== expectedBuildVersion) {
+            throw new Error(`CFBundleVersion must be ${expectedBuildVersion}`);
+          }
+          if (pkg.build.buildVersion !== expectedBuildVersion) {
+            throw new Error(`electron-builder buildVersion must be ${expectedBuildVersion}`);
           }
           if (pkg.build.mac.forceCodeSigning !== true) {
             throw new Error('forceCodeSigning must remain enabled');
@@ -138,7 +146,8 @@ jobs:
           yarn verify:ffmpeg:transcriber
           yarn electron-builder build --mac --arm64 --publish never
           yarn release:stage-ffmpeg-source release/build
-          scripts/notarize-macos-dmg.sh release/build/Drumroll-1.2.0-kb.2-arm64.dmg
+          release_version="$(node -p 'require("./package.json").version')"
+          scripts/notarize-macos-dmg.sh "release/build/Drumroll-${release_version}-arm64.dmg"
           node scripts/finalize-macos-release-metadata.mjs release/build --write
 
       - name: Verify unpacked application and final disk image
@@ -148,7 +157,8 @@ jobs:
           disk_images=(release/build/*.dmg)
           shopt -u nullglob
           [[ "${#disk_images[@]}" -eq 1 ]] || { echo "::error::Expected exactly one DMG"; exit 1; }
-          [[ "${disk_images[0]}" == 'release/build/Drumroll-1.2.0-kb.2-arm64.dmg' ]] || { echo "::error::Unexpected DMG name: ${disk_images[0]}"; exit 1; }
+          release_version="$(node -p 'require("./package.json").version')"
+          [[ "${disk_images[0]}" == "release/build/Drumroll-${release_version}-arm64.dmg" ]] || { echo "::error::Unexpected DMG name: ${disk_images[0]}"; exit 1; }
           yarn release:verify:mac "${disk_images[0]}"
 
       - name: Generate and verify SHA256SUMS.txt
@@ -159,10 +169,10 @@ jobs:
         with:
           name: drumroll-macos-arm64-${{ inputs.release_tag }}
           path: |
-            release/build/Drumroll-1.2.0-kb.2-arm64.dmg
-            release/build/Drumroll-1.2.0-kb.2-arm64.dmg.blockmap
-            release/build/Drumroll-1.2.0-kb.2-arm64.zip
-            release/build/Drumroll-1.2.0-kb.2-arm64.zip.blockmap
+            release/build/Drumroll-*-arm64.dmg
+            release/build/Drumroll-*-arm64.dmg.blockmap
+            release/build/Drumroll-*-arm64.zip
+            release/build/Drumroll-*-arm64.zip.blockmap
             release/build/latest-mac.yml
             release/build/ffmpeg-8.1.2.tar.xz
             release/build/SHA256SUMS.txt
@@ -177,6 +187,7 @@ jobs:
         run: |
           release_version="$(node -p 'require("./package.json").version')"
           artifact_prefix="Drumroll-${release_version}-arm64"
+          release_notes="docs/release-notes-${release_version}.md"
           release_assets=(
             "release/build/${artifact_prefix}.dmg"
             "release/build/${artifact_prefix}.dmg.blockmap"
@@ -190,6 +201,7 @@ jobs:
           for release_asset in "${release_assets[@]}"; do
             [[ -s "$release_asset" ]] || { echo "::error::Missing exact release asset: $release_asset"; exit 1; }
           done
+          [[ -s "$release_notes" ]] || { echo "::error::Missing release notes: $release_notes"; exit 1; }
 
           release_probe_error="$RUNNER_TEMP/drumroll-release-probe-error.txt"
           if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >/dev/null 2>"$release_probe_error"; then
@@ -212,13 +224,13 @@ jobs:
               "${release_assets[@]}" \
               --verify-tag \
               --title "Drumroll ${RELEASE_TAG#v}" \
-              --notes-file docs/release-notes-1.2.0-kb.2.md \
+              --notes-file "$release_notes" \
               --prerelease
           else
             gh release create "$RELEASE_TAG" \
               "${release_assets[@]}" \
               --target "$GITHUB_SHA" \
               --title "Drumroll ${RELEASE_TAG#v}" \
-              --notes-file docs/release-notes-1.2.0-kb.2.md \
+              --notes-file "$release_notes" \
               --prerelease
           fi

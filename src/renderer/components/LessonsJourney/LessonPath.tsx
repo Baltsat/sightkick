@@ -4,37 +4,24 @@ import { LessonNode } from './LessonNode';
 import { nodeState } from './journey';
 
 /**
- * A deliberate physical beat between nodes in the Arena. On a 1000px-tall
- * desktop window the scene lands six exercises in view; longer units remain
- * scrollable instead of compressing every part of a 25-lesson unit into an
- * unreadable board.
+ * The Journey is used from a kit at a fixed desktop distance. A season can
+ * contain more exercises than are readable in one 768px scene, so the stage
+ * intentionally shows a short, stable window around the kit-selected node.
+ * All nodes stay mounted (stable test IDs / unlock semantics), but only the
+ * four relevant pads occupy the visible studio instead of forcing a page
+ * scroll or shrinking lessons into unreadable dots.
  */
-const SCENE_PAGE_HEIGHT = 500;
-const VISIBLE_NODE_COUNT = 6;
-/**
- * These anchors deliberately sit over the six real drum pads in
- * `journey-studio.png`. Subsequent groups of six repeat on the scrollable
- * continuation of the path rather than becoming tiny, non-interactive dots.
- */
+const VISIBLE_NODE_COUNT = 4;
 const STUDIO_NODE_ANCHORS = [
-  { x: 64, y: 92 },
-  { x: 79, y: 168 },
-  { x: 70, y: 244 },
-  { x: 80, y: 320 },
-  { x: 64, y: 396 },
-  { x: 42, y: 468 },
+  { x: 21, y: 25 },
+  { x: 47, y: 34 },
+  { x: 31, y: 64 },
+  { x: 59, y: 73 },
 ];
 
 interface StudioPoint {
   x: number;
   y: number;
-}
-
-function studioPoint(index: number): StudioPoint {
-  const page = Math.floor(index / VISIBLE_NODE_COUNT);
-  const anchor = STUDIO_NODE_ANCHORS[index % VISIBLE_NODE_COUNT];
-
-  return { x: anchor.x, y: anchor.y + page * SCENE_PAGE_HEIGHT };
 }
 
 function studioPath(points: StudioPoint[]): string {
@@ -59,45 +46,70 @@ export interface LessonPathProps {
   unit: string;
   entries: LessonEntry[];
   progress: LessonProgress;
+  /** The deterministic target used by configured kit/keyboard controls. */
+  focusedLessonId?: string;
+  controlLegend: string;
+  controlSource: 'explicit' | 'kit-lanes' | 'unavailable';
   onPlay: (entry: LessonEntry) => void;
   onLockedClick: (entry: LessonEntry) => void;
 }
 
 /**
- * Winding vertical path through a season's exercises: a decorative SVG
- * connector (neutral for the whole season, accent for the stretch already
- * unlocked) behind a column of positioned `LessonNode`s. Pure CSS/SVG, no
- * charting library — node x-positions and the curve both come from
- * `buildSnakePath` so they always agree.
+ * A compact, focused route through a season. It is deliberately a viewport,
+ * not a vertically growing document: down/up changes the selected lesson and
+ * slides the four-node window along the route; confirm starts the highlighted
+ * unlocked lesson without the player leaving the kit.
  */
 export function LessonPath({
   unit,
   entries,
   progress,
+  focusedLessonId,
+  controlLegend,
+  controlSource,
   onPlay,
   onLockedClick,
 }: LessonPathProps) {
-  const points = useMemo(
-    () => entries.map((_, index) => studioPoint(index)),
-    [entries],
+  const focusedIndex = Math.max(
+    0,
+    entries.findIndex((entry) => entry.song.id === focusedLessonId),
   );
-  const d = useMemo(() => studioPath(points), [points]);
-  const unlockedCount = entries.filter((entry) => entry.unlocked).length;
+  const windowStart = Math.min(
+    Math.max(0, focusedIndex - 1),
+    Math.max(0, entries.length - VISIBLE_NODE_COUNT),
+  );
+  const visibleEntries = entries.slice(
+    windowStart,
+    windowStart + VISIBLE_NODE_COUNT,
+  );
+  const points = useMemo(
+    () =>
+      new Map(
+        visibleEntries.map((entry, index) => [
+          entry.song.id,
+          STUDIO_NODE_ANCHORS[index],
+        ]),
+      ),
+    [visibleEntries],
+  );
+  const d = useMemo(() => studioPath([...points.values()]), [points]);
+  const unlockedCount = visibleEntries.filter((entry) => entry.unlocked).length;
   const travelledD = useMemo(
-    () => studioPath(points.slice(0, unlockedCount)),
+    () => studioPath([...points.values()].slice(0, unlockedCount)),
     [points, unlockedCount],
   );
-  const pageCount = Math.max(1, Math.ceil(entries.length / VISIBLE_NODE_COUNT));
-  const sceneHeight = pageCount * SCENE_PAGE_HEIGHT;
+  const windowEnd = Math.min(entries.length, windowStart + VISIBLE_NODE_COUNT);
 
   return (
     <div
-      className="daybreak-lesson-path relative mt-4"
+      className="daybreak-lesson-path relative"
       data-testid={`lesson-path-${unit}`}
-      style={{ height: sceneHeight }}
+      data-window-start={windowStart + 1}
+      data-window-end={windowEnd}
+      data-window-size={visibleEntries.length}
     >
       <svg
-        viewBox={`0 0 100 ${sceneHeight}`}
+        viewBox="0 0 100 100"
         preserveAspectRatio="none"
         className="daybreak-lesson-path__track pointer-events-none absolute inset-0 size-full"
         aria-hidden="true"
@@ -125,19 +137,41 @@ export function LessonPath({
         )}
       </svg>
 
+      <div
+        className="daybreak-lesson-path__kit-hint"
+        data-testid="journey-kit-controls"
+        data-control-source={controlSource}
+      >
+        <span>
+          {controlSource === 'kit-lanes'
+            ? 'Kit navigation'
+            : 'Journey controls'}
+        </span>
+        <strong>{controlLegend}</strong>
+        <small>
+          {windowStart + 1}–{windowEnd} of {entries.length}
+        </small>
+      </div>
+
       <ul className="relative m-0 size-full list-none p-0">
-        {entries.map((entry, index) => (
-          <li key={entry.song.id} className="m-0 p-0">
-            <LessonNode
-              entry={entry}
-              state={nodeState(entry, progress)}
-              xPercent={points[index].x}
-              yPx={points[index].y}
-              onPlay={onPlay}
-              onLockedClick={onLockedClick}
-            />
-          </li>
-        ))}
+        {entries.map((entry) => {
+          const point = points.get(entry.song.id);
+
+          return (
+            <li key={entry.song.id} className="m-0 p-0">
+              <LessonNode
+                entry={entry}
+                state={nodeState(entry, progress)}
+                xPercent={point?.x ?? 0}
+                yPercent={point?.y ?? 0}
+                isKitFocused={entry.song.id === focusedLessonId}
+                isInViewport={Boolean(point)}
+                onPlay={onPlay}
+                onLockedClick={onLockedClick}
+              />
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

@@ -23,9 +23,11 @@ import {
   JudgeFalseHitHandler,
   JudgeHitHandler,
   LoopRegion,
+  LoopRestartHandler,
   MissHandler,
   PlaybackSnapshot,
   ResolvedJudgementHandler,
+  SeekStartHandler,
 } from './types';
 
 const KIT_ELEMENT_NAMES = new Set<string>(Object.keys(ELEMENT_TO_KEYS));
@@ -47,17 +49,13 @@ export class Engine {
   private judge = new Judge();
   private renderer = new GameRenderer(
     (tick, key) => this.judge.isHit(tick, key),
-    (tick) => this.missListeners.forEach((listener) => listener(tick)),
+    (tick, key) => this.judge.isMissed(tick, key),
   );
-  // Additive event surface for the streak/rage feature (and anything else
-  // that wants to watch play live without touching Judge/Transport
-  // internals): `onMiss` forwards GameRenderer's live miss-resolution hook
-  // (see MissHandler's doc comment), and `onReset` fires whenever this
-  // engine already resets Judge/GameRenderer state for a seek or restart -
-  // see `onSeek` below, the Transport option that already drives
-  // `judge.rewindTo`.
+  // Additive event surface for final Judge misses and administrative resets.
   private missListeners = new Set<MissHandler>();
   private resetListeners = new Set<() => void>();
+  private loopRestartListeners = new Set<LoopRestartHandler>();
+  private seekStartListeners = new Set<SeekStartHandler>();
   private runEndingListeners = new Set<() => boolean>();
   private onEndedCb: (
     score: ScoreData,
@@ -96,6 +94,12 @@ export class Engine {
       },
       onEnded: () => this.handleEnded(),
       onError: options.onError,
+      onLoopRestart: () => {
+        this.loopRestartListeners.forEach((listener) => listener());
+      },
+      onSeekStart: () => {
+        this.seekStartListeners.forEach((listener) => listener());
+      },
       onSeek: (tick) => {
         this.judge.rewindTo(tick);
         // Mirror Judge.rewindTo's own cutoff: a looped practice-range replay
@@ -170,6 +174,10 @@ export class Engine {
         return;
       }
 
+      this.missListeners.forEach((listener) =>
+        listener(judgement.expectedTick as number),
+      );
+
       this.runRecords.push({
         tick: judgement.expectedTick,
         timeSeconds: this.timeSecondsForTick(judgement.expectedTick),
@@ -228,6 +236,24 @@ export class Engine {
     };
   }
 
+  /** Fires only for a natural authored loop wrap, before the rewind reset. */
+  onLoopRestart(listener: LoopRestartHandler): () => void {
+    this.loopRestartListeners.add(listener);
+
+    return () => {
+      this.loopRestartListeners.delete(listener);
+    };
+  }
+
+  /** Fires before an administrative or natural rewind moves TimeStore. */
+  onSeekStart(listener: SeekStartHandler): () => void {
+    this.seekStartListeners.add(listener);
+
+    return () => {
+      this.seekStartListeners.delete(listener);
+    };
+  }
+
   /**
    * Synchronous pre-commit handshake after every chart head has a final
    * Judge outcome. Return false when an adaptive recovery restarted the
@@ -263,6 +289,8 @@ export class Engine {
       chart: context.chart,
       measures: context.measures,
       mapping: context.mapping,
+      hitToleranceSeconds: context.hitToleranceSeconds,
+      preferUnhitNotes: context.preferUnhitNotes,
     });
 
     this.renderFrame();

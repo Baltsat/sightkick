@@ -27,8 +27,8 @@ export interface RecordRunInput {
   totalHits: number;
   overallAccuracy: number;
   difficulty: Difficulty;
-  /** Star rating earned this run (0-5), or 0 for a run that doesn't score
-   * (Practice mode never sets scoreData - see modes.ts). */
+  /** Star rating earned this run (0-5), or 0 for analytics-only Practice.
+   * A full target-speed curriculum lesson may score from Practice. */
   starsEarned: number;
   /** Wall-clock practice time this run represents, already adjusted for
    * playback speed (a 4-minute chart at 0.5x is 8 practice minutes). */

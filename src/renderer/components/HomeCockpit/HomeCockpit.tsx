@@ -29,12 +29,11 @@ import { calculateAccuracy } from '../../scoring';
 import {
   MIN_RECENT_LANE_SAMPLES,
   RecentLaneSignal,
-  RECENT_HALF_LIFE_DAYS,
   RECENT_LANE_TREND_WINDOW_DAYS,
   RECENT_READINESS_WINDOW_DAYS,
 } from '../../services/mastery';
 import { RankedPracticeCandidate } from '../../services/next-practice';
-import { KitElement } from '../../services/practice-stats';
+import { KitElement, RunSummary } from '../../services/practice-stats';
 import homeKitStudio from '../../assets/daybreak/home-kit-studio.png';
 import drumstickCursor from '../../assets/daybreak/drumstick-cursor.png';
 import './HomeCockpit.css';
@@ -60,6 +59,24 @@ interface KitHotspot {
   position: string;
 }
 
+type CanonicalKitColorLane = 'orange' | 'red' | 'yellow' | 'blue' | 'green';
+
+/**
+ * The cockpit uses the same five notation lanes as the score: kick/orange,
+ * snare/red, the first cymbal/tom lane/yellow, the second/blue, and the
+ * third/green. Paired cymbal and tom voices deliberately share a color so
+ * Home rehearses the exact visual vocabulary the player sees in practice.
+ */
+const KIT_COLOR_LANE: Record<KitElement, CanonicalKitColorLane> = {
+  kick: 'orange',
+  snare: 'red',
+  hihat: 'yellow',
+  tom1: 'yellow',
+  ride: 'blue',
+  tom2: 'blue',
+  crash: 'green',
+  tom3: 'green',
+};
 const KIT_HOTSPOTS: KitHotspot[] = [
   { element: 'hihat', label: 'Hi-hat', position: 'hihat' },
   { element: 'crash', label: 'Crash', position: 'crash' },
@@ -75,6 +92,65 @@ interface LaneSignalSummary {
   compact: string;
   secondary: string;
   ariaDescription: string;
+}
+
+interface RecentCompletedSong {
+  song: Song;
+  summary: RunSummary;
+}
+
+const RECENT_SONG_ACCENT_LANES = ['hihat', 'snare', 'kick'] as const;
+
+function completedAtMs(summary: RunSummary) {
+  const completedAt = Date.parse(summary.completedAt);
+
+  return Number.isFinite(completedAt) ? completedAt : Number.NEGATIVE_INFINITY;
+}
+
+/**
+ * Home only names songs that have a real completed run. A song can have
+ * several stored attempts, so reduce each song to its newest `completedAt`
+ * before ranking the three rows across the library. This prevents the
+ * cockpit from mistaking an imported or merely-liked track for recent work.
+ */
+export function recentCompletedSongs(
+  songList: Song[],
+  runsBySong: Readonly<Record<string, RunSummary[]>> | undefined,
+): RecentCompletedSong[] {
+  if (!runsBySong) {
+    return [];
+  }
+
+  const songsById = new Map(
+    songList.filter((song) => !song.lesson).map((song) => [song.id, song]),
+  );
+
+  return Object.entries(runsBySong)
+    .flatMap(([songId, runs]) => {
+      const song = songsById.get(songId);
+
+      if (!song || runs.length === 0) {
+        return [];
+      }
+
+      const summary = runs.reduce((latest, candidate) =>
+        completedAtMs(candidate) > completedAtMs(latest) ? candidate : latest,
+      );
+
+      return [{ song, summary }];
+    })
+    .sort(
+      (left, right) =>
+        completedAtMs(right.summary) - completedAtMs(left.summary),
+    )
+    .slice(0, 3);
+}
+
+function recentRunLabel(summary: RunSummary) {
+  const accuracy = Math.round(summary.overallAccuracy * 100);
+  const mode = summary.mode === 'perform' ? 'perform' : 'practice';
+
+  return `${accuracy}% · ${mode}`;
 }
 
 function trendSummary(trendPp: number | undefined) {
@@ -199,15 +275,10 @@ export function HomeCockpit({
     lessonProgress.continueEntry ??
     lessonProgress.entries.find((entry) => entry.unlocked);
   const weakest = weakestLane(gamification.recentLaneSignals);
-  const recentLaneSampleCount =
-    gamification.recentLaneSignals?.reduce(
-      (total, signal) => total + signal.sampleCount,
-      0,
-    ) ?? 0;
-  const measuredLaneCount =
-    gamification.recentLaneSignals?.filter(
-      (signal) => signal.evidenceState === 'measured',
-    ).length ?? 0;
+  const recentSongs = useMemo(
+    () => recentCompletedSongs(songList, gamification.runsBySong),
+    [gamification.runsBySong, songList],
+  );
   const elementByControlId = useMemo(() => {
     const map = new Map<string, KitElement>();
 
@@ -283,12 +354,24 @@ export function HomeCockpit({
       : `${currentAccuracy}% best at ${difficulty}`;
   const inputStatus =
     inputReadiness === 'connected'
-      ? `${selectedDevice?.name ?? 'Input'} ready`
+      ? `Connected · ${selectedDevice?.name ?? 'Input'}`
       : inputReadiness === 'reconnecting'
-      ? `Waiting for ${
+      ? `Reconnecting · ${
           selectedDevice?.name ?? 'your kit'
-        } · reconnect USB and Drumroll will resume automatically`
-      : 'Choose an input in Settings before starting';
+        } · Drumroll will resume automatically`
+      : 'Waiting for a MIDI drum kit';
+  const inputStateLabel =
+    inputReadiness === 'connected'
+      ? 'Connected'
+      : inputReadiness === 'reconnecting'
+      ? 'Reconnecting'
+      : 'Waiting for kit';
+  const inputStateDetail =
+    inputReadiness === 'connected'
+      ? selectedDevice?.name ?? 'Drum input ready'
+      : inputReadiness === 'reconnecting'
+      ? `${selectedDevice?.name ?? 'Remembered kit'} · automatic retry`
+      : 'Connect USB MIDI · auto-detect is on';
   const rootStyle = {
     '--drumstick-cursor': `url(${drumstickCursor}) 14 14`,
   } as CSSProperties;
@@ -418,25 +501,27 @@ export function HomeCockpit({
         </div>
 
         <div className="home-cockpit__launch">
-          <p className="home-cockpit__lede">
-            {currentSong && recommendation
-              ? `${
-                  currentSong.artist
-                } · ${recommendation.suggestedSpeed.toFixed(1)}× start · ${
-                  recommendation.reason
-                }`
-              : currentSong
-              ? `${currentSong.artist} · ${currentAccuracyLabel}`
-              : 'Your kit is ready. Pick a chart to make the bass drum your Play button.'}
-          </p>
           <p
             className="home-cockpit__input-readiness"
             data-state={inputReadiness}
             data-testid="home-input-readiness"
             role="status"
+            aria-label={inputStatus}
           >
             <span aria-hidden="true" />
-            {inputStatus}
+            <span className="home-cockpit__input-readiness-copy">
+              <strong>{inputStateLabel}</strong>
+              <small>{inputStateDetail}</small>
+            </span>
+          </p>
+          <p className="home-cockpit__lede">
+            {currentSong && recommendation
+              ? `${
+                  currentSong.artist
+                } · ${recommendation.suggestedSpeed.toFixed(1)}× adaptive start`
+              : currentSong
+              ? `${currentSong.artist} · ${currentAccuracyLabel}`
+              : 'Choose a chart once; after that, your kit starts the session.'}
           </p>
           <div className="home-cockpit__actions">
             {recommendation && (
@@ -525,6 +610,7 @@ export function HomeCockpit({
                   `home-kit-hotspot--${hotspot.position}`,
                   isActive && 'home-kit-hotspot--active',
                 )}
+                data-color-lane={KIT_COLOR_LANE[hotspot.element]}
                 disabled={
                   hotspot.element === 'kick' &&
                   recommendation !== undefined &&
@@ -558,17 +644,21 @@ export function HomeCockpit({
                   <strong>
                     {hotspot.element === 'kick'
                       ? inputReadiness === 'connected'
-                        ? 'Play'
+                        ? recommendation
+                          ? 'Kick to start'
+                          : 'Choose song'
                         : 'Waiting'
                       : hotspot.label}
                   </strong>
                   <small>
                     {hotspot.element === 'kick'
-                      ? currentSong
-                        ? recommendation
-                          ? `${recommendation.suggestedSpeed.toFixed(1)}×`
-                          : 'choose'
-                        : 'choose'
+                      ? inputReadiness === 'reconnecting'
+                        ? 'auto-connect armed'
+                        : inputReadiness === 'waiting'
+                        ? 'connect MIDI'
+                        : currentSong && recommendation
+                        ? `${recommendation.suggestedSpeed.toFixed(1)}× · ready`
+                        : 'pick a chart'
                       : signal.compact}
                   </small>
                   {hotspot.element !== 'kick' && (
@@ -586,11 +676,7 @@ export function HomeCockpit({
           {activeLane
             ? `${KIT_HOTSPOTS.find((item) => item.element === activeLane)
                 ?.label} hit`
-            : inputReadiness !== 'connected'
-            ? inputStatus
-            : recommendation
-            ? 'After a short silence: kick, crash, kick, crash starts the recommendation.'
-            : 'Tap a drum, use its keyboard or MIDI mapping, or choose a song.'}
+            : ''}
         </p>
         <p
           className="sr-only"
@@ -610,86 +696,21 @@ export function HomeCockpit({
       </div>
 
       <div className="home-cockpit__below">
-        <article
-          className="home-cockpit__lane-evidence"
-          data-testid="home-lane-evidence"
-        >
-          <div>
-            <p className="home-cockpit__label">Evidence on this kit</p>
-            <h2>Recent kit accuracy</h2>
-          </div>
-          <div className="home-cockpit__lane-evidence-copy">
-            <p>
-              {RECENT_READINESS_WINDOW_DAYS}-day time-decayed hit / (hit + miss)
-              signal · {RECENT_HALF_LIFE_DAYS}-day half-life.
-            </p>
-            {gamification.recentLaneSignals === undefined ? (
-              <p>Loading dated scored lane evidence from saved runs.</p>
-            ) : gamification.recentLaneSignals.length === 0 ? (
-              <p>
-                No dated scored lane hits or misses in this window yet. Finish a
-                scored run to create a current signal.
-              </p>
-            ) : (
-              <p>
-                {recentLaneSampleCount} raw scored hits or misses across{' '}
-                {gamification.recentLaneSignals.length} observed lanes ·{' '}
-                {measuredLaneCount} lane
-                {measuredLaneCount === 1 ? '' : 's'} with{' '}
-                {MIN_RECENT_LANE_SAMPLES}+ samples. Trend compares raw accuracy
-                in the newest {RECENT_LANE_TREND_WINDOW_DAYS} days with the
-                preceding {RECENT_LANE_TREND_WINDOW_DAYS} when both have{' '}
-                {MIN_RECENT_LANE_SAMPLES}+ samples.
-              </p>
-            )}
-          </div>
-        </article>
         <article className="home-cockpit__next">
           <div>
-            <p className="home-cockpit__label">Next on your path</p>
+            <p className="home-cockpit__label">Current lesson</p>
             <h2>
               {nextLesson
-                ? 'Your next lesson is ready'
+                ? `Lesson · ${nextLesson.lesson.title}`
                 : 'Your first lesson is ready'}
             </h2>
-            <p>
+            <p className="home-cockpit__lesson-meta">
               {nextLesson
-                ? `${nextLesson.lesson.unit} · ${nextLesson.bestStars}/3 stars earned`
+                ? `${nextLesson.lesson.unit} · ${
+                    nextLesson.lesson.bpmStart ?? '—'
+                  } → ${nextLesson.lesson.bpmTarget ?? '—'} BPM`
                 : 'Open Journey to load the Drumroll Method into your library.'}
             </p>
-            {nextLesson?.lesson.cue && (
-              <div
-                className="home-cockpit__lesson-plan"
-                data-testid="home-current-lesson-plan"
-              >
-                <p>
-                  <strong>Cue:</strong> {nextLesson.lesson.cue}
-                </p>
-                <p>
-                  <strong>Tempo:</strong> {nextLesson.lesson.bpmStart ?? '—'} →{' '}
-                  {nextLesson.lesson.bpmTarget ?? '—'} BPM
-                  {nextLesson.lesson.prerequisiteIds?.length
-                    ? ` · prerequisite: ${nextLesson.lesson.prerequisiteIds.join(
-                        ', ',
-                      )}`
-                    : ' · no prerequisite'}
-                </p>
-                {nextLesson.lesson.doseRule && (
-                  <p>
-                    <strong>Dose:</strong> {nextLesson.lesson.doseRule}
-                  </p>
-                )}
-                {nextLesson.lesson.masteryRule && (
-                  <p>
-                    <strong>Mastery:</strong> {nextLesson.lesson.masteryRule}
-                  </p>
-                )}
-                <p data-testid="home-lesson-assessment-boundary">
-                  {nextLesson.lesson.assessmentBoundary ??
-                    'MIDI assesses timing and pad choice; sticking/form cue is not assessed.'}
-                </p>
-              </div>
-            )}
           </div>
           <Button
             type="text"
@@ -699,6 +720,50 @@ export function HomeCockpit({
             <FontAwesomeIcon icon={faGraduationCap} />
             <span>Journey</span>
           </Button>
+        </article>
+        <article
+          className="home-cockpit__recent-songs"
+          data-testid="home-recent-songs"
+          aria-labelledby="home-recent-songs-title"
+        >
+          <div className="home-cockpit__recent-heading">
+            <p className="home-cockpit__label">Recent songs</p>
+            <h2 id="home-recent-songs-title">Last completed passes</h2>
+          </div>
+          {recentSongs.length > 0 ? (
+            <ol className="home-cockpit__recent-list">
+              {recentSongs.map(({ song, summary }, index) => {
+                const accent =
+                  RECENT_SONG_ACCENT_LANES[
+                    index % RECENT_SONG_ACCENT_LANES.length
+                  ];
+
+                return (
+                  <li
+                    key={song.id}
+                    className="home-cockpit__recent-song"
+                    data-testid={`home-recent-song-${song.id}`}
+                    data-lane={accent}
+                  >
+                    <span className="home-cockpit__recent-song-copy">
+                      <strong>{song.name}</strong>
+                      <small>{song.artist}</small>
+                    </span>
+                    <span className="home-cockpit__recent-song-score">
+                      {recentRunLabel(summary)}
+                    </span>
+                    <time dateTime={summary.completedAt} className="sr-only">
+                      {summary.completedAt}
+                    </time>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : (
+            <p className="home-cockpit__recent-empty">
+              Your last three completed songs will appear here.
+            </p>
+          )}
         </article>
         <article className="home-cockpit__goal">
           <p className="home-cockpit__label">

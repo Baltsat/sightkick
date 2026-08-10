@@ -1,6 +1,8 @@
 .arena-shell {
-  min-height: 100vh;
   display: flex;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
   color: var(--color-text);
   background: radial-gradient(
       circle at 78% -8%,
@@ -146,6 +148,8 @@
 
 .arena-shell__workspace {
   display: flex;
+  height: 100%;
+  min-height: 0;
   min-width: 0;
   flex: 1;
   flex-direction: column;
@@ -228,7 +232,7 @@
 
 @media (max-width: 900px) {
   .arena-shell {
-    display: block;
+    flex-direction: column;
   }
 
   .arena-shell__rail {
@@ -244,6 +248,10 @@
     padding: 0.55rem 0.7rem;
     border-right: 0;
     border-bottom: 1px solid var(--color-border);
+  }
+
+  .arena-shell__workspace {
+    height: auto;
   }
 
   .arena-shell__brand {

@@ -8,9 +8,9 @@ import './web.css';
 
 const root = document.getElementById('root');
 const publicReleaseHref =
-  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.4/Drumroll-1.2.0-kb.4-arm64.dmg';
+  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.5/Drumroll-1.2.0-kb.5-arm64.dmg';
 const publicChecksumHref =
-  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.4/SHA256SUMS.txt';
+  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.5/SHA256SUMS.txt';
 
 if (!root) {
   throw new Error('Missing app root.');
@@ -118,8 +118,8 @@ function showLanding(): void {
         <p class="web-section-index">Built for the kit</p>
         <h2 id="web-platform-title">Your drums remain the fastest way forward.</h2>
         <div class="web-platform-grid">
-          <p><strong>Ready cue</strong>starts an eligible session with the fixed four-hit kick–crash–kick–crash command after a short silence.</p>
-          <p><strong>Practice</strong>protects learning quality with checkpoint recovery and repeatable focused loops.</p>
+          <p><strong>Ready cue</strong>starts an eligible session with one deliberate kick after a short silence.</p>
+          <p><strong>Practice</strong>parks after meaningful silence, rewinds to a musical checkpoint, and resumes from any mapped pad.</p>
           <p><strong>Perform</strong>protects continuity with one canonical, uninterrupted pass.</p>
         </div>
         <p class="web-platform-note">Keyboard and pointer controls remain available for setup and accessibility. Local files, native MIDI, and the full practice setup are desktop-first.</p>
@@ -129,7 +129,7 @@ function showLanding(): void {
         <div class="web-download-copy">
           <p class="web-section-index">The desktop release</p>
           <h2 id="web-download-title">Bring the studio to the kit.</h2>
-          <p>Drumroll 1.2.0-kb.4 is the Apple Silicon macOS preview. The public artifact is Developer ID signed, Apple notarized, and published with a reproducible SHA-256 checksum.</p>
+          <p>Drumroll 1.2.0-kb.5 is the Apple Silicon macOS preview. The public artifact is Developer ID signed, Apple notarized, and published with a reproducible SHA-256 checksum.</p>
         </div>
         <div class="web-download-action">
           <a id="desktop-download" href="${publicReleaseHref}">Download Drumroll for Apple Silicon</a>
@@ -142,8 +142,8 @@ function showLanding(): void {
         <h2 id="web-faq-title">What Drumroll can say today.</h2>
         <div class="web-faq-list">
           <details><summary>Does it require an electronic drum kit?</summary><p>Drumroll is designed around MIDI input from an electronic kit. Keyboard and pointer controls remain available for setup and accessibility.</p></details>
-          <details><summary>Will Coach always show trouble bars?</summary><p>No. Exact trouble bars and targeted loops require a saved run with full hit records. Summary-only runs can still report their recorded accuracy, timing, lane, wrong-hit, speed, and date.</p></details>
-          <details><summary>Is this download link public?</summary><p>Yes. It points to the exact v1.2.0-kb.4 GitHub release asset; SHA256SUMS.txt is published beside it.</p></details>
+          <details><summary>Will Coach always show trouble bars?</summary><p>No. Exact trouble bars and targeted loops require a saved run with full hit records. When they exist, every weak loop stays linked to the original review until two consecutive full-coverage, zero-error passes clear it. Summary-only runs can still report their recorded accuracy, timing, lane, wrong-hit, speed, and date.</p></details>
+          <details><summary>Is this download link public?</summary><p>Yes. It points to the exact v1.2.0-kb.5 GitHub release asset; SHA256SUMS.txt is published beside it.</p></details>
         </div>
       </section>
 

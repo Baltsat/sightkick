@@ -33,6 +33,8 @@ interface UsePracticeSessionParams {
   isEnded: boolean;
   onExit: () => void;
   initialPlaybackSpeed?: number;
+  onPlay?: () => void;
+  onPlayFromTick?: (tick: number) => void;
 }
 
 interface UsePracticeSessionResult {
@@ -57,6 +59,8 @@ export function usePracticeSession({
   isEnded,
   onExit,
   initialPlaybackSpeed = 1,
+  onPlay,
+  onPlayFromTick,
 }: UsePracticeSessionParams): UsePracticeSessionResult {
   const [focusIndex, setFocusIndex] = useState<number>();
   const [loopAnchor, setLoopAnchor] = useState<number>();
@@ -147,13 +151,22 @@ export function usePracticeSession({
   };
   const confirm = () => {
     if (focusIndex === undefined) {
-      engine?.play();
+      if (onPlay) {
+        onPlay();
+      } else {
+        engine?.play();
+      }
 
       return;
     }
 
     if (isLooping && loopAnchor !== undefined) {
-      engine?.play();
+      if (onPlay) {
+        onPlay();
+      } else {
+        engine?.play();
+      }
+
       clearSelection();
 
       return;
@@ -163,7 +176,11 @@ export function usePracticeSession({
       const measure = renderData[focusIndex]?.measure;
 
       if (measure) {
-        engine?.playFromTick(measure.startTick);
+        if (onPlayFromTick) {
+          onPlayFromTick(measure.startTick);
+        } else {
+          engine?.playFromTick(measure.startTick);
+        }
       }
 
       return;

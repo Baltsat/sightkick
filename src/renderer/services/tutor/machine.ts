@@ -350,7 +350,21 @@ function finishRecoveryAttempt(
       ...state,
       phase: 'observing',
       currentSpeed: state.targetSpeed,
+      // Reaching the bounded safety release is a checkpoint transition, not
+      // an invitation to continue displaying an impossible 0/3 game state.
+      // Refill the checkpoint lives while preserving the deferred recovery
+      // attempt as evidence for Coach and the end-of-run review.
+      livesRemaining: shouldDefer
+        ? state.settings.startingLives
+        : state.livesRemaining,
       recovery: undefined,
+      lastRecoveryOutcome: {
+        recoveryId: recovery.id,
+        status: shouldDefer ? 'deferred' : 'mastered',
+        startMeasure: recovery.region.startMeasure,
+        endMeasure: recovery.region.endMeasure,
+        cleanRepetitions,
+      },
       recoveryAttempts: attempts,
       nextSequence: state.nextSequence + 1,
       ignoreTriggersThroughMeasure: recovery.region.endMeasure,

@@ -374,7 +374,7 @@ describe('Engine', () => {
     expect(a.style.backgroundColor).toBe('');
   });
 
-  it('progress-colours notes before the active note', async () => {
+  it('does not mark unresolved notes missed while the transport is parked', async () => {
     const n0 = staveNote(['c/5']);
     const n1 = staveNote(['d/5']);
     const n2 = staveNote(['e/5']);
@@ -395,8 +395,8 @@ describe('Engine', () => {
     });
     engine.timeStore.set(0.5);
 
-    expect(hasClass(n0, 'vf-note-missed')).toBe(true);
-    expect(hasClass(n1, 'vf-note-missed')).toBe(true);
+    expect(uncolored(n0)).toBe(true);
+    expect(uncolored(n1)).toBe(true);
     expect(uncolored(n2)).toBe(true);
   });
 
@@ -551,17 +551,23 @@ describe('Engine', () => {
     );
   });
 
-  it('fires onMiss for each passed-unhit note during forward playback', async () => {
+  it('fires onMiss only after Judge closes the late-hit window', async () => {
     const n0 = staveNote(['c/5']);
     const n1 = staveNote(['d/5']);
     const n2 = staveNote(['e/5']);
+    const modelNotes = [
+      { tick: 0, isRest: false, notes: ['c/5'] } as Note,
+      { tick: 240, isRest: false, notes: ['d/5'] } as Note,
+      { tick: 480, isRest: false, notes: ['e/5'] } as Note,
+    ];
     const { engine } = await setup({
       renderData: [
-        measureData(0, 1920, [
-          rendered(0, n0),
-          rendered(240, n1),
-          rendered(480, n2),
-        ]),
+        measureData(
+          0,
+          1920,
+          [rendered(0, n0), rendered(240, n1), rendered(480, n2)],
+          modelNotes,
+        ),
       ],
     });
     const missed: number[] = [];
@@ -572,24 +578,16 @@ describe('Engine', () => {
       cursorEl: document.createElement('div'),
       highlightEls: [],
     });
-    engine.timeStore.set(0.5);
+    engine.playFromTick(0);
+    engine.timeStore.set(0.55);
 
-    // Same forward walk the "progress-colours notes" test above asserts
-    // paints vf-note-missed on n0/n1 - onMiss fires once per passed-unhit
-    // note-key, in the order they're walked.
     expect(missed).toEqual([0, 240]);
+    expect(hasClass(n0, 'vf-note-missed')).toBe(true);
+    expect(hasClass(n1, 'vf-note-missed')).toBe(true);
+    expect(uncolored(n2)).toBe(true);
   });
 
-  it('still fires onMiss for a note skipped by a forward seek', async () => {
-    // A forward seek's *first* internal render pass (see Engine's onSeek
-    // comment on why there are two) walks exactly like normal forward
-    // playback - GameRenderer has no way to tell "fast-forwarded" apart
-    // from "played through fast". So this inherits the same live-miss
-    // signal, same as the plain-forward-playback test above. The one
-    // difference is that a seek also always fires onReset (next test) -
-    // whatever a streak-style listener does in reaction to this onMiss
-    // gets immediately wiped by that onReset anyway, so the end state is
-    // the same either way.
+  it('does not fabricate a miss when a forward seek skips a note', async () => {
     const n0 = staveNote(['c/5']);
     const n1 = staveNote(['d/5']);
     const { engine } = await setup({
@@ -608,8 +606,43 @@ describe('Engine', () => {
     // so seeking to 1.1s makes n1 active and walks n0 as passed.
     engine.seekSeconds(1.1);
 
-    expect(hasClass(n0, 'vf-note-missed')).toBe(true);
-    expect(missed).toEqual([0]);
+    expect(uncolored(n0)).toBe(true);
+    expect(missed).toEqual([]);
+  });
+
+  it('accepts a late Practice hit after the next visual note activates without a false miss', async () => {
+    const snare = staveNote(['c/5']);
+    const tom = staveNote(['d/5']);
+    const { engine } = await setup({
+      hitToleranceSeconds: 0.16,
+      mapping: { snare: ['midi:38'] },
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [rendered(0, snare), rendered(96, tom)],
+          [
+            { tick: 0, isRest: false, notes: ['c/5'] } as Note,
+            { tick: 96, isRest: false, notes: ['d/5'] } as Note,
+          ],
+        ),
+      ],
+    });
+    const missed: number[] = [];
+
+    engine.onMiss((tick) => missed.push(tick));
+    engine.setRendererRefs({ cursorEl: undefined, highlightEls: [] });
+    engine.playFromTick(0);
+    engine.timeStore.set(0.12);
+
+    expect(uncolored(snare)).toBe(true);
+    expect(missed).toEqual([]);
+
+    emitInput('midi:38');
+
+    expect(hasClass(snare, 'vf-note-hit')).toBe(true);
+    expect(hasClass(snare, 'vf-note-missed')).toBe(false);
+    expect(missed).toEqual([]);
   });
 
   it('does not emit an authoritative miss judgement for a forward seek', async () => {
@@ -756,6 +789,30 @@ describe('Engine', () => {
 
     engine.seekSeconds(0.5);
     expect(resets).toHaveLength(2);
+  });
+
+  it('announces seek start before forwarding the completed reset', async () => {
+    const { engine } = await setup();
+    const events: string[] = [];
+
+    engine.onSeekStart(() => events.push('start'));
+    engine.onReset(() => events.push('reset'));
+    engine.seekSeconds(0.5);
+
+    expect(events).toEqual(['start', 'reset']);
+  });
+
+  it('forwards natural loop restarts to remediation listeners', async () => {
+    const { engine, player } = await setup();
+    const loopRestarts: number[] = [];
+
+    engine.onLoopRestart(() => loopRestarts.push(loopRestarts.length));
+    engine.setLoopRegion({ startTick: 0, endTick: 1920 });
+    engine.playFromTick(0);
+    player.currentTime = 3;
+    flushFrame();
+
+    expect(loopRestarts).toHaveLength(1);
   });
 
   it('forwards judge hit/false-hit events to external onHit/onFalseHit subscribers', async () => {

@@ -17,7 +17,11 @@ export function CountIn({ count, beatMs, animated = true }: CountInProps) {
     : undefined;
 
   return (
-    <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+    <div
+      className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+      data-testid="count-in"
+      aria-live="assertive"
+    >
       <div key={count} className="relative flex items-center justify-center">
         <div
           className="absolute rounded-full bg-accent/80 -z-1"

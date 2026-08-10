@@ -34,6 +34,8 @@ export class Transport {
   private onEndedCb: () => void;
   private onErrorCb: () => void;
   private onSeekCb: (tick: number) => void;
+  private onSeekStartCb: () => void;
+  private onLoopRestartCb: () => void;
   private chart: ParsedChart | undefined;
   private measures: Measure[] = [];
   private delaySeconds = 0;
@@ -56,6 +58,7 @@ export class Transport {
   private raf: number | undefined;
   private loopRegion: LoopRegion | undefined;
   private loopRestarting = false;
+  private suppressNextLoopCompletion = false;
   private playGeneration = 0;
   private pendingSpeed: number | undefined;
   private disposed = false;
@@ -68,6 +71,8 @@ export class Transport {
     this.onEndedCb = options.onEnded;
     this.onErrorCb = options.onError;
     this.onSeekCb = options.onSeek ?? (() => {});
+    this.onSeekStartCb = options.onSeekStart ?? (() => {});
+    this.onLoopRestartCb = options.onLoopRestart ?? (() => {});
     this.snapshot = this.buildSnapshot();
 
     if (options.trackData.length > 0) {
@@ -150,15 +155,21 @@ export class Transport {
 
   setLoopRegion(region: LoopRegion | undefined): void {
     const previous = this.loopRegion;
+    const unchanged = Boolean(
+      region &&
+        previous &&
+        previous.startTick === region.startTick &&
+        previous.endTick === region.endTick,
+    );
 
     this.loopRegion = region;
 
-    if (
-      !region ||
-      (previous &&
-        previous.startTick === region.startTick &&
-        previous.endTick === region.endTick)
-    ) {
+    if (!unchanged) {
+      this.suppressNextLoopCompletion = false;
+      this.loopRestarting = false;
+    }
+
+    if (!region || unchanged) {
       return;
     }
 
@@ -211,9 +222,17 @@ export class Transport {
     this.playFromTick(measure?.startTick ?? 0);
   }
 
-  playFromTick(tick: number): void {
+  playFromTick(tick: number, preserveLoopRestarting = false): void {
     if (!this.chart || !this.audioPlayer) {
       return;
+    }
+
+    // A fresh explicit start supersedes any pending suppression from a prior
+    // scrub-to-end. Natural restarts clear the flag before arriving here.
+    this.suppressNextLoopCompletion = false;
+
+    if (!preserveLoopRestarting) {
+      this.loopRestarting = false;
     }
 
     this.playGeneration += 1;
@@ -222,6 +241,7 @@ export class Transport {
 
     this.clearScheduling();
     this.audioPlayer.stop();
+    this.onSeekStartCb();
 
     const startTime = this.tickToTime(tick);
 
@@ -337,8 +357,14 @@ export class Transport {
     const wasActive = this.state === 'playing' || this.state === 'counting-in';
 
     this.clearScheduling();
+    this.onSeekStartCb();
     this.setPosition(seconds);
     this.nextBeatIndex = this.firstBeatIndexAtOrAfter(seconds);
+    this.suppressNextLoopCompletion = Boolean(
+      wasActive &&
+        this.loopRegion &&
+        seconds >= this.tickToTime(this.loopRegion.endTick),
+    );
 
     if (this.chart) {
       this.onSeekCb(
@@ -488,7 +514,13 @@ export class Transport {
     }
 
     this.loopRestarting = true;
-    this.playFromTick(this.loopRegion.startTick);
+
+    if (!this.suppressNextLoopCompletion) {
+      this.onLoopRestartCb();
+    }
+
+    this.suppressNextLoopCompletion = false;
+    this.playFromTick(this.loopRegion.startTick, true);
   }
 
   private scheduleClicks(): void {

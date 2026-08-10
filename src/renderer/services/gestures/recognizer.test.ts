@@ -36,27 +36,20 @@ function playSequence(
 const PRIMARY_COMMAND: KitElement[] = ['kick', 'crash', 'kick', 'crash'];
 
 describe('drum gesture recognizer', () => {
-  it('recognizes only the exact ordered four-strike ready command', () => {
-    const ready = playSequence(
-      createDrumGestureState(),
-      'ready',
-      PRIMARY_COMMAND,
-      1000,
-    );
+  it('starts from one deliberate kick on the home and ready surfaces', () => {
+    const ready = hit(createDrumGestureState(), 'ready', 'kick', 1000);
 
     expect(ready).toMatchObject({
       action: 'start',
-      gestureId: 'kit-command-start',
+      gestureId: 'kit-command-start-kick',
     });
 
-    const reversed = playSequence(
-      createDrumGestureState(),
-      'home',
-      ['crash', 'kick', 'crash', 'kick'],
-      2000,
-    );
+    const home = hit(createDrumGestureState(), 'home', 'kick', 2000);
 
-    expect(reversed.action).toBeUndefined();
+    expect(home).toMatchObject({
+      action: 'start',
+      gestureId: 'kit-command-start-kick',
+    });
   });
 
   it('recognizes pause only after silence and the full signature while playing', () => {
@@ -75,43 +68,19 @@ describe('drum gesture recognizer', () => {
     });
   });
 
-  it('rejects extra hits, reversed hits, quiet hits, short gaps, and slow sequences', () => {
-    const withExtra = playSequence(
-      createDrumGestureState(),
-      'ready',
-      ['kick', 'crash', 'snare', 'kick', 'crash'],
-      1000,
-    );
+  it('rejects a wrong lane, a low-velocity kick, and a kick without the required silence', () => {
+    const wrongLane = hit(createDrumGestureState(), 'ready', 'crash', 1000);
 
-    expect(withExtra.action).toBeUndefined();
+    expect(wrongLane.action).toBeUndefined();
 
-    const quiet = PRIMARY_COMMAND.reduce<DrumGestureTransition>(
-      (result, element, index) =>
-        hit(result.state, 'ready', element, 3000 + index * 180, 30),
-      { state: createDrumGestureState() },
-    );
+    const lowVelocity = hit(createDrumGestureState(), 'home', 'kick', 3000, 55);
 
-    expect(quiet.action).toBeUndefined();
+    expect(lowVelocity.action).toBeUndefined();
 
-    const rushed = playSequence(
-      createDrumGestureState(),
-      'ready',
-      PRIMARY_COMMAND,
-      5000,
-      20,
-    );
+    const recentTraffic = hit(createDrumGestureState(), 'ready', 'snare', 5000);
+    const tooSoon = hit(recentTraffic.state, 'ready', 'kick', 5400);
 
-    expect(rushed.action).toBeUndefined();
-
-    const slow = playSequence(
-      createDrumGestureState(),
-      'ready',
-      PRIMARY_COMMAND,
-      7000,
-      450,
-    );
-
-    expect(slow.action).toBeUndefined();
+    expect(tooSoon.action).toBeUndefined();
   });
 
   it('maps result and paused signatures only on their eligible surfaces', () => {
@@ -152,20 +121,15 @@ describe('drum gesture recognizer', () => {
     expect(retryOnPause.action).toBeUndefined();
   });
 
-  it('debounces one completed command', () => {
-    let result = playSequence(
-      createDrumGestureState(),
-      'ready',
-      PRIMARY_COMMAND,
-      1000,
-    );
+  it('debounces a one-kick start until the cooldown and silence window both pass', () => {
+    let result = hit(createDrumGestureState(), 'ready', 'kick', 1000);
 
     expect(result.action).toBe('start');
 
-    result = playSequence(result.state, 'ready', PRIMARY_COMMAND, 1700);
+    result = hit(result.state, 'ready', 'kick', 1400);
     expect(result.action).toBeUndefined();
 
-    result = playSequence(result.state, 'ready', PRIMARY_COMMAND, 3500);
+    result = hit(result.state, 'ready', 'kick', 2400);
     expect(result.action).toBe('start');
   });
 

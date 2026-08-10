@@ -9,13 +9,26 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   BEAT_SECONDS,
   COUNT_IN_BEATS,
+  DRUM_CHART,
   GUITAR_ONLY_CHART,
   SINGLE_NOTE_CHART,
   makeSong,
   setupSongView,
 } from '../test-support';
 import { multiLaneRunFixture } from '../../components/PracticeStats/test-fixtures';
+import { chartContentRevision } from '../../services/chart-revision';
+import { remediationQueueSlotKey } from '../../services/remediation';
 
+const TEST_CHART_REVISION = chartContentRevision({
+  songId: 'song-1',
+  difficulty: 'expert',
+  format: 'chart',
+  fileData: new TextEncoder().encode(DRUM_CHART),
+});
+const TEST_REMEDIATION_STORAGE_KEY = remediationQueueSlotKey(
+  'song-1',
+  TEST_CHART_REVISION,
+);
 const MULTI_STEM = {
   audio: [
     { src: 'drums.ogg', name: 'drums' },
@@ -94,8 +107,22 @@ describe('opening a song', () => {
     const flowHud = screen.getByTestId('flow-viewport-hud');
 
     expect(flowNotation).toBeInTheDocument();
-    expect(flowNotation).toHaveAttribute('data-presentation-zoom', '1.65');
-    expect(flowNotation).toHaveStyle({ zoom: '1.65' });
+    expect(flowNotation).toHaveAttribute('data-presentation-zoom', '1.15');
+    expect(flowNotation).toHaveStyle({ zoom: '1.15' });
+    expect(screen.getByTestId('flow-fixed-playhead')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        flowNotation.querySelectorAll('[data-flow-bar]').length,
+      ).toBeGreaterThan(0);
+    });
+    expect(
+      flowNotation.querySelectorAll('[data-flow-beat]').length,
+    ).toBeGreaterThanOrEqual(4);
+    expect(
+      screen
+        .getByTestId('flow-fixed-playhead')
+        .querySelector('[data-flow-location]'),
+    ).toHaveTextContent(/Bar 1 \/ \d+ · Beat 1/);
     expect(flowHud).toHaveAttribute('data-mode', 'perform');
     expect(
       screen.getByRole('group', { name: 'Notation view' }),
@@ -112,6 +139,13 @@ describe('opening a song', () => {
       'aria-pressed',
       'true',
     );
+    expect(screen.getByTestId('practice-input-readiness')).toHaveAttribute(
+      'data-state',
+      'waiting',
+    );
+    expect(screen.getByTestId('practice-input-readiness')).toHaveAccessibleName(
+      'Waiting for a MIDI drum kit',
+    );
 
     fireEvent.click(screen.getByTestId('notation-classic-toggle'));
 
@@ -123,6 +157,9 @@ describe('opening a song', () => {
       'aria-pressed',
       'true',
     );
+    expect(screen.getByTestId('notation-location')).toHaveAccessibleName(
+      /Bar 1 of \d+, beat 1 of 4/,
+    );
 
     const classicHeading = screen
       .getAllByRole('heading', { name: 'Master of Puppets' })
@@ -130,8 +167,12 @@ describe('opening a song', () => {
 
     expect(classicHeading).toBeDefined();
     expect(classicHeading?.parentElement?.parentElement).toHaveStyle({
-      zoom: '1',
+      zoom: '1.15',
     });
+    expect(screen.getByTestId('classic-notation')).toHaveAttribute(
+      'data-presentation-zoom',
+      '1.15',
+    );
     expect(
       JSON.parse(
         window.localStorage.getItem('settings.practiceNotationLayout') ?? '""',
@@ -164,7 +205,9 @@ describe('playing with count-in', () => {
       await view.loadSong();
       view.clickPlay();
 
-      expect(screen.getByText('1')).toBeInTheDocument();
+      expect(
+        within(screen.getByTestId('count-in')).getByText('1'),
+      ).toBeInTheDocument();
 
       const songStart = COUNT_IN_BEATS * BEAT_SECONDS;
       const scheduled = view.audio.bufferSources.flatMap((s) => s.starts);
@@ -173,7 +216,7 @@ describe('playing with count-in', () => {
 
       await view.completeCountIn();
 
-      expect(screen.queryByText('1')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('count-in')).not.toBeInTheDocument();
       expect(view.startedSources().length).toBeGreaterThan(0);
     } finally {
       vi.useRealTimers();
@@ -189,12 +232,14 @@ describe('playing with count-in', () => {
       await view.loadSong();
       view.clickPlay();
 
-      expect(screen.getByText('1')).toBeInTheDocument();
+      expect(
+        within(screen.getByTestId('count-in')).getByText('1'),
+      ).toBeInTheDocument();
 
       view.clickPlay();
       await view.completeCountIn();
 
-      expect(screen.queryByText('1')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('count-in')).not.toBeInTheDocument();
       expect(view.startedSources()).toHaveLength(0);
     } finally {
       vi.useRealTimers();
@@ -213,7 +258,7 @@ describe('disabling the count-in from settings', () => {
     view.toggleSetting('count-in');
     view.clickPlay();
 
-    expect(screen.queryByText('1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('count-in')).not.toBeInTheDocument();
     expect(view.startedSources().length).toBeGreaterThan(0);
   });
 
@@ -278,7 +323,7 @@ describe('playhead', () => {
 });
 
 describe('sheet appearance', () => {
-  it('renders drum-colored noteheads until colors are switched off in settings', async () => {
+  it('keeps Flow lane colors readable and lets Classic colors be switched off', async () => {
     const view = setupSongView();
 
     await view.loadSong();
@@ -291,6 +336,15 @@ describe('sheet appearance', () => {
     view.openSettings();
     view.openMoreSettings();
     view.toggleSetting('colors');
+
+    await waitFor(() => {
+      expect(
+        document.querySelectorAll('.vf-note-snare').length,
+      ).toBeGreaterThan(0);
+      expect(document.querySelectorAll('.vf-note-uncolored')).toHaveLength(0);
+    });
+
+    fireEvent.click(screen.getByTestId('notation-classic-toggle'));
 
     await waitFor(() => {
       expect(
@@ -1347,11 +1401,17 @@ describe('the score summary', () => {
 
     fireEvent.click(screen.getByTestId('coach-practice-bars'));
 
-    expect(screen.getByTestId('loop-toggle')).toBeChecked();
-    expect(screen.getByRole('spinbutton')).toHaveValue('0.7');
-    expect(view.measureHighlights()[0]).toHaveAttribute(
-      'data-selected',
-      'true',
+    await waitFor(() => {
+      expect(screen.getByTestId('loop-toggle')).toBeChecked();
+      expect(screen.getByRole('spinbutton')).toHaveValue('0.7');
+      expect(view.measureHighlights()[0]).toHaveAttribute(
+        'data-selected',
+        'true',
+      );
+      expect(screen.getByTestId('remediation-task')).toHaveTextContent('1 / 1');
+    });
+    expect(window.localStorage.getItem(TEST_REMEDIATION_STORAGE_KEY)).toContain(
+      '"status":"active"',
     );
   });
 });

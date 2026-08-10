@@ -21,7 +21,7 @@ import { faRepeat, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { IconButton } from '../IconButton';
 import { getScrollParent } from '../../services/engine/helpers';
 import { autoScrollSpeed } from './helpers';
-import { ContinuousNotationCamera } from '../ContinuousNotation';
+import { ContinuousNotationCamera, FlowMeter } from '../ContinuousNotation';
 
 export interface SheetMusicProps {
   engine: Engine | undefined;
@@ -67,6 +67,9 @@ export function SheetMusic({
   const cursorRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const scoreRef = useRef<HTMLDivElement>(null);
+  const flowStageRef = useRef<HTMLDivElement>(null);
+  const fixedFlowPlayheadRef = useRef<HTMLDivElement>(null);
   const highlightsRef = useMemo(
     () => renderData.map(() => createRef<HTMLDivElement>()),
     [renderData],
@@ -298,29 +301,51 @@ export function SheetMusic({
     handleMeasureMouseEnter,
   ]);
   const isFlow = layout === 'flow';
-  // Flow is viewed from the kit rather than at reading distance. Give the
-  // same score a distance-readable presentation boost while preserving the
-  // user's zoom control and its 2x ceiling; Classic keeps the exact requested
-  // value. The 1.65x default keeps the score, rather than the surrounding HUD,
-  // as the dominant Flow surface from normal kit distance.
-  const presentationZoom = isFlow ? Math.min(2, zoom * 1.65) : zoom;
+  // Both layouts use the exact same canonical VexFlow glyph scale. Flow
+  // changes only the camera and viewport; switching modes must never make
+  // the score subtly smaller or force the drummer to relearn its proportions.
+  // `zoom` remains the player's multiplier; the shared 1.15 baseline makes
+  // 1.0 readable from the drum throne without taking that control away.
+  const presentationZoom = zoom * 1.15;
 
   return (
     <div
       ref={wrapperRef}
       className={cn('min-w-max', isFlow && 'drumroll-flow-notation')}
       style={{ zoom: presentationZoom }}
-      data-testid={isFlow ? 'flow-notation' : undefined}
-      data-presentation-zoom={isFlow ? presentationZoom.toFixed(2) : undefined}
+      data-testid={isFlow ? 'flow-notation' : 'classic-notation'}
+      data-presentation-zoom={presentationZoom.toFixed(2)}
     >
       {isFlow && timeStore && chart && (
         <ContinuousNotationCamera
-          notationRef={wrapperRef}
+          notationRef={scoreRef}
+          stageRef={flowStageRef}
+          fixedPlayheadRef={fixedFlowPlayheadRef}
           timeStore={timeStore}
           chart={chart}
           renderData={renderData}
           delaySeconds={delaySeconds}
         />
+      )}
+      {isFlow && (
+        <div
+          ref={fixedFlowPlayheadRef}
+          className="drumroll-flow-fixed-playhead"
+          data-testid="flow-fixed-playhead"
+          aria-hidden="true"
+          style={{ display: 'none' }}
+        >
+          <span className="drumroll-flow-fixed-playhead__label">
+            <span className="drumroll-flow-fixed-playhead__now">Now</span>
+            <span
+              className="drumroll-flow-fixed-playhead__location"
+              data-flow-location
+            >
+              Bar 1 / {renderData.length} · Beat 1
+            </span>
+          </span>
+          <span className="drumroll-flow-fixed-playhead__beat" />
+        </div>
       )}
       {gameMode === 'practice' && isLooping && practiceRange && (
         <div className="fixed top-35 ml-10 bg-bg rounded-md z-100 px-4 py-3 flex items-center gap-2">
@@ -344,6 +369,7 @@ export function SheetMusic({
         </div>
       )}
       <div
+        ref={flowStageRef}
         className={cn(
           'flex flex-col items-center min-w-max',
           isFlow ? 'drumroll-flow-stage' : 'bg-paper rounded-[11px] p-10',
@@ -360,10 +386,14 @@ export function SheetMusic({
             </div>
           </>
         )}
-        <div className="min-w-max relative z-0">
+        <div ref={scoreRef} className="min-w-max relative z-0">
+          {isFlow && <FlowMeter renderData={renderData} />}
           <div
             ref={vexflowContainerRef}
-            className="min-w-max pointer-events-none **:pointer-events-none"
+            className={cn(
+              'min-w-max pointer-events-none **:pointer-events-none',
+              isFlow && 'drumroll-flow-score',
+            )}
           />
           {measureHighlights}
           <div

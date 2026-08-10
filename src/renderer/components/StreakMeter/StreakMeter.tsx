@@ -35,13 +35,12 @@ export function StreakMeter({
   className,
 }: StreakMeterProps) {
   const { streak, announceSeq, announceStage, shatterSeq } = ui;
-  const hasStarted =
-    streak.count > 0 || streak.best > 0 || streak.stage !== undefined;
 
-  // Nothing to show before the run's first correct hit - a permanent "0"
-  // pill at the top of the screen before the player has done anything
-  // would just be clutter, not motivation.
-  if (!hasStarted) {
+  // The meter represents a live streak, not run history. Once the current
+  // streak is broken, the best value remains available in Results; keeping a
+  // 0/best pill over the score is both distracting and visually collides with
+  // the location HUD at exactly the moment the player needs to recover.
+  if (streak.count <= 0) {
     return null;
   }
 

@@ -6,14 +6,134 @@ import { Tooltip } from '../Tooltip';
 import { LessonEntry, lockedHint } from '../../hooks/useLessons';
 import { NodeState } from './journey';
 import drumstickCursor from '../../assets/daybreak/drumstick-cursor.png';
+import pearlSnare from '../../assets/daybreak/journey-nodes/pearl-snare.png';
+import meshPad from '../../assets/daybreak/journey-nodes/mesh-pad.png';
+import bronzeCymbal from '../../assets/daybreak/journey-nodes/bronze-cymbal.png';
+import kickPad from '../../assets/daybreak/journey-nodes/kick-pad.png';
+
+type LessonLane = NonNullable<
+  LessonEntry['lesson']['targetLanes']
+>[number]['element'];
+
+type CanonicalColorLane = 'orange' | 'red' | 'yellow' | 'blue' | 'green';
+
+interface LessonNodeVisual {
+  asset: string;
+  instrument: 'snare' | 'pad' | 'cymbal' | 'kick-pad';
+  label: string;
+  colorLane: CanonicalColorLane;
+}
+
+const NODE_VISUALS: Record<LessonLane, LessonNodeVisual> = {
+  kick: {
+    asset: kickPad,
+    instrument: 'kick-pad',
+    label: 'Kick',
+    colorLane: 'orange',
+  },
+  snare: {
+    asset: pearlSnare,
+    instrument: 'snare',
+    label: 'Snare',
+    colorLane: 'red',
+  },
+  hihat: {
+    asset: bronzeCymbal,
+    instrument: 'cymbal',
+    label: 'Hi-hat',
+    colorLane: 'yellow',
+  },
+  tom1: {
+    asset: meshPad,
+    instrument: 'pad',
+    label: 'Tom 1',
+    colorLane: 'yellow',
+  },
+  ride: {
+    asset: bronzeCymbal,
+    instrument: 'cymbal',
+    label: 'Ride',
+    colorLane: 'blue',
+  },
+  tom2: {
+    asset: meshPad,
+    instrument: 'pad',
+    label: 'Tom 2',
+    colorLane: 'blue',
+  },
+  crash: {
+    asset: bronzeCymbal,
+    instrument: 'cymbal',
+    label: 'Crash',
+    colorLane: 'green',
+  },
+  tom3: {
+    asset: meshPad,
+    instrument: 'pad',
+    label: 'Floor tom',
+    colorLane: 'green',
+  },
+};
+
+function inferredLane(title: string): LessonLane {
+  const normalized = title.toLowerCase();
+
+  if (normalized.includes('kick')) {
+    return 'kick';
+  }
+
+  if (normalized.includes('ride')) {
+    return 'ride';
+  }
+
+  if (normalized.includes('crash')) {
+    return 'crash';
+  }
+
+  if (normalized.includes('hi-hat') || normalized.includes('hihat')) {
+    return 'hihat';
+  }
+
+  if (normalized.includes('tom 3') || normalized.includes('floor tom')) {
+    return 'tom3';
+  }
+
+  if (normalized.includes('tom 2')) {
+    return 'tom2';
+  }
+
+  if (normalized.includes('tom')) {
+    return 'tom1';
+  }
+
+  return 'snare';
+}
+
+function visualForLesson(entry: LessonEntry): LessonNodeVisual {
+  const dominantLane = entry.lesson.targetLanes?.reduce(
+    (strongest, target) =>
+      !strongest || target.weight > strongest.weight ? target : strongest,
+    undefined as
+      | NonNullable<LessonEntry['lesson']['targetLanes']>[number]
+      | undefined,
+  )?.element;
+
+  return NODE_VISUALS[
+    dominantLane ?? inferredLane(entry.song.name || entry.lesson.title)
+  ];
+}
 
 export interface LessonNodeProps {
   entry: LessonEntry;
   state: NodeState;
   /** Horizontal position (0-100) along the season's winding path. */
   xPercent: number;
-  /** Vertical scene anchor (px) over the prepared studio drum pads. */
-  yPx: number;
+  /** Vertical position (0-100) inside the fixed-size studio viewport. */
+  yPercent: number;
+  /** Current kit/keyboard target. Confirm always arms this unlocked lesson. */
+  isKitFocused?: boolean;
+  /** Off-window nodes remain mounted for stable IDs, but are not interactive. */
+  isInViewport?: boolean;
   onPlay: (entry: LessonEntry) => void;
   onLockedClick: (entry: LessonEntry) => void;
 }
@@ -28,12 +148,18 @@ export function LessonNode({
   entry,
   state,
   xPercent,
-  yPx,
+  yPercent,
+  isKitFocused = false,
+  isInViewport = true,
   onPlay,
   onLockedClick,
 }: LessonNodeProps) {
   const { lesson, unlocked, bestStars } = entry;
-  const exerciseTitle = entry.song.name || lesson.title;
+  /* The numbered badge already carries the curriculum coordinate. Keeping
+   * the plaque to the authored exercise title preserves the useful words at
+   * drum distance instead of repeating "Lesson 01.01" in every node. */
+  const exerciseTitle = lesson.title || entry.song.name;
+  const visual = visualForLesson(entry);
   const hint = lockedHint(entry);
   const readableHint = hint.replaceAll('\u2b50', 'stars');
   const activate = () => {
@@ -47,7 +173,7 @@ export function LessonNode({
     state === 'next-up'
       ? 'Next up'
       : state === 'done'
-      ? 'Mastered'
+      ? 'Cleared'
       : state === 'available'
       ? 'Ready'
       : 'Locked';
@@ -65,7 +191,7 @@ export function LessonNode({
         }
       }}
       role="button"
-      tabIndex={0}
+      tabIndex={isInViewport ? 0 : -1}
       aria-label={
         unlocked
           ? `Play ${exerciseTitle}`
@@ -74,46 +200,62 @@ export function LessonNode({
       data-testid={`lesson-item-${lesson.id}`}
       data-locked={unlocked ? undefined : 'true'}
       data-node-state={state}
+      data-node-instrument={visual.instrument}
+      data-color-lane={visual.colorLane}
+      data-kit-focused={isKitFocused ? 'true' : undefined}
+      data-in-journey-viewport={isInViewport ? 'true' : 'false'}
+      aria-hidden={isInViewport ? undefined : true}
       style={{
         left: `${xPercent}%`,
-        top: yPx,
+        top: `${yPercent}%`,
         cursor: `url(${drumstickCursor}) 8 3, pointer`,
       }}
       className={cn(
-        'daybreak-lesson-node absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-full border py-1.5 pl-1.5 pr-3 outline outline-1 -outline-offset-1 outline-white/50 cursor-pointer motion-safe:transition-[background-color,border-color,box-shadow,transform] motion-safe:duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#56d8f2]',
-        unlocked ? 'hover:scale-105' : 'daybreak-lesson-node--locked',
+        'daybreak-lesson-node absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer',
+        !unlocked && 'daybreak-lesson-node--locked',
+        !isInViewport && 'daybreak-lesson-node--offstage',
       )}
     >
-      <div
-        className={cn(
-          'daybreak-lesson-node__core flex size-11 shrink-0 items-center justify-center rounded-full font-display text-[11px] font-semibold',
-          state === 'locked' && 'bg-[#e5e8e8] text-[#65717e]',
-          state === 'available' && 'bg-[#fff4d2] text-[#5b410f]',
-        )}
-      >
-        {state === 'locked' ? (
-          <FontAwesomeIcon icon={faLock} aria-hidden="true" />
-        ) : state === 'done' ? (
-          <FontAwesomeIcon icon={faCheck} aria-hidden="true" />
-        ) : (
-          lesson.id
-        )}
+      <div className="daybreak-lesson-node__instrument" aria-hidden="true">
+        <span className="daybreak-lesson-node__glow" />
+        <img
+          className="daybreak-lesson-node__image"
+          src={visual.asset}
+          alt=""
+          draggable={false}
+        />
+        <span className="daybreak-lesson-node__badge">
+          {state === 'locked' ? (
+            <FontAwesomeIcon icon={faLock} />
+          ) : state === 'done' ? (
+            <FontAwesomeIcon icon={faCheck} />
+          ) : (
+            lesson.id
+          )}
+        </span>
       </div>
 
-      <div className="min-w-0">
-        <span className="daybreak-node-status">{stateLabel}</span>
+      <div className="daybreak-lesson-node__plaque">
+        <div className="daybreak-lesson-node__meta">
+          <span className="daybreak-node-status">{stateLabel}</span>
+          <span className="daybreak-node-lane">{visual.label}</span>
+        </div>
         <div
-          className="daybreak-lesson-node__title font-ui text-[13px] font-semibold leading-tight text-[#111722]"
+          className="daybreak-lesson-node__title font-ui text-[13px] font-semibold leading-tight"
           title={exerciseTitle}
         >
           {exerciseTitle}
         </div>
 
         {unlocked ? (
-          <Stars rating={bestStars} size="xs" className="mt-0.5 gap-1" />
+          <Stars
+            rating={bestStars}
+            size="xs"
+            className="daybreak-lesson-node__stars gap-1"
+          />
         ) : (
           <Tooltip title={`${readableHint} to unlock this exercise`}>
-            <span className="mt-0.5 block truncate text-xs font-medium text-[#46515e]">
+            <span className="daybreak-lesson-node__unlock block truncate text-xs font-medium text-white/70">
               {readableHint}
             </span>
           </Tooltip>

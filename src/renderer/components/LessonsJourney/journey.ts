@@ -1,5 +1,4 @@
 import {
-  LESSON_MASTERED_STARS,
   LessonEntry,
   LessonProgress,
   LessonUnitGroup,
@@ -13,8 +12,8 @@ export type NodeState = 'locked' | 'next-up' | 'done' | 'available';
 
 /**
  * A season is locked until its first entry unlocks, completed once every
- * entry in it is mastered, and active otherwise. Derived purely from the
- * existing unlock chain (`entry.unlocked` / `entry.bestStars`) — no new
+ * entry in it is cleared, and active otherwise. Derived purely from the
+ * existing unlock chain (`entry.unlocked` / `entry.cleared`) — no new
  * unlock math.
  */
 export function seasonState(group: LessonUnitGroup): SeasonState {
@@ -24,31 +23,27 @@ export function seasonState(group: LessonUnitGroup): SeasonState {
     return 'locked';
   }
 
-  const masteredCount = group.entries.filter(
-    (entry) => entry.bestStars >= LESSON_MASTERED_STARS,
-  ).length;
+  const clearedCount = group.entries.filter((entry) => entry.cleared).length;
 
-  return masteredCount === group.entries.length ? 'completed' : 'active';
+  return clearedCount === group.entries.length ? 'completed' : 'active';
 }
 
 /** Stars earned vs. the maximum obtainable (5 per exercise) across a season. */
 export function seasonStars(group: LessonUnitGroup): {
   earned: number;
   possible: number;
-  masteredCount: number;
+  clearedCount: number;
 } {
   const earned = group.entries.reduce((sum, entry) => sum + entry.bestStars, 0);
-  const masteredCount = group.entries.filter(
-    (entry) => entry.bestStars >= LESSON_MASTERED_STARS,
-  ).length;
+  const clearedCount = group.entries.filter((entry) => entry.cleared).length;
 
-  return { earned, possible: group.entries.length * 5, masteredCount };
+  return { earned, possible: group.entries.length * 5, clearedCount };
 }
 
 /**
  * Per-node path state. `next-up` is the single furthest unlocked-but-
- * unmastered lesson (the same pointer the existing Continue card uses),
- * `done` is a mastered exercise, `available` is unlocked but neither.
+ * uncleared lesson (the same pointer the existing Continue card uses),
+ * `done` is a cleared exercise, `available` is unlocked but neither.
  */
 export function nodeState(
   entry: LessonEntry,
@@ -62,7 +57,7 @@ export function nodeState(
     return 'next-up';
   }
 
-  return entry.bestStars >= LESSON_MASTERED_STARS ? 'done' : 'available';
+  return entry.cleared ? 'done' : 'available';
 }
 
 export interface CurrentSeasonInfo {
@@ -75,8 +70,8 @@ export interface CurrentSeasonInfo {
 
 /**
  * "Where am I" pointer for the header strip: the season and in-season
- * position of the furthest unlocked-unmastered lesson, falling back to the
- * furthest locked lesson once everything unlocked is mastered. Undefined
+ * position of the furthest unlocked-uncleared lesson, falling back to the
+ * furthest locked lesson once everything unlocked is cleared. Undefined
  * once the whole curriculum is complete.
  */
 export function currentSeasonInfo(

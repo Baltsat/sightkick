@@ -166,7 +166,12 @@ async function flush() {
 }
 
 async function setup(
-  options: Partial<{ trackData: TrackConfig[]; isDev: boolean }> = {},
+  options: Partial<{
+    trackData: TrackConfig[];
+    isDev: boolean;
+    onLoopRestart: () => void;
+    onSeekStart: () => void;
+  }> = {},
   context: Partial<TransportContext> = {},
 ) {
   const onEnded = vi.fn();
@@ -416,6 +421,24 @@ describe('Transport', () => {
 
     expect(player.start).toHaveBeenLastCalledWith(3);
     expect(engine.getSnapshot().isPlaying).toBe(true);
+  });
+
+  it('announces a seek before TimeStore moves so silence recovery can ignore it', async () => {
+    const observedPositions: number[] = [];
+    const engineRef: { current?: Transport } = {};
+    const setupResult = await setup({
+      onSeekStart: () =>
+        observedPositions.push(engineRef.current?.timeStore.get() ?? -1),
+    });
+    const engine = setupResult.engine;
+
+    engineRef.current = engine;
+    engine.playFromTick(0);
+    observedPositions.length = 0;
+    engine.seekSeconds(3);
+
+    expect(observedPositions).toEqual([0]);
+    expect(engine.timeStore.get()).toBe(3);
   });
 
   it('repositions without starting playback when seeking while not playing', async () => {
@@ -732,6 +755,76 @@ describe('Transport', () => {
       flushFrame();
 
       expect(player.start).toHaveBeenCalledTimes(2);
+    });
+
+    it('reports only natural loop wraps, never a scrub to the loop end', async () => {
+      const onLoopRestart = vi.fn();
+      const { engine, player } = await setup({ onLoopRestart });
+
+      engine.setLoopRegion({ startTick: 0, endTick: 1920 });
+      engine.playFromTick(0);
+      engine.seekSeconds(3);
+      player.currentTime = 3;
+      flushFrame();
+
+      expect(onLoopRestart).not.toHaveBeenCalled();
+
+      player.currentTime = 1;
+      flushFrame();
+      player.currentTime = 3;
+      flushFrame();
+
+      expect(onLoopRestart).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not carry scrub suppression across a pause and fresh loop start', async () => {
+      const onLoopRestart = vi.fn();
+      const { engine, player } = await setup({ onLoopRestart });
+
+      engine.setLoopRegion({ startTick: 0, endTick: 1920 });
+      engine.playFromTick(0);
+      engine.seekSeconds(3);
+      engine.pause();
+      engine.play();
+
+      player.currentTime = 3;
+      flushFrame();
+
+      expect(onLoopRestart).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears the natural-wrap guard when the player pauses and starts again', async () => {
+      const onLoopRestart = vi.fn();
+      const { engine, player } = await setup({ onLoopRestart });
+
+      engine.setLoopRegion({ startTick: 0, endTick: 1920 });
+      engine.playFromTick(0);
+      player.currentTime = 3;
+      flushFrame();
+
+      expect(onLoopRestart).toHaveBeenCalledTimes(1);
+
+      engine.pause();
+      engine.play();
+      player.currentTime = 3;
+      flushFrame();
+
+      expect(onLoopRestart).toHaveBeenCalledTimes(2);
+    });
+
+    it('clears scrub suppression when a different loop region takes ownership', async () => {
+      const onLoopRestart = vi.fn();
+      const { engine, player } = await setup({ onLoopRestart });
+
+      engine.setLoopRegion({ startTick: 0, endTick: 1920 });
+      engine.playFromTick(0);
+      engine.seekSeconds(3);
+      engine.setLoopRegion({ startTick: 0, endTick: 3840 });
+
+      player.currentTime = 5;
+      flushFrame();
+
+      expect(onLoopRestart).toHaveBeenCalledTimes(1);
     });
   });
 

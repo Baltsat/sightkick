@@ -201,7 +201,7 @@ describe('analyzePracticeRuns', () => {
       runs: [
         {
           summary: summary(1, 1),
-          records: Array.from({ length: 4 }, (_, index) => ({
+          records: Array.from({ length: 6 }, (_, index) => ({
             tick: 3840 + index * 240,
             deltaMs: -44,
             element: 'kick' as const,
@@ -222,5 +222,124 @@ describe('analyzePracticeRuns', () => {
     expect(`${lane?.title} ${lane?.summary}`).not.toMatch(
       /limb|hand|rebound|technique|dynamics|reading/i,
     );
+  });
+
+  it('groups authored 82–85 BPM tempo jitter into one adequately sampled lane region', () => {
+    const jitterChart: CoachChart = {
+      ...chart,
+      tempos: [
+        { tick: 0, bpm: 82 },
+        { tick: 100, bpm: 83 },
+        { tick: 200, bpm: 84 },
+        { tick: 300, bpm: 85 },
+        { tick: 400, bpm: 82 },
+        { tick: 500, bpm: 83 },
+        { tick: 600, bpm: 84 },
+        { tick: 700, bpm: 85 },
+      ],
+      measures: [
+        {
+          ...chart.measures[0],
+          endTick: 800,
+        },
+      ],
+    };
+    const jitterRecords = Array.from({ length: 8 }, (_, index) => ({
+      tick: index * 100,
+      deltaMs: 60,
+      element: 'kick' as const,
+      verdict: 'hit' as const,
+    }));
+    const result = analyzePracticeRuns({
+      chart: jitterChart,
+      runs: [
+        { summary: summary(1, 1), records: jitterRecords },
+        { summary: summary(1, 1), records: jitterRecords },
+      ],
+    });
+    const laneFindings = result.findings.filter(
+      (finding) => finding.kind === 'lane-weakness',
+    );
+
+    expect(laneFindings).toEqual([
+      expect.objectContaining({
+        severity: 'high',
+        title: 'kick lane records late hits around 85 BPM',
+        evidence: expect.objectContaining({
+          bpm: 85,
+          sampleCount: 16,
+        }),
+      }),
+    ]);
+  });
+
+  it('counts wrong-only strikes as failed bar outcomes', () => {
+    const wrongOnly: StoredPracticeRun = {
+      summary: summary(1, 0.5),
+      records: [
+        ...Array.from({ length: 4 }, (_, index) => ({
+          tick: 1920 + index * 240,
+          deltaMs: 0,
+          element: 'kick' as const,
+          verdict: 'hit' as const,
+        })),
+        ...Array.from({ length: 4 }, (_, index) => ({
+          tick: 2880 + index * 120,
+          deltaMs: 0,
+          element: 'snare' as const,
+          verdict: 'wrong' as const,
+        })),
+      ],
+    };
+    const trouble = analyzePracticeRuns({
+      chart,
+      runs: [wrongOnly],
+    }).findings.find((finding) => finding.kind === 'trouble-bars');
+
+    expect(trouble).toMatchObject({
+      evidence: {
+        barStart: 2,
+        barEnd: 2,
+        accuracy: 0.5,
+        sampleCount: 8,
+        hitCount: 4,
+        missCount: 0,
+        wrongHitCount: 4,
+      },
+    });
+  });
+
+  it('does not count a paired wrong strike twice after its matching miss', () => {
+    const paired: StoredPracticeRun = {
+      summary: summary(1, 0.75),
+      records: [
+        ...Array.from({ length: 6 }, (_, index) => ({
+          tick: index * 240,
+          deltaMs: 0,
+          element: index % 2 === 0 ? ('hihat' as const) : ('snare' as const),
+          verdict: 'hit' as const,
+        })),
+        { tick: 1440, deltaMs: 0, element: 'hihat', verdict: 'miss' },
+        { tick: 1680, deltaMs: 0, element: 'snare', verdict: 'miss' },
+        { tick: 1440, deltaMs: 0, element: 'tom1', verdict: 'wrong' },
+        { tick: 1680, deltaMs: 0, element: 'tom1', verdict: 'wrong' },
+      ],
+    };
+    const trouble = analyzePracticeRuns({
+      chart,
+      runs: [paired],
+    }).findings.find((finding) => finding.kind === 'trouble-bars');
+
+    expect(trouble).toMatchObject({
+      evidence: {
+        barStart: 1,
+        barEnd: 1,
+        accuracy: 0.75,
+        sampleCount: 8,
+        hitCount: 6,
+        missCount: 2,
+        wrongHitCount: 2,
+      },
+    });
   });
 });

@@ -341,6 +341,9 @@ describe('Tutor HUD evidence messages', () => {
     expect(messageForTutorCommand(deferred, settings)?.detail).toContain(
       '3 failed recovery attempts reached the configured 3-attempt safety limit',
     );
+    expect(messageForTutorCommand(deferred, settings)?.detail).toContain(
+      'Checkpoint lives refilled to 3',
+    );
     expect(messageForTutorCommand(deferred, settings)?.detail).not.toContain(
       'Six',
     );

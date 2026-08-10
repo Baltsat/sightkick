@@ -14,8 +14,6 @@ interface AppContextValue {
   setDifficulty: (d: Difficulty) => void;
   currentPath: string | null;
   setCurrentPath: (p: string | null) => void;
-  supportDismissed: boolean;
-  setSupportDismissed: (d: boolean) => void;
   isDev: boolean;
 }
 
@@ -27,10 +25,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     'expert',
   );
   const [currentPath, setCurrentPath] = useState<string | null>(null);
-  const [supportDismissed, setSupportDismissed] = usePersisted(
-    'settings.supportDismissed',
-    false,
-  );
   const [isDev, setIsDev] = useState(false);
 
   useEffect(() => {
@@ -47,19 +41,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setDifficulty,
       currentPath,
       setCurrentPath,
-      supportDismissed,
-      setSupportDismissed,
       isDev,
     }),
-    [
-      difficulty,
-      setDifficulty,
-      currentPath,
-      setCurrentPath,
-      supportDismissed,
-      setSupportDismissed,
-      isDev,
-    ],
+    [difficulty, setDifficulty, currentPath, setCurrentPath, isDev],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

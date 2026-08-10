@@ -4,8 +4,8 @@ meta:
   title: Drumroll Method - Drumset Fundamentals
   assessment_boundary: MIDI assesses timing and pad choice; sticking/form cue is not assessed.
   lesson_policy:
-    dose_rule: Four focused repeats, starting at the authored BPM floor and advancing only when the pattern remains controlled.
-    mastery_rule: Three clean passes at the authored target BPM with at least 90 percent scored accuracy.
+    dose_rule: Use focused repeats from the authored BPM floor; advance only while the pattern remains controlled.
+    mastery_rule: Clear gate - one complete uninterrupted pass at the authored target BPM with at least 90 percent scored accuracy; keep repeating until it feels consistent.
   inspiration:
     Pedagogical progression inspired by a well-known beginner drumset method book's lesson
     order (sticking basics, reading, coordination, 8th notes, toms, ties/rests, strokes, fills, musical
@@ -95,9 +95,9 @@ meta:
   ticks_per_quarter: 480
   gamification:
     stars_to_unlock:
-      Recommended minimum total stars earned (across all prior exercises) before this one
-      unlocks. Computed as the exercise's 0-based position in the full curriculum order, so unlocking
-      is a simple linear chain a future UI can widen (e.g. allow skipping ahead once N stars are banked).
+      Legacy schema name for the number of prior lesson clears required before this one unlocks.
+      Computed as the exercise's 0-based position in the full curriculum order, so a high star score
+      cannot skip authored prerequisites.
     next: id of the next exercise in the recommended play order, or null for the last exercise.
   skills_legend:
     kick-independence: kick drum plays independently of / alongside the hands

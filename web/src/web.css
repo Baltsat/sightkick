@@ -25,8 +25,11 @@ body {
   --web-ui: 'Instrument Sans Variable', 'Instrument Sans', Arial, sans-serif;
   min-width: 20rem;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 88% 3%, rgb(86 216 242 / 19%), transparent 22rem),
+  background: radial-gradient(
+      circle at 88% 3%,
+      rgb(86 216 242 / 19%),
+      transparent 22rem
+    ),
     radial-gradient(circle at 0% 37%, rgb(247 53 134 / 10%), transparent 29rem),
     var(--web-pearl);
   color: var(--web-ink);

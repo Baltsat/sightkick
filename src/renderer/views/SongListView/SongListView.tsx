@@ -17,7 +17,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import appIcon from '../../../../assets/icon.png';
-import { Song, YandexPlaylistCandidate } from '../../../types';
+import { ControlMapping, Song, YandexPlaylistCandidate } from '../../../types';
 import { SongFilter } from '../../components/SongFilter';
 import { SongList } from '../../components/SongList';
 import { SettingsButton } from '../../components/SettingsButton';
@@ -38,13 +38,15 @@ import { useSongList } from '../../hooks/useSongList';
 import { useDownload } from '../../hooks/useDownload';
 import { useSongFilter } from '../../hooks/useSongFilter';
 import { useLibraryCandidates } from '../../hooks/useLibraryCandidates';
-import { useInputControls } from '../../hooks/useInputControls';
+import {
+  InputControlHandlers,
+  useInputControls,
+} from '../../hooks/useInputControls';
 import { useGameModeSelector } from '../../hooks/useGameModeSelector';
 import {
   highestAvailableDifficulty,
   isLessonSong,
   LessonEntry,
-  LESSON_MASTERED_STARS,
   useLessonAutoRescan,
   useLessons,
 } from '../../hooks/useLessons';
@@ -75,6 +77,7 @@ import {
   toggledSortForIndex,
   wrapSortIndex,
 } from './helpers';
+import { resolveLibraryControls } from './library-controls';
 
 // Lazy-loaded: recharts (the Profile's mastery graph) is a meaningfully
 // sized dependency the library header/song list never otherwise needs, so
@@ -82,6 +85,18 @@ import {
 // the Profile drawer, not on every app launch.
 const ProfileView = lazy(() => import('../../components/Profile'));
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard', 'expert'];
+
+function LibraryInputControls({
+  mapping,
+  handlers,
+}: {
+  mapping: ControlMapping;
+  handlers: InputControlHandlers;
+}) {
+  useInputControls(mapping, handlers);
+
+  return null;
+}
 
 function candidateDifficulty(
   song: Song,
@@ -121,7 +136,11 @@ function appendCompletedRun(
 
 export function SongListView() {
   const { currentPath, difficulty, setDifficulty } = useApp();
-  const { controlMapping } = useInput();
+  const { controlMapping, inputMapping } = useInput();
+  const libraryControls = useMemo(
+    () => resolveLibraryControls(controlMapping, inputMapping),
+    [controlMapping, inputMapping],
+  );
   const platformCapabilities = window.drumrollPlatform?.capabilities;
   const youtubeImportAvailable = platformCapabilities?.youtubeImport ?? true;
   const onlineDownloadsAvailable =
@@ -300,7 +319,7 @@ export function SongListView() {
             cue: lesson.entry.lesson.cue,
             assessmentBoundary: lesson.entry.lesson.assessmentBoundary,
             challengeLevel: 0.12 + (lesson.index / finalLessonIndex) * 0.76,
-            mastered: lesson.entry.bestStars >= LESSON_MASTERED_STARS,
+            mastered: lesson.entry.cleared,
             availableDifficulties: song.drumDifficulties,
             chartTotalNotes: song.scoreData?.[targetDifficulty]?.totalNotes,
           },
@@ -358,7 +377,7 @@ export function SongListView() {
 
   useLessonAutoRescan({
     songList,
-    isLessonsTabActive: view === 'journey',
+    isLessonsTabActive: !songOpen && view === 'journey',
     totalLessons: lessonProgress.totalLessons,
     isScanning: scanProgress !== undefined,
     rescan: rescanLibrary,
@@ -484,7 +503,12 @@ export function SongListView() {
       setDifficulty(targetDifficulty);
     }
 
-    play(entry.song.id);
+    // A lesson is already an instructional choice. Showing the general
+    // song-mode picker here makes a seated player walk back to the laptop
+    // just to repeat that choice. Lessons therefore always enter their own
+    // chart directly in Practice; SongView remains responsible for its
+    // deliberate ready cue and count-in, so this does not start audio early.
+    navigate(`/${entry.song.id}?gameMode=practice`);
   };
   const startRecommendedPractice = useCallback(
     (completedRun?: PracticeHistoryEntry) => {
@@ -552,57 +576,57 @@ export function SongListView() {
     navigate(`/${entry.song.id}?gameMode=practice`, { replace: true });
   }, [difficulty, lessonProgress, navigate, searchParams, setDifficulty]);
 
-  useInputControls(
-    controlMapping,
-    isSortOpen
-      ? {
-          up: () => moveSortFocus(-1),
-          down: () => moveSortFocus(1),
-          confirm: toggleFocusedSortDirection,
-          back: () => setIsSortOpen(false),
-        }
-      : {
-          up: () =>
-            setFocusedSongIndex((index) =>
-              nextSongIndex(index, filteredSongList.length, -1),
-            ),
-          down: () =>
-            setFocusedSongIndex((index) =>
-              nextSongIndex(index, filteredSongList.length, 1),
-            ),
-          confirm: () => {
-            if (focusedSongIndex === undefined) {
-              return;
-            }
+  const libraryInputHandlers: InputControlHandlers = isSortOpen
+    ? {
+        up: () => moveSortFocus(-1),
+        down: () => moveSortFocus(1),
+        confirm: toggleFocusedSortDirection,
+        back: () => setIsSortOpen(false),
+      }
+    : {
+        up: () =>
+          setFocusedSongIndex((index) =>
+            nextSongIndex(index, filteredSongList.length, -1),
+          ),
+        down: () =>
+          setFocusedSongIndex((index) =>
+            nextSongIndex(index, filteredSongList.length, 1),
+          ),
+        confirm: () => {
+          if (focusedSongIndex === undefined) {
+            return;
+          }
 
-            const song = filteredSongList[focusedSongIndex];
+          const song = filteredSongList[focusedSongIndex];
 
-            if (!song) {
-              return;
-            }
+          if (!song) {
+            return;
+          }
 
-            if (libraryMode === 'local') {
+          if (libraryMode === 'local') {
+            if (libraryControls.kitActions.includes('confirm')) {
+              navigate(`/${song.id}?gameMode=practice`);
+            } else {
               play(song.id);
-            } else if (
-              libraryMode === 'online' &&
-              !songList.find(({ id }) => song.id === id)
-            ) {
-              handleDownload(song.id);
             }
-          },
-          sort: openSort,
-          library: () => {
-            if (!onlineDownloadsAvailable) {
-              return;
-            }
-
-            setLibraryMode(libraryMode === 'online' ? 'local' : 'online');
-          },
-          difficulty: () => setDifficulty(nextDifficulty(difficulty)),
+          } else if (
+            libraryMode === 'online' &&
+            !songList.find(({ id }) => song.id === id)
+          ) {
+            handleDownload(song.id);
+          }
         },
-    !songOpen && !gameModeSelector.isOpen && view === 'songs',
-  );
+        back: () => setView('home'),
+        sort: openSort,
+        library: () => {
+          if (!onlineDownloadsAvailable) {
+            return;
+          }
 
+          setLibraryMode(libraryMode === 'online' ? 'local' : 'online');
+        },
+        difficulty: () => setDifficulty(nextDifficulty(difficulty)),
+      };
   const openHomeCoach = () => {
     const coachSong =
       songList.find(
@@ -624,6 +648,13 @@ export function SongListView() {
   return (
     <StemToolsProvider value={stemTools}>
       {gameModeSelector.element}
+
+      {!songOpen && !gameModeSelector.isOpen && view === 'songs' && (
+        <LibraryInputControls
+          mapping={libraryControls.mapping}
+          handlers={libraryInputHandlers}
+        />
+      )}
 
       <AppShell
         view={view}
@@ -652,7 +683,7 @@ export function SongListView() {
           setIsProfileOpen(true);
         }}
       >
-        {view === 'home' && (
+        {!songOpen && view === 'home' && (
           <HomeCockpit
             surface="home"
             songList={songList}
@@ -667,7 +698,7 @@ export function SongListView() {
           />
         )}
 
-        {view === 'coach' && (
+        {!songOpen && view === 'coach' && (
           <HomeCockpit
             surface="coach"
             songList={songList}
@@ -682,16 +713,17 @@ export function SongListView() {
           />
         )}
 
-        {view === 'journey' && (
+        {!songOpen && view === 'journey' && (
           <LessonsView
             progress={lessonProgress}
             onPlay={playLesson}
             scanPercent={scanPercent}
             onRescan={rescanLibrary}
+            onBack={() => setView('home')}
           />
         )}
 
-        {view === 'songs' && (
+        {!songOpen && view === 'songs' && (
           <section
             className="flex h-full min-h-0 flex-col"
             id="library-content"
@@ -852,6 +884,28 @@ export function SongListView() {
                       onOpenChange={setIsSortOpen}
                       focusedIndex={isSortOpen ? focusedSortIndex : undefined}
                     />
+                  </div>
+                  <div
+                    className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted"
+                    role="status"
+                    aria-live="polite"
+                    data-testid="library-control-legend"
+                    data-control-source={libraryControls.source}
+                  >
+                    <span className="font-semibold text-text-body">
+                      {libraryControls.source === 'kit-lanes'
+                        ? 'Kit navigation'
+                        : libraryControls.source === 'mixed'
+                        ? 'Mixed navigation'
+                        : libraryControls.source === 'explicit'
+                        ? 'Mapped navigation'
+                        : 'Navigation unavailable'}
+                    </span>
+                    <span>{libraryControls.legend}</span>
+                    {libraryControls.kitActions.includes('confirm') &&
+                      libraryMode === 'local' && (
+                        <span>Local choices open directly in Practice.</span>
+                      )}
                   </div>
                 </div>
                 <SplittingQueue

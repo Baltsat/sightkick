@@ -39,6 +39,15 @@ export type SheetMusicLayout = 'classic' | 'flow';
 
 const MAX_MEASURES_PER_ROW = 2;
 const MIN_MEASURE_WIDTH = 300;
+
+// A Flow bar has to be readable from behind the kit, not merely fit the
+// formatter's minimum. Classic normally gives an ordinary 4/4 bar about
+// 600 px (two bars across TARGET_ROW_WIDTH); keeping Flow close to that
+// density makes the beat grid and individual drum lanes legible while the
+// camera, rather than a compressed score, owns navigation.
+export const FLOW_MIN_MEASURE_WIDTH = 540;
+
+const FLOW_MEASURE_WIDTH_SCALE = 1.12;
 const MEASURE_TRAILING_PAD = 20;
 // Auto-charted songs carry a tempo map with per-measure micro-fluctuations
 // (83.03 / 83.71 / 83.5 ...), which would otherwise print a new label on
@@ -72,9 +81,14 @@ export function renderMusic(
   const lineHeight = isFlow ? 190 : showBarNumbers ? 180 : 130;
   const renderData: RenderData[] = [];
   const tempoLabels = dedupedTempoLabels(song.measures, showTempo);
-  const widths = song.measures.map((measure, index) =>
+  const requiredWidths = song.measures.map((measure, index) =>
     requiredMeasureWidth(measure, tempoLabels[index]),
   );
+  const widths = isFlow
+    ? requiredWidths.map((width) =>
+        Math.max(FLOW_MIN_MEASURE_WIDTH, width * FLOW_MEASURE_WIDTH_SCALE),
+      )
+    : requiredWidths;
   // Flow is intentionally a *single* system. Do not make this a visual
   // approximation with translated rows: GameRenderer receives the VexFlow
   // staves in this exact geometry, so hit/miss/wrong-hit and cursor math keep

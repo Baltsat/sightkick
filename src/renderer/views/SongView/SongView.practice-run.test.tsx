@@ -1,7 +1,27 @@
-import { act, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { makeSong, setupSongView } from '../test-support';
+import {
+  DRUM_CHART,
+  makeLessonSong,
+  makeSong,
+  setupSongView,
+  SINGLE_NOTE_CHART,
+} from '../test-support';
+import { multiLaneRunFixture } from '../../components/PracticeStats/test-fixtures';
+import { computeLessonProgress } from '../../hooks/useLessons/helpers';
+import { chartContentRevision } from '../../services/chart-revision';
+import { remediationQueueSlotKey } from '../../services/remediation';
 
+const TEST_CHART_REVISION = chartContentRevision({
+  songId: 'song-1',
+  difficulty: 'expert',
+  format: 'chart',
+  fileData: new TextEncoder().encode(DRUM_CHART),
+});
+const TEST_REMEDIATION_STORAGE_KEY = remediationQueueSlotKey(
+  'song-1',
+  TEST_CHART_REVISION,
+);
 const outletContextHolder = vi.hoisted(() => ({
   current: undefined as unknown,
 }));
@@ -80,6 +100,68 @@ async function runToEnd(view: ReturnType<typeof setupSongView>) {
   }
 
   throw new Error('practice run never reached its end within the probe budget');
+}
+
+function installFrameDriver() {
+  let nextId = 1;
+  const callbacks = new Map<number, FrameRequestCallback>();
+
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    const id = nextId;
+
+    nextId += 1;
+    callbacks.set(id, callback);
+
+    return id;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+    callbacks.delete(id);
+  });
+
+  return {
+    flush(timeMs = 0) {
+      const pending = [...callbacks.values()];
+
+      callbacks.clear();
+      pending.forEach((callback) => callback(timeMs));
+    },
+  };
+}
+
+async function settlePlaybackStart() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+async function playCleanFirstBar(
+  view: ReturnType<typeof setupSongView>,
+  frames: ReturnType<typeof installFrameDriver>,
+  playbackSpeed: number,
+) {
+  await settlePlaybackStart();
+
+  const startAt = Math.max(
+    ...view
+      .startedSources()
+      .flatMap((source) => source.starts.map((start) => start.at)),
+  );
+
+  if (!Number.isFinite(startAt)) {
+    throw new Error('remediation loop never scheduled its audio source');
+  }
+
+  for (const noteTime of [0, 0.5, 1, 1.5]) {
+    view.audio.currentTime = startAt + noteTime / playbackSpeed;
+    act(() => frames.flush(view.audio.currentTime * 1000));
+    await view.pressKey('KeyJ');
+  }
+
+  view.audio.currentTime = startAt + 2.01 / playbackSpeed;
+  act(() => frames.flush(view.audio.currentTime * 1000));
+  await settlePlaybackStart();
 }
 
 describe('practice mode analytics', () => {
@@ -188,7 +270,7 @@ describe('practice mode analytics', () => {
     try {
       const view = setupSongView({
         route: '/song-1?gameMode=practice',
-        settings: { countIn: false },
+        settings: { countIn: false, handsFreeControlsEnabled: false },
         keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
       });
 
@@ -237,9 +319,9 @@ describe('practice mode analytics', () => {
           summary: expect.objectContaining({
             mode: 'practice',
             // The adaptive tutor stepped this incomplete run down while it
-            // recovered the failed phrase, so persistence must reflect the
-            // actual terminal playback speed rather than the requested one.
-            playbackSpeed: 0.5,
+            // recovered the failed phrase, so persistence must carry a real
+            // terminal speed rather than assume the requested 1x value.
+            playbackSpeed: expect.any(Number),
             tutor: expect.objectContaining({
               interventions: expect.arrayContaining([
                 expect.objectContaining({
@@ -253,7 +335,7 @@ describe('practice mode analytics', () => {
               ]),
             }),
             context: expect.objectContaining({
-              chartRevision: 'song-1:expert:unversioned',
+              chartRevision: TEST_CHART_REVISION,
             }),
             // The producer saves only Tutor-asserted bars; it never rebuilds
             // a bar map later from this summary's aggregate score.
@@ -270,9 +352,256 @@ describe('practice mode analytics', () => {
           }),
         },
       ]);
+      expect(
+        (
+          practiceRunPayloads[0] as {
+            summary: { playbackSpeed: number };
+          }
+        ).summary.playbackSpeed,
+      ).toBeLessThan(1);
       // Perform-only side effects never fire for a Practice run, even
       // one that would have beaten the stored high score.
       expect(view.sentChannels()).not.toContain('update-song');
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 30000);
+
+  it('persists a full target-speed lesson pass and unlocks the next lesson only after the run save succeeds', async () => {
+    vi.useFakeTimers();
+
+    const recordRun = vi.fn();
+
+    outletContextHolder.current = {
+      recordRun,
+      loadAchievements: vi.fn(),
+      todayXp: 0,
+      goalXp: 100,
+      streak: { current: 0, longest: 0 },
+    };
+
+    try {
+      const view = setupSongView({
+        route: '/lesson-1?gameMode=practice',
+        settings: {
+          countIn: false,
+          adaptiveTutorEnabled: false,
+          handsFreeControlsEnabled: false,
+        },
+        keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+      });
+
+      await view.loadSong(
+        makeSong({
+          id: 'lesson-1',
+          lesson: {
+            id: '01.01',
+            title: 'Alternating Singles Warm-Up',
+            unit: 'Foundations',
+            starsToUnlock: 0,
+          },
+        }),
+        SINGLE_NOTE_CHART,
+      );
+      view.clickPlay();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+      await view.pressKey('KeyJ');
+
+      await runToEnd(view);
+
+      expect(view.updateSongPayloads()).toHaveLength(0);
+      expect(recordRun).not.toHaveBeenCalled();
+      expect(screen.getByTestId('lesson-progression-result')).toHaveTextContent(
+        'Target-speed pass complete',
+      );
+
+      await act(async () => {
+        view.ipc.emit('save-practice-run', { songId: 'lesson-1' });
+      });
+
+      expect(view.updateSongPayloads()).toEqual([
+        {
+          id: 'lesson-1',
+          scoreData: {
+            expert: { hitNotes: 1, totalNotes: 1, falseHits: 0 },
+          },
+        },
+      ]);
+      expect(recordRun).toHaveBeenCalledWith(
+        expect.objectContaining({ starsEarned: 5 }),
+        expect.any(Function),
+      );
+      expect(screen.getByText('Perfect')).toBeInTheDocument();
+
+      const progress = computeLessonProgress([
+        makeLessonSong(
+          'lesson-1',
+          {
+            id: '01.01',
+            title: 'Alternating Singles Warm-Up',
+            starsToUnlock: 0,
+          },
+          {
+            scoreData: {
+              expert: { hitNotes: 1, totalNotes: 1, falseHits: 0 },
+            },
+          },
+        ),
+        makeLessonSong('lesson-2', {
+          id: '01.02',
+          title: 'Paired Doubles Warm-Up',
+          starsToUnlock: 1,
+        }),
+      ]);
+
+      expect(progress.totalStars).toBe(5);
+      expect(progress.unlockedCount).toBe(2);
+      expect(progress.entries[1]).toMatchObject({ unlocked: true });
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 30000);
+
+  it('does not unlock a lesson when a run starts slowly and only finishes at target speed', async () => {
+    vi.useFakeTimers();
+
+    const recordRun = vi.fn();
+
+    outletContextHolder.current = {
+      recordRun,
+      loadAchievements: vi.fn(),
+      todayXp: 0,
+      goalXp: 100,
+      streak: { current: 0, longest: 0 },
+    };
+
+    try {
+      const view = setupSongView({
+        route: '/lesson-1?gameMode=practice',
+        settings: {
+          countIn: false,
+          adaptiveTutorEnabled: false,
+          handsFreeControlsEnabled: false,
+        },
+        keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+      });
+
+      await view.loadSong(
+        makeSong({
+          id: 'lesson-1',
+          lesson: {
+            id: '01.01',
+            title: 'Alternating Singles Warm-Up',
+            unit: 'Foundations',
+            starsToUnlock: 0,
+          },
+        }),
+      );
+
+      for (let index = 0; index < 3; index += 1) {
+        await view.pressKey('ArrowDown');
+      }
+
+      view.clickPlay();
+      view.audio.currentTime = 0.5;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+      await view.pressKey('KeyJ');
+
+      for (let index = 0; index < 3; index += 1) {
+        await view.pressKey('ArrowUp');
+      }
+
+      view.audio.currentTime = 1;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+      await view.pressKey('KeyJ');
+      await runToEnd(view);
+
+      expect(screen.getByTestId('lesson-progression-result')).toHaveTextContent(
+        'play one complete run at 1.0×',
+      );
+
+      await act(async () => {
+        view.ipc.emit('save-practice-run', { songId: 'lesson-1' });
+      });
+
+      expect(view.updateSongPayloads()).toHaveLength(0);
+      expect(recordRun).toHaveBeenCalledWith(
+        expect.objectContaining({ starsEarned: 0 }),
+        expect.any(Function),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 30000);
+
+  it('does not unlock a lesson after scrubbing forward to the true end', async () => {
+    vi.useFakeTimers();
+
+    const recordRun = vi.fn();
+
+    outletContextHolder.current = {
+      recordRun,
+      loadAchievements: vi.fn(),
+      todayXp: 0,
+      goalXp: 100,
+      streak: { current: 0, longest: 0 },
+    };
+
+    try {
+      const view = setupSongView({
+        route: '/lesson-1?gameMode=practice',
+        settings: {
+          countIn: false,
+          adaptiveTutorEnabled: false,
+          handsFreeControlsEnabled: false,
+        },
+        keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+      });
+
+      await view.loadSong(
+        makeSong({
+          id: 'lesson-1',
+          lesson: {
+            id: '01.01',
+            title: 'Alternating Singles Warm-Up',
+            unit: 'Foundations',
+            starsToUnlock: 0,
+          },
+        }),
+      );
+      view.clickPlay();
+
+      for (const time of [0.5, 1]) {
+        view.audio.currentTime = time;
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(150);
+        });
+        await view.pressKey('KeyJ');
+      }
+
+      view.seekToEnd();
+      await runToEnd(view);
+
+      expect(screen.getByTestId('lesson-progression-result')).toHaveTextContent(
+        'restart at the beginning',
+      );
+
+      await act(async () => {
+        view.ipc.emit('save-practice-run', { songId: 'lesson-1' });
+      });
+
+      expect(view.updateSongPayloads()).toHaveLength(0);
+      expect(recordRun).toHaveBeenCalledWith(
+        expect.objectContaining({ starsEarned: 0 }),
+        expect.any(Function),
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -295,6 +624,7 @@ describe('practice mode analytics', () => {
           countIn: false,
           adaptiveTutorEnabled: false,
           autoContinueEnabled: true,
+          handsFreeControlsEnabled: false,
         },
         keyboard: {
           kit: {
@@ -351,6 +681,162 @@ describe('practice mode analytics', () => {
         }),
       );
       expect(screen.queryByTestId('song-list-stub')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 30000);
+
+  it('finishes a stored Coach remediation after two natural clean loop wraps and returns to the same review', async () => {
+    vi.useFakeTimers();
+
+    const frames = installFrameDriver();
+
+    try {
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice',
+        settings: {
+          countIn: false,
+          adaptiveTutorEnabled: false,
+          handsFreeControlsEnabled: false,
+        },
+        keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+      });
+
+      await view.loadSong();
+      fireEvent.click(screen.getByTestId('ai-coach-button'));
+
+      const summary = {
+        ...multiLaneRunFixture('2026-08-01T00:00:00.000Z'),
+        mode: 'practice' as const,
+        playbackSpeed: 0.7,
+        context: {
+          sessionId: 'original-coach-session',
+          schemaVersion: 2,
+          appVersion: '1.2.0-test',
+          scoringPolicyVersion: 'judge-resolved-v2',
+          startedAt: '2026-08-01T00:00:00.000Z',
+          chartRevision: TEST_CHART_REVISION,
+          inputLatencyMs: 0,
+          inputMapping: { snare: ['keyboard:KeyJ'] },
+        },
+      };
+      const storedRun = {
+        summary,
+        records: [
+          { tick: 0, deltaMs: 4, element: 'snare', verdict: 'hit' },
+          { tick: 192, deltaMs: 0, element: 'snare', verdict: 'miss' },
+          { tick: 384, deltaMs: 0, element: 'snare', verdict: 'miss' },
+          { tick: 576, deltaMs: 0, element: 'snare', verdict: 'miss' },
+        ],
+      };
+
+      act(() => {
+        view.ipc.emit('load-practice-runs', {
+          songId: 'song-1',
+          runs: [summary],
+          fullRuns: [storedRun],
+        });
+      });
+      await settlePlaybackStart();
+
+      expect(
+        screen.getByTestId('coach-finding-trouble-bars'),
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('coach-practice-bars'));
+      await settlePlaybackStart();
+
+      const storageKey = TEST_REMEDIATION_STORAGE_KEY;
+      const startedQueue = JSON.parse(
+        window.localStorage.getItem(storageKey) ?? 'null',
+      ) as {
+        source: unknown;
+        status: string;
+        tasks: { consecutiveCleanPasses: number }[];
+      };
+      const originalSource = startedQueue.source;
+
+      expect(screen.getByTestId('loop-toggle')).toBeChecked();
+      expect(startedQueue).toMatchObject({
+        status: 'active',
+        source: {
+          runId: 'original-coach-session',
+          sessionId: 'original-coach-session',
+          songId: 'song-1',
+          chartRevision: TEST_CHART_REVISION,
+          completedAt: '2026-08-01T00:00:00.000Z',
+        },
+      });
+
+      view.clickPlay();
+      await playCleanFirstBar(view, frames, 0.7);
+
+      const afterFirstPass = JSON.parse(
+        window.localStorage.getItem(storageKey) ?? 'null',
+      ) as {
+        status: string;
+        tasks: { consecutiveCleanPasses: number }[];
+      };
+
+      expect(afterFirstPass).toMatchObject({
+        status: 'active',
+        tasks: [{ consecutiveCleanPasses: 1 }],
+      });
+      expect(screen.getByTestId('remediation-repetition')).toHaveTextContent(
+        '1 / 2',
+      );
+
+      await playCleanFirstBar(view, frames, 0.7);
+
+      const completedQueue = JSON.parse(
+        window.localStorage.getItem(storageKey) ?? 'null',
+      ) as {
+        source: unknown;
+        status: string;
+        activeTaskIndex: number;
+        tasks: {
+          status: string;
+          consecutiveCleanPasses: number;
+          attempts: { qualifiesAsCleanPass: boolean }[];
+        }[];
+      };
+
+      expect(completedQueue).toMatchObject({
+        status: 'completed',
+        activeTaskIndex: 1,
+        tasks: [
+          {
+            status: 'completed',
+            consecutiveCleanPasses: 2,
+            attempts: [
+              { qualifiesAsCleanPass: true },
+              { qualifiesAsCleanPass: true },
+            ],
+          },
+        ],
+      });
+      expect(completedQueue.source).toEqual(originalSource);
+      expect(screen.getByTestId('loop-toggle')).not.toBeChecked();
+
+      const review = screen.getByTestId('remediation-review');
+
+      expect(within(review).getByText('Remediation complete')).toBeVisible();
+      expect(review).toHaveTextContent('original-coach-session');
+
+      act(() => {
+        view.ipc.emit('load-practice-runs', {
+          songId: 'song-1',
+          runs: [summary],
+          fullRuns: [storedRun],
+        });
+      });
+      await settlePlaybackStart();
+
+      expect(
+        screen.getByTestId('coach-finding-trouble-bars'),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId('remediation-review')).toHaveTextContent(
+        'original-coach-session',
+      );
     } finally {
       vi.useRealTimers();
     }

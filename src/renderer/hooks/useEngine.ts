@@ -16,6 +16,7 @@ import { Engine, PlaybackSnapshot, PlaybackState } from '../services/engine';
 import { inputBus } from '../input';
 import { useInput } from '../context/InputContext';
 import { HitRecord, RunSummary } from '../services/practice-stats';
+import { HIT_TOLERANCE_SECONDS } from '../services/engine/constants';
 
 interface UseEngineParams {
   trackData: TrackConfig[];
@@ -28,6 +29,8 @@ interface UseEngineParams {
   countInEnabled: boolean;
   playheadStyle: PlayheadStyle;
   mapping: InputMapping;
+  hitToleranceSeconds?: number;
+  preferUnhitNotes?: boolean;
   player: PlayerMode;
   onEnded: (
     score: ScoreData,
@@ -81,6 +84,8 @@ export function useEngine({
   countInEnabled,
   playheadStyle,
   mapping,
+  hitToleranceSeconds = HIT_TOLERANCE_SECONDS,
+  preferUnhitNotes = false,
   player,
   onEnded,
 }: UseEngineParams): UseEngineResult {
@@ -134,6 +139,8 @@ export function useEngine({
       countInEnabled,
       minDurationSeconds,
       mapping,
+      hitToleranceSeconds,
+      preferUnhitNotes,
     });
   }, [
     engine,
@@ -144,6 +151,8 @@ export function useEngine({
     minDurationSeconds,
     countInEnabled,
     mapping,
+    hitToleranceSeconds,
+    preferUnhitNotes,
   ]);
 
   useEffect(() => {

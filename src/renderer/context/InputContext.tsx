@@ -52,7 +52,7 @@ interface InputContextValue {
   setInputLatencyMs: (ms: number) => void;
 }
 
-export type InputReadiness = 'connected' | 'reconnecting' | 'needs-selection';
+export type InputReadiness = 'connected' | 'reconnecting' | 'waiting';
 
 const EMPTY_INPUT_MAPPING: Record<keyof InputMapping, string[]> = {
   hihat: [],
@@ -147,6 +147,8 @@ function assignControlInto(
 const InputContext = createContext<InputContextValue | null>(null);
 const SELECTED_DEVICE_KEY = 'settings.selectedDevice';
 
+export const MIDI_AUTO_CONNECT_OPT_OUT_KEY = 'settings.midiAutoConnectOptOut';
+
 export const MIDI_RECONNECT_DELAY_MS = 1_000;
 
 // A missing kit is expected to stay missing while the player plugs in USB,
@@ -161,6 +163,26 @@ export function midiReconnectDelayMs(attempt: number): number {
   );
 }
 
+// A fresh profile can encounter always-on virtual buses alongside the drum
+// module. Prefer one unmistakable Yamaha DTX port, otherwise only accept a
+// single unambiguous MIDI input. Two plausible kits still require a deliberate
+// choice; silently binding the wrong controller would be worse than waiting.
+const DTX_DEVICE_NAME = /\bdtx[\w-]*\b/i;
+
+export function autoSelectableMidiDevice(
+  devices: InputDevice[],
+): InputDevice | undefined {
+  const dtxDevices = devices.filter((device) =>
+    DTX_DEVICE_NAME.test(device.name),
+  );
+
+  if (dtxDevices.length === 1) {
+    return dtxDevices[0];
+  }
+
+  return devices.length === 1 ? devices[0] : undefined;
+}
+
 // A low-frequency probe catches physical USB disconnects that the native MIDI
 // driver does not always surface as an error event. It is deliberately a
 // single timeout, not an accumulating interval, and every query itself has a
@@ -170,28 +192,20 @@ export const MIDI_HEALTH_CHECK_DELAY_MS = 5_000;
 export const MIDI_OPEN_ACK_TIMEOUT_MS = 2_500;
 
 export function InputProvider({ children }: { children: ReactNode }) {
-  // Captured once, synchronously, during the first render — before
-  // `usePersisted`'s own write-back effect below has a chance to run and
-  // persist its default. This is the only reliable way to tell "this
-  // profile has never recorded a device preference" apart from "the
-  // preference is currently null" (a stored explicit "- None -" choice, or
-  // a previously-selected device that later disappeared, both also read
-  // back as null). Only a genuinely never-stored profile is eligible for
-  // auto-selecting a lone MIDI device below.
-  const [hadStoredDevice] = useState(
-    () => localStorage.getItem(SELECTED_DEVICE_KEY) !== null,
-  );
   const [selectedDevice, setPersistedSelectedDevice] =
     usePersisted<InputDevice | null>(SELECTED_DEVICE_KEY, null);
-  // A fresh profile may accept the one unambiguous hardware choice. As soon
-  // as a person picks a device (including explicit None), automatic choice is
-  // disabled for the rest of the session as well as on later launches.
+  const [midiAutoConnectOptOut, setMidiAutoConnectOptOut] =
+    usePersisted<boolean>(MIDI_AUTO_CONNECT_OPT_OUT_KEY, false);
+  // Older releases wrote the fallback null device into every profile, so a
+  // stored null cannot mean that the player deliberately chose "- None -".
+  // The separate opt-out marker preserves new explicit choices while legacy
+  // null profiles migrate back to safe, unambiguous hardware auto-connect.
   const [canAutoSelectMidi, setCanAutoSelectMidi] = useState(
-    () => !hadStoredDevice,
+    () => selectedDevice === null && !midiAutoConnectOptOut,
   );
   const [inputReadiness, setInputReadiness] = useState<InputReadiness>(() => {
     if (!selectedDevice) {
-      return 'needs-selection';
+      return 'waiting';
     }
 
     return selectedDevice.sourceId === 'midi' ? 'reconnecting' : 'connected';
@@ -235,24 +249,26 @@ export function InputProvider({ children }: { children: ReactNode }) {
   }, []);
   const setSelectedDevice = useCallback(
     (device: InputDevice | null) => {
-      // This is an explicit choice, including a conscious "- None -". Keep
-      // it distinct from a profile that has never stored a preference.
+      // Persist a conscious "- None -" separately from the legacy null
+      // fallback. Choosing any real input clears that opt-out again.
+      setMidiAutoConnectOptOut(device === null);
       setCanAutoSelectMidi(false);
       clearMidiRetry();
       reconnectAttempts.current = 0;
       setConfirmedMidiPort(undefined);
       setPersistedSelectedDevice(device);
-      setInputReadiness(
-        device?.sourceId === 'midi'
-          ? 'reconnecting'
-          : device
-          ? 'connected'
-          : 'needs-selection',
-      );
+
+      let readiness: InputReadiness = 'waiting';
+
+      if (device) {
+        readiness = device.sourceId === 'midi' ? 'reconnecting' : 'connected';
+      }
+
+      setInputReadiness(readiness);
       setMidiReconnectEpoch((epoch) => epoch + 1);
       setMidiOpenEpoch((epoch) => epoch + 1);
     },
-    [clearMidiRetry, setPersistedSelectedDevice],
+    [clearMidiRetry, setMidiAutoConnectOptOut, setPersistedSelectedDevice],
   );
   const inputMapping = useMemo(() => {
     const stored = selectedDevice
@@ -380,15 +396,30 @@ export function InputProvider({ children }: { children: ReactNode }) {
       if (!selectedDevice) {
         setConfirmedMidiPort(undefined);
         // Keyboard is synthetic and must not turn an empty hardware setup
-        // into a false positive. Only a never-configured profile is allowed
-        // to accept the sole real MIDI input.
+        // into a false positive. Profiles without a deliberate MIDI opt-out
+        // may accept the sole safe real MIDI input.
 
-        if (canAutoSelectMidi && midiDevices.length === 1) {
-          setConfirmedMidiPort(midiDevices[0].port);
-          setPersistedSelectedDevice(midiDevices[0]);
+        const autoSelectedDevice = canAutoSelectMidi
+          ? autoSelectableMidiDevice(midiDevices)
+          : undefined;
+
+        if (autoSelectedDevice) {
+          clearMidiRetry();
+          reconnectAttempts.current = 0;
+          setCanAutoSelectMidi(false);
+          setConfirmedMidiPort(autoSelectedDevice.port);
+          setPersistedSelectedDevice(autoSelectedDevice);
           setInputReadiness('reconnecting');
         } else {
-          setInputReadiness('needs-selection');
+          setInputReadiness('waiting');
+
+          // On a never-configured profile, an empty or ambiguous device list
+          // is not terminal: the player may simply not have plugged the USB
+          // cable in yet. Keep the same bounded background probe used for a
+          // remembered disconnected kit, without requiring Settings.
+          if (canAutoSelectMidi) {
+            scheduleMidiRetry();
+          }
         }
 
         return;

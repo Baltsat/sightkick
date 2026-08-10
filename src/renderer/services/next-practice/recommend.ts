@@ -829,7 +829,7 @@ function rankCandidate({
         : 1 - masteryBreakdown.mastery / 100,
       weight: 5,
       detail: isMastered
-        ? 'This lesson is already mastered.'
+        ? 'This lesson is already cleared.'
         : 'This unlocked lesson advances the structured learning path.',
     });
   }
@@ -853,7 +853,7 @@ function rankCandidate({
       weight: 25,
       detail:
         isMastered && ageDays >= 14
-          ? 'Mastered, but old enough for spaced review.'
+          ? 'Cleared, but old enough for spaced review.'
           : 'Recent mastery makes another immediate repetition low-value.',
     },
   ];

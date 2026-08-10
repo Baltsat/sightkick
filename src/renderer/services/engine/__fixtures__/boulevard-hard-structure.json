@@ -1,0 +1,56 @@
+{
+  "provenance": {
+    "song": "Boulevard of Broken Dreams",
+    "artist": "Green Day",
+    "sourceFormat": "mid",
+    "sourceSha256": "563969ed160250d4e07aa6b0b90eec58dabd921aa46453f49a7827a20a08bcca",
+    "difficulty": "hard",
+    "resolution": 480,
+    "timeSignature": [4, 4],
+    "scope": "Timing and drum-lane structure only; no audio or lyrics."
+  },
+  "measures": [
+    {
+      "startTick": 40320,
+      "endTick": 42240,
+      "notes": [
+        { "tick": 40320, "keys": ["f/4", "a/5/x2"] },
+        { "tick": 40560, "keys": ["f/4", "a/5/x2"] },
+        { "tick": 40800, "keys": ["c/5", "a/5/x2"] },
+        { "tick": 41040, "keys": ["a/5/x2"] },
+        { "tick": 41280, "keys": ["f/4", "a/5/x2"] },
+        { "tick": 41520, "keys": ["f/4", "a/5/x2"] },
+        { "tick": 41760, "keys": ["c/5", "a/5/x2"] },
+        { "tick": 42000, "keys": ["f/5/x2"] }
+      ]
+    },
+    {
+      "startTick": 42240,
+      "endTick": 44160,
+      "notes": [
+        { "tick": 42240, "keys": ["f/4", "f/5/x2"] },
+        { "tick": 42480, "keys": ["f/4", "a/5/x2"] },
+        { "tick": 42720, "keys": ["c/5", "a/5/x2"] },
+        { "tick": 42960, "keys": ["a/5/x2"] },
+        { "tick": 43200, "keys": ["f/4", "a/5/x2"] },
+        { "tick": 43440, "keys": ["f/4", "a/5/x2"] },
+        { "tick": 43680, "keys": ["c/5", "a/5/x2"] },
+        { "tick": 43920, "keys": ["a/5/x2"] }
+      ]
+    },
+    {
+      "startTick": 44160,
+      "endTick": 46080,
+      "notes": [
+        { "tick": 44160, "keys": ["f/4", "a/5/x2"] },
+        { "tick": 44400, "keys": ["f/4", "a/5/x2"] },
+        { "tick": 44640, "keys": ["c/5", "a/5/x2"] },
+        { "tick": 44880, "keys": ["a/5/x2"] },
+        { "tick": 45120, "keys": ["f/4", "a/5/x2"] },
+        { "tick": 45360, "keys": ["f/4", "a/5/x2"] },
+        { "tick": 45600, "keys": ["c/5", "a/5/x2"] },
+        { "tick": 45840, "keys": ["f/5/x2"] }
+      ]
+    }
+  ]
+}

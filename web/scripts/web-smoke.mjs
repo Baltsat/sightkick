@@ -12,7 +12,7 @@ const systemChrome =
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const expectedLessonCount = 170;
 const expectedPublicRelease =
-  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.4/Drumroll-1.2.0-kb.4-arm64.dmg';
+  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.5/Drumroll-1.2.0-kb.5-arm64.dmg';
 
 mkdirSync(shotDir, { recursive: true });
 
@@ -150,13 +150,14 @@ try {
 
   console.log('smoke: lesson');
   await page.getByTestId('lesson-item-01.01').click();
-  await page.getByTestId('game-mode-practice').waitFor({ timeout: 120_000 });
-  await page
-    .getByTestId('game-mode-practice')
-    .click({ force: true, timeout: 120_000 });
   await page
     .getByTestId('sheet-music-overlay')
     .waitFor({ state: 'attached', timeout: 120_000 });
+
+  if (await page.getByTestId('game-mode-practice').count()) {
+    throw new Error('A lesson reopened the obsolete mode picker.');
+  }
+
   await page
     .getByTestId('flow-viewport-hud')
     .getByRole('heading', { name: /Lesson 01\.01/i })

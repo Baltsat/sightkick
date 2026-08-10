@@ -24,7 +24,7 @@ interface Props {
   devices: InputDevice[];
   selectedDeviceId: string | undefined;
   selectedDeviceName?: string;
-  inputReadiness?: 'connected' | 'reconnecting' | 'needs-selection';
+  inputReadiness?: 'connected' | 'reconnecting' | 'waiting';
   onSelectDevice: (id: string | undefined) => void;
   mapping: ElementMapping;
   listeningTo: InputElement | undefined;
@@ -192,7 +192,7 @@ export function InputConfig({
               its mappings will be restored when it returns.
             </div>
           )}
-          {inputReadiness === 'needs-selection' && (
+          {inputReadiness === 'waiting' && (
             <div className="text-text-muted text-xs">
               Choose an input when you are ready. Keyboard input remains
               available without a MIDI device.

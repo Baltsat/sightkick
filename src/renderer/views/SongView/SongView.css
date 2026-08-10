@@ -1,6 +1,18 @@
 .drumroll-practice-shell {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   color: var(--color-ink);
   background: var(--color-paper-light);
+}
+
+.drumroll-classic-viewport {
+  padding: 1rem 1rem 10rem;
+  scrollbar-width: none;
+}
+
+.drumroll-classic-viewport::-webkit-scrollbar {
+  display: none;
 }
 
 .drumroll-practice-toolbar {
@@ -70,13 +82,77 @@
   background: rgb(255 255 255 / 74%);
 }
 
-@media (max-width: 980px) {
+.drumroll-practice-input-readiness {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.32rem;
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 680;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.drumroll-practice-input-readiness > span {
+  width: 0.46rem;
+  height: 0.46rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-green);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-green) 16%, transparent);
+}
+
+.drumroll-practice-input-readiness[data-state='reconnecting'] > span {
+  background: var(--color-amber);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-amber) 18%, transparent);
+}
+
+.drumroll-practice-input-readiness[data-state='waiting'] > span {
+  background: var(--color-text-faint);
+  box-shadow: 0 0 0 3px rgb(17 23 34 / 8%);
+}
+
+.drumroll-practice-toolbar__identity {
+  flex: 0 1 18rem;
+}
+
+/* Keep motivational feedback in the quiet left rail. The prior centered
+ * overlay occupied the same coordinates as Flow's title/location HUD. */
+.drumroll-practice-streak {
+  inset-inline: 1rem auto !important;
+  top: 1rem;
+  width: max-content;
+  justify-content: flex-start;
+}
+
+@media (max-width: 1100px) {
   .drumroll-practice-toolbar {
     gap: 0.65rem;
     padding-inline: 0.75rem;
   }
 
+  .drumroll-practice-toolbar__identity {
+    width: 12rem;
+    min-width: 12rem;
+    max-width: 12rem;
+    flex-basis: 12rem;
+  }
+
+  .drumroll-practice-toolbar__control-label {
+    display: none;
+  }
+
+  .drumroll-practice-toolbar__secondary-action {
+    display: none;
+  }
+
   .drumroll-practice-toolbar__controls {
     padding-inline: 0.55rem;
+  }
+
+  .drumroll-practice-streak {
+    top: 5.4rem;
   }
 }

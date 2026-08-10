@@ -64,6 +64,7 @@ import {
   setPrimaryGoal,
 } from './ipc/goals';
 import { loadRetiredLessons } from './ipc/retiredLessons';
+import { MAIN_WINDOW_SIZE } from './windowConfig';
 
 class AppState {
   private static instance: AppState;
@@ -264,8 +265,7 @@ class AppState {
       show: false,
       x: 0,
       y: 0,
-      width: 1366,
-      height: 768,
+      ...MAIN_WINDOW_SIZE,
       icon:
         process.platform === 'win32'
           ? getAssetPath('icon.ico')

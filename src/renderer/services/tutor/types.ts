@@ -63,6 +63,35 @@ export const DEFAULT_TUTOR_SETTINGS: TutorSettings = {
   contextBarsAfterFailure: 1,
 };
 
+/**
+ * Guided Practice deliberately waits for a sustained pattern before taking
+ * over. The original defaults are retained for deterministic service tests
+ * and advanced callers; the product surface applies this learner-facing
+ * profile so an isolated timing cluster cannot trap a developing player in
+ * recovery. Two controlled repetitions still establish retention, while the
+ * failed-attempt cap guarantees a terminal path back to the song.
+ */
+export const GUIDED_PRACTICE_TUTOR_SETTINGS: Partial<TutorSettings> = {
+  triggerAccuracy: 0.68,
+  minimumResolvedEvents: 8,
+  minimumDistinctErrors: 5,
+  minimumRepeatedBarFailures: 3,
+  minimumRepeatedBarErrors: 3,
+  minimumRepeatedWrongPadPairs: 3,
+  minimumTimingSamples: 8,
+  minimumTimingOutliers: 3,
+  timingSpreadThresholdMs: 90,
+  // Intervention is forgiving; mastery is explicit. The learner can keep
+  // moving after the safety limit, but a phrase is only labelled mastered
+  // after two truly error-free passes.
+  cleanMinimumAccuracy: 1,
+  cleanMinimumResolvedEvents: 6,
+  cleanMaximumMisses: 0,
+  cleanMaximumWrongHits: 0,
+  requiredCleanRepetitions: 2,
+  maximumFailedRecoveryAttempts: 2,
+};
+
 export interface TutorMeasureSpec {
   index: number;
   startTick: number;
@@ -150,6 +179,14 @@ export interface TutorRecovery {
   cleanRepetitions: number;
 }
 
+export interface TutorRecoveryOutcome {
+  recoveryId: string;
+  status: 'mastered' | 'deferred';
+  startMeasure: number;
+  endMeasure: number;
+  cleanRepetitions: number;
+}
+
 export interface TutorIntervention {
   id: string;
   trigger: TutorTrigger;
@@ -176,6 +213,8 @@ export interface TutorState {
   /** Kept in the reducer so repeated-bar evidence is deterministic and scoped to one run. */
   barFailureHistory: TutorBarFailureHistory;
   recovery?: TutorRecovery;
+  /** Last terminal loop result remains visible after returning to the song. */
+  lastRecoveryOutcome?: TutorRecoveryOutcome;
   interventions: TutorIntervention[];
   recoveryAttempts: TutorRecoveryAttempt[];
   nextSequence: number;

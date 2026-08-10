@@ -121,7 +121,7 @@ describe('seasonStars', () => {
     expect(seasonStars(progress.groups[0])).toEqual({
       earned: 8,
       possible: 10,
-      masteredCount: 2,
+      clearedCount: 1,
     });
   });
 });

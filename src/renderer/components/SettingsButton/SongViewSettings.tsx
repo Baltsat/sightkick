@@ -6,7 +6,6 @@ import { GameMode, PLAYHEAD_STYLES } from '../../types';
 import { useSongViewSettings } from '../../context/SongViewSettingsContext';
 import { SettingLabel } from './SettingLabel';
 import { Tooltip } from '../Tooltip';
-import { SupportButton } from '../SupportButton/SupportButton';
 import { useApp } from '../../context/AppContext';
 import themedark from '../../theme';
 
@@ -255,8 +254,6 @@ export function SongViewSettings({
       ) : null}
 
       {clickControls}
-
-      <SupportButton />
     </>
   );
 }

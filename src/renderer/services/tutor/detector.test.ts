@@ -134,6 +134,97 @@ describe('tutor detector', () => {
     });
   });
 
+  it('matches 80–110 tick wrong-pad confusions inside the Practice window', () => {
+    const practiceChart: TutorChartPlan = {
+      measures: [
+        { index: 0, startTick: 0, endTick: 480, expectedKeys: 4 },
+        { index: 1, startTick: 480, endTick: 960, expectedKeys: 4 },
+      ],
+    };
+    const hit = (id: string, expectedTick: number): ResolvedJudgement => ({
+      id,
+      verdict: 'hit',
+      measureIndex: 0,
+      expectedTick,
+      expectedElement: 'snare',
+      scoreable: true,
+    });
+    const miss = (id: string, expectedTick: number): ResolvedJudgement => ({
+      id,
+      verdict: 'miss',
+      measureIndex: 0,
+      expectedTick,
+      expectedElement: 'snare',
+      scoreable: true,
+    });
+    const wrongHit = (id: string, actualTick: number): ResolvedJudgement => ({
+      id,
+      verdict: 'wrong',
+      measureIndex: 0,
+      actualTick,
+      actualElement: 'tom1',
+      scoreable: true,
+    });
+    const judgements = {
+      0: [
+        hit('hit:0', 0),
+        hit('hit:1', 120),
+        miss('miss:0', 200),
+        miss('miss:1', 320),
+        wrongHit('wrong:0', 90),
+        wrongHit('wrong:1', 400),
+      ],
+    };
+
+    expect(
+      summarizeTutorWindow(practiceChart, judgements, 0, 0).wrongPadPairs,
+    ).toEqual([{ actualElement: 'tom1', expectedElement: 'snare', count: 2 }]);
+    expect(
+      detectTutorTrigger(
+        practiceChart,
+        judgements,
+        0,
+        DEFAULT_TUTOR_SETTINGS,
+        'trigger:practice-window',
+      )?.reason,
+    ).toBe('repeated-wrong-pad-pair');
+  });
+
+  it('does not pair a wrong hit across a bar boundary', () => {
+    const practiceChart: TutorChartPlan = {
+      measures: [
+        { index: 0, startTick: 0, endTick: 480, expectedKeys: 4 },
+        { index: 1, startTick: 480, endTick: 960, expectedKeys: 4 },
+      ],
+    };
+    const judgements: Record<number, ResolvedJudgement[]> = {
+      0: [
+        {
+          id: 'miss:bar-1',
+          verdict: 'miss',
+          measureIndex: 0,
+          expectedTick: 430,
+          expectedElement: 'snare',
+          scoreable: true,
+        },
+      ],
+      1: [
+        {
+          id: 'wrong:bar-2',
+          verdict: 'wrong',
+          measureIndex: 1,
+          actualTick: 500,
+          actualElement: 'tom1',
+          scoreable: true,
+        },
+      ],
+    };
+
+    expect(
+      summarizeTutorWindow(practiceChart, judgements, 0, 1).wrongPadPairs,
+    ).toEqual([]);
+  });
+
   it('does not invent a wrong-pad transition from an ambiguous miss cluster', () => {
     expect(
       detect({

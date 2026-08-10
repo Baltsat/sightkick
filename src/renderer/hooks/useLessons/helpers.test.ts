@@ -161,15 +161,15 @@ describe('computeLessonProgress', () => {
     expect(progress.unlockedCount).toBe(1);
   });
 
-  it('unlocks a lesson only once the cumulative star total reaches its threshold', () => {
+  it('unlocks exactly one next lesson per cleared prior lesson', () => {
     const songs = [
       makeLessonSong(
         'a',
         { id: '01.01', starsToUnlock: 0 },
         { scoreData: { expert: scoreFor(0.99) } }, // 5 stars
       ),
-      makeLessonSong('b', { id: '01.02', starsToUnlock: 5 }),
-      makeLessonSong('c', { id: '01.03', starsToUnlock: 6 }),
+      makeLessonSong('b', { id: '01.02', starsToUnlock: 1 }),
+      makeLessonSong('c', { id: '01.03', starsToUnlock: 2 }),
     ];
     const progress = computeLessonProgress(songs);
 
@@ -183,7 +183,7 @@ describe('computeLessonProgress', () => {
     expect(byId['01.01'].unlocked).toBe(true);
     expect(byId['01.02'].unlocked).toBe(true);
     expect(byId['01.03'].unlocked).toBe(false);
-    expect(byId['01.03'].starsNeeded).toBe(1);
+    expect(byId['01.03'].clearsNeeded).toBe(1);
   });
 
   it('sums the best stars per lesson song regardless of difficulty', () => {
@@ -258,19 +258,19 @@ describe('computeLessonProgress', () => {
     ]);
   });
 
-  it('points the continue card at the furthest unlocked-but-not-yet-mastered lesson', () => {
+  it('points the continue card at the furthest unlocked-but-not-yet-cleared lesson', () => {
     const songs = [
       makeLessonSong(
         'a',
         { id: '01.01', starsToUnlock: 0 },
-        { scoreData: { expert: scoreFor(0.99) } }, // mastered, 5 stars
+        { scoreData: { expert: scoreFor(0.99) } }, // cleared, 5 stars
       ),
       makeLessonSong(
         'b',
-        { id: '01.02', starsToUnlock: 5 },
-        { scoreData: { expert: scoreFor(0.5) } }, // unlocked, 2 stars — not mastered
+        { id: '01.02', starsToUnlock: 1 },
+        { scoreData: { expert: scoreFor(0.5) } }, // unlocked, not cleared
       ),
-      makeLessonSong('c', { id: '01.03', starsToUnlock: 20 }), // locked
+      makeLessonSong('c', { id: '01.03', starsToUnlock: 2 }), // locked
     ];
     const progress = computeLessonProgress(songs);
 
@@ -278,14 +278,14 @@ describe('computeLessonProgress', () => {
     expect(progress.nextLockedEntry?.lesson.id).toBe('01.03');
   });
 
-  it('has no continue entry once every unlocked lesson is mastered', () => {
+  it('has no continue entry once every unlocked lesson is cleared', () => {
     const songs = [
       makeLessonSong(
         'a',
         { id: '01.01', starsToUnlock: 0 },
         { scoreData: { expert: scoreFor(0.99) } },
       ),
-      makeLessonSong('b', { id: '01.02', starsToUnlock: 20 }),
+      makeLessonSong('b', { id: '01.02', starsToUnlock: 2 }),
     ];
     const progress = computeLessonProgress(songs);
 
@@ -318,11 +318,11 @@ describe('hasUnparsedLessonSongs', () => {
 });
 
 describe('lockedHint', () => {
-  it('describes how many more stars are needed', () => {
+  it('describes how many more lesson clears are needed', () => {
     const entry = computeLessonProgress([
       makeLessonSong('a', { id: '01.01', starsToUnlock: 12 }),
     ]).entries[0];
 
-    expect(lockedHint(entry)).toBe('Earn 12 more ⭐');
+    expect(lockedHint(entry)).toBe('Clear 12 more lessons');
   });
 });

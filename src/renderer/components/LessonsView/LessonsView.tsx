@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowsRotate } from '@fortawesome/free-solid-svg-icons';
 import { App, Button, Progress } from 'antd';
@@ -14,7 +14,10 @@ import {
   LessonProgress,
   lockedHint,
 } from '../../hooks/useLessons';
+import { useInput } from '../../context/InputContext';
+import { useInputControls } from '../../hooks/useInputControls';
 import journeyStudio from '../../assets/daybreak/journey-studio.png';
+import { resolveJourneyControls } from './journey-controls';
 import '../LessonsJourney/daybreak-journey.css';
 
 export interface LessonsViewProps {
@@ -24,6 +27,8 @@ export interface LessonsViewProps {
   scanPercent?: number;
   /** Fires the same 'rescan-songs' IPC as the settings rescan button. */
   onRescan: () => void;
+  /** Returns from Journey to the previous top-level surface. */
+  onBack?: () => void;
 }
 
 /**
@@ -37,12 +42,18 @@ export function LessonsView({
   onPlay,
   scanPercent,
   onRescan,
+  onBack,
 }: LessonsViewProps) {
   const { notification } = App.useApp();
+  const { controlMapping, inputMapping } = useInput();
+  const journeyControls = useMemo(
+    () => resolveJourneyControls(controlMapping, inputMapping),
+    [controlMapping, inputMapping],
+  );
   const { groups, totalLessons } = progress;
   const isScanning = scanPercent !== undefined;
   // The season the "where am I" pointer sits in opens by default; once the
-  // whole curriculum is mastered (no pointer left) the finale season opens
+  // whole curriculum is cleared (no pointer left) the finale season opens
   // instead of leaving everything collapsed.
   const currentUnit =
     currentSeasonInfo(progress)?.group.unit ?? groups[groups.length - 1]?.unit;
@@ -59,19 +70,116 @@ export function LessonsView({
     groups.findIndex((group) => group.unit === visibleUnit),
   );
   const visibleGroup = groups[visibleSeasonIndex];
+  const focusableEntries = useMemo(
+    () => visibleGroup?.entries.filter((entry) => entry.unlocked) ?? [],
+    [visibleGroup],
+  );
+  const preferredFocusedLessonId =
+    focusableEntries.find(
+      (entry) => entry.song.id === progress.continueEntry?.song.id,
+    )?.song.id ?? focusableEntries[0]?.song.id;
+  const [focusedLessonId, setFocusedLessonId] = useState<string | undefined>(
+    preferredFocusedLessonId,
+  );
+  const resolvedFocusedLessonId = focusableEntries.some(
+    (entry) => entry.song.id === focusedLessonId,
+  )
+    ? focusedLessonId
+    : preferredFocusedLessonId;
+  const selectSeason = useCallback(
+    (unit: string) => {
+      const group = groups.find((candidate) => candidate.unit === unit);
+      const unlocked = group?.entries.filter((entry) => entry.unlocked) ?? [];
+      const nextFocusedId =
+        unlocked.find(
+          (entry) => entry.song.id === progress.continueEntry?.song.id,
+        )?.song.id ?? unlocked[0]?.song.id;
+
+      setSelectedUnit(unit);
+      setFocusedLessonId(nextFocusedId);
+    },
+    [groups, progress.continueEntry?.song.id],
+  );
+  const moveKitFocus = useCallback(
+    (delta: number) => {
+      if (focusableEntries.length === 0) {
+        return;
+      }
+
+      setFocusedLessonId((current) => {
+        const currentIndex = focusableEntries.findIndex(
+          (entry) => entry.song.id === current,
+        );
+        const startIndex = currentIndex === -1 ? 0 : currentIndex;
+        const nextIndex =
+          (startIndex + delta + focusableEntries.length) %
+          focusableEntries.length;
+
+        return focusableEntries[nextIndex].song.id;
+      });
+    },
+    [focusableEntries],
+  );
+  const moveSeason = useCallback(
+    (delta: number) => {
+      const navigableGroups = groups.filter((group) =>
+        group.entries.some((entry) => entry.unlocked),
+      );
+
+      if (navigableGroups.length === 0) {
+        return;
+      }
+
+      const currentIndex = navigableGroups.findIndex(
+        (group) => group.unit === visibleUnit,
+      );
+      const startIndex = currentIndex === -1 ? 0 : currentIndex;
+      const nextIndex =
+        (startIndex + delta + navigableGroups.length) % navigableGroups.length;
+
+      selectSeason(navigableGroups[nextIndex].unit);
+    },
+    [groups, selectSeason, visibleUnit],
+  );
+  const confirmFocusedLesson = useCallback(() => {
+    const focused = focusableEntries.find(
+      (entry) => entry.song.id === resolvedFocusedLessonId,
+    );
+
+    if (focused) {
+      onPlay(focused);
+    }
+  }, [focusableEntries, onPlay, resolvedFocusedLessonId]);
+
+  // The lane-derived fallback exists only in this mounted Journey surface.
+  // InputContext remains unchanged, so the same pads retain their musical
+  // assignments in Practice and cannot collide with global app navigation.
+  useInputControls(
+    journeyControls.mapping,
+    {
+      up: () => moveKitFocus(-1),
+      down: () => moveKitFocus(1),
+      left: () => moveSeason(-1),
+      right: () => moveSeason(1),
+      confirm: confirmFocusedLesson,
+      back: onBack,
+    },
+    true,
+  );
+
   const visibleState = visibleGroup ? seasonState(visibleGroup) : 'active';
   const visibleStateLabel =
     visibleState === 'completed'
-      ? 'Season mastered'
+      ? 'Season cleared'
       : visibleState === 'locked'
       ? 'Venue locked'
       : 'Current stage';
   const handleLockedClick = (entry: LessonEntry) => {
-    const readableHint = lockedHint(entry).replaceAll('\u2b50', 'stars');
+    const readableHint = lockedHint(entry);
 
     notification.info({
       title: 'This lesson is locked',
-      description: `${readableHint} across your lessons to unlock “${
+      description: `${readableHint} to unlock “${
         entry.song.name || entry.lesson.title
       }.”`,
       placement: 'bottomRight',
@@ -120,10 +228,10 @@ export function LessonsView({
 
   return (
     <div
-      className="daybreak-journey-root h-full w-full overflow-y-auto"
+      className="daybreak-journey-root h-full w-full overflow-hidden"
       data-testid="lessons-scroll-root"
     >
-      <div className="daybreak-journey-shell mx-auto flex w-full flex-col gap-4 px-4 py-4 sm:px-5">
+      <div className="daybreak-journey-shell mx-auto flex h-full min-h-0 w-full flex-col gap-3 px-4 py-3 sm:px-5">
         <HeaderStrip progress={progress} onPlay={onPlay} />
 
         <nav
@@ -145,12 +253,12 @@ export function LessonsView({
                 data-season-state={state}
                 aria-current={isSelected ? 'step' : undefined}
                 aria-label={`Season ${index + 1}: ${group.unit}`}
-                onClick={() => setSelectedUnit(group.unit)}
+                onClick={() => selectSeason(group.unit)}
               >
                 <span aria-hidden="true">
                   {String(index + 1).padStart(2, '0')} ·{' '}
                 </span>
-                {group.unit}
+                <span className="daybreak-season-tab__label">{group.unit}</span>
                 <span
                   className="daybreak-season-tab__state"
                   data-state={state}
@@ -158,7 +266,7 @@ export function LessonsView({
                   aria-hidden="true"
                 >
                   {state === 'completed'
-                    ? 'Mastered'
+                    ? 'Cleared'
                     : state === 'locked'
                     ? 'Locked'
                     : 'Live'}
@@ -169,7 +277,7 @@ export function LessonsView({
         </nav>
 
         <div
-          className="daybreak-journey-stage pb-2"
+          className="daybreak-journey-stage min-h-0 grow"
           style={{
             backgroundImage: `url(${journeyStudio})`,
           }}
@@ -207,6 +315,9 @@ export function LessonsView({
               progress={progress}
               isCurrent={group.unit === currentUnit}
               isFeatured={group.unit === visibleUnit}
+              focusedLessonId={resolvedFocusedLessonId}
+              controlLegend={journeyControls.legend}
+              controlSource={journeyControls.source}
               onPlay={onPlay}
               onLockedClick={handleLockedClick}
             />

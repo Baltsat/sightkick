@@ -202,29 +202,29 @@ describe('full-kit', () => {
 });
 
 describe('season-finale', () => {
-  it('unlocks once every song in a lesson unit is mastered (3+ stars)', () => {
+  it('unlocks once every song in a lesson unit is cleared at 90%+', () => {
     const songList = [
       song({
         id: 'l1',
         lesson: { id: '01.01', starsToUnlock: 0, unit: 'Unit 1', title: 'A' },
-        scoreData: { expert: scoreForStars(3) },
+        scoreData: { expert: scoreForStars(5) },
       }),
       song({
         id: 'l2',
         lesson: { id: '01.02', starsToUnlock: 3, unit: 'Unit 1', title: 'B' },
-        scoreData: { expert: scoreForStars(4) },
+        scoreData: { expert: scoreForStars(5) },
       }),
     ];
 
     expect(unlockedIds([], songList).has('season-finale')).toBe(true);
   });
 
-  it('stays locked while one lesson in the unit is unmastered', () => {
+  it('stays locked while one lesson in the unit is below the clear gate', () => {
     const songList = [
       song({
         id: 'l1',
         lesson: { id: '01.01', starsToUnlock: 0, unit: 'Unit 1', title: 'A' },
-        scoreData: { expert: scoreForStars(3) },
+        scoreData: { expert: scoreForStars(5) },
       }),
       song({
         id: 'l2',

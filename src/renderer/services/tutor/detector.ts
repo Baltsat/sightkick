@@ -8,6 +8,17 @@ import {
   TutorWrongPadPair,
 } from './types';
 
+/**
+ * The Practice judge accepts a strike inside a 160 ms window. Tutor chart
+ * plans deliberately retain only musical ticks (not tempo maps), so this is
+ * the conservative 480 PPQ lower-tempo equivalent of that authoritative
+ * window: 120 ticks is 160 ms at 93.75 BPM and covers the recorded 82–85 BPM
+ * practice passages (~105–109 ticks). Keep the match inside the actual bar
+ * below; this widens real pad-confusion evidence without inventing a
+ * cross-bar transition.
+ */
+const PRACTICE_WRONG_PAD_PAIR_TOLERANCE_TICKS = 120;
+
 function uniqueExpectedOutcomes(
   judgements: ResolvedJudgement[],
 ): ResolvedJudgement[] {
@@ -75,11 +86,12 @@ function wrongPadPairs(
       return;
     }
 
-    // A conservative, local pairing prevents a stray wrong hit from being
-    // assigned to an arbitrary nearby miss. One wrong can only explain one
-    // uniquely close expected note in its own completed bar.
+    // One wrong can only explain one uniquely close expected note in its own
+    // completed bar. The old half-grid threshold was narrower than the
+    // authoritative Practice judge window on dense 16th-note bars, which
+    // discarded the observed 80–110 tick pad confusions.
     const toleranceTicks = Math.max(
-      1,
+      PRACTICE_WRONG_PAD_PAIR_TOLERANCE_TICKS,
       Math.floor(
         (measure.endTick - measure.startTick) /
           Math.max(2, measure.expectedKeys * 2),

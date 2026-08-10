@@ -2,9 +2,9 @@
   "schemaVersion": 2,
   "application": {
     "productName": "Drumroll",
-    "releaseVersion": "1.2.0-kb.4",
+    "releaseVersion": "1.2.0-kb.5",
     "shortVersion": "1.2.0",
-    "buildVersion": "1.2.4"
+    "buildVersion": "1.2.5"
   },
   "lessonLibrary": {
     "lessonCount": 170,
@@ -3450,9 +3450,7 @@
     },
     "architecture": "arm64",
     "minimumMacOSVersion": "12.0",
-    "externalLibraries": [
-      "zlib"
-    ],
+    "externalLibraries": ["zlib"],
     "files": [
       {
         "path": "bin/ffmpeg",
@@ -3496,9 +3494,7 @@
       "platform": "darwin",
       "architecture": "arm64",
       "minimumMacOSVersion": "12.0",
-      "externalLibraries": [
-        "zlib"
-      ],
+      "externalLibraries": ["zlib"],
       "configureArgs": [
         "--prefix=/opt/drumroll-ffmpeg-runtime",
         "--extra-version=drumroll-lgpl",

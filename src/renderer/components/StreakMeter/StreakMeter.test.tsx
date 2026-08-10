@@ -15,6 +15,24 @@ describe('StreakMeter', () => {
     expect(screen.queryByTestId('streak-meter')).not.toBeInTheDocument();
   });
 
+  it('hides immediately when the current streak breaks, even when a best streak remains', () => {
+    render(
+      <StreakMeter
+        ui={uiWithStreak({
+          streak: {
+            count: 0,
+            best: 18,
+            stage: STREAK_STAGES[1],
+            countedNoteIds: new Set(),
+          },
+          shatterSeq: 1,
+        })}
+      />,
+    );
+
+    expect(screen.queryByTestId('streak-meter')).not.toBeInTheDocument();
+  });
+
   it('shows the current count once the streak has started, even below the first stage', () => {
     render(
       <StreakMeter
@@ -152,7 +170,7 @@ describe('StreakMeter', () => {
   it('applies the shatter class only when animated (default true)', () => {
     const ui = uiWithStreak({
       streak: {
-        count: 0,
+        count: 1,
         best: 5,
         stage: undefined,
         countedNoteIds: new Set(),

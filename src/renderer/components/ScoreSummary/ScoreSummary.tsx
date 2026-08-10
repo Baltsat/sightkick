@@ -19,6 +19,7 @@ import {
   UseGamificationResult,
 } from '../../hooks/useGamification';
 import { AchievementToastQueue } from '../AchievementToastQueue';
+import type { LessonProgressionDecision } from '../../services/lesson-progression';
 
 interface Props {
   isOpen: boolean;
@@ -44,6 +45,7 @@ interface Props {
    * called). The whole XP/streak/nudge block simply doesn't render
    * without it, same as `practiceSummary` already does. */
   runResult?: RecordRunResult;
+  lessonProgression?: LessonProgressionDecision;
 }
 
 function noteCountLabel(count: number, verb: string): string {
@@ -128,6 +130,7 @@ export function ScoreSummary({
   practiceSummary,
   gamification,
   runResult,
+  lessonProgression,
 }: Props) {
   const starRating = useMemo(() => {
     if (!scoreData) {
@@ -266,9 +269,10 @@ export function ScoreSummary({
         {scoreData ? (
           // Star rating, accuracy headline and the hit/missed/false-hit grid
           // are all derived from `scoreData` — Perform-only (see
-          // ModePolicy.scoring's doc comment). A Practice run never sets
-          // scoreData, so this block simply doesn't render for one; its
-          // PracticeStats below still does.
+          // ModePolicy.scoring's doc comment). Ordinary Practice does not set
+          // scoreData; a saved full target-speed lesson pass may set it so
+          // the curriculum can award its honest stars. PracticeStats below
+          // remains the evidence view in either case.
           <>
             <Stars
               rating={starRating}
@@ -316,6 +320,28 @@ export function ScoreSummary({
               </div>
             </div>
           )
+        )}
+        {lessonProgression && (
+          <div
+            className="w-full rounded-xl border border-accent-soft-border bg-accent-soft-bg px-4 py-3 text-left"
+            data-testid="lesson-progression-result"
+            role="status"
+          >
+            <div className="text-sm font-semibold text-text">
+              {lessonProgression.qualifies
+                ? 'Target-speed pass complete'
+                : 'Practice saved for coaching'}
+            </div>
+            <div className="mt-1 text-xs leading-5 text-text-muted">
+              {lessonProgression.qualifies
+                ? 'Your stars are applied after this run is safely saved.'
+                : !lessonProgression.fullCoverage
+                ? 'To earn lesson stars, restart at the beginning and finish without scrubbing, looping, or recovery rewinds.'
+                : !lessonProgression.atTargetSpeed
+                ? 'Keep this evidence, then play one complete run at 1.0× to earn lesson stars.'
+                : 'Reach at least 90% scored accuracy on the complete 1.0× run to clear this lesson.'}
+            </div>
+          </div>
         )}
         <PracticeStats
           summary={practiceSummary}

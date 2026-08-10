@@ -19,7 +19,7 @@ import {
   SongLessonInfo,
 } from '../../types';
 import { antdTheme } from '../antdTheme';
-import { AppProvider } from '../context/AppContext';
+import { AppProvider, useApp } from '../context/AppContext';
 import { InputProvider } from '../context/InputContext';
 import { SongViewSettingsProvider } from '../context/SongViewSettingsContext';
 import {
@@ -510,6 +510,7 @@ export interface SongListOptions {
   route?: string;
   settings?: Record<string, unknown>;
   online?: EnchorChart[];
+  freshProfile?: boolean;
 }
 
 export interface SongListHarness {
@@ -548,6 +549,7 @@ export function setupSongListView({
   route = '/',
   settings,
   online = [],
+  freshProfile = false,
 }: SongListOptions = {}): SongListHarness {
   shimSvgBBox();
   installLocalStorage();
@@ -557,22 +559,32 @@ export function setupSongListView({
 
   installOnlineFetch(() => onlineResults);
 
-  seedSettings({
-    selectedDevice: { id: 'keyboard', name: 'Keyboard', sourceId: 'keyboard' },
-    controlMappings: { keyboard: navControlMappings() },
-    ...settings,
-  });
+  seedSettings(
+    freshProfile
+      ? settings ?? {}
+      : {
+          selectedDevice: {
+            id: 'keyboard',
+            name: 'Keyboard',
+            sourceId: 'keyboard',
+          },
+          controlMappings: { keyboard: navControlMappings() },
+          ...settings,
+        },
+  );
 
   function SongViewStub() {
     const navigate = useNavigate();
     const location = useLocation();
     const { id } = useParams();
+    const { difficulty } = useApp();
 
     return (
       <div
         data-testid="song-view-stub"
         data-song-id={id}
         data-search={location.search}
+        data-difficulty={difficulty}
       >
         <button
           type="button"

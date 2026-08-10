@@ -3,6 +3,7 @@ import {
   faBolt,
   faEarListen,
   faHeart,
+  faPause,
   faRotateLeft,
 } from '@fortawesome/free-solid-svg-icons';
 import { useId } from 'react';
@@ -13,6 +14,13 @@ import './TutorHud.css';
 interface TutorHudProps {
   state: TutorState;
   message: TutorHudMessage;
+  displayState?: 'inactivity-paused' | 'remediation';
+  remediation?: {
+    currentTask: number;
+    totalTasks: number;
+    cleanRepetitions: number;
+    requiredCleanRepetitions: number;
+  };
 }
 
 function labelForPhase(phase: TutorState['phase']) {
@@ -27,16 +35,31 @@ function labelForPhase(phase: TutorState['phase']) {
   return 'Adaptive tutor';
 }
 
-export function TutorHud({ state, message }: TutorHudProps) {
+export function TutorHud({
+  state,
+  message,
+  displayState,
+  remediation,
+}: TutorHudProps) {
   const titleId = useId();
   const detailId = useId();
 
-  if (state.phase === 'off') {
+  if (state.phase === 'off' && !remediation && !displayState) {
     return null;
   }
 
   const recovery = state.recovery;
-  const phaseLabel = labelForPhase(state.phase);
+  const completedRecovery = recovery ? undefined : state.lastRecoveryOutcome;
+  const checkpointLivesRefilled =
+    completedRecovery?.status === 'deferred' &&
+    state.settings.livesEnabled &&
+    state.livesRemaining === state.settings.startingLives;
+  const phaseLabel =
+    displayState === 'inactivity-paused'
+      ? 'Paused — no hits'
+      : displayState === 'remediation'
+      ? 'Coach remediation'
+      : labelForPhase(state.phase);
   const speedLabel = `${state.currentSpeed.toFixed(1)}×`;
 
   return (
@@ -44,6 +67,7 @@ export function TutorHud({ state, message }: TutorHudProps) {
       className="drumroll-tutor-hud"
       data-tone={message.tone}
       data-phase={state.phase}
+      data-display-state={displayState}
       data-testid="tutor-hud"
       role="status"
       aria-live="polite"
@@ -53,7 +77,13 @@ export function TutorHud({ state, message }: TutorHudProps) {
     >
       <div className="drumroll-tutor-hud__signal" aria-hidden="true">
         <FontAwesomeIcon
-          icon={recovery ? faRotateLeft : faEarListen}
+          icon={
+            displayState === 'inactivity-paused'
+              ? faPause
+              : recovery || remediation
+              ? faRotateLeft
+              : faEarListen
+          }
           fixedWidth
         />
       </div>
@@ -70,22 +100,50 @@ export function TutorHud({ state, message }: TutorHudProps) {
             {speedLabel}
           </dd>
         </div>
-        {recovery && (
+        {remediation && (
           <div className="drumroll-tutor-hud__metric">
-            <dt>Clean reps</dt>
-            <dd data-testid="tutor-repetition">
-              {recovery.cleanRepetitions} /{' '}
-              {state.settings.requiredCleanRepetitions}
+            <dt>Phrase</dt>
+            <dd data-testid="remediation-task">
+              {remediation.currentTask} / {remediation.totalTasks}
             </dd>
           </div>
         )}
-        {state.settings.livesEnabled && (
+        {remediation && (
           <div className="drumroll-tutor-hud__metric">
-            <dt>Lives</dt>
+            <dt>Clean reps</dt>
+            <dd data-testid="remediation-repetition">
+              {remediation.cleanRepetitions} /{' '}
+              {remediation.requiredCleanRepetitions}
+            </dd>
+          </div>
+        )}
+        {!remediation && (recovery || completedRecovery) && (
+          <div className="drumroll-tutor-hud__metric">
+            <dt>
+              {completedRecovery?.status === 'mastered'
+                ? 'Mastered'
+                : 'Clean reps'}
+            </dt>
+            <dd data-testid="tutor-repetition">
+              {recovery?.cleanRepetitions ??
+                completedRecovery?.cleanRepetitions}{' '}
+              / {state.settings.requiredCleanRepetitions}
+            </dd>
+          </div>
+        )}
+        {!remediation && state.settings.livesEnabled && (
+          <div className="drumroll-tutor-hud__metric">
+            <dt>{checkpointLivesRefilled ? 'Lives reset' : 'Lives'}</dt>
             <dd>
               <span
                 className="drumroll-tutor-hud__lives"
-                aria-label={`${state.livesRemaining} of ${state.settings.startingLives} lives remaining`}
+                aria-label={`${state.livesRemaining} of ${
+                  state.settings.startingLives
+                } lives ${
+                  checkpointLivesRefilled
+                    ? 'available after checkpoint reset'
+                    : 'remaining'
+                }`}
                 data-testid="tutor-lives"
               >
                 <strong>{state.livesRemaining}</strong>

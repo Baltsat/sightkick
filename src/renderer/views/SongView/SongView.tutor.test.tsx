@@ -1,6 +1,11 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { setupSongView } from '../test-support';
+import {
+  BEAT_SECONDS,
+  COUNT_IN_BEATS,
+  makeSong,
+  setupSongView,
+} from '../test-support';
 
 function savedRuns(view: ReturnType<typeof setupSongView>) {
   return view.ipc.sent
@@ -53,7 +58,7 @@ describe('adaptive tutor surfaces', () => {
     const hud = screen.getByTestId('tutor-hud');
 
     expect(within(hud).getByText('Ready when you are')).toBeInTheDocument();
-    expect(hud).toHaveAccessibleDescription(/kick, crash, kick, crash/i);
+    expect(hud).toHaveAccessibleDescription(/kick once/i);
     expect(
       screen.getByRole('spinbutton', { name: 'Playback speed' }),
     ).toBeInTheDocument();
@@ -85,6 +90,60 @@ describe('adaptive tutor surfaces', () => {
 });
 
 describe('safe hands-free run intent', () => {
+  it('starts a direct lesson count-in from one deliberate kick at the ready screen', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice',
+        keyboard: { kit: { kick: ['keyboard:KeyK'] } },
+      });
+
+      await view.loadSong(
+        makeSong({
+          name: 'Quarter-note pulse',
+          artist: 'SightKick Method',
+          lesson: {
+            id: '01.01',
+            starsToUnlock: 0,
+            unit: 'Unit 1 — Foundations',
+            title: 'Quarter-note pulse',
+          },
+        }),
+      );
+
+      expect(
+        within(screen.getByTestId('tutor-hud')).getByText('Star run ready'),
+      ).toBeInTheDocument();
+
+      await view.pressKey('KeyK');
+
+      expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+        'aria-label',
+        'Cancel count-in',
+      );
+      expect(
+        within(screen.getByTestId('count-in')).getByText('1'),
+      ).toBeInTheDocument();
+      expect(
+        view.audio.bufferSources
+          .flatMap((source) => source.starts)
+          .some((start) => start.at === COUNT_IN_BEATS * BEAT_SECONDS),
+      ).toBe(true);
+
+      await view.completeCountIn();
+
+      expect(screen.queryByTestId('count-in')).not.toBeInTheDocument();
+      expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+        'aria-label',
+        'Pause',
+      );
+      expect(view.startedSources().length).toBeGreaterThan(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('auto-starts a recommended Practice run at the requested tutor speed', async () => {
     const view = setupSongView({
       route: '/song-1?gameMode=practice&autoStart=1&practiceSpeed=0.7',

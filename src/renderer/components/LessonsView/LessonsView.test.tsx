@@ -1,10 +1,21 @@
 import { ReactNode } from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { App as AntdApp } from 'antd';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LessonsView } from './LessonsView';
 import { computeLessonProgress, LessonProgress } from '../../hooks/useLessons';
-import { ScoreData, Song, SongLessonInfo } from '../../../types';
+import {
+  MidiMessageType,
+  ScoreData,
+  Song,
+  SongLessonInfo,
+} from '../../../types';
+import { InputProvider } from '../../context/InputContext';
+import {
+  installIpcMock,
+  installLocalStorage,
+  IpcMock,
+} from '../../hooks/test-support';
 
 const EMPTY_PROGRESS: LessonProgress = {
   entries: [],
@@ -12,12 +23,63 @@ const EMPTY_PROGRESS: LessonProgress = {
   totalLessons: 0,
   unlockedCount: 0,
   totalStars: 0,
+  clearedCount: 0,
   continueEntry: undefined,
   nextLockedEntry: undefined,
 };
 
 function wrapper({ children }: { children: ReactNode }) {
-  return <AntdApp>{children}</AntdApp>;
+  return (
+    <AntdApp>
+      <InputProvider>{children}</InputProvider>
+    </AntdApp>
+  );
+}
+
+let ipc: IpcMock;
+
+beforeEach(() => {
+  installLocalStorage();
+  ipc = installIpcMock();
+});
+
+function seedFreshMidiJourneyProfile() {
+  const deviceId = 'midi:DTX402 Touch';
+
+  window.localStorage.setItem(
+    'settings.selectedDevice',
+    JSON.stringify({
+      id: deviceId,
+      name: 'DTX402 Touch',
+      sourceId: 'midi',
+      port: 2,
+    }),
+  );
+  window.localStorage.setItem(
+    'settings.inputMappings',
+    JSON.stringify({
+      [deviceId]: {
+        tom1: ['midi:71'],
+        tom2: ['midi:72'],
+        snare: ['midi:73'],
+        crash: ['midi:74'],
+      },
+    }),
+  );
+  window.localStorage.setItem(
+    'settings.controlMappings',
+    JSON.stringify({ [deviceId]: {} }),
+  );
+}
+
+function hitMidiNote(note: number) {
+  act(() => {
+    ipc.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note,
+      velocity: 100,
+    });
+  });
 }
 
 function makeSong(extra: Partial<Song> = {}): Song {
@@ -72,10 +134,10 @@ function scoreFor(accuracy: number): ScoreData {
   };
 }
 
-/** One mastered season, one active season (mixed done/next-up/locked), one fully locked season. */
+/** One cleared season, one active season (mixed done/next-up/locked), one fully locked season. */
 function makeMixedProgress(): LessonProgress {
   return computeLessonProgress([
-    // Season "Foundations" — fully mastered.
+    // Season "Foundations" — fully cleared.
     makeLessonSong(
       'a',
       { id: '01.01', starsToUnlock: 0, unit: 'Foundations', title: 'Singles' },
@@ -86,27 +148,27 @@ function makeMixedProgress(): LessonProgress {
       { id: '01.02', starsToUnlock: 0, unit: 'Foundations', title: 'Doubles' },
       { scoreData: { expert: scoreFor(0.99) } }, // 5 stars
     ),
-    // Season "Reading" — active: one mastered, one next-up, one locked.
+    // Season "Reading" — active: one cleared, one next-up, one locked.
     makeLessonSong(
       'c',
-      { id: '02.01', starsToUnlock: 5, unit: 'Reading', title: 'Whole Notes' },
-      { scoreData: { expert: scoreFor(0.65) } }, // 3 stars, mastered
+      { id: '02.01', starsToUnlock: 2, unit: 'Reading', title: 'Whole Notes' },
+      { scoreData: { expert: scoreFor(0.99) } }, // cleared
     ),
     makeLessonSong(
       'd',
-      { id: '02.02', starsToUnlock: 8, unit: 'Reading', title: 'Half Notes' },
-      { scoreData: { expert: scoreFor(0.5) } }, // 2 stars, unlocked but not mastered
+      { id: '02.02', starsToUnlock: 3, unit: 'Reading', title: 'Half Notes' },
+      { scoreData: { expert: scoreFor(0.5) } }, // unlocked but not cleared
     ),
     makeLessonSong('e', {
       id: '02.03',
-      starsToUnlock: 40,
+      starsToUnlock: 4,
       unit: 'Reading',
       title: 'Rests',
     }), // locked
     // Season "Grooves" — fully locked.
     makeLessonSong('f', {
       id: '03.01',
-      starsToUnlock: 99,
+      starsToUnlock: 5,
       unit: 'Grooves',
       title: 'First Beat',
     }),
@@ -173,7 +235,7 @@ describe('LessonsView — chain progress header', () => {
     ).toBeInTheDocument();
   });
 
-  it('exposes a stable scroll-root testid (distinct from the Songs list, which also scrolls)', () => {
+  it('uses a fixed, no-scroll Journey viewport so the kit player never has to scroll the page', () => {
     const progress = makeMixedProgress();
 
     render(
@@ -182,11 +244,15 @@ describe('LessonsView — chain progress header', () => {
     );
 
     expect(screen.getByTestId('lessons-scroll-root')).toHaveClass(
-      'overflow-y-auto',
+      'overflow-hidden',
+    );
+    expect(screen.getByTestId('lesson-season-stage')).toHaveClass('grow');
+    expect(screen.getAllByTestId('journey-kit-controls')[0]).toHaveTextContent(
+      'Set Journey controls in Configure input',
     );
   });
 
-  it('shows a continue card for the furthest unmastered unlocked lesson', () => {
+  it('shows a continue card for the furthest uncleared unlocked lesson', () => {
     const progress = makeMixedProgress();
 
     render(
@@ -236,6 +302,29 @@ describe('LessonsView — chain progress header', () => {
 });
 
 describe('LessonsView — seasons', () => {
+  it('uses the authored dominant lane to choose a physical instrument node and canonical notation colour', () => {
+    const progress = computeLessonProgress([
+      makeLessonSong('01.01', {
+        targetLanes: [
+          { element: 'snare', weight: 0.25 },
+          { element: 'kick', weight: 0.75 },
+        ],
+      }),
+    ]);
+
+    render(
+      <LessonsView progress={progress} onPlay={vi.fn()} onRescan={vi.fn()} />,
+      { wrapper },
+    );
+
+    const node = screen.getByTestId('lesson-item-01.01');
+
+    expect(node).toHaveAttribute('data-node-instrument', 'kick-pad');
+    expect(node).toHaveAttribute('data-color-lane', 'orange');
+    expect(within(node).getByText('Kick')).toBeInTheDocument();
+    expect(node.querySelector('img')).toHaveAttribute('draggable', 'false');
+  });
+
   it('renders every unit as a season card with a locked/active/completed state', () => {
     const progress = makeMixedProgress();
 
@@ -359,7 +448,7 @@ describe('LessonsView — seasons', () => {
     );
     expect(
       screen.getByTestId('season-rail-state-Foundations'),
-    ).toHaveTextContent('Mastered');
+    ).toHaveTextContent('Cleared');
     expect(screen.getByTestId('season-rail-state-Grooves')).toHaveTextContent(
       'Locked',
     );
@@ -454,7 +543,7 @@ describe('LessonsView — path nodes', () => {
     );
   });
 
-  it('greys out a locked node with data-locked and an Earn N more stars hint', () => {
+  it('greys out a locked node with data-locked and a clear-count hint', () => {
     const progress = makeMixedProgress();
 
     render(
@@ -467,7 +556,7 @@ describe('LessonsView — path nodes', () => {
     expect(locked).toHaveAttribute('data-locked', 'true');
     expect(locked).toHaveClass('daybreak-lesson-node--locked');
     expect(locked).not.toHaveClass('opacity-65');
-    expect(within(locked).getByText('Earn 25 more stars')).toBeInTheDocument();
+    expect(within(locked).getByText('Clear 1 more lesson')).toBeInTheDocument();
   });
 
   it('shows an honest "locked" notification instead of a dead click, and never calls onPlay', () => {
@@ -498,6 +587,74 @@ describe('LessonsView — path nodes', () => {
 
     expect(onPlay).toHaveBeenCalledTimes(1);
     expect(onPlay.mock.calls[0][0].lesson.id).toBe('01.02');
+  });
+
+  it('marks the current unlocked lesson as the deterministic kit target', () => {
+    const progress = makeMixedProgress();
+
+    render(
+      <LessonsView progress={progress} onPlay={vi.fn()} onRescan={vi.fn()} />,
+      { wrapper },
+    );
+
+    expect(screen.getByTestId('lesson-item-02.02')).toHaveAttribute(
+      'data-kit-focused',
+      'true',
+    );
+    expect(screen.getByTestId('lesson-item-02.01')).not.toHaveAttribute(
+      'data-kit-focused',
+    );
+  });
+
+  it('uses fresh-profile MIDI lanes to move focus, start a lesson, and back out without control mappings', () => {
+    seedFreshMidiJourneyProfile();
+
+    const progress = makeMixedProgress();
+    const onPlay = vi.fn();
+    const onBack = vi.fn();
+
+    render(
+      <LessonsView
+        progress={progress}
+        onPlay={onPlay}
+        onRescan={vi.fn()}
+        onBack={onBack}
+      />,
+      { wrapper },
+    );
+
+    const legend = within(
+      screen.getByTestId('season-card-Reading'),
+    ).getByTestId('journey-kit-controls');
+
+    expect(legend).toHaveAttribute('data-control-source', 'kit-lanes');
+    expect(legend).toHaveTextContent(
+      'Tom 1 / Tom 2 select · Snare starts · Crash backs',
+    );
+    expect(screen.getByTestId('lesson-item-02.02')).toHaveAttribute(
+      'data-kit-focused',
+      'true',
+    );
+
+    hitMidiNote(71);
+    expect(screen.getByTestId('lesson-item-02.01')).toHaveAttribute(
+      'data-kit-focused',
+      'true',
+    );
+
+    hitMidiNote(72);
+    expect(screen.getByTestId('lesson-item-02.02')).toHaveAttribute(
+      'data-kit-focused',
+      'true',
+    );
+
+    hitMidiNote(71);
+    hitMidiNote(73);
+    expect(onPlay).toHaveBeenCalledTimes(1);
+    expect(onPlay.mock.calls[0][0].lesson.id).toBe('02.01');
+
+    hitMidiNote(74);
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 
   it('activates an unlocked node on Enter and Space, same as a click', () => {

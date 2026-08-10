@@ -11,7 +11,9 @@ export interface ModePolicy {
    * ScoreSummary/PracticeStats — those fire in both modes whenever a run
    * actually ends with a real attempt. A practice run with looping/speed
    * is still evidence of progression, so it earns the same analytics as a
-   * Perform run even though it never earns stars.
+   * Perform run. Ordinary song Practice never earns stars; a complete
+   * target-speed curriculum lesson is the deliberate exception because
+   * lessons launch directly into Practice and need a real progression path.
    */
   scoring: boolean;
   allowScrubbing: boolean;

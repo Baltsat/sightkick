@@ -25,6 +25,11 @@ export const KIT_SHORT_LABEL: Partial<Record<InputElement, string>> = {
 
 export const HIT_TOLERANCE_SECONDS = 0.1;
 
+// Practice is a learning surface, not an audition. A 160 ms nearest-note
+// window keeps a developing player inside the phrase while Perform retains
+// the original 100 ms accuracy contract.
+export const PRACTICE_HIT_TOLERANCE_SECONDS = 0.16;
+
 export const ACCENT_VALUE_THRESHOLD = 90;
 
 export const GHOST_VALUE_THRESHOLD = 50;

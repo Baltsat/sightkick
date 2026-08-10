@@ -25,13 +25,18 @@ export interface SeasonCardProps {
   isCurrent: boolean;
   /** Whether this season is the spatial scene currently chosen from the rail. */
   isFeatured: boolean;
+  /** The unlocked lesson selected for kit/keyboard confirmation. */
+  focusedLessonId?: string;
+  /** Visible, truthful summary of the controls active on this Journey. */
+  controlLegend: string;
+  controlSource: 'explicit' | 'kit-lanes' | 'unavailable';
   onPlay: (entry: LessonEntry) => void;
   onLockedClick: (entry: LessonEntry) => void;
 }
 
 /**
  * A unit rendered as a racing-game "season": a ring showing how much of it
- * is mastered, a locked/active/completed visual state, and (once opened) the
+ * is cleared, a locked/active/completed visual state, and (once opened) the
  * winding path of its exercises. Like a level-select map, the current season
  * opens by default and the rest start collapsed to just their header — click
  * any header to open or close it. Collapsing is CSS-only (`hidden`, not a
@@ -46,13 +51,16 @@ export function SeasonCard({
   progress,
   isCurrent,
   isFeatured,
+  focusedLessonId,
+  controlLegend,
+  controlSource,
   onPlay,
   onLockedClick,
 }: SeasonCardProps) {
   const [expanded, setExpanded] = useState(isCurrent);
   const state = seasonState(group);
-  const { earned, possible, masteredCount } = seasonStars(group);
-  const donePercent = Math.round((masteredCount / group.entries.length) * 100);
+  const { earned, possible, clearedCount } = seasonStars(group);
+  const donePercent = Math.round((clearedCount / group.entries.length) * 100);
   const pathId = `lesson-path-${group.unit}`;
   // Rail selection always presents a usable path. The manual open/close state
   // still controls unfeatured seasons, preserving the old DOM/test contract.
@@ -123,7 +131,7 @@ export function SeasonCard({
           >
             {earned} / {possible}{' '}
             <FontAwesomeIcon icon={faStar} aria-label="stars" /> ·{' '}
-            {masteredCount}/{group.entries.length} exercises mastered
+            {clearedCount}/{group.entries.length} exercises cleared
           </div>
         </div>
 
@@ -148,6 +156,9 @@ export function SeasonCard({
           unit={group.unit}
           entries={group.entries}
           progress={progress}
+          focusedLessonId={focusedLessonId}
+          controlLegend={controlLegend}
+          controlSource={controlSource}
           onPlay={onPlay}
           onLockedClick={onLockedClick}
         />

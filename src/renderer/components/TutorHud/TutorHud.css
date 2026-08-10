@@ -38,7 +38,7 @@
   max-width: none;
   padding-inline: 0.45rem;
   font-size: clamp(0.7rem, 1.05vw, 0.88rem);
-  scale: 0.9;
+  scale: 1;
   transform-origin: center;
 }
 
@@ -80,6 +80,15 @@
 
 .drumroll-tutor-hud[data-tone='warning'] {
   --tutor-signal: #ffad2f;
+}
+
+.drumroll-tutor-hud[data-display-state='inactivity-paused'] {
+  border-color: color-mix(in srgb, var(--color-cyan) 34%, white);
+  background: linear-gradient(135deg, rgb(250 254 255 / 98%), #f1eadc 96%);
+}
+
+.drumroll-tutor-hud[data-display-state='remediation'] {
+  --tutor-signal: #ff684f;
 }
 
 .drumroll-tutor-hud[data-tone='recovery'] {
@@ -259,7 +268,7 @@
 
 @media (min-width: 1440px) {
   .drumroll-reference--above-tutor {
-    scale: 1;
+    scale: 1.08;
   }
 }
 

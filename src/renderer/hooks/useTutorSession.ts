@@ -32,12 +32,15 @@ interface UseTutorSessionParams {
   measures: Measure[];
   delaySeconds: number;
   enabled: boolean;
+  /** Temporarily stop observing without resetting accumulated tutor evidence. */
+  suspended?: boolean;
   targetSpeed: number;
   setPlaybackSpeed: (speed: number) => void;
   onTutorTakeover?: () => void;
   /** Synchronous evidence handoff used by SongView's end-of-run callback. */
   onStateChange?: (state: TutorState) => void;
   settings?: Partial<TutorSettings>;
+  hitToleranceSeconds?: number;
 }
 
 export interface UseTutorSessionResult {
@@ -199,7 +202,11 @@ export function messageForTutorCommand(
         title: 'Phrase saved for focus work',
         detail: `${failedAttempts} failed recovery ${
           failedAttempts === 1 ? 'attempt reached' : 'attempts reached'
-        } the configured ${maximumFailedAttempts}-attempt safety limit. Continuing without trapping you here.`,
+        } the configured ${maximumFailedAttempts}-attempt safety limit. Continuing without trapping you here.${
+          settings.livesEnabled
+            ? ` Checkpoint lives refilled to ${settings.startingLives}.`
+            : ''
+        }`,
         tone: 'warning',
       };
     }
@@ -319,11 +326,13 @@ export function useTutorSession({
   measures,
   delaySeconds,
   enabled,
+  suspended = false,
   targetSpeed,
   setPlaybackSpeed,
   onTutorTakeover,
   onStateChange,
   settings = {},
+  hitToleranceSeconds = HIT_TOLERANCE_SECONDS,
 }: UseTutorSessionParams): UseTutorSessionResult {
   const sectionStarts = useMemo(
     () =>
@@ -421,7 +430,7 @@ export function useTutorSession({
   }, [onStateChange, snapshot.state]);
 
   useEffect(() => {
-    if (!engine || !chart || !enabled || measures.length === 0) {
+    if (!engine || !chart || !enabled || suspended || measures.length === 0) {
       return undefined;
     }
 
@@ -481,7 +490,7 @@ export function useTutorSession({
 
       const observedTime = engine.timeStore.get();
       const resolvedChartTime =
-        observedTime - delaySeconds - HIT_TOLERANCE_SECONDS;
+        observedTime - delaySeconds - hitToleranceSeconds;
       const resolvedTick = secondsToTicks(
         resolvedChartTime,
         chart.resolution,
@@ -525,7 +534,16 @@ export function useTutorSession({
       offRunEnding();
       offTime();
     };
-  }, [chart, delaySeconds, enabled, engine, measures, send]);
+  }, [
+    chart,
+    delaySeconds,
+    enabled,
+    suspended,
+    engine,
+    hitToleranceSeconds,
+    measures,
+    send,
+  ]);
 
   return snapshot;
 }

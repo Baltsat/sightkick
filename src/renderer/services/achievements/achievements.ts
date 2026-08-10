@@ -3,7 +3,7 @@ import { GameMode } from '../../types';
 import { ALL_DIFFICULTIES } from '../../../constants';
 import { KIT_ELEMENTS } from '../../constants';
 import { LaneAccuracy } from '../practice-stats';
-import { getStarRating } from '../../scoring';
+import { calculateAccuracy, getStarRating } from '../../scoring';
 
 /**
  * Pure achievement derivation. No storage of its own — every badge is
@@ -14,12 +14,8 @@ import { getStarRating } from '../../scoring';
  * "already shown" cache for the unlock toast — this module only answers
  * "is this badge unlocked right now".
  *
- * `bestStarsForSong`/`LESSON_MASTERED_STARS` below intentionally duplicate
- * ~10 lines already in `hooks/useLessons/helpers.ts` instead of importing
- * from it. That module is under active redesign by another agent
- * (Seasons) per this branch's file fence — staying import-free keeps this
- * module isolated from that in-flight rewrite. Keep the constant in sync
- * by hand if the mastery threshold ever changes.
+ * The small lesson-accuracy reducer below intentionally stays import-free
+ * from hooks/useLessons so achievement derivation remains a pure service.
  */
 
 export type AchievementId =
@@ -76,8 +72,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'season-finale',
     title: 'Season Finale',
-    description: 'Mastered every lesson in a Drumroll Method unit.',
-    hint: 'Master (3⭐) every lesson in one Method unit.',
+    description: 'Cleared every lesson in a Drumroll Method unit.',
+    hint: 'Clear every lesson in one Method unit at 90%+ accuracy.',
   },
   {
     id: 'night-owl',
@@ -131,9 +127,7 @@ const EARLY_BIRD_BEFORE_HOUR = 8;
 /** "After 11pm" per the brief. */
 const NIGHT_OWL_AT_OR_AFTER_HOUR = 23;
 const SPEED_DEMON_MIN_STARS = 3;
-// Kept in sync by hand with hooks/useLessons/helpers.ts's
-// LESSON_MASTERED_STARS - see the module doc comment above.
-const LESSON_MASTERED_STARS = 3;
+const LESSON_CLEAR_ACCURACY = 0.9;
 
 /** Best star rating (0-5) earned on a song across every played difficulty. */
 export function bestStarsForSong(song: Song): number {
@@ -145,6 +139,18 @@ export function bestStarsForSong(song: Song): number {
     const data = song.scoreData?.[difficulty];
 
     return data ? Math.max(best, getStarRating(data)) : best;
+  }, 0);
+}
+
+function bestAccuracyForSong(song: Song): number {
+  if (!song.scoreData) {
+    return 0;
+  }
+
+  return ALL_DIFFICULTIES.reduce((best, difficulty) => {
+    const data = song.scoreData?.[difficulty];
+
+    return data ? Math.max(best, calculateAccuracy(data)) : best;
   }, 0);
 }
 
@@ -201,7 +207,7 @@ function hasSeasonFinale(songList: Song[]): boolean {
     (unitSongs) =>
       unitSongs.length > 0 &&
       unitSongs.every(
-        (song) => bestStarsForSong(song) >= LESSON_MASTERED_STARS,
+        (song) => bestAccuracyForSong(song) >= LESSON_CLEAR_ACCURACY,
       ),
   );
 }

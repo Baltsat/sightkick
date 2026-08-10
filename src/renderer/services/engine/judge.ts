@@ -39,6 +39,8 @@ export class Judge {
   private nextResolveIndex = 0;
   private wrongJudgementSequence = 0;
   private latencyMs = 0;
+  private hitToleranceSeconds = HIT_TOLERANCE_SECONDS;
+  private preferUnhitNotes = false;
 
   setContext(context: JudgeContext): void {
     const chartChanged = this.chart !== context.chart;
@@ -47,6 +49,12 @@ export class Judge {
     this.chart = context.chart;
     this.mapping = context.mapping;
     this.measures = context.measures;
+
+    if (context.hitToleranceSeconds !== undefined) {
+      this.hitToleranceSeconds = context.hitToleranceSeconds;
+    }
+
+    this.preferUnhitNotes = context.preferUnhitNotes ?? false;
 
     if (measuresChanged) {
       this.buildNoteIndex();
@@ -115,6 +123,10 @@ export class Judge {
 
   isHit(tick: number, prefix: string): boolean {
     return this.hits.get(tick)?.has(prefix) ?? false;
+  }
+
+  isMissed(tick: number, prefix: string): boolean {
+    return this.resolvedMisses.get(tick)?.has(prefix) ?? false;
   }
 
   get hitCount(): number {
@@ -227,7 +239,7 @@ export class Judge {
       chart.resolution,
       chart.tempos,
     );
-    const cutoffSeconds = currentTimeSeconds - HIT_TOLERANCE_SECONDS;
+    const cutoffSeconds = currentTimeSeconds - this.hitToleranceSeconds;
 
     this.resolveUntil(cutoffSeconds, chart);
   }
@@ -370,9 +382,13 @@ export class Judge {
     }
 
     const expectedPrefixes = new Set(
-      Object.entries(this.mapping).flatMap(([element, controls]) =>
-        controls?.includes(controlId) ? ELEMENT_TO_KEYS[element] ?? [] : [],
-      ),
+      Object.entries(this.mapping).flatMap(([element, controls]) => {
+        if (!controls?.includes(controlId)) {
+          return [];
+        }
+
+        return ELEMENT_TO_KEYS[element] ?? [];
+      }),
     );
 
     if (expectedPrefixes.size === 0) {
@@ -390,7 +406,7 @@ export class Judge {
     const currentTimeS = ticksToSeconds(tick, chart.resolution, chart.tempos);
     const toleranceTicks =
       secondsToTicks(
-        currentTimeS + HIT_TOLERANCE_SECONDS,
+        currentTimeS + this.hitToleranceSeconds,
         chart.resolution,
         chart.tempos,
       ) - tick;
@@ -415,9 +431,14 @@ export class Judge {
         continue;
       }
 
-      const hasMatchingKey = entry.note.notes.some((k) =>
-        expectedPrefixes.has(keyPrefix(k)),
-      );
+      const hasMatchingKey = entry.note.notes.some((key) => {
+        const prefix = keyPrefix(key);
+
+        return (
+          expectedPrefixes.has(prefix) &&
+          (!this.preferUnhitNotes || !this.isHit(entry.tick, prefix))
+        );
+      });
 
       if (hasMatchingKey) {
         bestDist = dist;

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import yandexFavoritesSource from '../../../../resources/library-sources/yandex-favorites-2026-08-10.json';
 import yandexSource from '../../../../resources/library-sources/yandex-drums-2026-08-09.json';
 import { parseYandexPlaylistCandidates } from '../../../library-sources/yandex';
+import { MidiMessageType } from '../../../types';
 import {
   makeEnchorChart,
   makeLessonSong,
@@ -47,9 +48,31 @@ describe('SongListView — loading the library', () => {
 
     expect(screen.getByTestId('home-cockpit')).toBeInTheDocument();
     expect(screen.getByTestId('kit-hotspot-kick')).toBeInTheDocument();
+    expect(
+      Object.fromEntries(
+        ['kick', 'snare', 'hihat', 'tom1', 'ride', 'tom2', 'crash', 'tom3'].map(
+          (element) => [
+            element,
+            screen
+              .getByTestId(`kit-hotspot-${element}`)
+              .getAttribute('data-color-lane'),
+          ],
+        ),
+      ),
+    ).toEqual({
+      kick: 'orange',
+      snare: 'red',
+      hihat: 'yellow',
+      tom1: 'yellow',
+      ride: 'blue',
+      tom2: 'blue',
+      crash: 'green',
+      tom3: 'green',
+    });
     expect(screen.getByTestId('home-hit-feedback')).not.toHaveAttribute(
       'aria-live',
     );
+    expect(screen.getByTestId('home-hit-feedback')).toBeEmptyDOMElement();
     expect(screen.getByTestId('home-session-status')).toHaveAttribute(
       'aria-live',
       'polite',
@@ -60,6 +83,18 @@ describe('SongListView — loading the library', () => {
     expect(
       screen.getByRole('button', { name: /choose a song/i }),
     ).toBeEnabled();
+  });
+
+  it('shows the cable-first Waiting state when no input is selected', () => {
+    mountSongListView({ settings: { selectedDevice: null } });
+
+    expect(screen.getByTestId('home-input-readiness')).toHaveTextContent(
+      'Waiting for kit',
+    );
+    expect(screen.getByTestId('home-input-readiness')).toHaveTextContent(
+      'Connect USB MIDI · auto-detect is on',
+    );
+    expect(screen.getByTestId('kit-hotspot-kick')).toHaveTextContent('Waiting');
   });
 
   it('makes kit readiness explicit and only enables the one-touch start after the remembered kit returns', async () => {
@@ -83,8 +118,19 @@ describe('SongListView — loading the library', () => {
     ]);
 
     expect(screen.getByTestId('home-input-readiness')).toHaveTextContent(
-      'Waiting for Yamaha DTX402',
+      'Reconnecting',
     );
+    expect(screen.getByTestId('home-input-readiness')).toHaveTextContent(
+      'Yamaha DTX402 · automatic retry',
+    );
+    expect(
+      within(screen.getByTestId('kit-hotspot-kick')).getByText('Waiting'),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('kit-hotspot-kick')).getByText(
+        'auto-connect armed',
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByTestId('home-start-practice')).toBeDisabled();
     expect(screen.getByTestId('kit-hotspot-kick')).toBeDisabled();
 
@@ -101,8 +147,17 @@ describe('SongListView — loading the library', () => {
 
     await waitFor(() =>
       expect(screen.getByTestId('home-input-readiness')).toHaveTextContent(
-        'Yamaha DTX402 ready',
+        'Connected',
       ),
+    );
+    expect(screen.getByTestId('home-input-readiness')).toHaveTextContent(
+      'Yamaha DTX402',
+    );
+    expect(screen.getByTestId('kit-hotspot-kick')).toHaveTextContent(
+      'Kick to start',
+    );
+    expect(screen.getByTestId('kit-hotspot-kick')).toHaveTextContent(
+      '0.7× · ready',
     );
     expect(screen.getByTestId('home-start-practice')).toBeEnabled();
     expect(screen.getByTestId('kit-hotspot-kick')).toBeEnabled();
@@ -169,6 +224,8 @@ describe('SongListView — loading the library', () => {
     expect(opened.getAttribute('data-search')).toContain('gameMode=practice');
     expect(opened.getAttribute('data-search')).toContain('autoStart=1');
     expect(opened.getAttribute('data-search')).toContain('practiceSpeed=0.7');
+    expect(screen.queryByTestId('home-cockpit')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('kit-hotspot-kick')).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('game-mode-selector-modal'),
     ).not.toBeInTheDocument();
@@ -261,9 +318,10 @@ describe('SongListView — loading the library', () => {
     await waitFor(() =>
       expect(screen.getByText('Mid and Floor Tom Signals')).toBeInTheDocument(),
     );
-    expect(screen.getByTestId('home-lane-evidence')).toHaveTextContent(
-      '28-day time-decayed hit / (hit + miss) signal · 7-day half-life.',
+    expect(screen.getByTestId('home-recent-songs')).toHaveTextContent(
+      'Your last three completed songs will appear here.',
     );
+    expect(screen.queryByTestId('home-lane-evidence')).not.toBeInTheDocument();
     expect(screen.getByTestId('kit-hotspot-tom2')).toHaveTextContent(
       '20% · 10',
     );
@@ -318,26 +376,94 @@ describe('SongListView — loading the library', () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByTestId('home-lane-evidence')).toHaveTextContent(
-        '20 raw scored hits or misses across 1 observed lanes · 1 lane with 8+ samples.',
+      expect(screen.getByTestId('kit-hotspot-tom2')).toHaveTextContent(
+        '96% · 20',
       ),
     );
     expect(screen.getByTestId('kit-hotspot-tom2')).toHaveTextContent(
       '96% · 20',
     );
     expect(screen.getByTestId('kit-hotspot-tom2')).toHaveTextContent('↑ 20 pp');
-    expect(screen.getByTestId('home-lane-evidence')).toHaveTextContent(
-      'Trend compares raw accuracy in the newest 14 days with the preceding 14 when both have 8+ samples.',
-    );
+    expect(screen.queryByTestId('home-lane-evidence')).not.toBeInTheDocument();
   });
 
-  it('starts the same recommendation from the exact Home kit command', async () => {
+  it('keeps the cockpit recent-song rows real, unique, and ordered by each song’s newest completed run', async () => {
+    const view = mountSongListView();
+    const run = (
+      completedAt: string,
+      overallAccuracy: number,
+      mode: 'practice' | 'perform' = 'practice',
+    ) => ({
+      completedAt,
+      totalHits: 10,
+      totalMisses: 0,
+      totalWrong: 0,
+      overallAccuracy,
+      laneAccuracy: [],
+      laneBias: [],
+      wrongHitCounts: [],
+      timingBias: {
+        meanMs: 0,
+        medianMs: 0,
+        spreadMs: 0,
+        earlyCount: 0,
+        lateCount: 0,
+        onTimeCount: 0,
+        sampleCount: 0,
+      },
+      mode,
+    });
+    const songAOlder = run('2026-08-03T10:00:00.000Z', 0.21);
+    const songANewer = run('2026-08-09T10:00:00.000Z', 0.91);
+    const songB = run('2026-08-11T10:00:00.000Z', 0.82, 'perform');
+    const songC = run('2026-08-10T10:00:00.000Z', 0.75);
+    const songD = run('2026-08-08T10:00:00.000Z', 0.99);
+
+    view.loadSongs(
+      ['song-a', 'song-b', 'song-c', 'song-d'].map((id) => makeListSong(id)),
+    );
+    await waitFor(() =>
+      expect(view.sentChannels()).toContain('load-all-practice-runs'),
+    );
+    view.emit('load-all-practice-runs', {
+      runs: [songAOlder, songANewer, songB, songC, songD],
+      runsBySong: {
+        'song-a': [songAOlder, songANewer],
+        'song-b': [songB],
+        'song-c': [songC],
+        'song-d': [songD],
+      },
+      archiveBySong: {},
+    });
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId(/home-recent-song-/)).toHaveLength(3),
+    );
+
+    const recentRows = screen.getAllByTestId(/home-recent-song-/);
+
+    expect(recentRows.map((row) => row.getAttribute('data-testid'))).toEqual([
+      'home-recent-song-song-b',
+      'home-recent-song-song-c',
+      'home-recent-song-song-a',
+    ]);
+    expect(screen.getByTestId('home-recent-song-song-a')).toHaveTextContent(
+      '91% · practice',
+    );
+    expect(screen.getByTestId('home-recent-song-song-b')).toHaveTextContent(
+      '82% · perform',
+    );
+    expect(
+      screen.queryByTestId('home-recent-song-song-d'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('starts the recommendation from one deliberate Home kick and unmounts the background cockpit', async () => {
     const view = mountSongListView({
       settings: {
         inputMappings: {
           keyboard: {
             kick: ['keyboard:KeyK'],
-            crash: ['keyboard:KeyC'],
           },
         },
       },
@@ -345,22 +471,14 @@ describe('SongListView — loading the library', () => {
 
     view.loadSongs([makeListSong('song-a', { liked: true })]);
 
-    let now = 1000;
-    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
-
-    try {
-      for (const code of ['KeyK', 'KeyC', 'KeyK', 'KeyC']) {
-        view.typeKey(code);
-        now += 180;
-      }
-    } finally {
-      clock.mockRestore();
-    }
+    view.typeKey('KeyK');
 
     const opened = await screen.findByTestId('song-view-stub');
 
     expect(opened).toHaveAttribute('data-song-id', 'song-a');
     expect(opened.getAttribute('data-search')).toContain('autoStart=1');
+    expect(screen.queryByTestId('home-cockpit')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('kit-hotspot-kick')).not.toBeInTheDocument();
   });
 
   it('requests the song list and stem-tool status on mount', () => {
@@ -1038,9 +1156,9 @@ describe('SongListView — opening a song', () => {
     // The modal's difficulty picker writes the same app-global state the
     // library header tabs read — SongView loads whatever that holds, so
     // this is the observable proof the song opens at the chosen difficulty.
-    expect(screen.getByTestId('difficulty-hard')).toHaveAttribute(
-      'aria-pressed',
-      'true',
+    expect(screen.getByTestId('song-view-stub')).toHaveAttribute(
+      'data-difficulty',
+      'hard',
     );
   });
 });
@@ -1391,6 +1509,175 @@ describe('SongListView — keyboard navigation', () => {
   });
 });
 
+describe('SongListView — fresh-profile kit navigation', () => {
+  it('auto-connects a DTX, moves focus, filters, and launches the chosen song directly in Practice', async () => {
+    const view = setupSongListView({
+      freshProfile: true,
+      settings: { controlMappings: {} },
+    });
+
+    view.loadSongs([
+      makeListSong('a', {
+        name: 'Alpha',
+        drumDifficulties: ['easy', 'expert'],
+      }),
+      makeListSong('b', {
+        name: 'Beta',
+        drumDifficulties: ['easy', 'expert'],
+      }),
+    ]);
+    view.selectView('songs');
+    view.emit('midi-device-list', [{ name: 'Yamaha DTX402', port: 2 }]);
+
+    await waitFor(() =>
+      expect(view.ipc.sent).toContainEqual({
+        channel: 'listen-midi',
+        args: [2],
+      }),
+    );
+    view.emit('midi-ready', { port: 2 });
+
+    const legend = screen.getByTestId('library-control-legend');
+
+    expect(legend).toHaveAttribute('data-control-source', 'kit-lanes');
+    expect(legend).toHaveTextContent(
+      'Tom 1 / Tom 2 move · Snare chooses · Hi-hat filters difficulty · Crash backs',
+    );
+    expect(legend).toHaveTextContent('Local choices open directly in Practice');
+
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 42,
+      velocity: 100,
+    });
+    expect(screen.getByTestId('difficulty-easy')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 47,
+      velocity: 100,
+    });
+    expect(view.isFocused('a')).toBe(true);
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 47,
+      velocity: 100,
+    });
+    expect(view.isFocused('b')).toBe(true);
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 48,
+      velocity: 100,
+    });
+    expect(view.isFocused('a')).toBe(true);
+
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 38,
+      velocity: 100,
+    });
+
+    const opened = await screen.findByTestId('song-view-stub');
+
+    expect(opened).toHaveAttribute('data-song-id', 'a');
+    expect(opened).toHaveAttribute('data-search', '?gameMode=practice');
+    expect(opened).toHaveAttribute('data-difficulty', 'easy');
+    expect(
+      screen.queryByTestId('game-mode-selector-modal'),
+    ).not.toBeInTheDocument();
+
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 42,
+      velocity: 100,
+    });
+    expect(opened).toHaveAttribute('data-difficulty', 'easy');
+  });
+
+  it('uses crash to return from Songs to Home', () => {
+    const deviceId = 'midi:Yamaha DTX402';
+    const view = setupSongListView({
+      settings: {
+        selectedDevice: {
+          id: deviceId,
+          name: 'Yamaha DTX402',
+          sourceId: 'midi',
+          port: 2,
+        },
+        controlMappings: { [deviceId]: {} },
+      },
+    });
+
+    view.loadSongs([makeListSong('a')]);
+    view.selectView('songs');
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 49,
+      velocity: 100,
+    });
+
+    expect(screen.getByTestId('home-cockpit')).toBeInTheDocument();
+  });
+
+  it('preserves an explicit action while missing actions still work from kit lanes', async () => {
+    const deviceId = 'midi:Yamaha DTX402';
+    const view = setupSongListView({
+      settings: {
+        selectedDevice: {
+          id: deviceId,
+          name: 'Yamaha DTX402',
+          sourceId: 'midi',
+          port: 2,
+        },
+        controlMappings: { [deviceId]: { down: ['midi:91'] } },
+      },
+    });
+
+    view.loadSongs([makeListSong('a')]);
+    view.selectView('songs');
+
+    expect(screen.getByTestId('library-control-legend')).toHaveAttribute(
+      'data-control-source',
+      'mixed',
+    );
+    expect(screen.getByTestId('library-control-legend')).toHaveTextContent(
+      'Explicit: 91 move',
+    );
+    expect(screen.getByTestId('library-control-legend')).toHaveTextContent(
+      'Kit fallback: Tom 1 moves up · Snare chooses · Hi-hat filters difficulty · Crash backs',
+    );
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 47,
+      velocity: 100,
+    });
+    expect(view.isFocused('a')).toBe(false);
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 91,
+      velocity: 100,
+    });
+    expect(view.isFocused('a')).toBe(true);
+
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 38,
+      velocity: 100,
+    });
+
+    const opened = await screen.findByTestId('song-view-stub');
+
+    expect(opened).toHaveAttribute('data-song-id', 'a');
+    expect(opened).toHaveAttribute('data-search', '?gameMode=practice');
+    expect(
+      screen.queryByTestId('game-mode-selector-modal'),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('SongListView — sort menu navigation', () => {
   it('opens the sort menu with the sort control', () => {
     const view = setupSongListView();
@@ -1587,7 +1874,7 @@ describe('SongListView — Lessons surface', () => {
     expect(screen.queryByText('Master of Puppets')).not.toBeInTheDocument();
   });
 
-  it('shows chain progress and a continue card for the furthest unmastered unlocked lesson', () => {
+  it('shows chain progress and a continue card for the furthest uncleared unlocked lesson', () => {
     const view = setupSongListView();
 
     view.loadSongs([
@@ -1598,7 +1885,7 @@ describe('SongListView — Lessons surface', () => {
           scoreData: {
             expert: { hitNotes: 50, totalNotes: 100, falseHits: 0 },
           },
-        }, // 2 stars — unlocked, not mastered
+        }, // 2 stars — unlocked, not cleared
       ),
     ]);
 
@@ -1613,7 +1900,7 @@ describe('SongListView — Lessons surface', () => {
     expect(within(card).getByText('Warm-Up Groove')).toBeInTheDocument();
   });
 
-  it('greys out a locked lesson with an "Earn N more" hint', () => {
+  it('greys out a locked lesson with a clear-count hint', () => {
     const view = setupSongListView();
 
     view.loadSongs([
@@ -1634,7 +1921,9 @@ describe('SongListView — Lessons surface', () => {
     const locked = screen.getByTestId('lesson-item-01.02');
 
     expect(locked).toHaveAttribute('data-locked', 'true');
-    expect(within(locked).getByText('Earn 12 more stars')).toBeInTheDocument();
+    expect(
+      within(locked).getByText('Clear 12 more lessons'),
+    ).toBeInTheDocument();
   });
 
   it('shows an honest message instead of a dead click on a locked lesson', () => {
@@ -1679,27 +1968,134 @@ describe('SongListView — Lessons surface', () => {
     expect(screen.getByTestId('lesson-item-01.01')).toBeInTheDocument();
   });
 
-  it('opens an unlocked lesson at its charted difficulty, ignoring the selected difficulty tab', async () => {
-    const view = setupSongListView({ settings: { difficulty: 'hard' } });
+  it('arms an unlocked lesson directly in Practice at its highest charted difficulty', async () => {
+    const view = setupSongListView({ settings: { difficulty: 'easy' } });
+
+    view.loadSongs([
+      makeLessonSong(
+        'lesson-1',
+        {
+          id: '01.01',
+          title: 'Warm-Up Groove',
+          starsToUnlock: 0,
+        },
+        { drumDifficulties: ['medium', 'hard'] },
+      ),
+    ]);
+
+    view.selectView('lessons');
+    view.clickLesson('01.01');
+
+    const opened = await screen.findByTestId('song-view-stub');
+
+    expect(opened).toHaveAttribute('data-song-id', 'lesson-1');
+    expect(opened).toHaveAttribute('data-search', '?gameMode=practice');
+    expect(
+      screen.queryByTestId('game-mode-selector-modal'),
+    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(window.localStorage.getItem('settings.difficulty')).toBe('"hard"');
+    });
+  });
+
+  it('moves deterministic Journey focus with configured keyboard controls and confirms the selected unlocked lesson', async () => {
+    const view = setupSongListView();
 
     view.loadSongs([
       makeLessonSong('lesson-1', {
         id: '01.01',
-        title: 'Warm-Up Groove',
+        title: 'Pulse',
+        starsToUnlock: 0,
+      }),
+      makeLessonSong('lesson-2', {
+        id: '01.02',
+        title: 'Quarter notes',
         starsToUnlock: 0,
       }),
     ]);
 
     view.selectView('lessons');
-    view.clickLesson('01.01');
-    view.chooseGameMode('perform');
 
-    expect(await screen.findByTestId('song-view-stub')).toBeInTheDocument();
-    await waitFor(() => {
-      expect(window.localStorage.getItem('settings.difficulty')).toBe(
-        '"expert"',
-      );
+    expect(screen.getByTestId('lesson-item-01.02')).toHaveAttribute(
+      'data-kit-focused',
+      'true',
+    );
+
+    view.press('down');
+
+    expect(screen.getByTestId('lesson-item-01.01')).toHaveAttribute(
+      'data-kit-focused',
+      'true',
+    );
+
+    view.press('confirm');
+
+    const opened = await screen.findByTestId('song-view-stub');
+
+    expect(opened).toHaveAttribute('data-song-id', 'lesson-1');
+    expect(opened).toHaveAttribute('data-search', '?gameMode=practice');
+  });
+
+  it('launches a Journey lesson from fresh DTX lane mappings when control mappings are empty', async () => {
+    const deviceId = 'midi:Yamaha DTX402';
+    const view = setupSongListView({
+      settings: {
+        selectedDevice: {
+          id: deviceId,
+          name: 'Yamaha DTX402',
+          sourceId: 'midi',
+          port: 2,
+        },
+        inputMappings: {
+          [deviceId]: {
+            tom1: ['midi:71'],
+            tom2: ['midi:72'],
+            snare: ['midi:73'],
+            crash: ['midi:74'],
+          },
+        },
+        controlMappings: { [deviceId]: {} },
+      },
     });
+
+    view.loadSongs([
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Pulse',
+        starsToUnlock: 0,
+      }),
+      makeLessonSong('lesson-2', {
+        id: '01.02',
+        title: 'Quarter notes',
+        starsToUnlock: 0,
+      }),
+    ]);
+    view.selectView('lessons');
+
+    expect(screen.getByTestId('lesson-item-01.02')).toHaveAttribute(
+      'data-kit-focused',
+      'true',
+    );
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 71,
+      velocity: 100,
+    });
+    expect(screen.getByTestId('lesson-item-01.01')).toHaveAttribute(
+      'data-kit-focused',
+      'true',
+    );
+
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 73,
+      velocity: 100,
+    });
+
+    const opened = await screen.findByTestId('song-view-stub');
+
+    expect(opened).toHaveAttribute('data-song-id', 'lesson-1');
+    expect(opened).toHaveAttribute('data-search', '?gameMode=practice');
   });
 });
 

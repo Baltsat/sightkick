@@ -30,8 +30,10 @@ export function HeaderStrip({ progress, onPlay }: HeaderStripProps) {
     nextLockedEntry,
   } = progress;
   const info = currentSeasonInfo(progress);
+  /* The numbered tile already carries the curriculum coordinate. Prefer the
+   * authored exercise title so the useful words survive the minimum window. */
   const continueTitle =
-    continueEntry?.song.name || continueEntry?.lesson.title || '';
+    continueEntry?.lesson.title || continueEntry?.song.name || '';
   const continueLesson = continueEntry?.lesson;
 
   return (
@@ -120,7 +122,7 @@ export function HeaderStrip({ progress, onPlay }: HeaderStripProps) {
                 )}
                 {continueLesson.masteryRule && (
                   <p className="m-0">
-                    <strong>Mastery:</strong> {continueLesson.masteryRule}
+                    <strong>Coach target:</strong> {continueLesson.masteryRule}
                   </p>
                 )}
                 <p
@@ -150,7 +152,7 @@ export function HeaderStrip({ progress, onPlay }: HeaderStripProps) {
           data-testid="lesson-all-mastered-card"
         >
           <p className="text-sm text-[#53606d]">
-            You&apos;ve mastered every lesson you&apos;ve unlocked.{' '}
+            You&apos;ve cleared every lesson you&apos;ve unlocked.{' '}
             {lockedHint(nextLockedEntry)} to unlock “
             {nextLockedEntry.lesson.title}.”
           </p>
