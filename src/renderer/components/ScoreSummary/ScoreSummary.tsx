@@ -20,6 +20,7 @@ import {
 } from '../../hooks/useGamification';
 import { AchievementToastQueue } from '../AchievementToastQueue';
 import type { LessonProgressionDecision } from '../../services/lesson-progression';
+import { KitCommandPrompt } from '../KitCommandPrompt';
 
 interface Props {
   isOpen: boolean;
@@ -46,6 +47,7 @@ interface Props {
    * without it, same as `practiceSummary` already does. */
   runResult?: RecordRunResult;
   lessonProgression?: LessonProgressionDecision;
+  handsFreeControlsEnabled?: boolean;
 }
 
 function noteCountLabel(count: number, verb: string): string {
@@ -131,6 +133,7 @@ export function ScoreSummary({
   gamification,
   runResult,
   lessonProgression,
+  handsFreeControlsEnabled = false,
 }: Props) {
   const starRating = useMemo(() => {
     if (!scoreData) {
@@ -208,17 +211,44 @@ export function ScoreSummary({
           No scored kit input was captured. Automatic continuation is paused.
         </div>
       )}
-      {isOpen && autoContinueEnabled && (
+      {isOpen && autoContinueEnabled && !continuationBlocked && (
         <AutoContinueCountdown
           label={nextLabel}
           seconds={autoContinueSeconds}
           onComplete={onNextSong}
         />
       )}
+      {isOpen && handsFreeControlsEnabled && !continuationBlocked && (
+        <section
+          className="grid gap-1 rounded-2xl bg-fill/70 px-3 py-2"
+          aria-label="Result controls from the drum kit"
+          data-testid="score-kit-controls"
+        >
+          <KitCommandPrompt
+            model={{
+              label: nextLabel,
+              steps: ['kick', 'crash', 'kick', 'crash'],
+            }}
+          />
+          <KitCommandPrompt
+            model={{
+              label: 'Play again',
+              steps: ['snare', 'kick', 'snare', 'kick'],
+            }}
+          />
+          <KitCommandPrompt
+            model={{
+              label: 'Leave session',
+              steps: ['ride', 'kick', 'ride', 'crash'],
+            }}
+          />
+        </section>
+      )}
       <div className="flex w-full gap-3">
         <Button
           data-testid="score-retry"
           className="grow"
+          disabled={continuationBlocked}
           onClick={() => onRetry()}
           icon={<FontAwesomeIcon icon={faRepeat} />}
           size="large"

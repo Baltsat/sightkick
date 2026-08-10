@@ -1,0 +1,224 @@
+{
+  "viewport": {
+    "width": 1225,
+    "height": 768
+  },
+  "proofs": [
+    {
+      "label": "02-home-pointer-strike",
+      "viewport": {
+        "width": 1225,
+        "height": 768
+      },
+      "phase": null,
+      "documentOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "bodyOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "visibleKitCommands": []
+    },
+    {
+      "label": "03-songs-kit-controls",
+      "viewport": {
+        "width": 1225,
+        "height": 768
+      },
+      "phase": null,
+      "documentOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "bodyOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "visibleKitCommands": [
+        "Move: Tom 1 for previous, or Tom 2 for next",
+        "Choose: Snare",
+        "Difficulty: Hi-hat",
+        "Source: Ride",
+        "Sort: Tom 3",
+        "Back: Crash"
+      ]
+    },
+    {
+      "label": "04-journey-kit-controls",
+      "viewport": {
+        "width": 1225,
+        "height": 768
+      },
+      "phase": null,
+      "documentOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "bodyOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "visibleKitCommands": [
+        "Select: Tom 1 for previous, or Tom 2 for next",
+        "Season: Hi-hat for previous, or Ride for next",
+        "Start: Snare",
+        "Back: Crash"
+      ]
+    },
+    {
+      "label": "05-practice-ready",
+      "viewport": {
+        "width": 1225,
+        "height": 768
+      },
+      "phase": "ready",
+      "documentOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "bodyOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "visibleKitCommands": [
+        "Kick to start the count-in: Kick"
+      ]
+    },
+    {
+      "label": "06-count-in",
+      "viewport": {
+        "width": 1225,
+        "height": 768
+      },
+      "phase": "counting-in",
+      "documentOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "bodyOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "visibleKitCommands": []
+    },
+    {
+      "label": "06-count-in-reduced-motion",
+      "viewport": {
+        "width": 1225,
+        "height": 768
+      },
+      "phase": "counting-in",
+      "documentOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "bodyOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "visibleKitCommands": []
+    },
+    {
+      "label": "07-practice-playing-flow",
+      "viewport": {
+        "width": 1225,
+        "height": 768
+      },
+      "phase": "playing",
+      "documentOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "bodyOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "visibleKitCommands": [
+        "Pause from the kit: Kick, then Crash, then Kick, then Crash"
+      ]
+    },
+    {
+      "label": "08-practice-paused",
+      "viewport": {
+        "width": 1225,
+        "height": 768
+      },
+      "phase": "paused",
+      "documentOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "bodyOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "visibleKitCommands": [
+        "Resume from the kit: Kick, then Crash, then Kick, then Crash"
+      ]
+    },
+    {
+      "label": "09-practice-paused-classic",
+      "viewport": {
+        "width": 1225,
+        "height": 768
+      },
+      "phase": "paused",
+      "documentOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "bodyOverflow": {
+        "horizontal": false,
+        "vertical": false,
+        "scrollWidth": 1225,
+        "scrollHeight": 768
+      },
+      "visibleKitCommands": [
+        "Resume from the kit: Kick, then Crash, then Kick, then Crash"
+      ]
+    }
+  ],
+  "reducedMotion": {
+    "normalAnimationName": "drumroll-count-in-beat",
+    "reducedAnimationName": "none"
+  },
+  "consoleErrors": [],
+  "pageErrors": [],
+  "failedLayoutProofs": []
+}

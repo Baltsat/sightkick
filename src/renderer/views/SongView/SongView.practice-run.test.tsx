@@ -128,6 +128,34 @@ function installFrameDriver() {
   };
 }
 
+function installGestureClock(startMs = 3_000) {
+  let now = startMs;
+  const spy = vi.spyOn(performance, 'now').mockImplementation(() => now);
+
+  return {
+    advance(milliseconds: number) {
+      now += milliseconds;
+    },
+    restore() {
+      spy.mockRestore();
+    },
+  };
+}
+
+async function strikeGesture(
+  view: ReturnType<typeof setupSongView>,
+  clock: ReturnType<typeof installGestureClock>,
+  codes: string[],
+) {
+  for (const [index, code] of codes.entries()) {
+    if (index > 0) {
+      clock.advance(180);
+    }
+
+    await view.pressKey(code);
+  }
+}
+
 async function settlePlaybackStart() {
   await act(async () => {
     await Promise.resolve();
@@ -165,6 +193,204 @@ async function playCleanFirstBar(
 }
 
 describe('practice mode analytics', () => {
+  it('keeps a pause command out of checkpoints, Tutor evidence, and completed analytics', async () => {
+    vi.useFakeTimers();
+
+    const clock = installGestureClock();
+    const frames = installFrameDriver();
+
+    try {
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice&practiceSpeed=2',
+        settings: { countIn: false },
+        keyboard: {
+          kit: {
+            kick: ['keyboard:KeyK'],
+            crash: ['keyboard:KeyC'],
+            snare: ['keyboard:KeyJ'],
+          },
+        },
+      });
+
+      await view.loadSong(makeSong(), SINGLE_NOTE_CHART);
+      view.clickPlay();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+
+      for (const [index, code] of ['KeyK', 'KeyC', 'KeyK', 'KeyC'].entries()) {
+        if (index > 0) {
+          // Three legal 360 ms gaps put the command at 1080 ms, just inside
+          // its 1100 ms wall-clock window. At 2x the chart advances 2.16 s,
+          // proving cleanup uses the captured chart boundary rather than a
+          // fixed one-second rewind.
+          clock.advance(360);
+          view.audio.currentTime += 0.36;
+          act(() => frames.flush(view.audio.currentTime * 1000));
+        }
+
+        await view.pressKey(code);
+      }
+
+      await act(async () => Promise.resolve());
+
+      expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+        'aria-label',
+        'Play',
+      );
+      act(() => window.dispatchEvent(new Event('pagehide')));
+
+      const checkpoint = view.ipc.sent
+        .filter((entry) => entry.channel === 'save-practice-attempt-checkpoint')
+        .map((entry) => entry.args[0] as { checkpoint: { records: unknown[] } })
+        .at(-1);
+
+      expect(checkpoint?.checkpoint.records).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            verdict: 'wrong',
+            element: expect.stringMatching(/kick|crash/),
+          }),
+        ]),
+      );
+      expect(
+        within(screen.getByTestId('tutor-hud')).queryByText(
+          'Phrase needs one more pass',
+        ),
+      ).not.toBeInTheDocument();
+
+      clock.advance(1_200);
+      await strikeGesture(view, clock, ['KeyK', 'KeyC', 'KeyK', 'KeyC']);
+      await act(async () => Promise.resolve());
+      expect(screen.getByTestId('count-in')).toBeInTheDocument();
+      await view.completeCountIn();
+      await settlePlaybackStart();
+
+      const resumedAt = Math.max(
+        ...view
+          .startedSources()
+          .flatMap((source) => source.starts.map((start) => start.at)),
+      );
+
+      view.audio.currentTime = resumedAt;
+      act(() => frames.flush(view.audio.currentTime * 1000));
+      await view.pressKey('KeyJ');
+
+      view.openSettings();
+      fireEvent.click(screen.getByTestId('setting-hands-free-controls'));
+      fireEvent.click(screen.getByTestId('setting-adaptive-tutor'));
+      await runToEnd(view);
+
+      const completed = view.ipc.sent
+        .filter((entry) => entry.channel === 'save-practice-run')
+        .map((entry) => entry.args[0])
+        .at(-1) as
+        | { summary: { totalWrong: number }; records: unknown[] }
+        | undefined;
+
+      expect(completed).toBeDefined();
+      expect(completed!).toMatchObject({
+        summary: { totalWrong: 0 },
+      });
+      expect(completed!.records).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            verdict: 'wrong',
+            element: expect.stringMatching(/kick|crash/),
+          }),
+        ]),
+      );
+    } finally {
+      clock.restore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('retires the resumed source checkpoint with the completed live run', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice',
+        settings: { adaptiveTutorEnabled: false },
+        keyboard: { kit: { kick: ['keyboard:KeyK'] } },
+      });
+
+      await view.loadSong(makeSong(), DRUM_CHART);
+      act(() => {
+        view.ipc.emit('load-practice-attempt-checkpoints', {
+          songId: 'song-1',
+          checkpoints: [
+            {
+              schemaVersion: 1,
+              state: 'in-progress',
+              songId: 'song-1',
+              sessionId: 'interrupted-source',
+              startedAt: '2026-08-10T10:00:00.000Z',
+              updatedAt: '2026-08-10T10:02:00.000Z',
+              chartRevision: TEST_CHART_REVISION,
+              mode: 'practice',
+              difficulty: 'expert',
+              playbackSpeed: 1,
+              positionTick: 0,
+              records: [],
+            },
+          ],
+        });
+      });
+
+      await view.pressKey('KeyK');
+      expect(screen.getByTestId('count-in')).toBeInTheDocument();
+      await view.completeCountIn();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+      expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+        'aria-label',
+        'Pause',
+      );
+      view.openSettings();
+      fireEvent.click(screen.getByTestId('setting-hands-free-controls'));
+      await runToEnd(view);
+
+      const payload = view.ipc.sent
+        .filter((entry) => entry.channel === 'save-practice-run')
+        .map((entry) => entry.args[0])
+        .at(-1) as
+        | {
+            songId: string;
+            finalizeAttemptSessionIds: string[];
+          }
+        | undefined;
+
+      expect(payload).toBeDefined();
+      expect(payload!).toMatchObject({
+        songId: 'song-1',
+        finalizeAttemptSessionIds: [expect.any(String), 'interrupted-source'],
+      });
+      expect(payload!.finalizeAttemptSessionIds[0]).not.toBe(
+        'interrupted-source',
+      );
+
+      const completedRunIndex = view.ipc.sent
+        .map((entry) => entry.channel)
+        .lastIndexOf('save-practice-run');
+      const checkpointIndices = view.ipc.sent
+        .map((entry, index) => ({ channel: entry.channel, index }))
+        .filter((entry) => entry.channel === 'save-practice-attempt-checkpoint')
+        .map((entry) => entry.index);
+
+      expect(checkpointIndices.some((index) => index < completedRunIndex)).toBe(
+        true,
+      );
+      expect(checkpointIndices.some((index) => index > completedRunIndex)).toBe(
+        false,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not mint a high score or durable rewards when practice evidence fails to save', async () => {
     const recordRun = vi.fn((input: unknown) => {
       window.electron.ipcRenderer.sendMessage('record-practice-day', input);
@@ -313,6 +539,7 @@ describe('practice mode analytics', () => {
       expect(practiceRunPayloads).toEqual([
         {
           songId: 'song-1',
+          finalizeAttemptSessionIds: [expect.any(String)],
           records: expect.arrayContaining([
             expect.objectContaining({ verdict: 'miss', element: 'snare' }),
           ]),
@@ -624,19 +851,20 @@ describe('practice mode analytics', () => {
           countIn: false,
           adaptiveTutorEnabled: false,
           autoContinueEnabled: true,
-          handsFreeControlsEnabled: false,
+          handsFreeControlsEnabled: true,
         },
         keyboard: {
           kit: {
             snare: ['keyboard:KeyJ'],
             kick: ['keyboard:KeyK'],
             crash: ['keyboard:KeyL'],
+            ride: ['keyboard:KeyI'],
           },
         },
         onContinuePractice: continuePractice,
       });
 
-      await view.loadSong();
+      await view.loadSong(makeSong(), SINGLE_NOTE_CHART);
       view.clickPlay();
 
       await act(async () => {
@@ -666,13 +894,34 @@ describe('practice mode analytics', () => {
       expect(continuePractice).not.toHaveBeenCalled();
       expect(screen.getByTestId('score-modal')).toBeInTheDocument();
 
+      for (const code of ['KeyI', 'KeyK', 'KeyI', 'KeyL']) {
+        await view.pressKey(code);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(100);
+        });
+      }
+
+      expect(continuePractice).not.toHaveBeenCalled();
+      expect(screen.getByTestId('score-modal')).toBeInTheDocument();
+
       await act(async () => {
         view.ipc.emit('save-practice-run', { songId: 'song-1' });
       });
 
       expect(screen.getByTestId('score-next')).toBeEnabled();
       expect(screen.getByTestId('score-auto-continue')).toBeInTheDocument();
-      view.clickTestId('score-next');
+      expect(screen.getByTestId('score-kit-controls')).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_200);
+      });
+
+      for (const code of ['KeyK', 'KeyL', 'KeyK', 'KeyL']) {
+        await view.pressKey(code);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(100);
+        });
+      }
 
       expect(continuePractice).toHaveBeenCalledWith(
         expect.objectContaining({

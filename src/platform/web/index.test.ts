@@ -418,6 +418,114 @@ describe('web platform channel mapping', () => {
     });
   });
 
+  it('keeps interrupted web attempts separate from completed-run history until explicit finalization', async () => {
+    const checkpoint = {
+      songId: 'song-1',
+      sessionId: 'web-attempt-1',
+      startedAt: '2026-08-10T00:00:00.000Z',
+      updatedAt: '2026-08-10T00:00:04.000Z',
+      chartRevision: 'song-1:expert:v1',
+      mode: 'practice' as const,
+      difficulty: 'expert' as const,
+      playbackSpeed: 0.8,
+      positionTick: 960,
+      records: [
+        {
+          tick: 480,
+          timeSeconds: 0.5,
+          deltaMs: -12,
+          element: 'snare',
+          verdict: 'hit' as const,
+          velocity: 100,
+        },
+      ],
+    };
+
+    await expect(
+      replyWithArgs(
+        'save-practice-attempt-checkpoint',
+        'save-practice-attempt-checkpoint',
+        { checkpoint },
+      ),
+    ).resolves.toMatchObject({
+      songId: 'song-1',
+      checkpoints: [
+        {
+          state: 'in-progress',
+          sessionId: 'web-attempt-1',
+          records: [
+            {
+              tick: 480,
+              deltaMs: -12,
+              element: 'snare',
+              verdict: 'hit',
+              velocity: 100,
+            },
+          ],
+        },
+      ],
+    });
+
+    await expect(
+      replyWithArgs(
+        'load-practice-attempt-checkpoints',
+        'load-practice-attempt-checkpoints',
+        'song-1',
+      ),
+    ).resolves.toMatchObject({
+      songId: 'song-1',
+      checkpoints: [expect.objectContaining({ sessionId: 'web-attempt-1' })],
+    });
+    await expect(
+      replyWithArgs('load-practice-runs', 'load-practice-runs', 'song-1'),
+    ).resolves.toMatchObject({ runs: [], fullRuns: [] });
+
+    await replyWithArgs(
+      'save-practice-attempt-checkpoint',
+      'save-practice-attempt-checkpoint',
+      {
+        checkpoint: {
+          ...checkpoint,
+          sessionId: 'web-resumed-live-run',
+          updatedAt: '2026-08-10T00:04:00.000Z',
+        },
+      },
+    );
+
+    await expect(
+      replyWithArgs('save-practice-run', 'save-practice-run', {
+        songId: 'song-1',
+        summary: {
+          completedAt: '2026-08-10T00:05:00.000Z',
+          totalHits: 1,
+          totalMisses: 0,
+          totalWrong: 0,
+          overallAccuracy: 1,
+          laneAccuracy: [],
+          laneBias: [],
+          timingBias: {
+            meanMs: 0,
+            medianMs: 0,
+            spreadMs: 0,
+            earlyCount: 0,
+            lateCount: 0,
+            onTimeCount: 1,
+            sampleCount: 1,
+          },
+          wrongHitCounts: [],
+        },
+        finalizeAttemptSessionIds: ['web-attempt-1', 'web-resumed-live-run'],
+      }),
+    ).resolves.toMatchObject({ songId: 'song-1' });
+    await expect(
+      replyWithArgs(
+        'load-practice-attempt-checkpoints',
+        'load-practice-attempt-checkpoints',
+        'song-1',
+      ),
+    ).resolves.toEqual({ songId: 'song-1', checkpoints: [] });
+  });
+
   it('archives evicted web summaries while keeping recent summary and hit-record caps', async () => {
     const summaryAt = (index: number) => ({
       completedAt: `202${index % 2}-01-${String((index % 27) + 1).padStart(

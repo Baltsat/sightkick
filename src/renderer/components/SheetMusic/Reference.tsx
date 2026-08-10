@@ -13,6 +13,7 @@ interface ReferenceProps {
 export function Reference({ className }: ReferenceProps) {
   return (
     <div
+      data-testid="drum-reference"
       className={cn(
         'bg-paper-light px-2 py-1 rounded-xl border border-ink/13 text-ink shadow-paper-strong flex items-center',
         className,

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   HitRecord,
+  MAX_PRACTICE_ATTEMPT_CHECKPOINTS_PER_SONG,
   PracticeRunArchive,
   RunSummary,
   StoredPracticeRun,
@@ -50,7 +51,10 @@ vi.mock('../AppState', () => ({
 const {
   MAX_STORED_FULL_RUNS_PER_SONG,
   MAX_STORED_RUNS_PER_SONG,
+  finalizePracticeAttemptCheckpoint,
+  loadPracticeAttemptCheckpoints,
   loadPracticeRuns,
+  savePracticeAttemptCheckpoint,
   savePracticeRun,
 } = await import('./practiceStats');
 
@@ -84,6 +88,26 @@ function fakeRecord(tick = 0): HitRecord {
     element: 'snare',
     verdict: 'hit',
     velocity: 92,
+  };
+}
+
+function fakeCheckpoint(
+  sessionId = 'attempt-1',
+  updatedAt = '2026-08-10T00:00:00.000Z',
+) {
+  return {
+    checkpoint: {
+      songId: 'song-1',
+      sessionId,
+      startedAt: '2026-08-09T23:59:00.000Z',
+      updatedAt,
+      chartRevision: 'chart-revision-1',
+      mode: 'practice' as const,
+      difficulty: 'expert' as const,
+      playbackSpeed: 0.8,
+      positionTick: 960,
+      records: [fakeRecord(480)],
+    },
   };
 }
 
@@ -647,5 +671,200 @@ describe('loadPracticeRuns', () => {
     expect(lastReply(event, 'load-practice-runs')!.args[0]).toEqual({
       error: 'songId is required',
     });
+  });
+});
+
+describe('practice attempt checkpoints', () => {
+  it('upserts an in-progress attempt without manufacturing a completed run', () => {
+    storeHolder.current = makeStore({});
+
+    const firstEvent = makeEvent();
+
+    savePracticeAttemptCheckpoint(
+      firstEvent as never,
+      fakeCheckpoint('attempt-1'),
+    );
+
+    expect(storeHolder.current.get('practiceRuns.song-1')).toBeUndefined();
+    expect(
+      storeHolder.current.get('practiceRunDetails.song-1'),
+    ).toBeUndefined();
+    expect(
+      storeHolder.current.get('practiceAttemptCheckpoints.song-1'),
+    ).toEqual([
+      expect.objectContaining({
+        state: 'in-progress',
+        sessionId: 'attempt-1',
+        records: [
+          {
+            tick: 480,
+            deltaMs: -12,
+            element: 'snare',
+            verdict: 'hit',
+            velocity: 92,
+          },
+        ],
+      }),
+    ]);
+
+    const updateEvent = makeEvent();
+    const updated = fakeCheckpoint('attempt-1', '2026-08-10T00:01:00.000Z');
+
+    updated.checkpoint.positionTick = 1_920;
+    updated.checkpoint.records = [fakeRecord(480), fakeRecord(960)];
+    savePracticeAttemptCheckpoint(updateEvent as never, updated);
+
+    expect(
+      storeHolder.current.get('practiceAttemptCheckpoints.song-1'),
+    ).toEqual([
+      expect.objectContaining({
+        sessionId: 'attempt-1',
+        positionTick: 1_920,
+        records: expect.arrayContaining([
+          expect.objectContaining({ tick: 480 }),
+          expect.objectContaining({ tick: 960 }),
+        ]),
+      }),
+    ]);
+    expect(
+      lastReply(updateEvent, 'save-practice-attempt-checkpoint')!.args[0],
+    ).toMatchObject({
+      songId: 'song-1',
+      checkpoints: [expect.objectContaining({ sessionId: 'attempt-1' })],
+    });
+  });
+
+  it('keeps a bounded chronological recovery buffer per song', () => {
+    storeHolder.current = makeStore({});
+
+    for (
+      let index = 0;
+      index < MAX_PRACTICE_ATTEMPT_CHECKPOINTS_PER_SONG + 2;
+      index += 1
+    ) {
+      const event = makeEvent();
+
+      savePracticeAttemptCheckpoint(
+        event as never,
+        fakeCheckpoint(`attempt-${index}`, `2026-08-10T00:0${index}:00.000Z`),
+      );
+    }
+
+    const checkpoints = storeHolder.current.get(
+      'practiceAttemptCheckpoints.song-1',
+    ) as { sessionId: string }[];
+
+    expect(checkpoints).toHaveLength(MAX_PRACTICE_ATTEMPT_CHECKPOINTS_PER_SONG);
+    expect(checkpoints.map(({ sessionId }) => sessionId)).toEqual(
+      Array.from(
+        { length: MAX_PRACTICE_ATTEMPT_CHECKPOINTS_PER_SONG },
+        (_, index) => `attempt-${index + 2}`,
+      ),
+    );
+  });
+
+  it('loads interrupted evidence and clears only the finalized session', () => {
+    storeHolder.current = makeStore({});
+    savePracticeAttemptCheckpoint(
+      makeEvent() as never,
+      fakeCheckpoint('attempt-complete'),
+    );
+    savePracticeAttemptCheckpoint(
+      makeEvent() as never,
+      fakeCheckpoint('attempt-still-open', '2026-08-10T00:02:00.000Z'),
+    );
+
+    const loadEvent = makeEvent();
+
+    loadPracticeAttemptCheckpoints(loadEvent as never, 'song-1');
+
+    expect(
+      lastReply(loadEvent, 'load-practice-attempt-checkpoints')!.args[0],
+    ).toMatchObject({
+      songId: 'song-1',
+      checkpoints: [
+        expect.objectContaining({ sessionId: 'attempt-complete' }),
+        expect.objectContaining({ sessionId: 'attempt-still-open' }),
+      ],
+    });
+
+    const finalizationEvent = makeEvent();
+
+    finalizePracticeAttemptCheckpoint(finalizationEvent as never, {
+      songId: 'song-1',
+      sessionId: 'attempt-complete',
+    });
+
+    expect(
+      storeHolder.current.get('practiceAttemptCheckpoints.song-1'),
+    ).toEqual([expect.objectContaining({ sessionId: 'attempt-still-open' })]);
+    expect(storeHolder.current.get('practiceRuns.song-1')).toBeUndefined();
+    expect(
+      lastReply(finalizationEvent, 'finalize-practice-attempt-checkpoint')!
+        .args[0],
+    ).toMatchObject({
+      songId: 'song-1',
+      checkpoints: [
+        expect.objectContaining({ sessionId: 'attempt-still-open' }),
+      ],
+    });
+  });
+
+  it('can finalize an attempt atomically with its completed run', () => {
+    storeHolder.current = makeStore({});
+    savePracticeAttemptCheckpoint(
+      makeEvent() as never,
+      fakeCheckpoint('attempt-to-complete'),
+    );
+
+    const event = makeEvent();
+
+    savePracticeRun(event as never, {
+      songId: 'song-1',
+      summary: fakeSummary(),
+      records: [fakeRecord(480)],
+      finalizeAttemptSessionId: 'attempt-to-complete',
+    });
+
+    expect(storeHolder.current.get('practiceRuns.song-1')).toEqual([
+      fakeSummary(),
+    ]);
+    expect(
+      storeHolder.current.get('practiceAttemptCheckpoints.song-1'),
+    ).toEqual([]);
+    expect(storeSetControl.calls.at(-1)).toEqual(
+      expect.objectContaining({
+        practiceRuns: expect.any(Object),
+        practiceRunDetails: expect.any(Object),
+        practiceAttemptCheckpoints: { 'song-1': [] },
+      }),
+    );
+  });
+
+  it('atomically retires both the resumed source and live run drafts', () => {
+    storeHolder.current = makeStore({});
+    savePracticeAttemptCheckpoint(
+      makeEvent() as never,
+      fakeCheckpoint('interrupted-source'),
+    );
+    savePracticeAttemptCheckpoint(
+      makeEvent() as never,
+      fakeCheckpoint('resumed-live-run'),
+    );
+    savePracticeAttemptCheckpoint(
+      makeEvent() as never,
+      fakeCheckpoint('unrelated-draft'),
+    );
+
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary: fakeSummary(),
+      records: [fakeRecord(480)],
+      finalizeAttemptSessionIds: ['interrupted-source', 'resumed-live-run'],
+    });
+
+    expect(
+      storeHolder.current.get('practiceAttemptCheckpoints.song-1'),
+    ).toEqual([expect.objectContaining({ sessionId: 'unrelated-draft' })]);
   });
 });

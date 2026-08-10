@@ -62,7 +62,7 @@ if [[ "${#disk_images[@]}" -ne 1 ]]; then
     echo "Expected exactly one DMG after the local release build." >&2
     exit 1
 fi
-expected_disk_image="$output_dir/Drumroll-1.2.0-kb.5-arm64.dmg"
+expected_disk_image="$output_dir/Drumroll-1.2.0-kb.6-arm64.dmg"
 if [[ "${disk_images[0]}" != "$expected_disk_image" ]]; then
     echo "Unexpected DMG name: ${disk_images[0]}" >&2
     echo "Expected: $expected_disk_image" >&2

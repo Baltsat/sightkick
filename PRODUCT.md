@@ -129,8 +129,9 @@ Practice mode includes these controls:
 
 - adaptive recovery on or off,
 - checkpoint recovery on or off,
-- lives on or off,
-- three lives by default when lives are on,
+- relaxed Guided Practice by default, with lives off,
+- an opt-in Challenge lives switch,
+- three lives when Challenge lives are on,
 - auto-continue on or off,
 - Flow or Classic notation,
 - speed floor and speed ceiling,
@@ -147,6 +148,9 @@ It does not trigger on one isolated mistake.
 
 The recovery starts from the latest safe musical checkpoint before the trouble window.
 The app stores a compact failed-attempt trace before it seeks.
+It pauses for a short readable explanation instead of jumping immediately.
+Recovery and away-resume always use the chart-aware audible count-in, even when
+the player has disabled the optional count-in for an ordinary first start.
 The count-in resumes at a reduced speed when repeated failure requires it.
 
 The player exits the recovery after clean repetitions at the target threshold.
@@ -163,13 +167,14 @@ The app can return to it after a life is lost.
 
 ### Lives
 
-Lives add game pressure without hiding learning evidence.
+Lives are an opt-in Challenge mechanic. Guided Practice stays non-punitive and
+uses clean-repetition progress without hiding learning evidence.
 
 - A material failure consumes one life.
 - A single isolated miss does not consume a life.
 - After a life loss, Drumroll stores the attempt and returns to a checkpoint.
 - At zero lives, the session changes to a focused recovery block.
-- The player can disable lives at any time before a run.
+- The player can enable or disable Challenge lives at any time before a run.
 
 ## Perform mode
 
@@ -183,18 +188,24 @@ The end screen can offer a focused Practice session from real trouble evidence.
 
 The first control vocabulary must be deliberate and hard to trigger by accident.
 
-- Start, pause, resume, or continue: kick, crash, kick, crash after a
-  state-specific quiet window.
+- Start from Home or Ready: one deliberate kick after a state-specific quiet
+  window.
+- Pause while playing, resume from pause, or continue from results: kick,
+  crash, kick, crash after a state-specific quiet window.
 - Retry from results: snare, kick, snare, kick after a quiet window.
 - End from pause or results: ride, kick, ride, crash after a quiet window.
-- Every command requires four exact, ordered, sufficiently strong strikes
-  inside a bounded timing window; an extra, reversed, quiet, or mistimed hit
-  cancels the candidate.
+- Every multi-hit command requires four exact, ordered, sufficiently strong
+  strikes inside a bounded timing window; an extra, reversed, quiet, or
+  mistimed hit cancels the candidate.
 
 Drumroll only recognizes control gestures in eligible states.
 Scored song hits never become control actions.
-This release exposes the fixed safe vocabulary in contextual help. Gesture
-customization remains future work and is not claimed by the current UI.
+This release draws the state-specific command at drum distance in Ready,
+Active Play, Paused, Away, and Results. Songs uses visible kit tokens for
+moving, choosing, filtering difficulty, changing source, sorting, and going
+back. Journey uses the same visual vocabulary for lesson selection, season
+movement, starting, and leaving. Gesture customization remains future work
+and is not claimed by the current UI.
 
 ## Next-best-practice selector
 
@@ -266,6 +277,15 @@ Each saved session has:
 - Tutor checkpoint windows, remaining lives, and recovery-attempt outcomes,
 - app and schema version.
 
+An interrupted Practice attempt is saved separately from completed history.
+Its append-only attempt record preserves every resolved hit, miss, and
+wrong-pad outcome across Tutor rewinds, while its canonical record remains the
+single current scoring pass. Reopening the same song surfaces the latest
+matching attempt, bar, and evidence count. One kick resumes from that bar with
+a fresh count-in; the old draft stays labeled as interrupted evidence until a
+completed run is committed atomically. Drafts never award XP, mastery, stars,
+or completed-session credit.
+
 Recovery summaries are compact.
 They store the window, reason, speed, attempt result, and aggregate evidence.
 They do not duplicate the complete chart.
@@ -317,6 +337,7 @@ One exceptional run cannot erase repeated weak evidence.
 - source candidates,
 - source and availability labels,
 - search, filters, import, and preparation status.
+- visible DTX commands for move, choose, difficulty, source, sort, and back.
 
 ### Journey
 
@@ -325,6 +346,7 @@ One exceptional run cannot erase repeated weak evidence.
 - prerequisite state,
 - next exercise,
 - actual exercise title and goal.
+- visible DTX commands for lesson focus, season movement, start, and back.
 
 ### Coach and Profile
 

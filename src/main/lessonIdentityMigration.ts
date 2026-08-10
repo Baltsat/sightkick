@@ -1,6 +1,7 @@
 import type { Goal } from './ipc/goals';
 import type { StorageSchema } from '../types';
 import type {
+  PracticeAttemptCheckpoint,
   RunSummary,
   StoredPracticeRun,
 } from '../renderer/services/practice-stats';
@@ -14,6 +15,7 @@ export interface LessonIdentityStoreData {
   practiceRuns?: Record<string, RunSummary[]>;
   practiceRunDetails?: Record<string, StoredPracticeRun[]>;
   practiceRunArchive?: Record<string, PracticeRunArchive>;
+  practiceAttemptCheckpoints?: Record<string, PracticeAttemptCheckpoint[]>;
   goals?: Goal[];
 }
 
@@ -146,6 +148,59 @@ function migrateArchiveRecord(
   return migrated;
 }
 
+function mergeUniqueCheckpoints(
+  left: readonly PracticeAttemptCheckpoint[],
+  right: readonly PracticeAttemptCheckpoint[],
+): PracticeAttemptCheckpoint[] {
+  const bySessionId = new Map<string, PracticeAttemptCheckpoint>();
+
+  for (const checkpoint of [...left, ...right]) {
+    const existing = bySessionId.get(checkpoint.sessionId);
+
+    if (!existing || existing.updatedAt <= checkpoint.updatedAt) {
+      bySessionId.set(checkpoint.sessionId, checkpoint);
+    }
+  }
+
+  return [...bySessionId.values()].sort(
+    (leftEntry, rightEntry) =>
+      leftEntry.updatedAt.localeCompare(rightEntry.updatedAt) ||
+      leftEntry.sessionId.localeCompare(rightEntry.sessionId),
+  );
+}
+
+function migrateCheckpointRecord(
+  raw: Record<string, PracticeAttemptCheckpoint[]> | undefined,
+  migrations: Readonly<Record<string, string>>,
+): Record<string, PracticeAttemptCheckpoint[]> | undefined {
+  if (!raw) {
+    return undefined;
+  }
+
+  const moves = Object.entries(migrations).filter(
+    ([legacyId, canonicalId]) =>
+      legacyId !== canonicalId && raw[legacyId] !== undefined,
+  );
+  const sourceIds = new Set(moves.map(([legacyId]) => legacyId));
+  const migrated = Object.fromEntries(
+    Object.entries(raw).filter(([songId]) => !sourceIds.has(songId)),
+  );
+
+  for (const [legacyId, canonicalId] of moves) {
+    const moved = raw[legacyId].map((checkpoint) => ({
+      ...checkpoint,
+      songId: canonicalId,
+    }));
+
+    migrated[canonicalId] = mergeUniqueCheckpoints(
+      moved,
+      migrated[canonicalId] ?? [],
+    );
+  }
+
+  return migrated;
+}
+
 /**
  * Moves every persistent song-ID reference for exercises whose content
  * identity was proven by the lesson bootstrap. The transformation is pure
@@ -179,6 +234,14 @@ export function migrateLessonIdentityStoreData(
       ? {
           practiceRunArchive: migrateArchiveRecord(
             data.practiceRunArchive,
+            migrations,
+          ),
+        }
+      : {}),
+    ...(data.practiceAttemptCheckpoints
+      ? {
+          practiceAttemptCheckpoints: migrateCheckpointRecord(
+            data.practiceAttemptCheckpoints,
             migrations,
           ),
         }
@@ -221,6 +284,9 @@ export function applyLessonProfileMigration(
           | undefined,
         practiceRunArchive: store.get('practiceRunArchive') as
           | Record<string, PracticeRunArchive>
+          | undefined,
+        practiceAttemptCheckpoints: store.get('practiceAttemptCheckpoints') as
+          | Record<string, PracticeAttemptCheckpoint[]>
           | undefined,
         goals: store.get('goals') as Goal[] | undefined,
       },

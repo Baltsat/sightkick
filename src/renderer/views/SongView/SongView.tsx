@@ -40,7 +40,7 @@ import { useSongLoader } from '../../hooks/useSongLoader';
 import { useEngine } from '../../hooks/useEngine';
 import { useVolumeControls } from '../../hooks/useVolumeControls';
 import { useMuteToggle } from '../../hooks/useMuteToggle';
-import { ticksToSeconds } from '../../../chart-parser/timing';
+import { secondsToTicks, ticksToSeconds } from '../../../chart-parser/timing';
 import { calculateAccuracy, getStarRating } from '../../scoring';
 import {
   RecordRunResult,
@@ -64,6 +64,7 @@ import {
   computeRunsTrend,
   decideRunEvidence,
   learningEvidenceForTutorRun,
+  PracticeAttemptCheckpoint,
   PRACTICE_RUN_SCHEMA_VERSION,
   RunSummary,
   SCORING_POLICY_VERSION,
@@ -85,9 +86,12 @@ import {
   summarizeCoachFindings,
 } from '../../services/coach';
 import { TutorHud } from '../../components/TutorHud';
+import { KitCommandPrompt } from '../../components/KitCommandPrompt';
 import { useTutorSession } from '../../hooks/useTutorSession';
+import { usePracticeAttemptCheckpoint } from '../../hooks/usePracticeAttemptCheckpoint';
 import { useDrumGestures } from '../../hooks/useDrumGestures';
 import { DrumGestureAction, DrumGestureSurface } from '../../services/gestures';
+import { CountInPolicy } from '../../services/engine';
 import {
   HIT_TOLERANCE_SECONDS,
   PRACTICE_HIT_TOLERANCE_SECONDS,
@@ -122,6 +126,7 @@ interface PracticeRunIdentity {
 
 const APP_VERSION =
   typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'development';
+const EMPTY_ATTEMPT_EVIDENCE = { getAttemptRecords: () => [] };
 
 function createPracticeRunIdentity(): PracticeRunIdentity {
   const randomId = globalThis.crypto?.randomUUID?.();
@@ -191,6 +196,9 @@ export function SongView() {
   const [isCoachLoading, setIsCoachLoading] = useState(false);
   const [songRuns, setSongRuns] = useState<RunSummary[]>();
   const [fullRuns, setFullRuns] = useState<StoredPracticeRun[]>();
+  const [interruptedAttempts, setInterruptedAttempts] = useState<
+    PracticeAttemptCheckpoint[]
+  >([]);
   const [gamificationResult, setGamificationResult] =
     useState<RecordRunResult>();
   const [lessonProgressionResult, setLessonProgressionResult] =
@@ -208,8 +216,8 @@ export function SongView() {
     true,
   );
   const [tutorLivesEnabled, setTutorLivesEnabled] = usePersisted<boolean>(
-    'settings.tutorLivesEnabled',
-    true,
+    'settings.challengeLivesEnabled',
+    false,
   );
   const [autoContinueEnabled, setAutoContinueEnabled] = usePersisted<boolean>(
     'settings.autoContinueEnabled',
@@ -219,6 +227,7 @@ export function SongView() {
     usePersisted<boolean>('settings.handsFreeControlsEnabled', true);
   const exportPdfOffRef = useRef<(() => void) | undefined>(undefined);
   const loadRunsOffRef = useRef<(() => void) | undefined>(undefined);
+  const loadAttemptsOffRef = useRef<(() => void) | undefined>(undefined);
   const saveRunOffRef = useRef<(() => void) | undefined>(undefined);
   // Provided by SongListView's route outlet. Tests and isolated callers may
   // still mount SongView without that parent, so the context remains optional.
@@ -275,6 +284,21 @@ export function SongView() {
     createPracticeRunIdentity,
   );
   const runIdentityRef = useRef<PracticeRunIdentity>(runIdentity);
+  const attemptCheckpointControlRef = useRef<
+    | {
+        prepareForCompletion: () => boolean;
+      }
+    | undefined
+  >(undefined);
+  // A failed completed-run write intentionally leaves its recovery draft on
+  // disk. Carry every such id into the next successful atomic save so a later
+  // retry cannot strand a stale "interrupted" attempt.
+  const pendingAttemptSessionIdsRef = useRef<Set<string>>(new Set());
+  // A resumed run receives a fresh live identity so its new evidence is not
+  // relabelled as the interrupted draft. Keep the source checkpoint id until
+  // a completed run is durably acknowledged, then retire both drafts in the
+  // same persistence operation.
+  const resumedAttemptSessionIdRef = useRef<string | undefined>(undefined);
   // A ready-state kit command is explicit practice intent even though the
   // two command strikes happen while Judge is deliberately disabled. This
   // distinguishes a hands-free attempt from an untouched autoplay run.
@@ -299,6 +323,34 @@ export function SongView() {
       }),
     [difficulty, fileData, format, id],
   );
+
+  useEffect(() => {
+    if (!id || gameMode !== 'practice') {
+      return undefined;
+    }
+
+    loadAttemptsOffRef.current?.();
+    loadAttemptsOffRef.current = window.electron.ipcRenderer.once<
+      | { songId: string; checkpoints: PracticeAttemptCheckpoint[] }
+      | { error: string }
+    >('load-practice-attempt-checkpoints', (result) => {
+      loadAttemptsOffRef.current = undefined;
+
+      if ('checkpoints' in result) {
+        setInterruptedAttempts(result.checkpoints);
+      }
+    });
+    window.electron.ipcRenderer.sendMessage(
+      'load-practice-attempt-checkpoints',
+      id,
+    );
+
+    return () => {
+      loadAttemptsOffRef.current?.();
+      loadAttemptsOffRef.current = undefined;
+    };
+  }, [gameMode, id]);
+
   // The difficulties this specific chart actually carries - auto-charted
   // songs usually have all four, lesson charts often only Expert. Falls
   // back to just the currently-loaded difficulty (rather than every
@@ -359,6 +411,37 @@ export function SongView() {
     () => renderData.map((rd) => rd.measure),
     [renderData],
   );
+  const interruptedAttempt = useMemo(
+    () =>
+      interruptedAttempts
+        .filter(
+          (attempt) =>
+            attempt.songId === id &&
+            attempt.chartRevision === currentChartRevision,
+        )
+        .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
+        .at(-1),
+    [currentChartRevision, id, interruptedAttempts],
+  );
+  const interruptedResumeMeasure = useMemo(() => {
+    if (!interruptedAttempt || measures.length === 0) {
+      return undefined;
+    }
+
+    const containingIndex = measures.findIndex(
+      (measure) =>
+        interruptedAttempt.positionTick >= measure.startTick &&
+        interruptedAttempt.positionTick < measure.endTick,
+    );
+
+    return containingIndex >= 0
+      ? containingIndex
+      : Math.max(0, measures.length - 1);
+  }, [interruptedAttempt, measures]);
+  const interruptedResumeTick =
+    interruptedResumeMeasure === undefined
+      ? undefined
+      : measures[interruptedResumeMeasure]?.startTick;
   const coachResult = useMemo(() => {
     if (!chart || !parsedMidi || !fullRuns) {
       return undefined;
@@ -394,7 +477,6 @@ export function SongView() {
   const {
     engine,
     isReady,
-    state: playbackState,
     duration,
     timeStore,
     isPlaying,
@@ -402,6 +484,7 @@ export function SongView() {
     isStarted,
     isEnded,
     countInBeat,
+    countInBeats,
     countInBeatMs,
     play,
     playFromTick,
@@ -435,6 +518,13 @@ export function SongView() {
       // can tell a Practice rep at 0.7x apart from a full-speed Perform
       // pass.
       const identity = runIdentityRef.current;
+
+      // Capture the final Judge journal synchronously before Transport's
+      // ended-state render can tear down the checkpoint hook. This seals its
+      // lifecycle listeners without deleting the draft; the atomic run save
+      // below owns deletion only after it reaches durable storage.
+      attemptCheckpointControlRef.current?.prepareForCompletion();
+
       const tutorEvidence =
         gameMode === 'practice' && tutorEvidenceRef.current
           ? {
@@ -526,6 +616,20 @@ export function SongView() {
       }
 
       if (id && persistEligible) {
+        const finalizeAttemptSessionIds = [
+          identity.sessionId,
+          ...(resumedAttemptSessionIdRef.current
+            ? [resumedAttemptSessionIdRef.current]
+            : []),
+          ...pendingAttemptSessionIdsRef.current,
+        ].filter(
+          (sessionId, index, allSessionIds) =>
+            allSessionIds.indexOf(sessionId) === index,
+        );
+
+        finalizeAttemptSessionIds.forEach((sessionId) =>
+          pendingAttemptSessionIdsRef.current.add(sessionId),
+        );
         saveRunOffRef.current?.();
         saveRunOffRef.current = window.electron.ipcRenderer.once<
           { error: string } | { songId: string }
@@ -542,6 +646,10 @@ export function SongView() {
             });
           } else {
             setPracticePersistenceState('saved');
+            finalizeAttemptSessionIds.forEach((sessionId) =>
+              pendingAttemptSessionIdsRef.current.delete(sessionId),
+            );
+            resumedAttemptSessionIdRef.current = undefined;
 
             if (lessonProgression.qualifies) {
               setScoreData(score);
@@ -582,7 +690,16 @@ export function SongView() {
           songId: id,
           summary: runSummary,
           records,
+          finalizeAttemptSessionIds,
         });
+      } else if (id && identity.startedAt) {
+        // The transport ended intentionally but produced no durable scored
+        // evidence. Clear only this open draft so it is not mislabelled as an
+        // interrupted session on the next launch.
+        window.electron.ipcRenderer.sendMessage(
+          'finalize-practice-attempt-checkpoint',
+          { songId: id, sessionId: identity.sessionId },
+        );
       }
 
       const nextRunIdentity = createPracticeRunIdentity();
@@ -595,6 +712,76 @@ export function SongView() {
       expectedInitialLessonSeekRef.current = false;
     },
   });
+  const readAttemptCheckpointSeed = useCallback(() => {
+    const identity = runIdentityRef.current;
+
+    if (!engine || !id || !chart || !identity.startedAt) {
+      return undefined;
+    }
+
+    return {
+      songId: id,
+      sessionId: identity.sessionId,
+      startedAt: identity.startedAt,
+      chartRevision: currentChartRevision,
+      mode: gameMode ?? ('perform' as const),
+      difficulty,
+      playbackSpeed: policy.speedControl ? playbackSpeedRef.current : 1,
+      positionTick: () =>
+        Math.max(
+          0,
+          secondsToTicks(
+            timeStore.get() - delaySeconds,
+            chart.resolution,
+            chart.tempos,
+          ),
+        ),
+    };
+  }, [
+    chart,
+    currentChartRevision,
+    delaySeconds,
+    difficulty,
+    engine,
+    gameMode,
+    id,
+    policy.speedControl,
+    timeStore,
+  ]);
+  const attemptCheckpointOptions = useMemo(
+    () => ({
+      enabled: Boolean(
+        engine && id && chart && runIdentity.startedAt && !isEnded,
+      ),
+      readSeed: readAttemptCheckpointSeed,
+      evidence: engine ?? EMPTY_ATTEMPT_EVIDENCE,
+    }),
+    [
+      chart,
+      engine,
+      id,
+      isEnded,
+      readAttemptCheckpointSeed,
+      runIdentity.startedAt,
+    ],
+  );
+  const { prepareForCompletion: prepareCheckpointForCompletion } =
+    usePracticeAttemptCheckpoint(attemptCheckpointOptions);
+
+  useEffect(() => {
+    const control = {
+      prepareForCompletion: prepareCheckpointForCompletion,
+    };
+
+    attemptCheckpointControlRef.current = control;
+
+    return () => {
+      if (attemptCheckpointControlRef.current === control) {
+        attemptCheckpointControlRef.current = undefined;
+      }
+    };
+  }, [prepareCheckpointForCompletion]);
+
   // Additive: subscribes to this same `engine` instance's public
   // onHit/onFalseHit/onMiss/onReset events (see engine.ts) and turns them
   // into in-play streak state, without touching anything above. Perform
@@ -651,16 +838,43 @@ export function SongView() {
     // this run ineligible for lesson progression.
     expectedInitialLessonSeekRef.current = true;
   }, []);
-  const playRun = useCallback(() => {
-    beginLessonTraversal(timeStore.get() <= Math.max(0, delaySeconds) + 0.05);
-    markRunStarted();
-    play();
-  }, [beginLessonTraversal, delaySeconds, markRunStarted, play, timeStore]);
+  const playRun = useCallback(
+    (countInPolicy: CountInPolicy = 'inherit') => {
+      beginLessonTraversal(timeStore.get() <= Math.max(0, delaySeconds) + 0.05);
+      markRunStarted();
+
+      if (countInPolicy === 'inherit') {
+        play();
+      } else if (chart) {
+        const currentTick = secondsToTicks(
+          Math.max(0, timeStore.get() - delaySeconds),
+          chart.resolution,
+          chart.tempos,
+        );
+        const currentMeasure = measures.find(
+          (measure) =>
+            currentTick >= measure.startTick && currentTick < measure.endTick,
+        );
+
+        playFromTick(currentMeasure?.startTick ?? 0, countInPolicy);
+      }
+    },
+    [
+      beginLessonTraversal,
+      chart,
+      delaySeconds,
+      markRunStarted,
+      measures,
+      play,
+      playFromTick,
+      timeStore,
+    ],
+  );
   const playRunFromTick = useCallback(
-    (tick: number) => {
+    (tick: number, countInPolicy: CountInPolicy = 'inherit') => {
       beginLessonTraversal(tick <= 0);
       markRunStarted();
-      playFromTick(tick);
+      playFromTick(tick, countInPolicy);
     },
     [beginLessonTraversal, markRunStarted, playFromTick],
   );
@@ -695,10 +909,14 @@ export function SongView() {
     practiceSummary,
   ]);
   const onRetry = useCallback(() => {
+    if (gameMode === 'practice' && practicePersistenceState === 'saving') {
+      return;
+    }
+
     setIsScoreModalOpen(false);
     setPracticePersistenceState('no-evidence');
     playRunFromTick(0);
-  }, [playRunFromTick]);
+  }, [gameMode, playRunFromTick, practicePersistenceState]);
   const loadStoredRuns = useCallback(
     (forCoach: boolean) => {
       if (!id) {
@@ -965,7 +1183,7 @@ export function SongView() {
   const resumeAfterInactivity = useCallback(
     (checkpoint: InactivityCheckpoint) => {
       guidedReadyRef.current = true;
-      playRunFromTick(checkpoint.checkpointTick);
+      playRunFromTick(checkpoint.checkpointTick, 'force');
     },
     [playRunFromTick],
   );
@@ -1070,23 +1288,41 @@ export function SongView() {
       return 'playing';
     }
 
-    if (isStarted || playbackState === 'parked') {
+    if (isStarted) {
       return 'paused';
     }
 
     return 'ready';
-  }, [isCounting, isPlaying, isScoreModalOpen, isStarted, playbackState]);
+  }, [isCounting, isPlaying, isScoreModalOpen, isStarted]);
   const onDrumGesture = useCallback(
     (action: DrumGestureAction) => {
+      // Multi-hit gestures are observed before Judge and resolved after the
+      // final physical strike. Close that evidence transaction first: a
+      // deliberate command must never become Coach/Tutor error evidence.
+      const commandRewindSeconds = engine?.completeControlGestureCapture();
+
       if (action === 'start') {
         guidedReadyRef.current = true;
+
+        if (interruptedAttempt && interruptedResumeTick !== undefined) {
+          resumedAttemptSessionIdRef.current = interruptedAttempt.sessionId;
+          setInterruptedAttempts((attempts) =>
+            attempts.filter(
+              (attempt) => attempt.sessionId !== interruptedAttempt.sessionId,
+            ),
+          );
+          playRunFromTick(interruptedResumeTick, 'force');
+
+          return;
+        }
+
         playRun();
 
         return;
       }
 
       if (action === 'resume') {
-        playRun();
+        playRun('force');
 
         return;
       }
@@ -1094,9 +1330,10 @@ export function SongView() {
       if (action === 'pause') {
         pause();
         // The four deliberate command strikes arrive through the same MIDI
-        // bus as musical input. Rewind past the command signature so Judge
-        // and the canonical run record cannot learn from control gestures.
-        seekSeconds(Math.max(0, timeStore.get() - 1.1));
+        // bus as musical input. Rewind to the transaction's exact first
+        // affected chart boundary so neither Judge nor canonical analytics
+        // can learn from control gestures, including at 2x playback.
+        seekSeconds(commandRewindSeconds ?? timeStore.get());
 
         return;
       }
@@ -1120,21 +1357,39 @@ export function SongView() {
     },
     [
       cancel,
+      engine,
       navigate,
       onNextSong,
       onRetry,
       pause,
       playRun,
+      playRunFromTick,
       seekSeconds,
       timeStore,
+      interruptedAttempt,
+      interruptedResumeTick,
     ],
   );
 
   useDrumGestures({
-    enabled: handsFreeControlsEnabled && !isLoading,
+    enabled:
+      handsFreeControlsEnabled &&
+      !isLoading &&
+      !(
+        tutorSession.state.phase === 'recovering' &&
+        !isPlaying &&
+        !isCounting
+      ) &&
+      !(
+        drumGestureSurface === 'result' &&
+        gameMode === 'practice' &&
+        practicePersistenceState === 'saving'
+      ),
     surface: drumGestureSurface,
     mapping: inputMapping,
     onAction: onDrumGesture,
+    onCandidateStart: () => engine?.beginControlGestureCapture(),
+    onCandidateCancel: () => engine?.cancelControlGestureCapture(),
   });
 
   const tutorHudMessage = useMemo(() => {
@@ -1174,6 +1429,18 @@ export function SongView() {
     }
 
     if (handsFreeControlsEnabled && drumGestureSurface === 'ready') {
+      if (interruptedAttempt && interruptedResumeMeasure !== undefined) {
+        return {
+          title: 'Interrupted attempt saved',
+          detail: `${
+            interruptedAttempt.records.length
+          } scored outcomes are preserved separately. Kick once to pick up from bar ${
+            interruptedResumeMeasure + 1
+          } with a fresh count-in; this creates a new attempt without relabelling the interrupted one as complete.`,
+          tone: 'steady' as const,
+        };
+      }
+
       const lessonDetail = songData?.lesson
         ? playbackSpeed < 0.999
           ? `Kick once to start. This ${playbackSpeed.toFixed(
@@ -1208,6 +1475,8 @@ export function SongView() {
     countIn,
     handsFreeControlsEnabled,
     inactivityRecovery,
+    interruptedAttempt,
+    interruptedResumeMeasure,
     remediationSession.activeTask,
     playbackSpeed,
     songData?.lesson,
@@ -1549,6 +1818,8 @@ export function SongView() {
 
   useEffect(() => () => loadRunsOffRef.current?.(), []);
 
+  useEffect(() => () => loadAttemptsOffRef.current?.(), []);
+
   useEffect(() => () => saveRunOffRef.current?.(), []);
 
   useEffect(() => {
@@ -1595,13 +1866,13 @@ export function SongView() {
       </div>
       <div className="flex items-center justify-between gap-3">
         <SettingLabel
-          label="Practice lives"
-          tooltip="Show a three-life challenge while keeping every mistake as learning evidence."
+          label="Challenge lives"
+          tooltip="Optional game pressure. Leave this off for relaxed practice with clean-repetition progress."
         />
         <Switch
           size="small"
           data-testid="setting-tutor-lives"
-          aria-label="Practice lives"
+          aria-label="Challenge lives"
           checked={tutorLivesEnabled}
           disabled={!adaptiveTutorEnabled}
           onChange={setTutorLivesEnabled}
@@ -1641,9 +1912,106 @@ export function SongView() {
       </p>
     </section>
   );
+  const practicePresentationPhase = useMemo(() => {
+    if (isScoreModalOpen) {
+      return 'result';
+    }
+
+    if (inactivityRecovery.phase === 'parked') {
+      return 'inactivity-paused';
+    }
+
+    if (isCounting) {
+      return 'counting-in';
+    }
+
+    if (isPlaying) {
+      return 'playing';
+    }
+
+    if (
+      tutorSession.state.phase === 'recovering' ||
+      remediationSession.activeTask
+    ) {
+      return 'recovery-explain';
+    }
+
+    return isStarted ? 'paused' : 'ready';
+  }, [
+    inactivityRecovery.phase,
+    isCounting,
+    isPlaying,
+    isScoreModalOpen,
+    isStarted,
+    remediationSession.activeTask,
+    tutorSession.state.phase,
+  ]);
+  const kitControlPrompt = useMemo(() => {
+    if (!handsFreeControlsEnabled) {
+      return undefined;
+    }
+
+    if (practicePresentationPhase === 'ready') {
+      if (interruptedAttempt && interruptedResumeMeasure !== undefined) {
+        return {
+          label: `Resume saved bar ${interruptedResumeMeasure + 1}`,
+          steps: ['kick'] as const,
+        };
+      }
+
+      return {
+        label: countIn ? 'Kick to start the count-in' : 'Kick to start',
+        steps: ['kick'] as const,
+      };
+    }
+
+    if (practicePresentationPhase === 'paused') {
+      return {
+        label: 'Resume from the kit',
+        steps: ['kick', 'crash', 'kick', 'crash'] as const,
+      };
+    }
+
+    if (practicePresentationPhase === 'inactivity-paused') {
+      return {
+        label: 'Return with a fresh count-in',
+        steps: ['any'] as const,
+      };
+    }
+
+    if (practicePresentationPhase === 'playing') {
+      return {
+        label: 'Pause from the kit',
+        steps: ['kick', 'crash', 'kick', 'crash'] as const,
+      };
+    }
+
+    return undefined;
+  }, [
+    countIn,
+    handsFreeControlsEnabled,
+    interruptedAttempt,
+    interruptedResumeMeasure,
+    practicePresentationPhase,
+  ]);
+  const tutorDisplayState =
+    practicePresentationPhase === 'inactivity-paused'
+      ? 'inactivity-paused'
+      : remediationSession.activeTask
+      ? 'remediation'
+      : practicePresentationPhase === 'ready'
+      ? 'kit-ready'
+      : practicePresentationPhase === 'paused'
+      ? 'kit-paused'
+      : practicePresentationPhase === 'recovery-explain'
+      ? 'recovery-explain'
+      : undefined;
 
   return (
-    <Layout className="drumroll-practice-shell h-full pointer-events-auto">
+    <Layout
+      className="drumroll-practice-shell h-full pointer-events-auto"
+      data-session-phase={practicePresentationPhase}
+    >
       <ScoreSummary
         isOpen={isScoreModalOpen}
         onNextSong={onNextSong}
@@ -1665,6 +2033,7 @@ export function SongView() {
         gamification={gamification}
         runResult={gamificationResult}
         lessonProgression={lessonProgressionResult}
+        handsFreeControlsEnabled={handsFreeControlsEnabled}
       />
       <Drawer
         title="Practice stats"
@@ -1959,7 +2328,7 @@ export function SongView() {
       <div className="relative grow flex min-h-0">
         <Content
           className={cn(
-            'grow m-0 flex min-h-0 flex-col font-display text-ink',
+            'drumroll-notation-stage grow m-0 flex min-h-0 flex-col font-display text-ink',
             notationLayout === 'flow'
               ? 'drumroll-flow-viewport overflow-hidden'
               : 'drumroll-classic-viewport items-center overflow-auto',
@@ -2051,13 +2420,9 @@ export function SongView() {
           <TutorHud
             state={tutorSession.state}
             message={tutorHudMessage}
-            displayState={
-              inactivityRecovery.phase === 'parked'
-                ? 'inactivity-paused'
-                : remediationSession.activeTask
-                ? 'remediation'
-                : undefined
-            }
+            displayState={tutorDisplayState}
+            controlPrompt={kitControlPrompt}
+            controlPromptCompact={practicePresentationPhase === 'playing'}
             remediation={
               remediationSession.activeTask && remediationProgress
                 ? {
@@ -2071,12 +2436,27 @@ export function SongView() {
             }
           />
         )}
+        {gameMode !== 'practice' && kitControlPrompt && (
+          <div
+            className="drumroll-perform-kit-prompt"
+            data-testid="perform-kit-control-prompt"
+          >
+            <KitCommandPrompt
+              model={kitControlPrompt}
+              compact={practicePresentationPhase === 'playing'}
+            />
+          </div>
+        )}
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-bg/80 z-10 backdrop-blur-xs">
             <Spin size="large" />
           </div>
         )}
-        <CountIn count={countInBeat} beatMs={countInBeatMs} />
+        <CountIn
+          count={countInBeat}
+          total={countInBeats}
+          beatMs={countInBeatMs}
+        />
         <StreakMeter ui={streakUi} className="drumroll-practice-streak" />
         {transportIndicator && (
           <div

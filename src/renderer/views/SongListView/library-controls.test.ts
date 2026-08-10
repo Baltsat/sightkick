@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveLibraryControls } from './library-controls';
 
 describe('resolveLibraryControls', () => {
-  it('keeps each explicit action authoritative and fills only missing actions', () => {
+  it('keeps each explicit action and adds non-conflicting kit fallbacks', () => {
     const controls = resolveLibraryControls(
       { down: ['midi:91'] },
       {
@@ -12,13 +12,13 @@ describe('resolveLibraryControls', () => {
       },
     );
 
-    expect(controls.mapping.down).toEqual(['midi:91']);
+    expect(controls.mapping.down).toEqual(['midi:91', 'midi:47']);
     expect(controls.mapping.up).toEqual(['midi:48']);
     expect(controls.mapping.confirm).toEqual(['midi:38']);
     expect(controls.source).toBe('mixed');
-    expect(controls.kitActions).toEqual(['up', 'confirm']);
+    expect(controls.kitActions).toEqual(['up', 'down', 'confirm']);
     expect(controls.legend).toBe(
-      'Explicit: 91 move · Kit fallback: Tom 1 moves up · Snare chooses',
+      'Explicit: 91 move · Kit fallback: Tom 1 / Tom 2 move · Snare chooses',
     );
   });
 

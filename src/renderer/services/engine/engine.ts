@@ -17,6 +17,7 @@ import { ELEMENT_TO_KEYS, KEY_TO_ELEMENT } from './constants';
 import { keyPrefix } from './helpers';
 import {
   EngineContext,
+  CountInPolicy,
   EngineOptions,
   GameRendererRefs,
   EngineSettings,
@@ -57,6 +58,7 @@ export class Engine {
   private loopRestartListeners = new Set<LoopRestartHandler>();
   private seekStartListeners = new Set<SeekStartHandler>();
   private runEndingListeners = new Set<() => boolean>();
+  private judgementListeners = new Set<ResolvedJudgementHandler>();
   private onEndedCb: (
     score: ScoreData,
     practiceSummary: RunSummary,
@@ -73,6 +75,21 @@ export class Engine {
   private falseHitUnsub: () => void;
   private judgementUnsub: () => void;
   private runRecords: HitRecord[] = [];
+  /**
+   * Append-only evidence for the entire open attempt. Unlike `runRecords`,
+   * this journal is never pruned by a seek or Tutor rewind, so an interrupted
+   * checkpoint retains every resolved pass through a troublesome phrase.
+   */
+  private attemptRecords: HitRecord[] = [];
+  private controlGestureCapture:
+    | {
+        attemptRecordCount: number;
+        runRecordCount: number;
+        startedAtSeconds: number;
+        startedAtTick?: number;
+        judgements: Parameters<ResolvedJudgementHandler>[0][];
+      }
+    | undefined;
   private suppressJudgementResolution = false;
 
   constructor(options: EngineOptions) {
@@ -140,14 +157,17 @@ export class Engine {
       const element = meta.element;
 
       prefixes.forEach(() => {
-        this.runRecords.push({
+        const record: HitRecord = {
           tick: meta.tick,
           timeSeconds: meta.timeSeconds,
           deltaMs: meta.deltaMs,
           element,
           verdict: 'hit',
           velocity: meta.velocity,
-        });
+        };
+
+        this.runRecords.push(record);
+        this.attemptRecords.push({ ...record });
       });
     });
     this.falseHitUnsub = this.judge.onFalseHit((record) => {
@@ -157,13 +177,16 @@ export class Engine {
         return;
       }
 
-      this.runRecords.push({
+      const resolvedRecord: HitRecord = {
         tick: record.tick,
         timeSeconds: record.timeSeconds,
         deltaMs: 0,
         element: record.element,
         verdict: 'wrong',
-      });
+      };
+
+      this.runRecords.push(resolvedRecord);
+      this.attemptRecords.push({ ...resolvedRecord });
     });
     this.judgementUnsub = this.judge.onJudgement((judgement) => {
       if (
@@ -171,20 +194,31 @@ export class Engine {
         judgement.expectedTick === undefined ||
         !isKitElement(judgement.expectedElement)
       ) {
-        return;
+        // Hits and wrong-pad outcomes have already been stored by their
+        // dedicated Judge channels above. They still share the same buffered
+        // external judgement path below.
+      } else {
+        this.missListeners.forEach((listener) =>
+          listener(judgement.expectedTick as number),
+        );
+
+        const record: HitRecord = {
+          tick: judgement.expectedTick,
+          timeSeconds: this.timeSecondsForTick(judgement.expectedTick),
+          deltaMs: 0,
+          element: judgement.expectedElement,
+          verdict: 'miss',
+        };
+
+        this.runRecords.push(record);
+        this.attemptRecords.push({ ...record });
       }
 
-      this.missListeners.forEach((listener) =>
-        listener(judgement.expectedTick as number),
-      );
-
-      this.runRecords.push({
-        tick: judgement.expectedTick,
-        timeSeconds: this.timeSecondsForTick(judgement.expectedTick),
-        deltaMs: 0,
-        element: judgement.expectedElement,
-        verdict: 'miss',
-      });
+      if (this.controlGestureCapture) {
+        this.controlGestureCapture.judgements.push({ ...judgement });
+      } else {
+        this.judgementListeners.forEach((listener) => listener(judgement));
+      }
     });
   }
 
@@ -212,7 +246,11 @@ export class Engine {
 
   /** Final Judge outcomes for adaptive practice and evidence capture. */
   onJudgement(listener: ResolvedJudgementHandler): () => void {
-    return this.judge.onJudgement(listener);
+    this.judgementListeners.add(listener);
+
+    return () => {
+      this.judgementListeners.delete(listener);
+    };
   }
 
   /** See `MissHandler`'s doc comment in types.ts. */
@@ -268,6 +306,115 @@ export class Engine {
   }
 
   getSnapshot = (): PlaybackSnapshot => this.transport.getSnapshot();
+
+  /**
+   * Returns a defensive snapshot of the evidence accumulated for the current
+   * unfinished pass. It intentionally contains only real Judge outcomes; the
+   * caller may persist it as a crash-recovery draft, but must not present it
+   * as a completed RunSummary.
+   */
+  getRunRecords(): HitRecord[] {
+    return this.runRecords.map((record) => ({ ...record }));
+  }
+
+  /**
+   * Returns every Judge-resolved outcome observed since this attempt began,
+   * including superseded passes before manual seeks and adaptive rewinds.
+   * It is recovery/audit evidence only; completed scoring still uses the
+   * canonical `runRecords` snapshot above.
+   */
+  getAttemptRecords(): HitRecord[] {
+    const records = this.controlGestureCapture
+      ? this.attemptRecords.slice(
+          0,
+          this.controlGestureCapture.attemptRecordCount,
+        )
+      : this.attemptRecords;
+
+    return records.map((record) => ({ ...record }));
+  }
+
+  /**
+   * Open a tiny evidence transaction before a possible multi-hit kit command
+   * reaches Judge. Canonical scoring continues normally so a failed pattern
+   * can remain real drumming; only Tutor delivery and the interruption journal
+   * wait for the recognizer's decision.
+   */
+  beginControlGestureCapture(): void {
+    if (this.controlGestureCapture) {
+      return;
+    }
+
+    this.controlGestureCapture = {
+      attemptRecordCount: this.attemptRecords.length,
+      runRecordCount: this.runRecords.length,
+      startedAtSeconds: this.transport.timeStore.get(),
+      startedAtTick: this.chart
+        ? Math.max(
+            0,
+            secondsToTicks(
+              this.transport.timeStore.get() - this.delaySeconds,
+              this.chart.resolution,
+              this.chart.tempos,
+            ),
+          )
+        : undefined,
+      judgements: [],
+    };
+  }
+
+  /** A diverged/timed-out pattern was musical input; release it to Tutor. */
+  cancelControlGestureCapture(): void {
+    const capture = this.controlGestureCapture;
+
+    if (!capture) {
+      return;
+    }
+
+    this.controlGestureCapture = undefined;
+    capture.judgements.forEach((judgement) => {
+      this.judgementListeners.forEach((listener) => listener(judgement));
+    });
+  }
+
+  /**
+   * A recognized command is UI control, not learning evidence.
+   *
+   * Returns the exact transport boundary that the caller must seek to when
+   * the command interrupted active playback. That boundary is derived from
+   * the capture start and every Judge record produced during the candidate,
+   * so it remains correct at every playback speed and also covers a command
+   * strike that happened to match a slightly earlier authored note.
+   */
+  completeControlGestureCapture(): number | undefined {
+    const capture = this.controlGestureCapture;
+
+    if (!capture) {
+      return undefined;
+    }
+
+    const capturedRunRecords = this.runRecords.slice(capture.runRecordCount);
+    const capturedTicks = capturedRunRecords.map((record) => record.tick);
+    const rewindTick =
+      capture.startedAtTick === undefined
+        ? undefined
+        : Math.min(capture.startedAtTick, ...capturedTicks);
+
+    this.runRecords = this.runRecords.slice(0, capture.runRecordCount);
+    this.attemptRecords = this.attemptRecords.slice(
+      0,
+      capture.attemptRecordCount,
+    );
+    this.controlGestureCapture = undefined;
+
+    return this.chart && rewindTick !== undefined
+      ? Math.max(
+          0,
+          ticksToSeconds(rewindTick, this.chart.resolution, this.chart.tempos) +
+            this.delaySeconds,
+        )
+      : capture.startedAtSeconds;
+  }
 
   setContext(context: EngineContext): void {
     this.chart = context.chart;
@@ -335,8 +482,10 @@ export class Engine {
     this.withAdministrativeSeek(() => this.transport.play());
   }
 
-  playFromTick(tick: number): void {
-    this.withAdministrativeSeek(() => this.transport.playFromTick(tick));
+  playFromTick(tick: number, countInPolicy: CountInPolicy = 'inherit'): void {
+    this.withAdministrativeSeek(() =>
+      this.transport.playFromTick(tick, countInPolicy),
+    );
   }
 
   pause(): void {
@@ -395,6 +544,8 @@ export class Engine {
     this.hitUnsub();
     this.falseHitUnsub();
     this.judgementUnsub();
+    this.controlGestureCapture = undefined;
+    this.judgementListeners.clear();
     this.transport.dispose();
   }
 
@@ -421,6 +572,9 @@ export class Engine {
     // a loop only ever contributes its *last* pass's hits/misses to the
     // summary below — honest evidence of the most recent attempt, not a
     // growing tally that rewards repetition over accuracy.
+    // An unfinished candidate is ordinary playing. Release its delayed Tutor
+    // outcomes before the terminal resolution handshake.
+    this.cancelControlGestureCapture();
     this.judge.resolveAll();
 
     if ([...this.runEndingListeners].some((listener) => !listener())) {
@@ -439,6 +593,7 @@ export class Engine {
     const practiceSummary = summarizeRun(records, new Date().toISOString());
 
     this.runRecords = [];
+    this.attemptRecords = [];
 
     this.onEndedCb(
       {

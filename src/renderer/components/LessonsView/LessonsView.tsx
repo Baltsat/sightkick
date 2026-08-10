@@ -318,6 +318,7 @@ export function LessonsView({
               focusedLessonId={resolvedFocusedLessonId}
               controlLegend={journeyControls.legend}
               controlSource={journeyControls.source}
+              kitActions={journeyControls.kitActions}
               onPlay={onPlay}
               onLockedClick={handleLockedClick}
             />

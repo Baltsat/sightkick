@@ -12,8 +12,9 @@ const JOURNEY_CONTROL_KEYS: (keyof ControlMapping)[] = [
 
 export interface JourneyControls {
   mapping: ControlMapping;
-  source: 'explicit' | 'kit-lanes' | 'unavailable';
+  source: 'explicit' | 'mixed' | 'kit-lanes' | 'unavailable';
   legend: string;
+  kitActions: Array<'up' | 'down' | 'left' | 'right' | 'confirm' | 'back'>;
 }
 
 function hasAssignedControl(
@@ -80,22 +81,20 @@ function explicitLegend(mapping: ControlMapping): string {
  * Resolve controls for the Journey surface only. Authored control mappings
  * remain authoritative. When none of the Journey actions has an explicit
  * binding, familiar kit lanes become a local fallback: Tom 1/Tom 2 move,
- * Snare starts, and Crash backs out. Nothing is written to InputContext, so
+ * Hi-hat/Ride change season, Snare starts, and Crash backs out. Nothing is
+ * written to InputContext, so
  * the pads retain their musical meaning everywhere else in the app.
  */
 export function resolveJourneyControls(
   controlMapping: ControlMapping,
   inputMapping: InputMapping,
 ): JourneyControls {
-  if (hasAssignedControl(controlMapping, JOURNEY_CONTROL_KEYS)) {
-    return {
-      mapping: controlMapping,
-      source: 'explicit',
-      legend: explicitLegend(controlMapping),
-    };
-  }
-
-  const claimed = new Set<string>();
+  const hasExplicit = hasAssignedControl(controlMapping, JOURNEY_CONTROL_KEYS);
+  // Never let a local fallback steal a pad/key that the player deliberately
+  // assigned anywhere in the control map. Fill only missing Journey actions.
+  const claimed = new Set<string>(
+    Object.values(controlMapping).flatMap((controlIds) => controlIds ?? []),
+  );
   const claim = (controlIds: string[] | undefined): string[] =>
     (controlIds ?? []).filter((controlId) => {
       if (claimed.has(controlId)) {
@@ -106,11 +105,29 @@ export function resolveJourneyControls(
 
       return true;
     });
+  const fallbackMapping: ControlMapping = {
+    up: (controlMapping.up?.length ?? 0) > 0 ? [] : claim(inputMapping.tom1),
+    down:
+      (controlMapping.down?.length ?? 0) > 0 ? [] : claim(inputMapping.tom2),
+    left:
+      (controlMapping.left?.length ?? 0) > 0 ? [] : claim(inputMapping.hihat),
+    right:
+      (controlMapping.right?.length ?? 0) > 0 ? [] : claim(inputMapping.ride),
+    confirm:
+      (controlMapping.confirm?.length ?? 0) > 0
+        ? []
+        : claim(inputMapping.snare),
+    back:
+      (controlMapping.back?.length ?? 0) > 0 ? [] : claim(inputMapping.crash),
+  };
   const mapping: ControlMapping = {
-    up: claim(inputMapping.tom1),
-    down: claim(inputMapping.tom2),
-    confirm: claim(inputMapping.snare),
-    back: claim(inputMapping.crash),
+    ...controlMapping,
+    ...Object.fromEntries(
+      JOURNEY_CONTROL_KEYS.map((key) => [
+        key,
+        [...(controlMapping[key] ?? []), ...(fallbackMapping[key] ?? [])],
+      ]),
+    ),
   };
 
   if (!hasAssignedControl(mapping, JOURNEY_CONTROL_KEYS)) {
@@ -118,30 +135,75 @@ export function resolveJourneyControls(
       mapping,
       source: 'unavailable',
       legend: 'Set Journey controls in Configure input',
+      kitActions: [],
     };
   }
 
   const parts: string[] = [];
+  const kitActions: JourneyControls['kitActions'] = [];
 
-  if ((mapping.up?.length ?? 0) > 0 && (mapping.down?.length ?? 0) > 0) {
+  if (
+    (fallbackMapping.up?.length ?? 0) > 0 &&
+    (fallbackMapping.down?.length ?? 0) > 0
+  ) {
     parts.push('Tom 1 / Tom 2 select');
-  } else if ((mapping.up?.length ?? 0) > 0) {
+  } else if ((fallbackMapping.up?.length ?? 0) > 0) {
     parts.push('Tom 1 selects previous');
-  } else if ((mapping.down?.length ?? 0) > 0) {
+  } else if ((fallbackMapping.down?.length ?? 0) > 0) {
     parts.push('Tom 2 selects next');
   }
 
-  if ((mapping.confirm?.length ?? 0) > 0) {
-    parts.push('Snare starts');
+  if ((fallbackMapping.up?.length ?? 0) > 0) {
+    kitActions.push('up');
   }
 
-  if ((mapping.back?.length ?? 0) > 0) {
-    parts.push('Crash backs');
+  if ((fallbackMapping.down?.length ?? 0) > 0) {
+    kitActions.push('down');
   }
+
+  if ((fallbackMapping.confirm?.length ?? 0) > 0) {
+    parts.push('Snare starts');
+    kitActions.push('confirm');
+  }
+
+  if (
+    (fallbackMapping.left?.length ?? 0) > 0 &&
+    (fallbackMapping.right?.length ?? 0) > 0
+  ) {
+    parts.push('Hi-hat / Ride change season');
+  } else if ((fallbackMapping.left?.length ?? 0) > 0) {
+    parts.push('Hi-hat selects previous season');
+  } else if ((fallbackMapping.right?.length ?? 0) > 0) {
+    parts.push('Ride selects next season');
+  }
+
+  if ((fallbackMapping.left?.length ?? 0) > 0) {
+    kitActions.push('left');
+  }
+
+  if ((fallbackMapping.right?.length ?? 0) > 0) {
+    kitActions.push('right');
+  }
+
+  if ((fallbackMapping.back?.length ?? 0) > 0) {
+    parts.push('Crash backs');
+    kitActions.push('back');
+  }
+
+  const fallbackLegend = parts.join(' · ');
+  const explicit = explicitLegend(controlMapping);
 
   return {
     mapping,
-    source: 'kit-lanes',
-    legend: parts.join(' · '),
+    source:
+      kitActions.length === 0
+        ? 'explicit'
+        : hasExplicit
+        ? 'mixed'
+        : 'kit-lanes',
+    legend: [explicit, fallbackLegend].filter(Boolean).join(' · '),
+    kitActions: (
+      ['up', 'down', 'left', 'right', 'confirm', 'back'] as const
+    ).filter((action) => kitActions.includes(action)),
   };
 }

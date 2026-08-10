@@ -25,10 +25,11 @@ export const KIT_SHORT_LABEL: Partial<Record<InputElement, string>> = {
 
 export const HIT_TOLERANCE_SECONDS = 0.1;
 
-// Practice is a learning surface, not an audition. A 160 ms nearest-note
-// window keeps a developing player inside the phrase while Perform retains
+// Practice is a learning surface, not an audition. The real Boulevard run
+// showed same-lane pulse drift centred near 144 ms, so an 180 ms nearest-note
+// window keeps that developing player inside the phrase while Perform retains
 // the original 100 ms accuracy contract.
-export const PRACTICE_HIT_TOLERANCE_SECONDS = 0.16;
+export const PRACTICE_HIT_TOLERANCE_SECONDS = 0.18;
 
 export const ACCENT_VALUE_THRESHOLD = 90;
 
@@ -61,6 +62,7 @@ export const SNAPSHOT_KEYS: (keyof PlaybackSnapshot)[] = [
   'isStarted',
   'isEnded',
   'countInBeat',
+  'countInBeats',
   'countInBeatMs',
   'isReady',
   'duration',

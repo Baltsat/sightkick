@@ -268,6 +268,50 @@ describe('Transport', () => {
     expect(engine.getSnapshot().isStarted).toBe(true);
   });
 
+  it('can force a musical count-in for a recovery even when initial count-in is disabled', async () => {
+    const { engine } = await setup({}, { countInEnabled: false });
+
+    engine.playFromTick(1920, 'force');
+
+    expect(engine.getSnapshot()).toMatchObject({
+      state: 'counting-in',
+      countInBeat: 1,
+      countInBeats: 4,
+    });
+  });
+
+  it('keeps a forced compound-meter recovery count-in on dotted beats', async () => {
+    const compoundMeasures = [
+      {
+        startTick: 0,
+        endTick: 1440,
+        timeSig: [6, 8],
+        isCompound: true,
+      },
+    ] as unknown as Measure[];
+    const { engine } = await setup(
+      {},
+      { countInEnabled: false, measures: compoundMeasures },
+    );
+
+    engine.playFromTick(0, 'force');
+
+    expect(engine.getSnapshot()).toMatchObject({
+      state: 'counting-in',
+      countInBeat: 1,
+      countInBeats: 2,
+    });
+  });
+
+  it('can explicitly skip count-in without changing the saved preference', async () => {
+    const { engine } = await setup({}, { countInEnabled: true });
+
+    engine.playFromTick(1920, 'skip');
+
+    expect(engine.getSnapshot().state).toBe('playing');
+    expect(engine.getSnapshot().countInBeat).toBeUndefined();
+  });
+
   it('pins the cursor and schedules a future start during the count-in', async () => {
     const { engine, player } = await setup({}, { countInEnabled: true });
 
@@ -275,6 +319,7 @@ describe('Transport', () => {
 
     expect(engine.getSnapshot().state).toBe('counting-in');
     expect(engine.getSnapshot().countInBeat).toBe(1);
+    expect(engine.getSnapshot().countInBeats).toBe(4);
     expect(engine.timeStore.get()).toBeCloseTo(2);
     expect(player.start).toHaveBeenCalledTimes(1);
     expect(player.start).toHaveBeenLastCalledWith(

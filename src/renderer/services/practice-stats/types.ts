@@ -9,6 +9,24 @@ import type {
 
 export const PRACTICE_RUN_SCHEMA_VERSION = 2;
 
+/**
+ * An incomplete, local-only capture of a practice attempt. It is deliberately
+ * not a RunSummary: checkpoints never award XP, affect mastery, or appear in
+ * completed-history analytics. Their sole job is to make the latest scored
+ * evidence recoverable if the app closes, crashes, or the player walks away.
+ */
+export const PRACTICE_ATTEMPT_CHECKPOINT_SCHEMA_VERSION = 1;
+
+/** Keep a small recovery buffer without allowing abandoned attempts to grow indefinitely. */
+export const MAX_PRACTICE_ATTEMPT_CHECKPOINTS_PER_SONG = 3;
+
+/**
+ * Full hit evidence is still bounded while an attempt is open. This limit is
+ * intentionally much larger than a normal song chart; it is a safety rail for
+ * unusually long sessions, not a normal truncation policy.
+ */
+export const MAX_PRACTICE_ATTEMPT_RECORDS = 20_000;
+
 export const SCORING_POLICY_VERSION = 'judge-resolved-v2';
 
 /**
@@ -204,3 +222,32 @@ export interface StoredPracticeRun {
   summary: RunSummary;
   records: StoredHitRecord[];
 }
+
+/**
+ * Crash-recovery evidence for a run that has not reached its natural end.
+ *
+ * `state` is intentionally fixed to `in-progress`: a recovered checkpoint
+ * must never be confused with a completed performance or silently promoted
+ * into the completed run archive.
+ */
+export interface PracticeAttemptCheckpoint {
+  schemaVersion: number;
+  state: 'in-progress';
+  songId: string;
+  sessionId: string;
+  startedAt: string;
+  updatedAt: string;
+  chartRevision: string;
+  mode: GameMode;
+  difficulty: Difficulty;
+  playbackSpeed: number;
+  /** Authored chart position at the most recent durable checkpoint. */
+  positionTick: number;
+  /** Compact scored evidence observed so far, never a synthesized result. */
+  records: StoredHitRecord[];
+}
+
+export type PracticeAttemptCheckpointBySong = Record<
+  string,
+  PracticeAttemptCheckpoint[]
+>;

@@ -6,9 +6,9 @@ import { inputBus } from '../input';
 import { Engine } from '../services/engine';
 import { TimeStore } from '../services/time-store';
 
-export const INACTIVITY_MIN_SECONDS = 3.25;
+export const INACTIVITY_MIN_SECONDS = 2.25;
 
-export const INACTIVITY_MIN_EXPECTED_HEADS = 4;
+export const INACTIVITY_MIN_EXPECTED_HEADS = 3;
 
 export interface InactivityCheckpoint {
   phase: 'parked';
@@ -50,7 +50,7 @@ export function expectedHeadsBetween(
     (total, measure) =>
       total +
       measure.notes.reduce((measureTotal, note) => {
-        if (note.isRest || note.tick < startTick || note.tick >= endTick) {
+        if (note.isRest || note.tick <= startTick || note.tick >= endTick) {
           return measureTotal;
         }
 
@@ -145,6 +145,14 @@ export function useKitInactivityRecovery({
     const offSeekStart = engine.onSeekStart(() => {
       administrativeSeekRef.current = true;
     });
+    const offHit = engine.onHit((_position, _prefixes, meta) => {
+      if (!isPlayingRef.current || stateRef.current.phase === 'parked') {
+        return;
+      }
+
+      lastActivitySecondsRef.current = timeStore.get();
+      lastActivityTickRef.current = meta.tick;
+    });
     const offReset = engine.onReset(() => {
       const seconds = timeStore.get();
 
@@ -159,6 +167,7 @@ export function useKitInactivityRecovery({
 
     return () => {
       offSeekStart();
+      offHit();
       offReset();
       administrativeSeekRef.current = false;
     };
@@ -193,10 +202,14 @@ export function useKitInactivityRecovery({
       const seconds = timeStore.get();
 
       lastActivitySecondsRef.current = seconds;
-      lastActivityTickRef.current = secondsToTicks(
-        seconds - delaySeconds,
-        chart.resolution,
-        chart.tempos,
+      // Engine resolves an early-but-correct strike against the authored
+      // head before this raw InputBus listener runs. Never let the physical
+      // transport tick move that accepted authored boundary backwards: doing
+      // so would count the note we just hit as newly abandoned and park one
+      // head too early.
+      lastActivityTickRef.current = Math.max(
+        lastActivityTickRef.current,
+        secondsToTicks(seconds - delaySeconds, chart.resolution, chart.tempos),
       );
     });
   }, [chart, delaySeconds, enabled, mappedControls, onResume, timeStore]);

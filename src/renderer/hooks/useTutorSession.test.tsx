@@ -1,11 +1,19 @@
 import { StrictMode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Measure, ParsedChart } from '../../chart-parser/types';
 import { Engine, ResolvedJudgement } from '../services/engine';
 import { TimeStore } from '../services/time-store';
 import { DEFAULT_TUTOR_SETTINGS, TutorCommand } from '../services/tutor';
-import { messageForTutorCommand, useTutorSession } from './useTutorSession';
+import {
+  messageForTutorCommand,
+  RECOVERY_PREVIEW_MS,
+  useTutorSession,
+} from './useTutorSession';
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 class TutorEngineProbe {
   readonly timeStore = new TimeStore();
@@ -146,6 +154,8 @@ describe('useTutorSession run-ending handshake', () => {
   });
 
   it('recovers a final-bar failure, repeats cleanly, and commits Results exactly once after release', () => {
+    vi.useFakeTimers();
+
     const probe = new TutorEngineProbe();
     const setPlaybackSpeed = vi.fn();
     const { result } = renderHook(() =>
@@ -169,7 +179,11 @@ describe('useTutorSession run-ending handshake', () => {
 
     expect(firstCommit).toBe(false);
     expect(result.current.state.phase).toBe('recovering');
-    expect(probe.playFromTick).toHaveBeenLastCalledWith(0);
+    expect(probe.playFromTick).not.toHaveBeenCalled();
+
+    act(() => vi.advanceTimersByTime(RECOVERY_PREVIEW_MS));
+
+    expect(probe.playFromTick).toHaveBeenLastCalledWith(0, 'force');
 
     let firstCleanCommit = true;
 
@@ -180,6 +194,10 @@ describe('useTutorSession run-ending handshake', () => {
 
     expect(firstCleanCommit).toBe(false);
     expect(result.current.state.phase).toBe('recovering');
+    expect(probe.playFromTick).toHaveBeenCalledTimes(1);
+
+    act(() => vi.advanceTimersByTime(RECOVERY_PREVIEW_MS));
+
     expect(probe.playFromTick).toHaveBeenCalledTimes(2);
 
     let releasedCommit = false;
@@ -232,6 +250,34 @@ describe('useTutorSession run-ending handshake', () => {
         recoveryAttempts: [],
       });
     });
+  });
+
+  it('cancels a staged recovery when the session unmounts', () => {
+    vi.useFakeTimers();
+
+    const probe = new TutorEngineProbe();
+    const { unmount } = renderHook(() =>
+      useTutorSession({
+        engine: probe as unknown as Engine,
+        runKey: 'leaving-run',
+        chart,
+        measures,
+        delaySeconds: 0,
+        enabled: true,
+        targetSpeed: 1,
+        setPlaybackSpeed: vi.fn(),
+      }),
+    );
+
+    act(() => {
+      emitPass(probe, 'miss');
+      probe.finish();
+    });
+
+    expect(probe.playFromTick).not.toHaveBeenCalled();
+    unmount();
+    act(() => vi.advanceTimersByTime(RECOVERY_PREVIEW_MS));
+    expect(probe.playFromTick).not.toHaveBeenCalled();
   });
 });
 
@@ -287,11 +333,20 @@ describe('Tutor HUD evidence messages', () => {
       messageForTutorCommand(material, DEFAULT_TUTOR_SETTINGS)?.detail,
     ).toContain('8 resolved notes, 63% accuracy, 3 misses, and 2 wrong hits');
     expect(
+      messageForTutorCommand(material, {
+        ...DEFAULT_TUTOR_SETTINGS,
+        livesEnabled: false,
+      })?.detail,
+    ).not.toContain('lives remain');
+    expect(
       messageForTutorCommand(rewind, DEFAULT_TUTOR_SETTINGS)?.detail,
     ).toContain('Checkpoint bar 3 gives 1 lead-in bar before failed bars 4–5');
     expect(
       messageForTutorCommand(rewind, DEFAULT_TUTOR_SETTINGS)?.detail,
     ).toContain('first pass stays at 80% to confirm the pattern');
+    expect(
+      messageForTutorCommand(rewind, DEFAULT_TUTOR_SETTINGS)?.detail,
+    ).toContain('listen for the count-in before playing');
   });
 
   it('explains the configured clean predicate and configurable deferral limit', () => {

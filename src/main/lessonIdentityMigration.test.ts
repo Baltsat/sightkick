@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   archiveRunSummaries,
   emptyPracticeRunArchive,
+  PracticeAttemptCheckpoint,
   RunSummary,
 } from '../renderer/services/practice-stats';
 import {
@@ -31,6 +32,27 @@ function run(completedAt: string, totalHits: number): RunSummary {
   };
 }
 
+function checkpoint(
+  songId: string,
+  sessionId: string,
+  updatedAt: string,
+): PracticeAttemptCheckpoint {
+  return {
+    schemaVersion: 1,
+    state: 'in-progress',
+    songId,
+    sessionId,
+    startedAt: '2026-08-10T00:00:00.000Z',
+    updatedAt,
+    chartRevision: 'chart-revision-1',
+    mode: 'practice',
+    difficulty: 'expert',
+    playbackSpeed: 0.8,
+    positionTick: 960,
+    records: [],
+  };
+}
+
 describe('migrateLessonIdentityStoreData', () => {
   it('moves summaries, full evidence, archives, and goals to the canonical lesson ID', () => {
     const legacyRun = run('2026-08-01T10:00:00.000Z', 8);
@@ -55,6 +77,18 @@ describe('migrateLessonIdentityStoreData', () => {
         practiceRunArchive: {
           legacy: legacyArchive,
           'lesson:01.01': canonicalArchive,
+        },
+        practiceAttemptCheckpoints: {
+          legacy: [
+            checkpoint('legacy', 'legacy-attempt', '2026-08-10T00:03:00.000Z'),
+          ],
+          'lesson:01.01': [
+            checkpoint(
+              'lesson:01.01',
+              'canonical-attempt',
+              '2026-08-10T00:04:00.000Z',
+            ),
+          ],
         },
         goals: [
           {
@@ -86,6 +120,17 @@ describe('migrateLessonIdentityStoreData', () => {
     expect(migrated.practiceRunDetails?.legacy).toBeUndefined();
     expect(migrated.practiceRunDetails?.['lesson:01.01']).toHaveLength(2);
     expect(migrated.practiceRunArchive?.legacy).toBeUndefined();
+    expect(migrated.practiceAttemptCheckpoints?.legacy).toBeUndefined();
+    expect(migrated.practiceAttemptCheckpoints?.['lesson:01.01']).toEqual([
+      expect.objectContaining({
+        songId: 'lesson:01.01',
+        sessionId: 'legacy-attempt',
+      }),
+      expect.objectContaining({
+        songId: 'lesson:01.01',
+        sessionId: 'canonical-attempt',
+      }),
+    ]);
     expect(
       Object.values(
         migrated.practiceRunArchive?.['lesson:01.01']?.days ?? {},

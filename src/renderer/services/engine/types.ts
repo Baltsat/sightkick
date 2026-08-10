@@ -166,6 +166,8 @@ export type PlaybackState =
   | 'playing'
   | 'ended';
 
+export type CountInPolicy = 'inherit' | 'force' | 'skip';
+
 export interface LoopRegion {
   startTick: number;
   endTick: number;
@@ -186,6 +188,7 @@ export interface PlaybackSnapshot {
   isStarted: boolean;
   isEnded: boolean;
   countInBeat: number | undefined;
+  countInBeats: number | undefined;
   countInBeatMs: number | undefined;
   isReady: boolean;
   duration: number;

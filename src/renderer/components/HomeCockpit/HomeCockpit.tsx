@@ -25,6 +25,7 @@ import { inputBus } from '../../input';
 import { UseGamificationResult } from '../../hooks/useGamification';
 import { LessonProgress } from '../../hooks/useLessons';
 import { useDrumGestures } from '../../hooks/useDrumGestures';
+import { DrumGestureAction } from '../../services/gestures';
 import { calculateAccuracy } from '../../scoring';
 import {
   MIN_RECENT_LANE_SAMPLES,
@@ -34,8 +35,9 @@ import {
 } from '../../services/mastery';
 import { RankedPracticeCandidate } from '../../services/next-practice';
 import { KitElement, RunSummary } from '../../services/practice-stats';
+import { playKitPreview } from '../../services/kit-preview-audio';
 import homeKitStudio from '../../assets/daybreak/home-kit-studio.png';
-import drumstickCursor from '../../assets/daybreak/drumstick-cursor.png';
+import drumstickCursor from '../../assets/daybreak/drumstick-cursor-reversed.png';
 import './HomeCockpit.css';
 
 export type CockpitSurface = 'home' | 'coach';
@@ -51,6 +53,7 @@ interface HomeCockpitProps {
   onOpenSongs: () => void;
   onOpenJourney: () => void;
   onOpenCoach: () => void;
+  onOpenProfile: () => void;
 }
 
 interface KitHotspot {
@@ -87,6 +90,12 @@ const KIT_HOTSPOTS: KitHotspot[] = [
   { element: 'tom3', label: 'Floor tom', position: 'tom3' },
   { element: 'kick', label: 'Kick', position: 'kick' },
 ];
+const HOME_KIT_NAV_LABEL: Partial<Record<KitElement, string>> = {
+  snare: 'Songs',
+  tom1: 'Journey',
+  ride: 'Coach',
+  crash: 'Profile',
+};
 
 interface LaneSignalSummary {
   compact: string;
@@ -256,10 +265,13 @@ export function HomeCockpit({
   onOpenSongs,
   onOpenJourney,
   onOpenCoach,
+  onOpenProfile,
 }: HomeCockpitProps) {
   const { inputMapping, inputReadiness, selectedDevice } = useInput();
   const [activeLane, setActiveLane] = useState<KitElement>();
+  const [pointerStrikeLane, setPointerStrikeLane] = useState<KitElement>();
   const clearPulseRef = useRef<number | undefined>(undefined);
+  const clearPointerStrikeRef = useRef<number | undefined>(undefined);
   const currentSong = useMemo(
     () =>
       songList.find((song) => song.id === recommendation?.candidate.id) ??
@@ -305,19 +317,55 @@ export function HomeCockpit({
     pulseLane('kick');
     onStartRecommended();
   }, [inputReadiness, onStartRecommended, pulseLane]);
-
-  useDrumGestures({
-    enabled:
-      surface === 'home' &&
-      recommendation !== undefined &&
-      inputReadiness === 'connected',
-    surface: 'home',
-    mapping: inputMapping,
-    onAction: (action) => {
+  const handlePointerStrike = useCallback(
+    (element: KitElement) => {
+      pulseLane(element);
+      playKitPreview(element);
+      window.clearTimeout(clearPointerStrikeRef.current);
+      setPointerStrikeLane(element);
+      clearPointerStrikeRef.current = window.setTimeout(() => {
+        setPointerStrikeLane(undefined);
+      }, 420);
+    },
+    [pulseLane],
+  );
+  const handleHomeKitAction = useCallback(
+    (action: DrumGestureAction) => {
       if (action === 'start') {
-        handleStartRecommended();
+        if (recommendation) {
+          handleStartRecommended();
+        } else {
+          onOpenSongs();
+        }
+
+        return;
+      }
+
+      if (action === 'open-songs') {
+        onOpenSongs();
+      } else if (action === 'open-journey') {
+        onOpenJourney();
+      } else if (action === 'open-coach') {
+        onOpenCoach();
+      } else if (action === 'open-profile') {
+        onOpenProfile();
       }
     },
+    [
+      handleStartRecommended,
+      onOpenCoach,
+      onOpenJourney,
+      onOpenProfile,
+      onOpenSongs,
+      recommendation,
+    ],
+  );
+
+  useDrumGestures({
+    enabled: surface === 'home' && inputReadiness === 'connected',
+    surface: 'home',
+    mapping: inputMapping,
+    onAction: handleHomeKitAction,
   });
 
   useEffect(() => {
@@ -332,6 +380,7 @@ export function HomeCockpit({
     return () => {
       unsubscribe();
       window.clearTimeout(clearPulseRef.current);
+      window.clearTimeout(clearPointerStrikeRef.current);
     };
   }, [elementByControlId, pulseLane]);
 
@@ -373,7 +422,7 @@ export function HomeCockpit({
       ? `${selectedDevice?.name ?? 'Remembered kit'} · automatic retry`
       : 'Connect USB MIDI · auto-detect is on';
   const rootStyle = {
-    '--drumstick-cursor': `url(${drumstickCursor}) 14 14`,
+    '--drumstick-cursor': `url(${drumstickCursor}) 6 6`,
   } as CSSProperties;
 
   if (surface === 'coach') {
@@ -595,6 +644,7 @@ export function HomeCockpit({
         >
           {KIT_HOTSPOTS.map((hotspot) => {
             const isActive = activeLane === hotspot.element;
+            const isPointerStrike = pointerStrikeLane === hotspot.element;
             const signal = laneSummary(
               hotspot.element,
               gamification.recentLaneSignals,
@@ -611,11 +661,6 @@ export function HomeCockpit({
                   isActive && 'home-kit-hotspot--active',
                 )}
                 data-color-lane={KIT_COLOR_LANE[hotspot.element]}
-                disabled={
-                  hotspot.element === 'kick' &&
-                  recommendation !== undefined &&
-                  inputReadiness !== 'connected'
-                }
                 aria-label={`${hotspot.label}: ${signal.ariaDescription} ${
                   hotspot.element === 'kick'
                     ? recommendation
@@ -625,10 +670,14 @@ export function HomeCockpit({
                           1,
                         )} times speed.`
                       : 'Choose a song.'
+                    : HOME_KIT_NAV_LABEL[hotspot.element]
+                    ? `Hit this pad on your physical kit to open ${
+                        HOME_KIT_NAV_LABEL[hotspot.element]
+                      }.`
                     : `Pulse ${hotspot.label}.`
                 }`}
                 onClick={() => {
-                  pulseLane(hotspot.element);
+                  handlePointerStrike(hotspot.element);
 
                   if (hotspot.element === 'kick') {
                     if (recommendation) {
@@ -640,6 +689,13 @@ export function HomeCockpit({
                 }}
               >
                 <span className="home-kit-hotspot__ring" aria-hidden="true" />
+                <img
+                  className="home-kit-hotspot__stick"
+                  data-active={isPointerStrike}
+                  src={drumstickCursor}
+                  alt=""
+                  aria-hidden="true"
+                />
                 <span className="home-kit-hotspot__copy">
                   <strong>
                     {hotspot.element === 'kick'
@@ -659,11 +715,13 @@ export function HomeCockpit({
                         : currentSong && recommendation
                         ? `${recommendation.suggestedSpeed.toFixed(1)}× · ready`
                         : 'pick a chart'
-                      : signal.compact}
+                      : HOME_KIT_NAV_LABEL[hotspot.element] ?? signal.compact}
                   </small>
                   {hotspot.element !== 'kick' && (
                     <small className="home-kit-hotspot__evidence">
-                      {signal.secondary}
+                      {HOME_KIT_NAV_LABEL[hotspot.element]
+                        ? `${signal.compact} · ${signal.secondary}`
+                        : signal.secondary}
                     </small>
                   )}
                 </span>

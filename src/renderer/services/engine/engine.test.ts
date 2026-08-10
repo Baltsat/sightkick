@@ -711,6 +711,99 @@ describe('Engine', () => {
     );
   });
 
+  it('buffers a possible kit command, releases failed patterns, and discards completed commands', async () => {
+    const snare = staveNote(['c/5']);
+    const { engine } = await setup({
+      mapping: { kick: ['midi:36'], crash: ['midi:49'] },
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [rendered(0, snare)],
+          [{ tick: 0, isRest: false, notes: ['c/5'] } as Note],
+        ),
+      ],
+    });
+    const judgements: ResolvedJudgement[] = [];
+
+    engine.onJudgement((judgement) => judgements.push(judgement));
+    engine.playFromTick(0);
+
+    engine.beginControlGestureCapture();
+    emitInput('midi:36');
+
+    expect(engine.getAttemptRecords()).toEqual([]);
+    expect(judgements).toEqual([]);
+
+    engine.cancelControlGestureCapture();
+
+    expect(engine.getAttemptRecords()).toEqual([
+      expect.objectContaining({ element: 'kick', verdict: 'wrong' }),
+    ]);
+    expect(judgements).toEqual([
+      expect.objectContaining({ actualElement: 'kick', verdict: 'wrong' }),
+    ]);
+
+    engine.beginControlGestureCapture();
+    emitInput('midi:49');
+
+    expect(engine.getAttemptRecords()).toHaveLength(1);
+    expect(judgements).toHaveLength(1);
+
+    engine.completeControlGestureCapture();
+
+    expect(engine.getAttemptRecords()).toHaveLength(1);
+    expect(judgements).toHaveLength(1);
+  });
+
+  it('returns an exact rewind boundary and removes a near-window command at 2x from score and analytics', async () => {
+    const snare = staveNote(['c/5']);
+    const { engine, onEnded, player } = await setup({
+      mapping: { kick: ['midi:36'], crash: ['midi:49'] },
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [rendered(1440, snare)],
+          [{ tick: 1440, isRest: false, notes: ['c/5'] } as Note],
+        ),
+      ],
+    });
+
+    engine.setPlaybackSpeed(2);
+    engine.playFromTick(0);
+    engine.beginControlGestureCapture();
+
+    emitInput('midi:36');
+    engine.timeStore.set(0.72);
+    emitInput('midi:49');
+    engine.timeStore.set(1.44);
+    emitInput('midi:36');
+    engine.timeStore.set(2.16);
+    emitInput('midi:49');
+
+    const rewindSeconds = engine.completeControlGestureCapture();
+
+    expect(rewindSeconds).toBe(0);
+    expect(engine.getRunRecords()).toEqual([]);
+    expect(engine.getAttemptRecords()).toEqual([]);
+
+    engine.pause();
+    engine.seekSeconds(rewindSeconds!);
+    player.onEnded();
+
+    expect(onEnded).toHaveBeenCalledWith(
+      expect.objectContaining({ falseHits: 0, hitNotes: 0 }),
+      expect.objectContaining({ totalWrong: 0 }),
+      expect.not.arrayContaining([
+        expect.objectContaining({
+          verdict: 'wrong',
+          element: expect.stringMatching(/kick|crash/),
+        }),
+      ]),
+    );
+  });
+
   it('finalizes tail judgements before notifying tutor and SongView run listeners', async () => {
     const note = staveNote(['c/5']);
     const { engine, onEnded, player } = await setup({
@@ -846,6 +939,52 @@ describe('Engine', () => {
 
     expect(hits).toHaveLength(1);
     expect(falseHits).toHaveLength(1);
+  });
+
+  it('exposes defensive in-progress evidence snapshots for checkpoint persistence', async () => {
+    const note = staveNote(['c/5']);
+    const { engine } = await setup({
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [rendered(480, note)],
+          [{ tick: 480, isRest: false, notes: ['c/5'] } as Note],
+        ),
+      ],
+    });
+
+    engine.setMapping({ snare: ['midi:38'] });
+    engine.playFromTick(0);
+    engine.seekSeconds(0.5);
+    emitInput('midi:38');
+
+    const firstSnapshot = engine.getRunRecords();
+
+    expect(firstSnapshot).toEqual([
+      expect.objectContaining({ tick: 480, element: 'snare', verdict: 'hit' }),
+    ]);
+
+    firstSnapshot[0].tick = 999;
+
+    expect(engine.getRunRecords()).toEqual([
+      expect.objectContaining({ tick: 480, element: 'snare', verdict: 'hit' }),
+    ]);
+    expect(engine.getAttemptRecords()).toEqual([
+      expect.objectContaining({ tick: 480, element: 'snare', verdict: 'hit' }),
+    ]);
+
+    engine.seekSeconds(0);
+    engine.seekSeconds(0.5);
+    emitInput('midi:38');
+
+    expect(engine.getRunRecords()).toHaveLength(1);
+    expect(engine.getAttemptRecords()).toHaveLength(2);
+
+    const attemptSnapshot = engine.getAttemptRecords();
+
+    attemptSnapshot[0].tick = 777;
+    expect(engine.getAttemptRecords()[0].tick).toBe(480);
   });
 
   it('does not register input hits before playback starts', async () => {

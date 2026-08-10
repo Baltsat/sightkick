@@ -48,7 +48,9 @@ afterEach(() => {
 
 describe('opening a song', () => {
   it('shows the song header and real rendered sheet music', async () => {
-    const view = setupSongView();
+    const view = setupSongView({
+      settings: { handsFreeControlsEnabled: true },
+    });
 
     await view.loadSong();
 
@@ -57,6 +59,11 @@ describe('opening a song', () => {
     await waitFor(() => {
       expect(document.querySelectorAll('svg').length).toBeGreaterThan(0);
     });
+    expect(
+      within(screen.getByTestId('perform-kit-control-prompt')).getByTestId(
+        'kit-command-prompt',
+      ),
+    ).toHaveAccessibleName('Kick to start the count-in: Kick');
   });
 
   it('prevents display sleep while open and releases it on leave', () => {
@@ -1342,6 +1349,7 @@ describe('the score summary', () => {
     expect(practiceRunPayloads).toEqual([
       {
         songId: 'song-1',
+        finalizeAttemptSessionIds: [expect.any(String)],
         records: expect.arrayContaining([
           expect.objectContaining({ verdict: 'hit', element: 'snare' }),
           expect.objectContaining({ verdict: 'miss', element: 'snare' }),
@@ -1438,15 +1446,17 @@ describe('the reference legend', () => {
 
     await view.loadSong();
 
-    expect(screen.getByText('Snare')).toBeInTheDocument();
-    expect(screen.getByText('Kick')).toBeInTheDocument();
+    const reference = within(screen.getByTestId('drum-reference'));
+
+    expect(reference.getByText('Snare')).toBeInTheDocument();
+    expect(reference.getByText('Kick')).toBeInTheDocument();
 
     view.openSettings();
     view.openMoreSettings();
     view.toggleSetting('reference');
 
     await waitFor(() => {
-      expect(screen.queryByText('Snare')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('drum-reference')).not.toBeInTheDocument();
     });
   });
 

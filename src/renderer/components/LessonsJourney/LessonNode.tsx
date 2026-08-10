@@ -1,11 +1,13 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faLock } from '@fortawesome/free-solid-svg-icons';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '../../cn';
 import { Stars } from '../Stars';
 import { Tooltip } from '../Tooltip';
 import { LessonEntry, lockedHint } from '../../hooks/useLessons';
 import { NodeState } from './journey';
-import drumstickCursor from '../../assets/daybreak/drumstick-cursor.png';
+import { playKitPreview } from '../../services/kit-preview-audio';
+import drumstickCursor from '../../assets/daybreak/drumstick-cursor-reversed.png';
 import pearlSnare from '../../assets/daybreak/journey-nodes/pearl-snare.png';
 import meshPad from '../../assets/daybreak/journey-nodes/mesh-pad.png';
 import bronzeCymbal from '../../assets/daybreak/journey-nodes/bronze-cymbal.png';
@@ -19,6 +21,7 @@ type CanonicalColorLane = 'orange' | 'red' | 'yellow' | 'blue' | 'green';
 
 interface LessonNodeVisual {
   asset: string;
+  element: LessonLane;
   instrument: 'snare' | 'pad' | 'cymbal' | 'kick-pad';
   label: string;
   colorLane: CanonicalColorLane;
@@ -27,48 +30,56 @@ interface LessonNodeVisual {
 const NODE_VISUALS: Record<LessonLane, LessonNodeVisual> = {
   kick: {
     asset: kickPad,
+    element: 'kick',
     instrument: 'kick-pad',
     label: 'Kick',
     colorLane: 'orange',
   },
   snare: {
     asset: pearlSnare,
+    element: 'snare',
     instrument: 'snare',
     label: 'Snare',
     colorLane: 'red',
   },
   hihat: {
     asset: bronzeCymbal,
+    element: 'hihat',
     instrument: 'cymbal',
     label: 'Hi-hat',
     colorLane: 'yellow',
   },
   tom1: {
     asset: meshPad,
+    element: 'tom1',
     instrument: 'pad',
     label: 'Tom 1',
     colorLane: 'yellow',
   },
   ride: {
     asset: bronzeCymbal,
+    element: 'ride',
     instrument: 'cymbal',
     label: 'Ride',
     colorLane: 'blue',
   },
   tom2: {
     asset: meshPad,
+    element: 'tom2',
     instrument: 'pad',
     label: 'Tom 2',
     colorLane: 'blue',
   },
   crash: {
     asset: bronzeCymbal,
+    element: 'crash',
     instrument: 'cymbal',
     label: 'Crash',
     colorLane: 'green',
   },
   tom3: {
     asset: meshPad,
+    element: 'tom3',
     instrument: 'pad',
     label: 'Floor tom',
     colorLane: 'green',
@@ -162,13 +173,39 @@ export function LessonNode({
   const visual = visualForLesson(entry);
   const hint = lockedHint(entry);
   const readableHint = hint.replaceAll('\u2b50', 'stars');
-  const activate = () => {
+  const [pointerStriking, setPointerStriking] = useState(false);
+  const pointerTimerRef = useRef<number | undefined>(undefined);
+  const activate = (fromPointer = false) => {
     if (unlocked) {
+      if (fromPointer) {
+        if (pointerStriking) {
+          return;
+        }
+
+        playKitPreview(visual.element);
+        setPointerStriking(true);
+        window.clearTimeout(pointerTimerRef.current);
+        pointerTimerRef.current = window.setTimeout(() => {
+          setPointerStriking(false);
+          onPlay(entry);
+        }, 140);
+
+        return;
+      }
+
       onPlay(entry);
     } else {
       onLockedClick(entry);
     }
   };
+
+  useEffect(
+    () => () => {
+      window.clearTimeout(pointerTimerRef.current);
+    },
+    [],
+  );
+
   const stateLabel =
     state === 'next-up'
       ? 'Next up'
@@ -180,7 +217,7 @@ export function LessonNode({
 
   return (
     <div
-      onClick={activate}
+      onClick={() => activate(true)}
       onKeyDown={(event) => {
         if (
           event.currentTarget === event.target &&
@@ -208,7 +245,7 @@ export function LessonNode({
       style={{
         left: `${xPercent}%`,
         top: `${yPercent}%`,
-        cursor: `url(${drumstickCursor}) 8 3, pointer`,
+        cursor: `url(${drumstickCursor}) 6 6, pointer`,
       }}
       className={cn(
         'daybreak-lesson-node absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer',
@@ -222,6 +259,14 @@ export function LessonNode({
           className="daybreak-lesson-node__image"
           src={visual.asset}
           alt=""
+          draggable={false}
+        />
+        <img
+          className="daybreak-lesson-node__strike-stick"
+          data-active={pointerStriking}
+          src={drumstickCursor}
+          alt=""
+          aria-hidden="true"
           draggable={false}
         />
         <span className="daybreak-lesson-node__badge">

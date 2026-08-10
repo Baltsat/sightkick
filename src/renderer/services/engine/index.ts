@@ -4,6 +4,7 @@ export type {
   EngineContext,
   EngineOptions,
   EngineSettings,
+  CountInPolicy,
   FalseHitRecord,
   HitEventMeta,
   JudgeFalseHitHandler,

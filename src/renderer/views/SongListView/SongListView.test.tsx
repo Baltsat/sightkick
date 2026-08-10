@@ -11,6 +11,14 @@ import {
   setupSongListView as mountSongListView,
 } from '../test-support';
 
+const { playKitPreviewMock } = vi.hoisted(() => ({
+  playKitPreviewMock: vi.fn(),
+}));
+
+vi.mock('../../services/kit-preview-audio', () => ({
+  playKitPreview: playKitPreviewMock,
+}));
+
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: ({ count }: { count: number }) => ({
     getTotalSize: () => count * 76,
@@ -29,6 +37,7 @@ vi.mock('@tanstack/react-virtual', () => ({
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  playKitPreviewMock.mockClear();
 });
 
 // The product now opens at the kit cockpit. These library-focused regression
@@ -83,6 +92,74 @@ describe('SongListView — loading the library', () => {
     expect(
       screen.getByRole('button', { name: /choose a song/i }),
     ).toBeEnabled();
+
+    fireEvent.click(screen.getByTestId('kit-hotspot-snare'));
+
+    expect(playKitPreviewMock).toHaveBeenCalledOnce();
+    expect(playKitPreviewMock).toHaveBeenCalledWith('snare');
+
+    expect(
+      screen
+        .getByTestId('kit-hotspot-snare')
+        .querySelector('.home-kit-hotspot__stick'),
+    ).toHaveAttribute('data-active', 'true');
+  });
+
+  it('keeps physical MIDI feedback silent and separate from the pointer stick', async () => {
+    const view = mountSongListView({ freshProfile: true });
+
+    view.emit('midi-device-list', [{ name: 'Yamaha DTX402', port: 2 }]);
+    await waitFor(() =>
+      expect(view.ipc.sent).toContainEqual({
+        channel: 'listen-midi',
+        args: [2],
+      }),
+    );
+    view.emit('midi-ready', { port: 2 });
+    playKitPreviewMock.mockClear();
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 45,
+      velocity: 100,
+    });
+
+    const tom2 = screen.getByTestId('kit-hotspot-tom2');
+
+    expect(tom2).toHaveClass('home-kit-hotspot--active');
+    expect(tom2.querySelector('.home-kit-hotspot__stick')).toHaveAttribute(
+      'data-active',
+      'false',
+    );
+    expect(playKitPreviewMock).not.toHaveBeenCalled();
+  });
+
+  it('opens primary Home destinations directly from the physical kit', async () => {
+    const view = mountSongListView({ freshProfile: true });
+
+    view.emit('midi-device-list', [{ name: 'Yamaha DTX402', port: 2 }]);
+    await waitFor(() =>
+      expect(view.ipc.sent).toContainEqual({
+        channel: 'listen-midi',
+        args: [2],
+      }),
+    );
+    view.emit('midi-ready', { port: 2 });
+
+    expect(screen.getByTestId('kit-hotspot-snare')).toHaveTextContent('Songs');
+    expect(screen.getByTestId('kit-hotspot-tom1')).toHaveTextContent('Journey');
+    expect(screen.getByTestId('kit-hotspot-ride')).toHaveTextContent('Coach');
+    expect(screen.getByTestId('kit-hotspot-crash')).toHaveTextContent(
+      'Profile',
+    );
+
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 38,
+      velocity: 100,
+    });
+
+    expect(screen.queryByTestId('home-cockpit')).not.toBeInTheDocument();
+    expect(screen.getByText('Your drum library')).toBeVisible();
   });
 
   it('shows the cable-first Waiting state when no input is selected', () => {
@@ -132,7 +209,11 @@ describe('SongListView — loading the library', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByTestId('home-start-practice')).toBeDisabled();
-    expect(screen.getByTestId('kit-hotspot-kick')).toBeDisabled();
+    expect(screen.getByTestId('kit-hotspot-kick')).toBeEnabled();
+
+    fireEvent.click(screen.getByTestId('kit-hotspot-kick'));
+    expect(playKitPreviewMock).toHaveBeenCalledWith('kick');
+    expect(screen.getByTestId('home-cockpit')).toBeInTheDocument();
 
     view.emit('midi-device-list', [
       {
@@ -1541,9 +1622,45 @@ describe('SongListView — fresh-profile kit navigation', () => {
 
     expect(legend).toHaveAttribute('data-control-source', 'kit-lanes');
     expect(legend).toHaveTextContent(
-      'Tom 1 / Tom 2 move · Snare chooses · Hi-hat filters difficulty · Crash backs',
+      'Tom 1 / Tom 2 move · Snare chooses · Hi-hat filters difficulty · Ride changes source · Tom 3 opens sort · Crash backs',
     );
+    expect(
+      screen.getByTestId('library-kit-control-commands'),
+    ).toHaveTextContent('Move');
+    expect(
+      screen.getByTestId('library-kit-control-commands'),
+    ).toHaveTextContent('Source');
     expect(legend).toHaveTextContent('Local choices open directly in Practice');
+
+    for (const expectedMode of ['drums', 'favorites', 'online', 'local']) {
+      view.emit('listen-midi', {
+        type: MidiMessageType.NoteOn,
+        note: 51,
+        velocity: 100,
+      });
+      expect(screen.getByTestId(`mode-${expectedMode}`)).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    }
+
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 43,
+      velocity: 100,
+    });
+    expect(screen.getByTestId('sort-option-name')).toBeInTheDocument();
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 49,
+      velocity: 100,
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('sort-trigger')).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      ),
+    );
 
     view.emit('listen-midi', {
       type: MidiMessageType.NoteOn,
@@ -1622,7 +1739,7 @@ describe('SongListView — fresh-profile kit navigation', () => {
     expect(screen.getByTestId('home-cockpit')).toBeInTheDocument();
   });
 
-  it('preserves an explicit action while missing actions still work from kit lanes', async () => {
+  it('preserves an explicit action while every action still works from kit lanes', async () => {
     const deviceId = 'midi:Yamaha DTX402';
     const view = setupSongListView({
       settings: {
@@ -1647,14 +1764,14 @@ describe('SongListView — fresh-profile kit navigation', () => {
       'Explicit: 91 move',
     );
     expect(screen.getByTestId('library-control-legend')).toHaveTextContent(
-      'Kit fallback: Tom 1 moves up · Snare chooses · Hi-hat filters difficulty · Crash backs',
+      'Kit fallback: Tom 1 / Tom 2 move · Snare chooses · Hi-hat filters difficulty · Ride changes source · Tom 3 opens sort · Crash backs',
     );
     view.emit('listen-midi', {
       type: MidiMessageType.NoteOn,
       note: 47,
       velocity: 100,
     });
-    expect(view.isFocused('a')).toBe(false);
+    expect(view.isFocused('a')).toBe(true);
     view.emit('listen-midi', {
       type: MidiMessageType.NoteOn,
       note: 91,

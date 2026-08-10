@@ -18,6 +18,10 @@ export class CountInScheduler {
     return this.currentBeat;
   }
 
+  get totalBeats(): number {
+    return this.beats;
+  }
+
   isComplete(now: number): boolean {
     return now >= this.songStartCtx;
   }

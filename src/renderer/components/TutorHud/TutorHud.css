@@ -87,6 +87,25 @@
   background: linear-gradient(135deg, rgb(250 254 255 / 98%), #f1eadc 96%);
 }
 
+.drumroll-tutor-hud[data-display-state='kit-ready'] {
+  --tutor-signal: var(--color-green);
+}
+
+.drumroll-tutor-hud[data-display-state='kit-paused'] {
+  --tutor-signal: var(--color-cyan);
+}
+
+.drumroll-tutor-hud[data-display-state='recovery-explain'] {
+  --tutor-signal: var(--color-coral);
+}
+
+.drumroll-tutor-hud[data-display-state='kit-ready'] .drumroll-tutor-hud__signal,
+.drumroll-tutor-hud[data-display-state='inactivity-paused']
+  .drumroll-tutor-hud__signal {
+  animation: drumroll-kit-ready-breathe 1.8s cubic-bezier(0.16, 1, 0.3, 1)
+    infinite alternate;
+}
+
 .drumroll-tutor-hud[data-display-state='remediation'] {
   --tutor-signal: #ff684f;
 }
@@ -123,8 +142,8 @@
   font-family: var(--font-ui);
 }
 
-.drumroll-tutor-hud__copy strong,
-.drumroll-tutor-hud__copy span {
+.drumroll-tutor-hud__copy > strong,
+.drumroll-tutor-hud__copy > span {
   display: block;
 }
 
@@ -138,7 +157,7 @@
   text-transform: uppercase;
 }
 
-.drumroll-tutor-hud__copy strong {
+.drumroll-tutor-hud__copy > strong {
   overflow: hidden;
   color: var(--color-ink);
   font-family: var(--font-display);
@@ -150,7 +169,7 @@
   white-space: nowrap;
 }
 
-.drumroll-tutor-hud__copy span {
+.drumroll-tutor-hud__copy > span {
   margin-top: 0.32rem;
   max-width: 68ch;
   color: var(--color-text-muted);
@@ -249,6 +268,20 @@
   }
 }
 
+@keyframes drumroll-kit-ready-breathe {
+  from {
+    transform: scale(0.94);
+    filter: drop-shadow(0 4px 9px rgb(17 23 34 / 12%));
+  }
+
+  to {
+    transform: scale(1.04);
+    filter: drop-shadow(
+      0 8px 18px color-mix(in srgb, var(--tutor-signal) 52%, transparent)
+    );
+  }
+}
+
 @media (max-width: 900px) {
   .drumroll-tutor-hud {
     grid-template-columns: auto minmax(0, 1fr);
@@ -292,13 +325,20 @@
     padding-left: 0;
   }
 
-  .drumroll-tutor-hud__copy strong {
+  .drumroll-tutor-hud__copy > strong {
     white-space: normal;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .drumroll-tutor-hud[data-tone='recovery']::after {
+    animation: none;
+  }
+
+  .drumroll-tutor-hud[data-display-state='kit-ready']
+    .drumroll-tutor-hud__signal,
+  .drumroll-tutor-hud[data-display-state='inactivity-paused']
+    .drumroll-tutor-hud__signal {
     animation: none;
   }
 }

@@ -1,7 +1,8 @@
 .home-cockpit,
 .coach-desk {
   height: 100%;
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 88% 10%,
       rgb(86 216 242 / 14%),
       transparent 26rem
@@ -49,7 +50,8 @@
 
 .home-cockpit__wash {
   pointer-events: none;
-  background: linear-gradient(
+  background:
+    linear-gradient(
       90deg,
       rgb(17 23 34 / 82%) 0%,
       rgb(17 23 34 / 54%) 28%,
@@ -74,11 +76,11 @@
 }
 
 .home-cockpit__launch {
-  bottom: clamp(2.25rem, 4.4vh, 3.8rem);
+  bottom: clamp(1rem, 2.2vh, 1.4rem);
   left: clamp(1.5rem, 5vw, 5rem);
   z-index: 4;
-  width: min(21rem, 29%);
-  padding: 0.9rem 1rem 1rem;
+  width: min(24rem, 36%);
+  padding: 0.72rem 0.82rem 0.78rem;
   border: 1px solid rgb(255 250 242 / 26%);
   border-radius: 1rem;
   background: linear-gradient(135deg, rgb(17 23 34 / 72%), rgb(17 23 34 / 46%));
@@ -126,7 +128,7 @@
 
 .home-cockpit__lede {
   max-width: none;
-  margin: 0.66rem 0 0;
+  margin: 0.42rem 0 0;
   overflow: hidden;
   color: rgb(255 250 242 / 66%);
   font-size: clamp(0.66rem, 0.78vw, 0.76rem);
@@ -137,9 +139,16 @@
 
 .home-cockpit__actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-  margin-top: 0.68rem;
+  flex-wrap: nowrap;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+}
+
+.home-cockpit__actions .ant-btn {
+  min-width: 0;
+  flex: 1 1 0;
+  padding-inline: 0.62rem;
+  font-size: 0.78rem;
 }
 
 .home-cockpit__input-readiness {
@@ -148,7 +157,7 @@
   gap: 0.68rem;
   width: 100%;
   margin: 0;
-  padding: 0.62rem 0.72rem;
+  padding: 0.5rem 0.62rem;
   border: 1px solid color-mix(in srgb, var(--color-green) 44%, white);
   border-radius: 0.82rem;
   color: #fffaf2;
@@ -424,6 +433,24 @@
     box-shadow 140ms ease,
     background 140ms ease,
     transform 140ms ease;
+}
+
+.home-kit-hotspot__stick {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 4;
+  width: clamp(3.25rem, 5vw, 4.25rem);
+  height: auto;
+  opacity: 0;
+  filter: drop-shadow(0 7px 7px rgb(17 23 34 / 30%));
+  transform: translate(-0.45rem, -0.45rem) rotate(18deg);
+  transform-origin: 0.45rem 0.45rem;
+  pointer-events: none;
+}
+
+.home-kit-hotspot__stick[data-active='true'] {
+  animation: home-kit-pointer-strike 420ms cubic-bezier(0.16, 1, 0.3, 1) 1;
 }
 
 .home-kit-hotspot:hover .home-kit-hotspot__ring,
@@ -730,12 +757,17 @@
   overflow: hidden;
   border: 1px solid rgb(17 23 34 / 10%);
   border-radius: 1.75rem;
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 82% 36%,
       rgb(247 53 134 / 22%),
       transparent 13rem
     ),
-    radial-gradient(circle at 71% 72%, rgb(255 173 47 / 29%), transparent 16rem),
+    radial-gradient(
+      circle at 71% 72%,
+      rgb(255 173 47 / 29%),
+      transparent 16rem
+    ),
     var(--color-ink);
   box-shadow: 0 1.5rem 3.5rem rgb(17 23 34 / 16%);
 }
@@ -801,12 +833,8 @@
 
 .coach-desk__card--focus {
   border-color: rgb(247 53 134 / 26%);
-  background: linear-gradient(
-      145deg,
-      rgb(247 53 134 / 11%),
-      rgb(255 173 47 / 12%)
-    ),
-    #fff;
+  background:
+    linear-gradient(145deg, rgb(247 53 134 / 11%), rgb(255 173 47 / 12%)), #fff;
 }
 
 .coach-desk__card h2 {
@@ -854,7 +882,7 @@
     max-width: 48%;
   }
   .home-cockpit__launch {
-    width: min(22rem, 36%);
+    width: min(24rem, 44%);
   }
   /* The global masthead already carries streak and XP. At the minimum
    * supported kit viewport those duplicate cards competed with the only
@@ -1020,5 +1048,37 @@
   .home-kit-hotspot--active .home-kit-hotspot__ring {
     animation: none;
     transition: none;
+  }
+
+  .home-kit-hotspot__stick[data-active='true'] {
+    animation: none;
+    opacity: 1;
+    transform: translate(-0.45rem, -0.45rem);
+  }
+}
+
+@keyframes home-kit-pointer-strike {
+  0% {
+    opacity: 0;
+    transform: translate(-0.45rem, -0.45rem) rotate(24deg) scale(0.96);
+  }
+
+  22% {
+    opacity: 1;
+  }
+
+  46% {
+    opacity: 1;
+    transform: translate(-0.45rem, -0.45rem) rotate(-5deg) scale(1);
+  }
+
+  68% {
+    opacity: 0.9;
+    transform: translate(-0.45rem, -0.45rem) rotate(4deg) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-0.45rem, -0.45rem) rotate(12deg) scale(0.98);
   }
 }

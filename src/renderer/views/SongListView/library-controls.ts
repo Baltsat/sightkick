@@ -109,6 +109,14 @@ function kitLegend(
     parts.push('Hi-hat filters difficulty');
   }
 
+  if (has('library') && (mapping.library?.length ?? 0) > 0) {
+    parts.push('Ride changes source');
+  }
+
+  if (has('sort') && (mapping.sort?.length ?? 0) > 0) {
+    parts.push('Tom 3 opens sort');
+  }
+
   if (has('back') && (mapping.back?.length ?? 0) > 0) {
     parts.push('Crash backs');
   }
@@ -130,11 +138,6 @@ export function resolveLibraryControls(
     controlIds: string[] | undefined,
   ): string[] => {
     const assigned = controlMapping[action] ?? [];
-
-    if (assigned.length > 0) {
-      return assigned;
-    }
-
     const fallback = (controlIds ?? []).filter((controlId) => {
       if (claimed.has(controlId)) {
         return false;
@@ -149,7 +152,11 @@ export function resolveLibraryControls(
       kitActions.push(action);
     }
 
-    return fallback;
+    // Explicit keyboard/pad bindings stay valid, but they must not suppress
+    // the drum-lane fallback. A player who configured one shortcut months
+    // ago should still be able to sit at a freshly connected kit and control
+    // the full library without returning to Settings.
+    return [...assigned, ...fallback];
   };
   const mapping: ControlMapping = {
     ...controlMapping,
@@ -157,6 +164,8 @@ export function resolveLibraryControls(
     down: fill('down', inputMapping.tom2),
     confirm: fill('confirm', inputMapping.snare),
     difficulty: fill('difficulty', inputMapping.hihat),
+    library: fill('library', inputMapping.ride),
+    sort: fill('sort', inputMapping.tom3),
     back: fill('back', inputMapping.crash),
   };
 

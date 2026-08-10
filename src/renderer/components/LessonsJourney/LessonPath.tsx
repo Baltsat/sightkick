@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { LessonEntry, LessonProgress } from '../../hooks/useLessons';
 import { LessonNode } from './LessonNode';
 import { nodeState } from './journey';
+import { KitCommandPrompt } from '../KitCommandPrompt';
 
 /**
  * The Journey is used from a kit at a fixed desktop distance. A season can
@@ -49,7 +50,8 @@ export interface LessonPathProps {
   /** The deterministic target used by configured kit/keyboard controls. */
   focusedLessonId?: string;
   controlLegend: string;
-  controlSource: 'explicit' | 'kit-lanes' | 'unavailable';
+  controlSource: 'explicit' | 'mixed' | 'kit-lanes' | 'unavailable';
+  kitActions: Array<'up' | 'down' | 'left' | 'right' | 'confirm' | 'back'>;
   onPlay: (entry: LessonEntry) => void;
   onLockedClick: (entry: LessonEntry) => void;
 }
@@ -67,6 +69,7 @@ export function LessonPath({
   focusedLessonId,
   controlLegend,
   controlSource,
+  kitActions,
   onPlay,
   onLockedClick,
 }: LessonPathProps) {
@@ -99,6 +102,22 @@ export function LessonPath({
     [points, unlockedCount],
   );
   const windowEnd = Math.min(entries.length, windowStart + VISIBLE_NODE_COUNT);
+  const lessonSteps = [
+    ...(kitActions.includes('up') ? (['tom1'] as const) : []),
+    ...(kitActions.includes('down') ? (['tom2'] as const) : []),
+  ];
+  const lessonStepHints = [
+    ...(kitActions.includes('up') ? ['Previous'] : []),
+    ...(kitActions.includes('down') ? ['Next'] : []),
+  ];
+  const seasonSteps = [
+    ...(kitActions.includes('left') ? (['hihat'] as const) : []),
+    ...(kitActions.includes('right') ? (['ride'] as const) : []),
+  ];
+  const seasonStepHints = [
+    ...(kitActions.includes('left') ? ['Previous'] : []),
+    ...(kitActions.includes('right') ? ['Next'] : []),
+  ];
 
   return (
     <div
@@ -145,9 +164,57 @@ export function LessonPath({
         <span>
           {controlSource === 'kit-lanes'
             ? 'Kit navigation'
+            : controlSource === 'mixed'
+            ? 'Mixed navigation'
             : 'Journey controls'}
         </span>
-        <strong>{controlLegend}</strong>
+        {controlSource === 'kit-lanes' || controlSource === 'mixed' ? (
+          <div className="daybreak-lesson-path__kit-commands">
+            {lessonSteps.length > 0 && (
+              <KitCommandPrompt
+                compact
+                tone="dark"
+                model={{
+                  label: 'Select',
+                  steps: lessonSteps,
+                  relationship: 'alternatives',
+                  stepHints: lessonStepHints,
+                }}
+              />
+            )}
+            {seasonSteps.length > 0 && (
+              <KitCommandPrompt
+                compact
+                tone="dark"
+                model={{
+                  label: 'Season',
+                  steps: seasonSteps,
+                  relationship: 'alternatives',
+                  stepHints: seasonStepHints,
+                }}
+              />
+            )}
+            {kitActions.includes('confirm') && (
+              <KitCommandPrompt
+                compact
+                tone="dark"
+                model={{ label: 'Start', steps: ['snare'] }}
+              />
+            )}
+            {kitActions.includes('back') && (
+              <KitCommandPrompt
+                compact
+                tone="dark"
+                model={{ label: 'Back', steps: ['crash'] }}
+              />
+            )}
+          </div>
+        ) : (
+          <strong>{controlLegend}</strong>
+        )}
+        {(controlSource === 'kit-lanes' || controlSource === 'mixed') && (
+          <strong className="sr-only">{controlLegend}</strong>
+        )}
         <small>
           {windowStart + 1}–{windowEnd} of {entries.length}
         </small>

@@ -19,6 +19,8 @@ import { normalizeLibrarySourceProvenance } from '../../library-sources/provenan
 import type { PlatformAdapter } from '../types';
 import type {
   HitRecord,
+  PracticeAttemptCheckpoint,
+  PracticeAttemptCheckpointBySong,
   PracticeRunArchive,
   PracticeRunArchiveBySong,
   RunSummary,
@@ -28,8 +30,11 @@ import type {
 import {
   archiveRunSummaries,
   emptyPracticeRunArchive,
+  MAX_PRACTICE_ATTEMPT_CHECKPOINTS_PER_SONG,
+  MAX_PRACTICE_ATTEMPT_RECORDS,
   MAX_RECENT_FULL_PRACTICE_RUNS_PER_SONG,
   MAX_RECENT_PRACTICE_SUMMARIES_PER_SONG,
+  PRACTICE_ATTEMPT_CHECKPOINT_SCHEMA_VERSION,
   readPracticeRunArchive,
 } from '../../renderer/services/practice-stats';
 import { webCapabilities } from './capabilities';
@@ -65,6 +70,7 @@ interface UpstreamJob {
 
 const SCORE_KEY = 'drumroll.web.song-overrides';
 const RUNS_KEY = 'drumroll.web.practice-runs';
+const ATTEMPT_CHECKPOINTS_KEY = 'drumroll.web.practice-attempt-checkpoints';
 const DAYS_KEY = 'drumroll.web.practice-days';
 const GOALS_KEY = 'drumroll.web.goals';
 const MAX_STORED_GOALS = 50;
@@ -104,6 +110,13 @@ interface WebPracticeHistory {
 }
 
 const WEB_PRACTICE_HISTORY_SCHEMA_VERSION = 1 as const;
+
+interface WebPracticeAttemptHistory {
+  schemaVersion: 1;
+  checkpointsBySong: PracticeAttemptCheckpointBySong;
+}
+
+const WEB_PRACTICE_ATTEMPT_HISTORY_SCHEMA_VERSION = 1 as const;
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -345,6 +358,80 @@ function writePracticeHistory(history: WebPracticeHistory): void {
   writeJson(RUNS_KEY, history);
 }
 
+function isPracticeAttemptCheckpoint(
+  value: unknown,
+): value is PracticeAttemptCheckpoint {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    value.state === 'in-progress' &&
+    typeof value.songId === 'string' &&
+    Boolean(value.songId) &&
+    typeof value.sessionId === 'string' &&
+    Boolean(value.sessionId) &&
+    typeof value.startedAt === 'string' &&
+    Boolean(value.startedAt) &&
+    typeof value.updatedAt === 'string' &&
+    Boolean(value.updatedAt) &&
+    typeof value.chartRevision === 'string' &&
+    Boolean(value.chartRevision) &&
+    (value.mode === 'practice' || value.mode === 'perform') &&
+    isDifficulty(value.difficulty) &&
+    typeof value.playbackSpeed === 'number' &&
+    Number.isFinite(value.playbackSpeed) &&
+    typeof value.positionTick === 'number' &&
+    Number.isFinite(value.positionTick) &&
+    Array.isArray(value.records)
+  );
+}
+
+function readAttemptCheckpoints(raw: unknown): PracticeAttemptCheckpoint[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw
+    .filter(isPracticeAttemptCheckpoint)
+    .map((checkpoint) => ({
+      ...checkpoint,
+      schemaVersion: PRACTICE_ATTEMPT_CHECKPOINT_SCHEMA_VERSION,
+      records: checkpoint.records.slice(-MAX_PRACTICE_ATTEMPT_RECORDS),
+    }))
+    .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
+    .slice(-MAX_PRACTICE_ATTEMPT_CHECKPOINTS_PER_SONG);
+}
+
+function readPracticeAttemptHistory(): WebPracticeAttemptHistory {
+  const raw = readJson<unknown>(ATTEMPT_CHECKPOINTS_KEY, {});
+
+  if (
+    isRecord(raw) &&
+    raw.schemaVersion === WEB_PRACTICE_ATTEMPT_HISTORY_SCHEMA_VERSION &&
+    isRecord(raw.checkpointsBySong)
+  ) {
+    return {
+      schemaVersion: WEB_PRACTICE_ATTEMPT_HISTORY_SCHEMA_VERSION,
+      checkpointsBySong: Object.fromEntries(
+        Object.entries(raw.checkpointsBySong).map(([songId, checkpoints]) => [
+          songId,
+          readAttemptCheckpoints(checkpoints),
+        ]),
+      ),
+    };
+  }
+
+  return {
+    schemaVersion: WEB_PRACTICE_ATTEMPT_HISTORY_SCHEMA_VERSION,
+    checkpointsBySong: {},
+  };
+}
+
+function writePracticeAttemptHistory(history: WebPracticeAttemptHistory): void {
+  writeJson(ATTEMPT_CHECKPOINTS_KEY, history);
+}
+
 function responseForRuns(
   songId: string,
   entries: WebPracticeRun[],
@@ -437,6 +524,10 @@ export class WebPlatform implements PlatformAdapter {
       'export-pdf': 'export-pdf',
       'save-practice-run': 'save-practice-run',
       'load-practice-runs': 'load-practice-runs',
+      'save-practice-attempt-checkpoint': 'save-practice-attempt-checkpoint',
+      'load-practice-attempt-checkpoints': 'load-practice-attempt-checkpoints',
+      'finalize-practice-attempt-checkpoint':
+        'finalize-practice-attempt-checkpoint',
       'load-all-practice-runs': 'load-all-practice-runs',
       'load-retired-lessons': 'load-retired-lessons',
       'record-practice-day': 'record-practice-day',
@@ -592,6 +683,8 @@ export class WebPlatform implements PlatformAdapter {
     songId: string;
     summary: RunSummary;
     records?: HitRecord[];
+    finalizeAttemptSessionId?: string;
+    finalizeAttemptSessionIds?: string[];
   }): void {
     const history = readPracticeHistory();
     const allEntries = [
@@ -635,10 +728,131 @@ export class WebPlatform implements PlatformAdapter {
     };
 
     writePracticeHistory(nextHistory);
+
+    // localStorage cannot atomically span the completed-history and draft
+    // keys. Persist the completed run first: a cleanup failure can leave a
+    // harmless stale draft, while clearing first could lose real evidence.
+    const finalizedSessionIds = new Set(
+      [
+        payload.finalizeAttemptSessionId,
+        ...(payload.finalizeAttemptSessionIds ?? []),
+      ].filter((sessionId): sessionId is string => Boolean(sessionId)),
+    );
+
+    if (finalizedSessionIds.size > 0) {
+      try {
+        const attemptHistory = readPracticeAttemptHistory();
+
+        writePracticeAttemptHistory({
+          ...attemptHistory,
+          checkpointsBySong: {
+            ...attemptHistory.checkpointsBySong,
+            [payload.songId]: readAttemptCheckpoints(
+              attemptHistory.checkpointsBySong[payload.songId],
+            ).filter(
+              (checkpoint) => !finalizedSessionIds.has(checkpoint.sessionId),
+            ),
+          },
+        });
+      } catch {
+        // The completed run is already durable. Retaining its draft is safer
+        // than reporting a false failed completion or losing the draft early.
+      }
+    }
+
     this.emit(
       'save-practice-run',
       responseForRuns(payload.songId, retained, archive),
     );
+  }
+
+  /**
+   * Mirrors the desktop checkpoint contract. This persistence remains local
+   * to the browser and never contributes to completed-run analytics.
+   */
+  private saveAttemptCheckpoint(payload: {
+    checkpoint: Omit<
+      PracticeAttemptCheckpoint,
+      'schemaVersion' | 'state' | 'records'
+    > & { records: HitRecord[] };
+  }): void {
+    const checkpoint = payload?.checkpoint;
+
+    if (!checkpoint?.songId) {
+      throw new Error('checkpoint.songId is required');
+    }
+
+    if (!checkpoint.sessionId) {
+      throw new Error('checkpoint.sessionId is required');
+    }
+
+    const history = readPracticeAttemptHistory();
+    const normalized: PracticeAttemptCheckpoint = {
+      schemaVersion: PRACTICE_ATTEMPT_CHECKPOINT_SCHEMA_VERSION,
+      state: 'in-progress',
+      songId: checkpoint.songId,
+      sessionId: checkpoint.sessionId,
+      startedAt: checkpoint.startedAt,
+      updatedAt: checkpoint.updatedAt,
+      chartRevision: checkpoint.chartRevision,
+      mode: checkpoint.mode,
+      difficulty: checkpoint.difficulty,
+      playbackSpeed: checkpoint.playbackSpeed,
+      positionTick: checkpoint.positionTick,
+      records: checkpoint.records
+        .map(compactRecord)
+        .slice(-MAX_PRACTICE_ATTEMPT_RECORDS),
+    };
+    const checkpoints = [
+      ...(history.checkpointsBySong[normalized.songId] ?? []).filter(
+        (candidate) => candidate.sessionId !== normalized.sessionId,
+      ),
+      normalized,
+    ]
+      .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
+      .slice(-MAX_PRACTICE_ATTEMPT_CHECKPOINTS_PER_SONG);
+
+    writePracticeAttemptHistory({
+      ...history,
+      checkpointsBySong: {
+        ...history.checkpointsBySong,
+        [normalized.songId]: checkpoints,
+      },
+    });
+    this.emit('save-practice-attempt-checkpoint', {
+      songId: normalized.songId,
+      checkpoints,
+    });
+  }
+
+  private finalizeAttemptCheckpoint(payload: {
+    songId: string;
+    sessionId: string;
+  }): void {
+    if (!payload?.songId) {
+      throw new Error('songId is required');
+    }
+
+    if (!payload.sessionId) {
+      throw new Error('sessionId is required');
+    }
+
+    const history = readPracticeAttemptHistory();
+    const checkpoints = readAttemptCheckpoints(
+      history.checkpointsBySong[payload.songId],
+    ).filter((checkpoint) => checkpoint.sessionId !== payload.sessionId);
+
+    writePracticeAttemptHistory({
+      ...history,
+      checkpointsBySong: {
+        ...history.checkpointsBySong,
+        [payload.songId]: checkpoints,
+      },
+    });
+    this.emit('finalize-practice-attempt-checkpoint', {
+      songId: payload.songId,
+      checkpoints,
+    });
   }
 
   private recordPracticeDay(payload: {
@@ -887,7 +1101,42 @@ export class WebPlatform implements PlatformAdapter {
             songId: string;
             summary: RunSummary;
             records?: HitRecord[];
+            finalizeAttemptSessionId?: string;
+            finalizeAttemptSessionIds?: string[];
           },
+        );
+
+        break;
+
+      case 'save-practice-attempt-checkpoint':
+        this.saveAttemptCheckpoint(
+          args[0] as {
+            checkpoint: Omit<
+              PracticeAttemptCheckpoint,
+              'schemaVersion' | 'state' | 'records'
+            > & { records: HitRecord[] };
+          },
+        );
+
+        break;
+
+      case 'load-practice-attempt-checkpoints': {
+        const songId = String(args[0]);
+        const history = readPracticeAttemptHistory();
+
+        this.emit('load-practice-attempt-checkpoints', {
+          songId,
+          checkpoints: readAttemptCheckpoints(
+            history.checkpointsBySong[songId],
+          ),
+        });
+
+        break;
+      }
+
+      case 'finalize-practice-attempt-checkpoint':
+        this.finalizeAttemptCheckpoint(
+          args[0] as { songId: string; sessionId: string },
         );
 
         break;

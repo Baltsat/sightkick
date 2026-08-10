@@ -29,7 +29,8 @@ export interface SeasonCardProps {
   focusedLessonId?: string;
   /** Visible, truthful summary of the controls active on this Journey. */
   controlLegend: string;
-  controlSource: 'explicit' | 'kit-lanes' | 'unavailable';
+  controlSource: 'explicit' | 'mixed' | 'kit-lanes' | 'unavailable';
+  kitActions: Array<'up' | 'down' | 'left' | 'right' | 'confirm' | 'back'>;
   onPlay: (entry: LessonEntry) => void;
   onLockedClick: (entry: LessonEntry) => void;
 }
@@ -54,6 +55,7 @@ export function SeasonCard({
   focusedLessonId,
   controlLegend,
   controlSource,
+  kitActions,
   onPlay,
   onLockedClick,
 }: SeasonCardProps) {
@@ -159,6 +161,7 @@ export function SeasonCard({
           focusedLessonId={focusedLessonId}
           controlLegend={controlLegend}
           controlSource={controlSource}
+          kitActions={kitActions}
           onPlay={onPlay}
           onLockedClick={onLockedClick}
         />

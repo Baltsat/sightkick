@@ -45,7 +45,13 @@ import { fetchMyMusic } from './ipc/myMusic';
 import { loadLibraryCandidates } from './ipc/loadLibraryCandidates';
 import { bootstrapLessonLibrary } from './lessonLibrary';
 import { applyLessonProfileMigration } from './lessonIdentityMigration';
-import { savePracticeRun, loadPracticeRuns } from './ipc/practiceStats';
+import {
+  finalizePracticeAttemptCheckpoint,
+  loadPracticeAttemptCheckpoints,
+  loadPracticeRuns,
+  savePracticeAttemptCheckpoint,
+  savePracticeRun,
+} from './ipc/practiceStats';
 import {
   configureCoachStore,
   getCoachingNotes,
@@ -184,6 +190,18 @@ class AppState {
     ipcMain.on('update-song', updateSong);
     ipcMain.on('save-practice-run', savePracticeRun);
     ipcMain.on('load-practice-runs', loadPracticeRuns);
+    ipcMain.on(
+      'save-practice-attempt-checkpoint',
+      savePracticeAttemptCheckpoint,
+    );
+    ipcMain.on(
+      'load-practice-attempt-checkpoints',
+      loadPracticeAttemptCheckpoints,
+    );
+    ipcMain.on(
+      'finalize-practice-attempt-checkpoint',
+      finalizePracticeAttemptCheckpoint,
+    );
     ipcMain.on('get-coach-settings', getCoachSettings);
     ipcMain.on('save-coach-settings', saveCoachSettings);
     ipcMain.on('get-coaching-notes', getCoachingNotes);

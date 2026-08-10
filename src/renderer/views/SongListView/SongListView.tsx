@@ -18,6 +18,7 @@ import {
 } from 'react-router-dom';
 import appIcon from '../../../../assets/icon.png';
 import { ControlMapping, Song, YandexPlaylistCandidate } from '../../../types';
+import type { LibraryMode } from '../../types';
 import { SongFilter } from '../../components/SongFilter';
 import { SongList } from '../../components/SongList';
 import { SettingsButton } from '../../components/SettingsButton';
@@ -59,6 +60,7 @@ import { localDateKey } from '../../services/streaks';
 import { SaveGoalInput, SetGoalModal, useGoals } from '../../components/Goals';
 import { AppShell, ArenaView } from '../../components/AppShell';
 import { HomeCockpit } from '../../components/HomeCockpit';
+import { KitCommandPrompt } from '../../components/KitCommandPrompt';
 import {
   PracticeCandidate,
   PracticeHistoryEntry,
@@ -141,6 +143,14 @@ export function SongListView() {
     () => resolveLibraryControls(controlMapping, inputMapping),
     [controlMapping, inputMapping],
   );
+  const libraryMoveSteps = [
+    ...(libraryControls.kitActions.includes('up') ? (['tom1'] as const) : []),
+    ...(libraryControls.kitActions.includes('down') ? (['tom2'] as const) : []),
+  ];
+  const libraryMoveHints = [
+    ...(libraryControls.kitActions.includes('up') ? ['Previous'] : []),
+    ...(libraryControls.kitActions.includes('down') ? ['Next'] : []),
+  ];
   const platformCapabilities = window.drumrollPlatform?.capabilities;
   const youtubeImportAvailable = platformCapabilities?.youtubeImport ?? true;
   const onlineDownloadsAvailable =
@@ -617,13 +627,26 @@ export function SongListView() {
           }
         },
         back: () => setView('home'),
-        sort: openSort,
+        sort: () => {
+          if (sortAvailable) {
+            openSort();
+          }
+        },
         library: () => {
-          if (!onlineDownloadsAvailable) {
+          if (!libraryControls.kitActions.includes('library')) {
+            if (onlineDownloadsAvailable) {
+              setLibraryMode(libraryMode === 'online' ? 'local' : 'online');
+            }
+
             return;
           }
 
-          setLibraryMode(libraryMode === 'online' ? 'local' : 'online');
+          const modes: LibraryMode[] = onlineDownloadsAvailable
+            ? ['local', 'drums', 'favorites', 'online']
+            : ['local', 'drums', 'favorites'];
+          const currentIndex = modes.indexOf(libraryMode);
+
+          setLibraryMode(modes[(Math.max(0, currentIndex) + 1) % modes.length]);
         },
         difficulty: () => setDifficulty(nextDifficulty(difficulty)),
       };
@@ -695,6 +718,10 @@ export function SongListView() {
             onOpenSongs={() => setView('songs')}
             onOpenJourney={() => setView('journey')}
             onOpenCoach={openHomeCoach}
+            onOpenProfile={() => {
+              gamification.loadAchievements();
+              setIsProfileOpen(true);
+            }}
           />
         )}
 
@@ -710,6 +737,10 @@ export function SongListView() {
             onOpenSongs={() => setView('songs')}
             onOpenJourney={() => setView('journey')}
             onOpenCoach={openHomeCoach}
+            onOpenProfile={() => {
+              gamification.loadAchievements();
+              setIsProfileOpen(true);
+            }}
           />
         )}
 
@@ -901,7 +932,65 @@ export function SongListView() {
                         ? 'Mapped navigation'
                         : 'Navigation unavailable'}
                     </span>
-                    <span>{libraryControls.legend}</span>
+                    {(libraryControls.source === 'kit-lanes' ||
+                      libraryControls.source === 'mixed') && (
+                      <div
+                        className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
+                        data-testid="library-kit-control-commands"
+                      >
+                        {libraryMoveSteps.length > 0 && (
+                          <KitCommandPrompt
+                            compact
+                            model={{
+                              label: 'Move',
+                              steps: libraryMoveSteps,
+                              relationship: 'alternatives',
+                              stepHints: libraryMoveHints,
+                            }}
+                          />
+                        )}
+                        {libraryControls.kitActions.includes('confirm') && (
+                          <KitCommandPrompt
+                            compact
+                            model={{ label: 'Choose', steps: ['snare'] }}
+                          />
+                        )}
+                        {libraryControls.kitActions.includes('difficulty') && (
+                          <KitCommandPrompt
+                            compact
+                            model={{ label: 'Difficulty', steps: ['hihat'] }}
+                          />
+                        )}
+                        {libraryControls.kitActions.includes('library') && (
+                          <KitCommandPrompt
+                            compact
+                            model={{ label: 'Source', steps: ['ride'] }}
+                          />
+                        )}
+                        {libraryControls.kitActions.includes('sort') && (
+                          <KitCommandPrompt
+                            compact
+                            model={{ label: 'Sort', steps: ['tom3'] }}
+                          />
+                        )}
+                        {libraryControls.kitActions.includes('back') && (
+                          <KitCommandPrompt
+                            compact
+                            model={{ label: 'Back', steps: ['crash'] }}
+                          />
+                        )}
+                      </div>
+                    )}
+                    <span
+                      className={
+                        libraryControls.source === 'kit-lanes' ||
+                        libraryControls.source === 'mixed'
+                          ? 'sr-only'
+                          : undefined
+                      }
+                    >
+                      {libraryControls.legend}
+                    </span>
                     {libraryControls.kitActions.includes('confirm') &&
                       libraryMode === 'local' && (
                         <span>Local choices open directly in Practice.</span>

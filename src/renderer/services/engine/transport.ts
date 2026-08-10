@@ -16,6 +16,7 @@ import {
 import { Beat, getBeatGrid, getCountInInfo } from '../beat-grid';
 import {
   LoopRegion,
+  CountInPolicy,
   PlaybackSnapshot,
   PlaybackState,
   TransportContext,
@@ -222,7 +223,11 @@ export class Transport {
     this.playFromTick(measure?.startTick ?? 0);
   }
 
-  playFromTick(tick: number, preserveLoopRestarting = false): void {
+  playFromTick(
+    tick: number,
+    countInPolicy: CountInPolicy = 'inherit',
+    preserveLoopRestarting = false,
+  ): void {
     if (!this.chart || !this.audioPlayer) {
       return;
     }
@@ -249,7 +254,7 @@ export class Transport {
     this.onSeekCb(tick);
     this.nextBeatIndex = this.firstBeatIndexAtOrAfter(startTime);
 
-    void this.beginPlayback(tick, startTime, generation);
+    void this.beginPlayback(tick, startTime, generation, countInPolicy);
   }
 
   private get playbackSpeed(): number {
@@ -264,6 +269,7 @@ export class Transport {
     tick: number,
     startTime: number,
     generation: number,
+    countInPolicy: CountInPolicy,
   ): Promise<void> {
     if (!this.chart || !this.audioPlayer || !this.clickTrack) {
       return;
@@ -279,7 +285,11 @@ export class Transport {
       return;
     }
 
-    if (!this.countInEnabled) {
+    const shouldCountIn =
+      countInPolicy === 'force' ||
+      (countInPolicy === 'inherit' && this.countInEnabled);
+
+    if (!shouldCountIn) {
       this.songStartCtx = ctx.currentTime;
       this.clickTrack.cancelGain();
       this.clickTrack.setGain(this.clickVolume);
@@ -520,7 +530,7 @@ export class Transport {
     }
 
     this.suppressNextLoopCompletion = false;
-    this.playFromTick(this.loopRegion.startTick, true);
+    this.playFromTick(this.loopRegion.startTick, 'inherit', true);
   }
 
   private scheduleClicks(): void {
@@ -604,6 +614,7 @@ export class Transport {
       isStarted: this.isStarted,
       isEnded: this.state === 'ended',
       countInBeat: this.countIn?.beat,
+      countInBeats: this.countIn?.totalBeats,
       countInBeatMs: this.countIn?.beatMs,
       isReady: this.audioPlayer !== undefined,
       duration: this.audioPlayer?.duration ?? 0,

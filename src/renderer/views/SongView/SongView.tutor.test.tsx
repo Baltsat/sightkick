@@ -3,9 +3,18 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   BEAT_SECONDS,
   COUNT_IN_BEATS,
+  DRUM_CHART,
   makeSong,
   setupSongView,
 } from '../test-support';
+import { chartContentRevision } from '../../services/chart-revision';
+
+const TEST_CHART_REVISION = chartContentRevision({
+  songId: 'song-1',
+  difficulty: 'expert',
+  format: 'chart',
+  fileData: new TextEncoder().encode(DRUM_CHART),
+});
 
 function savedRuns(view: ReturnType<typeof setupSongView>) {
   return view.ipc.sent
@@ -59,6 +68,10 @@ describe('adaptive tutor surfaces', () => {
 
     expect(within(hud).getByText('Ready when you are')).toBeInTheDocument();
     expect(hud).toHaveAccessibleDescription(/kick once/i);
+    expect(within(hud).getByTestId('kit-command-prompt')).toHaveAccessibleName(
+      'Kick to start the count-in: Kick',
+    );
+    expect(within(hud).queryByTestId('tutor-lives')).not.toBeInTheDocument();
     expect(
       screen.getByRole('spinbutton', { name: 'Playback speed' }),
     ).toBeInTheDocument();
@@ -70,8 +83,8 @@ describe('adaptive tutor surfaces', () => {
     expect(screen.getByRole('switch', { name: 'Tutor listens' })).toBeChecked();
     expect(screen.getByRole('switch', { name: 'Smart rewind' })).toBeChecked();
     expect(
-      screen.getByRole('switch', { name: 'Practice lives' }),
-    ).toBeChecked();
+      screen.getByRole('switch', { name: 'Challenge lives' }),
+    ).not.toBeChecked();
     expect(screen.getByRole('switch', { name: 'Auto-continue' })).toBeChecked();
     expect(screen.getByRole('switch', { name: 'Kit controls' })).toBeChecked();
 
@@ -90,6 +103,91 @@ describe('adaptive tutor surfaces', () => {
 });
 
 describe('safe hands-free run intent', () => {
+  it('keeps the active-play pause command visible without a full-size prompt', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      settings: { countIn: false },
+      keyboard: {
+        kit: {
+          kick: ['keyboard:KeyK'],
+          crash: ['keyboard:KeyC'],
+        },
+      },
+    });
+
+    await view.loadSong();
+    await view.pressKey('KeyK');
+
+    const prompt = within(screen.getByTestId('tutor-hud')).getByTestId(
+      'kit-command-prompt',
+    );
+
+    expect(prompt).toHaveAccessibleName(
+      'Pause from the kit: Kick, then Crash, then Kick, then Crash',
+    );
+    expect(prompt).toHaveAttribute('data-compact', 'true');
+  });
+
+  it('surfaces an interrupted attempt and resumes it from the kit with a fresh count-in', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice',
+        keyboard: { kit: { kick: ['keyboard:KeyK'] } },
+      });
+
+      await view.loadSong();
+      act(() => {
+        view.ipc.emit('load-practice-attempt-checkpoints', {
+          songId: 'song-1',
+          checkpoints: [
+            {
+              schemaVersion: 1,
+              state: 'in-progress',
+              songId: 'song-1',
+              sessionId: 'interrupted-1',
+              startedAt: '2026-08-10T10:00:00.000Z',
+              updatedAt: '2026-08-10T10:02:00.000Z',
+              chartRevision: TEST_CHART_REVISION,
+              mode: 'practice',
+              difficulty: 'expert',
+              playbackSpeed: 0.8,
+              positionTick: 2_100,
+              records: [
+                {
+                  tick: 1_920,
+                  deltaMs: 12,
+                  element: 'snare',
+                  verdict: 'hit',
+                  velocity: 94,
+                },
+              ],
+            },
+          ],
+        });
+      });
+
+      const hud = screen.getByTestId('tutor-hud');
+
+      expect(within(hud).getByText('Interrupted attempt saved')).toBeVisible();
+      expect(within(hud).getByText(/1 scored outcome/)).toBeVisible();
+      expect(
+        within(hud).getByTestId('kit-command-prompt'),
+      ).toHaveAccessibleName('Resume saved bar 2: Kick');
+
+      await view.pressKey('KeyK');
+
+      expect(screen.getByTestId('count-in')).toBeInTheDocument();
+      expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+        'aria-label',
+        'Cancel count-in',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('starts a direct lesson count-in from one deliberate kick at the ready screen', async () => {
     vi.useFakeTimers();
 
@@ -197,7 +295,7 @@ describe('safe hands-free run intent', () => {
     }
   });
 
-  it('starts from the deliberate four-strike command while Judge is inactive, then stores the guided attempt without inventing a hit', async () => {
+  it('starts from one deliberate kick while Judge is inactive, then stores the guided attempt without inventing a hit', async () => {
     const view = setupSongView({
       settings: { countIn: false },
       keyboard: {
@@ -210,13 +308,7 @@ describe('safe hands-free run intent', () => {
 
     await view.loadSong();
 
-    const clock = installCommandClock();
-
-    try {
-      await strikeCommand(view, clock, ['KeyK', 'KeyC', 'KeyK', 'KeyC']);
-    } finally {
-      clock.restore();
-    }
+    await view.pressKey('KeyK');
 
     expect(view.startedSources().length).toBeGreaterThan(0);
 
@@ -238,6 +330,37 @@ describe('safe hands-free run intent', () => {
       }),
     ]);
     expect(view.sentChannels()).not.toContain('update-song');
+  });
+
+  it('returns a cancelled first count-in to one-kick Ready', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice',
+        keyboard: { kit: { kick: ['keyboard:KeyK'] } },
+      });
+
+      await view.loadSong();
+      await view.pressKey('KeyK');
+      expect(screen.getByTestId('count-in')).toBeInTheDocument();
+
+      view.clickPlay();
+
+      expect(screen.queryByTestId('count-in')).not.toBeInTheDocument();
+      expect(
+        within(screen.getByTestId('tutor-hud')).getByTestId(
+          'kit-command-prompt',
+        ),
+      ).toHaveAccessibleName('Kick to start the count-in: Kick');
+
+      vi.advanceTimersByTime(1000);
+      await view.pressKey('KeyK');
+
+      expect(screen.getByTestId('count-in')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('stores an all-wrong attempt as coaching evidence without a high score', async () => {

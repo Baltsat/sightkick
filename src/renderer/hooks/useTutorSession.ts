@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from 'react';
 import { ParsedChart, Measure } from '../../chart-parser/types';
 import { secondsToTicks } from '../../chart-parser/timing';
 import { Engine } from '../services/engine';
@@ -58,6 +64,13 @@ const INITIAL_MESSAGE: TutorHudMessage = {
   detail: 'Play naturally. One noisy hit will not interrupt the song.',
   tone: 'steady',
 };
+
+/**
+ * A short visual breath separates diagnosis from transport. The chart-aware
+ * audible count-in still follows this preview, so recovery never feels like
+ * an instant, unexplained jump back into the phrase.
+ */
+export const RECOVERY_PREVIEW_MS = 900;
 
 function percent(value: number): string {
   return `${Math.round(value * 100)}%`;
@@ -130,7 +143,11 @@ export function messageForTutorCommand(
       title: 'Phrase needs one more pass',
       detail: `Bars ${command.trigger.stats.startMeasure + 1}–${
         command.trigger.stats.endMeasure + 1
-      }: ${triggerEvidence(command)} ${command.livesRemaining} lives remain.`,
+      }: ${triggerEvidence(command)}${
+        settings.livesEnabled
+          ? ` ${command.livesRemaining} lives remain.`
+          : ' Recovery is based on the phrase, not a life penalty.'
+      }`,
       tone: 'warning',
     };
   }
@@ -157,7 +174,7 @@ export function messageForTutorCommand(
         livesRemaining: 0,
       })} ${checkpointReason} Replay ends at bar ${recoveryEnd}; first pass stays at ${percent(
         command.speed,
-      )} to confirm the pattern before any slowdown.`,
+      )} to confirm the pattern before any slowdown. Take a breath, then listen for the count-in before playing.`,
       tone: 'recovery',
     };
   }
@@ -365,6 +382,22 @@ export function useTutorSession({
     activeHolder.store.subscribe,
     activeHolder.store.getSnapshot,
   );
+  const recoveryTimerRef = useRef<number | undefined>(undefined);
+
+  useEffect(
+    () => () => {
+      window.clearTimeout(recoveryTimerRef.current);
+      recoveryTimerRef.current = undefined;
+    },
+    [engine, sessionKey],
+  );
+
+  useEffect(() => {
+    if (!enabled || suspended) {
+      window.clearTimeout(recoveryTimerRef.current);
+      recoveryTimerRef.current = undefined;
+    }
+  }, [enabled, suspended]);
 
   useEffect(() => {
     if (activeHolder.store.syncTargetSpeed(targetSpeed)) {
@@ -387,12 +420,18 @@ export function useTutorSession({
         engine.setLoopRegion(undefined);
         engine.setPlaybackSpeed(command.speed);
         setPlaybackSpeed(command.speed);
-        engine.playFromTick(command.recovery.region.startTick);
+        window.clearTimeout(recoveryTimerRef.current);
+        recoveryTimerRef.current = window.setTimeout(() => {
+          recoveryTimerRef.current = undefined;
+          engine.playFromTick(command.recovery.region.startTick, 'force');
+        }, RECOVERY_PREVIEW_MS);
 
         return;
       }
 
       if (command.type === 'resume-main') {
+        window.clearTimeout(recoveryTimerRef.current);
+        recoveryTimerRef.current = undefined;
         engine.pause();
         engine.setLoopRegion(undefined);
         engine.setPlaybackSpeed(command.speed);
@@ -403,7 +442,7 @@ export function useTutorSession({
         // clean/deferred attempt; starting audio at the chart end would only
         // manufacture a second end event.
         if (command.resumeTick !== undefined) {
-          engine.playFromTick(command.resumeTick);
+          engine.playFromTick(command.resumeTick, 'force');
         }
       }
     },
@@ -518,11 +557,39 @@ export function useTutorSession({
         index += 1
       ) {
         lastCompletedMeasure = index;
-        send({ type: 'measure-complete', measureIndex: index });
 
-        // A tutor command may have synchronously rewound the transport.
-        // Stop walking the old timeline; the nested TimeStore update has
-        // already reset the cursor for the new recovery pass.
+        const commands = send({
+          type: 'measure-complete',
+          measureIndex: index,
+        });
+        const rewind = commands.find(
+          (command) =>
+            command.type === 'begin-recovery' ||
+            command.type === 'repeat-recovery',
+        );
+
+        if (
+          rewind?.type === 'begin-recovery' ||
+          rewind?.type === 'repeat-recovery'
+        ) {
+          lastCompletedMeasure = rewind.recovery.region.startMeasure - 1;
+
+          return;
+        }
+
+        const resumed = commands.find(
+          (command) =>
+            command.type === 'resume-main' && command.resumeTick !== undefined,
+        );
+
+        if (resumed?.type === 'resume-main') {
+          lastCompletedMeasure = (resumed.resumeMeasure ?? 0) - 1;
+
+          return;
+        }
+
+        // Administrative callers may still synchronously move transport.
+        // Stop walking the old timeline when that happens.
         if (engine.timeStore.get() !== observedTime) {
           return;
         }

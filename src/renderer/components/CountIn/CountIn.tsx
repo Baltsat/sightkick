@@ -1,62 +1,64 @@
-import themedark from '../../theme';
+import { CSSProperties } from 'react';
+import './CountIn.css';
 
 interface CountInProps {
   count: number | undefined;
+  total?: number | undefined;
   beatMs: number | undefined;
   animated?: boolean;
 }
 
-export function CountIn({ count, beatMs, animated = true }: CountInProps) {
+export function CountIn({
+  count,
+  total,
+  beatMs,
+  animated = true,
+}: CountInProps) {
   if (count === undefined || count <= 0) {
     return undefined;
   }
 
-  const duration = `${(beatMs ?? 800) / 1000}s`;
-  const animation = animated
-    ? `countdown-pop ${duration} ease-out reverse forwards`
-    : undefined;
+  const beatCount = Math.max(count, total ?? 4);
+  const style = {
+    '--count-in-beat-duration': `${Math.max(180, beatMs ?? 800)}ms`,
+    '--count-in-columns': Math.min(beatCount, 4),
+    '--count-in-progress': count / beatCount,
+  } as CSSProperties;
 
   return (
     <div
-      className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+      className="drumroll-count-in"
+      data-animated={animated}
       data-testid="count-in"
       aria-live="assertive"
+      aria-label={`Count in ${count} of ${beatCount}`}
+      style={style}
     >
-      <div key={count} className="relative flex items-center justify-center">
-        <div
-          className="absolute rounded-full bg-accent/80 -z-1"
-          style={{
-            width: '12rem',
-            height: '12rem',
-            animation,
-            boxShadow: themedark.shadow.accentButton,
-            background:
-              'radial-gradient(var(--color-accent-bright), color-mix(in srgb, var(--color-accent-bright) 56%, transparent) 90%, rgba(0,0,0,0) 100%)',
-          }}
-        />
-        <div
-          className="font-ui tabular-num select-none"
-          style={{
-            fontSize: '8rem',
-            lineHeight: 1,
-            fontWeight: 700,
-            color: themedark.color.text,
-            animation,
-          }}
-        >
-          {count}
+      <div className="drumroll-count-in__surface">
+        <p>Listen. Play after {beatCount}.</p>
+        <ol className="drumroll-count-in__beats" aria-hidden="true">
+          {Array.from({ length: beatCount }, (_, index) => {
+            const beat = index + 1;
+
+            return (
+              <li
+                key={beat}
+                className="drumroll-count-in__beat"
+                data-state={
+                  beat === count ? 'active' : beat < count ? 'passed' : 'next'
+                }
+              >
+                <span key={beat === count ? `${beat}-${count}` : beat}>
+                  {beat}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+        <div className="drumroll-count-in__progress" aria-hidden="true">
+          <span />
         </div>
       </div>
-      <style>
-        {`
-          @keyframes countdown-pop {
-            0% { transform: scale(0.6); opacity: 0; }
-            25%  { transform: scale(1); opacity: 1; }
-            70%  { transform: scale(1.05); opacity: 1; }
-            100%   { transform: scale(2); opacity: 0; }
-          }
-        `}
-      </style>
     </div>
   );
 }

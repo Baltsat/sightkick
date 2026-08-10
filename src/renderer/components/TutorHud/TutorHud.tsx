@@ -1,6 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBolt,
+  faDrum,
   faEarListen,
   faHeart,
   faPause,
@@ -9,12 +10,20 @@ import {
 import { useId } from 'react';
 import { TutorHudMessage } from '../../hooks/useTutorSession';
 import { TutorState } from '../../services/tutor';
+import { KitCommandPrompt, KitCommandPromptModel } from '../KitCommandPrompt';
 import './TutorHud.css';
 
 interface TutorHudProps {
   state: TutorState;
   message: TutorHudMessage;
-  displayState?: 'inactivity-paused' | 'remediation';
+  displayState?:
+    | 'inactivity-paused'
+    | 'kit-paused'
+    | 'kit-ready'
+    | 'recovery-explain'
+    | 'remediation';
+  controlPrompt?: KitCommandPromptModel;
+  controlPromptCompact?: boolean;
   remediation?: {
     currentTask: number;
     totalTasks: number;
@@ -39,12 +48,19 @@ export function TutorHud({
   state,
   message,
   displayState,
+  controlPrompt,
+  controlPromptCompact = false,
   remediation,
 }: TutorHudProps) {
   const titleId = useId();
   const detailId = useId();
 
-  if (state.phase === 'off' && !remediation && !displayState) {
+  if (
+    state.phase === 'off' &&
+    !remediation &&
+    !displayState &&
+    !controlPrompt
+  ) {
     return null;
   }
 
@@ -57,6 +73,12 @@ export function TutorHud({
   const phaseLabel =
     displayState === 'inactivity-paused'
       ? 'Paused — no hits'
+      : displayState === 'kit-ready'
+      ? 'Kit ready'
+      : displayState === 'kit-paused'
+      ? 'Paused at the kit'
+      : displayState === 'recovery-explain'
+      ? 'Recovery preview'
       : displayState === 'remediation'
       ? 'Coach remediation'
       : labelForPhase(state.phase);
@@ -80,6 +102,8 @@ export function TutorHud({
           icon={
             displayState === 'inactivity-paused'
               ? faPause
+              : displayState === 'kit-ready'
+              ? faDrum
               : recovery || remediation
               ? faRotateLeft
               : faEarListen
@@ -91,6 +115,12 @@ export function TutorHud({
         <span className="drumroll-tutor-hud__eyebrow">{phaseLabel}</span>
         <strong id={titleId}>{message.title}</strong>
         <span id={detailId}>{message.detail}</span>
+        {controlPrompt && (
+          <KitCommandPrompt
+            model={controlPrompt}
+            compact={controlPromptCompact}
+          />
+        )}
       </div>
       <dl className="drumroll-tutor-hud__telemetry" aria-label="Tutor status">
         <div className="drumroll-tutor-hud__metric drumroll-tutor-hud__speed">

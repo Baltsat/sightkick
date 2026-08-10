@@ -1,5 +1,12 @@
 import { ReactNode } from 'react';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { App as AntdApp } from 'antd';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LessonsView } from './LessonsView';
@@ -16,6 +23,14 @@ import {
   installLocalStorage,
   IpcMock,
 } from '../../hooks/test-support';
+
+const { playKitPreviewMock } = vi.hoisted(() => ({
+  playKitPreviewMock: vi.fn(),
+}));
+
+vi.mock('../../services/kit-preview-audio', () => ({
+  playKitPreview: playKitPreviewMock,
+}));
 
 const EMPTY_PROGRESS: LessonProgress = {
   entries: [],
@@ -41,6 +56,7 @@ let ipc: IpcMock;
 beforeEach(() => {
   installLocalStorage();
   ipc = installIpcMock();
+  playKitPreviewMock.mockClear();
 });
 
 function seedFreshMidiJourneyProfile() {
@@ -63,6 +79,8 @@ function seedFreshMidiJourneyProfile() {
         tom2: ['midi:72'],
         snare: ['midi:73'],
         crash: ['midi:74'],
+        hihat: ['midi:75'],
+        ride: ['midi:76'],
       },
     }),
   );
@@ -574,7 +592,7 @@ describe('LessonsView — path nodes', () => {
     expect(onPlay).not.toHaveBeenCalled();
   });
 
-  it('calls onPlay when an unlocked node is clicked', () => {
+  it('strikes and sounds an unlocked drum node before opening it', async () => {
     const progress = makeMixedProgress();
     const onPlay = vi.fn();
 
@@ -585,7 +603,15 @@ describe('LessonsView — path nodes', () => {
 
     fireEvent.click(screen.getByTestId('lesson-item-01.02'));
 
-    expect(onPlay).toHaveBeenCalledTimes(1);
+    expect(playKitPreviewMock).toHaveBeenCalledOnce();
+    expect(
+      screen
+        .getByTestId('lesson-item-01.02')
+        .querySelector('.daybreak-lesson-node__strike-stick'),
+    ).toHaveAttribute('data-active', 'true');
+    expect(onPlay).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(onPlay).toHaveBeenCalledTimes(1));
     expect(onPlay.mock.calls[0][0].lesson.id).toBe('01.02');
   });
 
@@ -629,10 +655,22 @@ describe('LessonsView — path nodes', () => {
 
     expect(legend).toHaveAttribute('data-control-source', 'kit-lanes');
     expect(legend).toHaveTextContent(
-      'Tom 1 / Tom 2 select · Snare starts · Crash backs',
+      'Tom 1 / Tom 2 select · Snare starts · Hi-hat / Ride change season · Crash backs',
     );
+    expect(legend).toHaveTextContent('Season');
     expect(screen.getByTestId('lesson-item-02.02')).toHaveAttribute(
       'data-kit-focused',
+      'true',
+    );
+
+    hitMidiNote(75);
+    expect(screen.getByTestId('season-card-Foundations')).toHaveAttribute(
+      'data-featured',
+      'true',
+    );
+    hitMidiNote(76);
+    expect(screen.getByTestId('season-card-Reading')).toHaveAttribute(
+      'data-featured',
       'true',
     );
 
@@ -652,6 +690,12 @@ describe('LessonsView — path nodes', () => {
     hitMidiNote(73);
     expect(onPlay).toHaveBeenCalledTimes(1);
     expect(onPlay.mock.calls[0][0].lesson.id).toBe('02.01');
+    expect(playKitPreviewMock).not.toHaveBeenCalled();
+    expect(
+      screen
+        .getByTestId('lesson-item-02.01')
+        .querySelector('.daybreak-lesson-node__strike-stick'),
+    ).toHaveAttribute('data-active', 'false');
 
     hitMidiNote(74);
     expect(onBack).toHaveBeenCalledTimes(1);

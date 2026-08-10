@@ -52,6 +52,21 @@ describe('drum gesture recognizer', () => {
     });
   });
 
+  it('opens every primary Home destination with one deliberate named pad', () => {
+    expect(hit(createDrumGestureState(), 'home', 'snare', 1_000).action).toBe(
+      'open-songs',
+    );
+    expect(hit(createDrumGestureState(), 'home', 'tom1', 2_000).action).toBe(
+      'open-journey',
+    );
+    expect(hit(createDrumGestureState(), 'home', 'ride', 3_000).action).toBe(
+      'open-coach',
+    );
+    expect(hit(createDrumGestureState(), 'home', 'crash', 4_000).action).toBe(
+      'open-profile',
+    );
+  });
+
   it('recognizes pause only after silence and the full signature while playing', () => {
     let state = hit(createDrumGestureState(), 'playing', 'hihat', 1000).state;
     const tooSoon = playSequence(state, 'playing', PRIMARY_COMMAND, 1800);

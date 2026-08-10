@@ -9,6 +9,10 @@ export type DrumGestureSurface =
 
 export type DrumGestureAction =
   | 'start'
+  | 'open-songs'
+  | 'open-journey'
+  | 'open-coach'
+  | 'open-profile'
   | 'pause'
   | 'resume'
   | 'continue'

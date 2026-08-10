@@ -59,6 +59,19 @@ describe('InputBus', () => {
     expect(second).toEqual(first);
   });
 
+  it('notifies priority gesture observers before ordinary scoring listeners', () => {
+    const a = makeSource('midi', []);
+    const bus = new InputBus([a.source]);
+    const order: string[] = [];
+
+    bus.subscribe(() => order.push('engine'));
+    bus.subscribePriority(() => order.push('gesture'));
+    bus.start();
+    a.emit({ controlId: 'midi:36', value: 100 });
+
+    expect(order).toEqual(['gesture', 'engine']);
+  });
+
   it('does not deliver events to a listener after it unsubscribes', () => {
     const a = makeSource('midi', []);
     const bus = new InputBus([a.source]);

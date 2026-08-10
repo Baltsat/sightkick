@@ -86,11 +86,35 @@ describe('ScoreSummary', () => {
     const { modal } = renderSummary({
       onNextSong,
       persistenceState: 'saving',
+      handsFreeControlsEnabled: true,
+      autoContinueEnabled: true,
     });
 
     expect(modal.getByTestId('score-next')).toBeDisabled();
+    expect(modal.getByTestId('score-retry')).toBeDisabled();
+    expect(modal.queryByTestId('score-kit-controls')).not.toBeInTheDocument();
+    expect(modal.queryByTestId('score-auto-continue')).not.toBeInTheDocument();
     fireEvent.click(modal.getByTestId('score-next'));
     expect(onNextSong).not.toHaveBeenCalled();
+  });
+
+  it('draws all result commands when kit control is enabled', () => {
+    const { modal } = renderSummary({
+      handsFreeControlsEnabled: true,
+      persistenceState: 'saved',
+      nextLabel: 'Next practice',
+    });
+
+    expect(modal.getByTestId('score-kit-controls')).toBeInTheDocument();
+    expect(
+      modal.getByLabelText(/Next practice: Kick, then Crash/i),
+    ).toBeInTheDocument();
+    expect(
+      modal.getByLabelText(/Play again: Snare, then Kick/i),
+    ).toBeInTheDocument();
+    expect(
+      modal.getByLabelText(/Leave session: Ride, then Kick/i),
+    ).toBeInTheDocument();
   });
 
   it.each(['saved', 'failed', 'no-evidence'] as const)(
