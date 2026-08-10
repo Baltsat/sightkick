@@ -180,9 +180,9 @@ That makes this table historical proof, not the current release gate.
 | ------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Practice Flow + Tutor key | `66-preview-kb4-tutor-legend.png` | The eight pad-name colors form a dedicated, centered dock above Tutor; Tom 1/2/3 remain visible and neither surface clips the score. |
 
-The kb.4 source preview passes the reopened collision check. Final acceptance
-remains **pending** until the exact signed/notarized kb.4 installation and its
-clean-HEAD public deployment reproduce the accepted source surfaces.
+The kb.4 source preview passes the reopened collision check. The exact
+signed/notarized kb.4 installation and clean-source public deployment now
+reproduce the accepted surface, closing the final acceptance gate.
 
 ### kb.4 final light-notation polish
 
@@ -201,3 +201,17 @@ still supplied the retired dark-stage white VexFlow palette underneath the new
 paper surface. `77-preview-light-flow-ink.png` is the corrected proof. It uses
 the same ink stave, stems, beams, and structural strokes as Classic while
 retaining the per-lane note colors, warm horizontal strip, and light Tutor HUD.
+
+### kb.4 final installed and public acceptance
+
+| Surface                       | Evidence                             | Result                                                                                                                                                         |
+| ----------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Corrected Flow source preview | `77-preview-light-flow-ink.png`      | Dark musical ink restores stave, stem, beam, and bar-line contrast without losing the warm horizontal strip or lane colors.                                    |
+| Public landing                | `78-public-final-landing.png`        | The clean Cloudflare deployment presents the bright editorial product story and the current signed kb.4 download.                                              |
+| Public Flow story             | `79-public-final-light-flow.png`     | The deployed site shows the accepted warm-paper Flow cockpit instead of the retired dark-stage capture.                                                        |
+| Installed notarized Flow      | `80-installed-final-light-flow.jpeg` | `/Applications/Drumroll.app` reproduces the light Flow strip, dark notation ink, complete eight-lane key, adaptive Tutor HUD, lives, speed, and kit-pause cue. |
+
+Independent visual acceptance returned zero P0 and zero P1 findings after the
+ink correction. The exact installed app was opened with the preserved real
+profile, exercised through the built-in Keyboard input, paused before a result
+could be saved, and quit with the live profile byte-identical to its backup.

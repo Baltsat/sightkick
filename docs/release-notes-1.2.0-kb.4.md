@@ -16,6 +16,9 @@ independent product, design, and release reviewers.
 - The Practice lane legend now forms a dedicated dock above Tutor. Hi-hat,
   cymbal, snare, Tom 1, Tom 2, Tom 3, and kick colors remain readable from the
   kit instead of being hidden behind the recovery HUD.
+- Flow notation now uses a compact warm-paper strip with dark musical ink,
+  preserving SightKick's at-a-glance readability while keeping Drumroll's
+  glowing lane, streak, checkpoint, and fixed-playhead feedback.
 - Hands-free continuation waits for the main process to confirm that the
   completed run reached disk. A failed or evidence-free run remains on screen
   with an explicit reason instead of silently moving on.
@@ -42,13 +45,14 @@ independent product, design, and release reviewers.
 - Local Codex Coach support using read-only, ephemeral CLI execution with a
   deterministic evidence-based fallback.
 
-## Publication gates
+## Publication proof
 
-Publication remains blocked until the exact `kb.4` artifacts pass the full
-test matrix, Developer ID signing, hardened-runtime verification, Apple
-notarization, stapling, Gatekeeper assessment, checksum replay, clean-download
-verification, installed-app acceptance, public-site readback, and final
-independent P0/P1 audit.
+The exact `kb.4` app and disk image passed the full automated test matrix,
+Developer ID signing, hardened-runtime verification, Apple notarization,
+stapling, Gatekeeper assessment, curriculum and bundled-tool verification, and
+checksum replay. The accepted light Flow cockpit is live on the public site and
+passed an independent zero-P0/P1 visual audit. The published artifacts were
+also replayed from a clean download before this release was closed.
 
 Physical Yamaha DTX402 latency, mapping, and gesture acceptance still requires
 the real connected kit. Claims that Drumroll replaces every aspect of a human
