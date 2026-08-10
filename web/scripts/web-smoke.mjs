@@ -29,6 +29,36 @@ const context = await browser.newContext({
 const page = await context.newPage();
 const errors = [];
 
+async function waitForImages(targetPage, selector) {
+  await targetPage.locator(selector).evaluateAll(async (images) => {
+    await Promise.all(
+      images.map(
+        (image) =>
+          new Promise((resolve, reject) => {
+            if (image.complete) {
+              if (image.naturalWidth > 0) {
+                resolve();
+              } else {
+                reject(new Error(`Image failed to load: ${image.currentSrc}`));
+              }
+              return;
+            }
+
+            image.addEventListener('load', resolve, { once: true });
+            image.addEventListener(
+              'error',
+              () =>
+                reject(
+                  new Error(`Image failed to load: ${image.currentSrc}`),
+                ),
+              { once: true },
+            );
+          }),
+      ),
+    );
+  });
+}
+
 page.on('pageerror', (error) => errors.push(error.message));
 page.on('console', (message) => {
   if (message.type() === 'error') {
@@ -51,6 +81,7 @@ try {
   await page
     .getByRole('heading', { name: /sit down/i })
     .waitFor({ timeout: 120_000 });
+  await waitForImages(page, '.web-landing img');
   await page.screenshot({
     path: path.join(shotDir, '01-marketing-landing.png'),
     animations: 'disabled',
