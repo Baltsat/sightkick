@@ -195,3 +195,9 @@ clean-HEAD public deployment reproduce the accepted source surfaces.
 This final pass follows the Impeccable craft checks for hierarchy, typography,
 material restraint, control grouping, and non-generic surface treatment. It
 does not change scoring, playback, Tutor behavior, or saved-run semantics.
+
+The first independent pass then caught one genuine contrast regression: Flow
+still supplied the retired dark-stage white VexFlow palette underneath the new
+paper surface. `77-preview-light-flow-ink.png` is the corrected proof. It uses
+the same ink stave, stems, beams, and structural strokes as Classic while
+retaining the per-lane note colors, warm horizontal strip, and light Tutor HUD.

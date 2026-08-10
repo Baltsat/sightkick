@@ -6,11 +6,6 @@ import { renderMusic, SheetMusicLayout } from '../../chart-parser/renderer';
 import { ParsedChart, RenderData } from '../../chart-parser/types';
 import { SHEET_MUSIC_COLORS } from '../constants';
 
-const FLOW_SHEET_MUSIC_COLORS = {
-  note: '#f8f5ef',
-  stave: 'rgba(248, 245, 239, 0.64)',
-};
-
 interface UseSheetMusicParams {
   fileData: Buffer | undefined;
   format: 'mid' | 'chart';
@@ -88,7 +83,7 @@ export function useSheetMusic({
       renderMusic(
         vexflowContainerRef.current,
         parsedMidi,
-        layout === 'flow' ? FLOW_SHEET_MUSIC_COLORS : SHEET_MUSIC_COLORS,
+        SHEET_MUSIC_COLORS,
         showBarNumbers,
         enableColors,
         showTempo,
