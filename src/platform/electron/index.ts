@@ -8,6 +8,7 @@ export function electronPlatform(): PlatformAdapter {
       indexedDbImports: false,
       webMidi: false,
       youtubeImport: true,
+      onlineSongDownloads: true,
       localFolderImport: true,
       localAudioImport: true,
       stemSplit: true,

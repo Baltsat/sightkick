@@ -134,6 +134,9 @@ export function SongView() {
   const [scoreData, setScoreData] = useState<ScoreData>();
   const [practiceSummary, setPracticeSummary] = useState<RunSummary>();
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
+  const [practicePersistenceState, setPracticePersistenceState] = useState<
+    'saving' | 'saved' | 'failed' | 'no-evidence'
+  >('no-evidence');
   const [isExporting, setIsExporting] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isCoachOpen, setIsCoachOpen] = useState(false);
@@ -383,6 +386,11 @@ export function SongView() {
       });
 
       setPracticeSummary(runSummary);
+      setPracticePersistenceState(
+        gameMode === 'practice' && id && persistEligible
+          ? 'saving'
+          : 'no-evidence',
+      );
       // Cleared synchronously so a still-open modal from a prior run never
       // shows last run's XP for a frame while this run's recordRun IPC
       // round trip (below) is in flight.
@@ -407,6 +415,7 @@ export function SongView() {
           saveRunOffRef.current = undefined;
 
           if ('error' in result) {
+            setPracticePersistenceState('failed');
             notification.error({
               title: 'Practice history was not saved',
               description: `${result.error} Your existing history is unchanged.`,
@@ -414,6 +423,8 @@ export function SongView() {
               duration: 0,
             });
           } else {
+            setPracticePersistenceState('saved');
+
             // A saved all-wrong/Tutor run does not earn rewards, but it is
             // still fresh Coach evidence. Refresh the shared Home cache only
             // after persistence succeeds so its next recommendation is live.
@@ -507,6 +518,10 @@ export function SongView() {
     [markRunStarted, playFromTick],
   );
   const onNextSong = useCallback(() => {
+    if (gameMode === 'practice' && practicePersistenceState === 'saving') {
+      return;
+    }
+
     setIsScoreModalOpen(false);
 
     if (
@@ -524,9 +539,17 @@ export function SongView() {
     }
 
     navigate('/');
-  }, [gameMode, id, navigate, outletContext, practiceSummary]);
+  }, [
+    gameMode,
+    id,
+    navigate,
+    outletContext,
+    practicePersistenceState,
+    practiceSummary,
+  ]);
   const onRetry = useCallback(() => {
     setIsScoreModalOpen(false);
+    setPracticePersistenceState('no-evidence');
     playRunFromTick(0);
   }, [playRunFromTick]);
   const loadStoredRuns = useCallback(
@@ -1180,7 +1203,14 @@ export function SongView() {
         isOpen={isScoreModalOpen}
         onNextSong={onNextSong}
         nextLabel={gameMode === 'practice' ? 'Next practice' : undefined}
-        autoContinueEnabled={gameMode === 'practice' && autoContinueEnabled}
+        autoContinueEnabled={
+          gameMode === 'practice' &&
+          autoContinueEnabled &&
+          practicePersistenceState === 'saved'
+        }
+        persistenceState={
+          gameMode === 'practice' ? practicePersistenceState : undefined
+        }
         onRetry={onRetry}
         onCoach={onOpenCoach}
         songData={songData}

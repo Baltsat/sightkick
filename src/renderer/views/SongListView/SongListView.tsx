@@ -122,6 +122,15 @@ function appendCompletedRun(
 export function SongListView() {
   const { currentPath, difficulty, setDifficulty } = useApp();
   const { controlMapping } = useInput();
+  const platformCapabilities = window.drumrollPlatform?.capabilities;
+  const youtubeImportAvailable = platformCapabilities?.youtubeImport ?? true;
+  const onlineDownloadsAvailable =
+    platformCapabilities?.onlineSongDownloads ?? true;
+  const localFolderImportAvailable =
+    platformCapabilities?.localFolderImport ?? true;
+  const myMusicAvailable = platformCapabilities?.myMusic ?? true;
+  const hasAddMusicAction =
+    youtubeImportAvailable || localFolderImportAvailable || myMusicAvailable;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const songOpen = useOutlet() !== null;
@@ -228,7 +237,25 @@ export function SongListView() {
   const [myMusicOpen, setMyMusicOpen] = useState(false);
   const [requestedSongSearch, setRequestedSongSearch] =
     useState<SongSearchRequest>();
-  const [recommendationNowMs] = useState(() => Date.now());
+  const [recommendationNowMs, setRecommendationNowMs] = useState(() =>
+    Date.now(),
+  );
+
+  useEffect(() => {
+    if (!onlineDownloadsAvailable && libraryMode === 'online') {
+      setLibraryMode('local');
+    }
+  }, [libraryMode, onlineDownloadsAvailable, setLibraryMode]);
+
+  useEffect(() => {
+    const timer = window.setInterval(
+      () => setRecommendationNowMs(Date.now()),
+      60_000,
+    );
+
+    return () => window.clearInterval(timer);
+  }, []);
+
   // The Lessons unlock chain always looks at every lesson song, regardless
   // of the app's globally selected difficulty tab — lesson charts only ever
   // carry an Expert drum track, so filtering by difficulty here would hide
@@ -564,8 +591,13 @@ export function SongListView() {
             }
           },
           sort: openSort,
-          library: () =>
-            setLibraryMode(libraryMode === 'online' ? 'local' : 'online'),
+          library: () => {
+            if (!onlineDownloadsAvailable) {
+              return;
+            }
+
+            setLibraryMode(libraryMode === 'online' ? 'local' : 'online');
+          },
           difficulty: () => setDifficulty(nextDifficulty(difficulty)),
         },
     !songOpen && !gameModeSelector.isOpen && view === 'songs',
@@ -761,46 +793,57 @@ export function SongListView() {
                           : filteredSongList.length
                       }
                       libraryMode={libraryMode}
+                      onlineDownloadsAvailable={onlineDownloadsAvailable}
                       onChangeLibraryMode={setLibraryMode}
                     />
-                    <div
-                      className="flex min-w-fit shrink-0 flex-wrap items-center gap-2 rounded-2xl bg-fill p-1.5 *:shrink-0"
-                      data-testid="add-music-actions"
-                      aria-label="Add music"
-                    >
-                      <span className="px-2 text-xs font-semibold uppercase tracking-[0.12em] text-text-faint">
-                        Add music
-                      </span>
-                      <SongSearch
-                        disabled={currentPath === null}
-                        requestedSearch={requestedSongSearch}
-                      />
-                      <SongImport
-                        disabled={currentPath === null}
-                        onImported={handleSongImported}
-                      />
-                      <Tooltip
-                        title={
-                          currentPath === null
-                            ? 'Select a library folder first'
-                            : 'Add songs from your YouTube Music Liked playlist'
-                        }
+                    {hasAddMusicAction && (
+                      <div
+                        className="flex min-w-fit shrink-0 flex-wrap items-center gap-2 rounded-2xl bg-fill p-1.5 *:shrink-0"
+                        data-testid="add-music-actions"
+                        aria-label="Add music"
                       >
-                        <Button
-                          icon={<FontAwesomeIcon icon={faMusic} />}
-                          size="large"
-                          data-testid="my-music-trigger"
-                          disabled={currentPath === null}
-                          onClick={() => setMyMusicOpen(true)}
-                        >
-                          My Music
-                        </Button>
-                      </Tooltip>
-                      <AutoChart
-                        disabled={currentPath === null}
-                        onImported={handleSongImported}
-                      />
-                    </div>
+                        <span className="px-2 text-xs font-semibold uppercase tracking-[0.12em] text-text-faint">
+                          Add music
+                        </span>
+                        {youtubeImportAvailable && (
+                          <SongSearch
+                            disabled={currentPath === null}
+                            requestedSearch={requestedSongSearch}
+                          />
+                        )}
+                        {localFolderImportAvailable && (
+                          <SongImport
+                            disabled={currentPath === null}
+                            onImported={handleSongImported}
+                          />
+                        )}
+                        {myMusicAvailable && (
+                          <Tooltip
+                            title={
+                              currentPath === null
+                                ? 'Select a library folder first'
+                                : 'Add songs from your YouTube Music Liked playlist'
+                            }
+                          >
+                            <Button
+                              icon={<FontAwesomeIcon icon={faMusic} />}
+                              size="large"
+                              data-testid="my-music-trigger"
+                              disabled={currentPath === null}
+                              onClick={() => setMyMusicOpen(true)}
+                            >
+                              My Music
+                            </Button>
+                          </Tooltip>
+                        )}
+                        {youtubeImportAvailable && (
+                          <AutoChart
+                            disabled={currentPath === null}
+                            onImported={handleSongImported}
+                          />
+                        )}
+                      </div>
+                    )}
                     <SortButton
                       sort={sort}
                       disabled={!sortAvailable}
@@ -843,7 +886,9 @@ export function SongListView() {
                     tracks={filteredLibraryCandidates}
                     query={nameFilter}
                     linkedTrackIds={linkedCandidateIds}
-                    canFindAndChart={currentPath !== null}
+                    canFindAndChart={
+                      youtubeImportAvailable && currentPath !== null
+                    }
                     onFindAndChart={findAndChartCandidate}
                   />
                 ) : (
@@ -904,6 +949,7 @@ export function SongListView() {
                   hasFolder={currentPath !== null}
                   hasSongs={librarySongs.length > 0}
                   query={nameFilter}
+                  onlineDownloadsAvailable={onlineDownloadsAvailable}
                   onClearFilter={() => setNameFilter('')}
                   onBrowseOnline={() => setLibraryMode('online')}
                 />

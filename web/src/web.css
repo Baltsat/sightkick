@@ -25,11 +25,8 @@ body {
   --web-ui: 'Instrument Sans Variable', 'Instrument Sans', Arial, sans-serif;
   min-width: 20rem;
   overflow: hidden;
-  background: radial-gradient(
-      circle at 88% 3%,
-      rgb(86 216 242 / 19%),
-      transparent 22rem
-    ),
+  background:
+    radial-gradient(circle at 88% 3%, rgb(86 216 242 / 19%), transparent 22rem),
     radial-gradient(circle at 0% 37%, rgb(247 53 134 / 10%), transparent 29rem),
     var(--web-pearl);
   color: var(--web-ink);
@@ -217,13 +214,37 @@ body {
   cursor: pointer;
 }
 
+.web-actions a.web-actions__download {
+  padding: 13px 19px;
+  color: white;
+  background: var(--web-magenta);
+  box-shadow: 0 12px 26px rgb(247 53 134 / 24%);
+  text-decoration: none;
+}
+
+.web-actions button.web-actions__browser {
+  border: 1px solid rgb(17 23 34 / 18%);
+  color: var(--web-ink);
+  background: rgb(255 255 255 / 72%);
+  box-shadow: none;
+}
+
 .web-actions button:hover,
 .web-actions button:focus-visible,
+.web-actions a.web-actions__download:hover,
+.web-actions a.web-actions__download:focus-visible,
 .web-download-action a:hover,
 .web-download-action a:focus-visible {
   transform: translateY(-2px);
   background: #df1d70;
   box-shadow: 0 16px 34px rgb(247 53 134 / 32%);
+}
+
+.web-actions button.web-actions__browser:hover,
+.web-actions button.web-actions__browser:focus-visible {
+  color: var(--web-magenta);
+  background: white;
+  box-shadow: 0 12px 24px rgb(17 23 34 / 10%);
 }
 
 .web-actions a {
@@ -339,7 +360,7 @@ body {
 
 .web-practice-capture img {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 16 / 10;
   object-fit: cover;
   object-position: center;
 }

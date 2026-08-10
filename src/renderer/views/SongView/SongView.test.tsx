@@ -1389,6 +1389,17 @@ describe('the reference legend', () => {
       expect(screen.queryByText('Snare')).not.toBeInTheDocument();
     });
   });
+
+  it('docks the color key above the adaptive Tutor instead of behind it', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong();
+
+    expect(
+      document.querySelector('.drumroll-reference--above-tutor'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('tutor-hud')).toBeInTheDocument();
+  });
 });
 
 // Carries a real note track for two difficulties, with Medium truncated to

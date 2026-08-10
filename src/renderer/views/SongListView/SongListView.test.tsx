@@ -62,6 +62,92 @@ describe('SongListView — loading the library', () => {
     ).toBeEnabled();
   });
 
+  it('makes kit readiness explicit and only enables the one-touch start after the remembered kit returns', async () => {
+    const view = mountSongListView({
+      settings: {
+        selectedDevice: {
+          id: 'midi:Yamaha DTX402',
+          name: 'Yamaha DTX402',
+          sourceId: 'midi',
+          port: 2,
+        },
+      },
+    });
+
+    view.loadSongs([
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Pulse and posture',
+        starsToUnlock: 0,
+      }),
+    ]);
+
+    expect(screen.getByTestId('home-input-readiness')).toHaveTextContent(
+      'Waiting for Yamaha DTX402',
+    );
+    expect(screen.getByTestId('home-start-practice')).toBeDisabled();
+    expect(screen.getByTestId('kit-hotspot-kick')).toBeDisabled();
+
+    view.emit('midi-device-list', [
+      {
+        id: 'midi:Yamaha DTX402',
+        name: 'Yamaha DTX402',
+        sourceId: 'midi',
+        port: 7,
+      },
+    ]);
+    await waitFor(() => expect(view.sentChannels()).toContain('listen-midi'));
+    view.emit('midi-ready', { port: 7 });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-input-readiness')).toHaveTextContent(
+        'Yamaha DTX402 ready',
+      ),
+    );
+    expect(screen.getByTestId('home-start-practice')).toBeEnabled();
+    expect(screen.getByTestId('kit-hotspot-kick')).toBeEnabled();
+  });
+
+  it('does not expose desktop-only music actions in the browser library', () => {
+    vi.stubGlobal('drumrollPlatform', {
+      kind: 'web',
+      capabilities: {
+        lessonLibrary: true,
+        indexedDbImports: true,
+        webMidi: true,
+        youtubeImport: false,
+        onlineSongDownloads: false,
+        localFolderImport: false,
+        localAudioImport: false,
+        stemSplit: false,
+        octave: false,
+        myMusic: false,
+        appUpdates: false,
+        openSongDirectory: false,
+      },
+    });
+
+    const view = setupSongListView();
+
+    expect(screen.queryByTestId('add-music-actions')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('song-search-input')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('import-song-trigger')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('my-music-trigger')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('create-chart-trigger'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mode-online')).not.toBeInTheDocument();
+    expect(screen.getByTestId('mode-local')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    view.press('library');
+    expect(screen.getByTestId('mode-local')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
   it('launches the deterministic next lesson directly in Practice at its recommended speed', async () => {
     const view = mountSongListView();
 

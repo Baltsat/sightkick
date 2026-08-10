@@ -238,6 +238,10 @@ export interface MidiDevice {
   name: string;
 }
 
+export interface MidiReadyResponse {
+  port: number;
+}
+
 export enum MidiMessageType {
   NoteOn = 144,
   NoteOff = 128,

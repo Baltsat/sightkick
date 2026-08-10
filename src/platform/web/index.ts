@@ -988,9 +988,18 @@ export class WebPlatform implements PlatformAdapter {
         break;
 
       case 'listen-midi':
-        await this.midi.listen(Number(args[0]), (message: MidiMessage) => {
-          this.emit('listen-midi', message);
-        });
+        try {
+          const port = Number(args[0]);
+
+          await this.midi.listen(port, (message: MidiMessage) => {
+            this.emit('listen-midi', message);
+          });
+          this.emit('midi-ready', { port });
+        } catch (error) {
+          this.emit('midi-error', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
 
         break;
 
@@ -1002,7 +1011,7 @@ export class WebPlatform implements PlatformAdapter {
       case 'check-auto-chart-backends':
         this.emit('auto-chart-backends', {
           sightkick: false,
-          remote: true,
+          remote: false,
           octave: false,
           default: 'remote',
         });
@@ -1011,16 +1020,17 @@ export class WebPlatform implements PlatformAdapter {
 
       case 'get-auto-chart-remote-settings':
         this.emit('auto-chart-remote-settings', {
-          endpoint: '/api/import',
-          tokenConfigured: true,
+          endpoint: '',
+          tokenConfigured: false,
         });
 
         break;
 
       case 'save-test-auto-chart-remote':
         this.emit('auto-chart-remote-test', {
-          ok: true,
-          message: 'Cloudflare manages the web transcriber connection.',
+          ok: false,
+          message:
+            'Chart creation is available in the desktop app; this browser deployment has no transcriber connection.',
         });
 
         break;

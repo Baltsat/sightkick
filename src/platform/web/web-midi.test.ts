@@ -46,7 +46,12 @@ describe('web MIDI adapter', () => {
       { id: 'midi:DTX', name: 'DTX', sourceId: 'midi', port: 0 },
     ]);
 
+    const ready = new Promise<{ port: number }>((resolve) => {
+      window.electron.ipcRenderer.once('midi-ready', resolve);
+    });
+
     window.electron.ipcRenderer.sendMessage('listen-midi', 0);
+    await expect(ready).resolves.toEqual({ port: 0 });
     await vi.waitFor(() => expect(input.onmidimessage).toBeTypeOf('function'));
     input.onmidimessage?.({ data: new Uint8Array([0x90, 38, 111]) });
     await vi.waitFor(() =>

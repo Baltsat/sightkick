@@ -291,8 +291,18 @@ describe('practice mode analytics', () => {
     try {
       const view = setupSongView({
         route: '/song-1?gameMode=practice',
-        settings: { countIn: false, adaptiveTutorEnabled: false },
-        keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+        settings: {
+          countIn: false,
+          adaptiveTutorEnabled: false,
+          autoContinueEnabled: true,
+        },
+        keyboard: {
+          kit: {
+            snare: ['keyboard:KeyJ'],
+            kick: ['keyboard:KeyK'],
+            crash: ['keyboard:KeyL'],
+          },
+        },
         onContinuePractice: continuePractice,
       });
 
@@ -308,6 +318,30 @@ describe('practice mode analytics', () => {
       expect(screen.getByTestId('score-next')).toHaveTextContent(
         'Next practice',
       );
+      expect(screen.getByTestId('score-next')).toBeDisabled();
+      expect(
+        screen.queryByTestId('score-auto-continue'),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId('score-persistence-status')).toHaveTextContent(
+        'Saving this run',
+      );
+
+      for (const code of ['KeyK', 'KeyL', 'KeyK', 'KeyL']) {
+        await view.pressKey(code);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(100);
+        });
+      }
+
+      expect(continuePractice).not.toHaveBeenCalled();
+      expect(screen.getByTestId('score-modal')).toBeInTheDocument();
+
+      await act(async () => {
+        view.ipc.emit('save-practice-run', { songId: 'song-1' });
+      });
+
+      expect(screen.getByTestId('score-next')).toBeEnabled();
+      expect(screen.getByTestId('score-auto-continue')).toBeInTheDocument();
       view.clickTestId('score-next');
 
       expect(continuePractice).toHaveBeenCalledWith(

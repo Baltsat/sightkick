@@ -2,7 +2,8 @@
 .coach-desk {
   height: 100%;
   overflow-y: auto;
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 88% 10%,
       rgb(86 216 242 / 14%),
       transparent 26rem
@@ -42,7 +43,8 @@
 
 .home-cockpit__wash {
   pointer-events: none;
-  background: linear-gradient(
+  background:
+    linear-gradient(
       90deg,
       rgb(17 23 34 / 82%) 0%,
       rgb(17 23 34 / 54%) 28%,
@@ -143,6 +145,42 @@
   flex-wrap: wrap;
   gap: 0.65rem;
   margin-top: 0.85rem;
+}
+
+.home-cockpit__input-readiness {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: fit-content;
+  margin: 0.75rem 0 0;
+  padding: 0.42rem 0.7rem;
+  border: 1px solid rgb(17 23 34 / 12%);
+  border-radius: 999px;
+  color: rgb(17 23 34 / 72%);
+  background: rgb(255 255 255 / 72%);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.25;
+  box-shadow: 0 7px 18px rgb(17 23 34 / 8%);
+  backdrop-filter: blur(12px);
+}
+
+.home-cockpit__input-readiness > span {
+  width: 0.52rem;
+  height: 0.52rem;
+  border-radius: 50%;
+  background: #24a971;
+  box-shadow: 0 0 0 4px rgb(36 169 113 / 13%);
+}
+
+.home-cockpit__input-readiness[data-state='reconnecting'] > span {
+  background: #f29a2e;
+  box-shadow: 0 0 0 4px rgb(242 154 46 / 15%);
+}
+
+.home-cockpit__input-readiness[data-state='needs-selection'] > span {
+  background: #e95372;
+  box-shadow: 0 0 0 4px rgb(233 83 114 / 14%);
 }
 
 .coach-desk .ant-btn-primary {
@@ -321,6 +359,15 @@
     0 0 2.8rem rgb(255 173 47 / 84%),
     0 0 4.8rem rgb(247 53 134 / 52%);
   transform: scale(1.08);
+}
+
+.home-kit-hotspot:disabled {
+  cursor: not-allowed;
+}
+
+.home-kit-hotspot:disabled .home-kit-hotspot__ring {
+  opacity: 0.58;
+  filter: saturate(0.45);
 }
 
 .home-kit-hotspot--active .home-kit-hotspot__ring {
@@ -523,12 +570,17 @@
   overflow: hidden;
   border: 1px solid rgb(17 23 34 / 10%);
   border-radius: 1.75rem;
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 82% 36%,
       rgb(247 53 134 / 22%),
       transparent 13rem
     ),
-    radial-gradient(circle at 71% 72%, rgb(255 173 47 / 29%), transparent 16rem),
+    radial-gradient(
+      circle at 71% 72%,
+      rgb(255 173 47 / 29%),
+      transparent 16rem
+    ),
     var(--color-ink);
   box-shadow: 0 1.5rem 3.5rem rgb(17 23 34 / 16%);
 }
@@ -594,12 +646,8 @@
 
 .coach-desk__card--focus {
   border-color: rgb(247 53 134 / 26%);
-  background: linear-gradient(
-      145deg,
-      rgb(247 53 134 / 11%),
-      rgb(255 173 47 / 12%)
-    ),
-    #fff;
+  background:
+    linear-gradient(145deg, rgb(247 53 134 / 11%), rgb(255 173 47 / 12%)), #fff;
 }
 
 .coach-desk__card h2 {

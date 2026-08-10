@@ -36,6 +36,7 @@ export type Channels =
   | 'open-song-directory'
   | 'midi-device-list'
   | 'listen-midi'
+  | 'midi-ready'
   | 'midi-error'
   | 'stop-listen-midi'
   | 'check-update'

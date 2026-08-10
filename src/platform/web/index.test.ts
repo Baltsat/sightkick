@@ -64,7 +64,8 @@ describe('web platform channel mapping', () => {
       lessonLibrary: true,
       indexedDbImports: true,
       webMidi: true,
-      youtubeImport: true,
+      youtubeImport: false,
+      onlineSongDownloads: false,
       localFolderImport: false,
       stemSplit: false,
       octave: false,
@@ -73,14 +74,32 @@ describe('web platform channel mapping', () => {
     });
   });
 
-  it('advertises only the managed remote chart backend', async () => {
+  it('does not advertise a transcriber that production has not configured', async () => {
     await expect(
       reply('check-auto-chart-backends', 'auto-chart-backends'),
     ).resolves.toEqual({
       sightkick: false,
-      remote: true,
+      remote: false,
       octave: false,
       default: 'remote',
+    });
+  });
+
+  it('reports the browser transcriber settings honestly', async () => {
+    await expect(
+      reply('get-auto-chart-remote-settings', 'auto-chart-remote-settings'),
+    ).resolves.toEqual({ endpoint: '', tokenConfigured: false });
+
+    await expect(
+      replyWithArgs(
+        'save-test-auto-chart-remote',
+        'auto-chart-remote-test',
+        {},
+      ),
+    ).resolves.toEqual({
+      ok: false,
+      message:
+        'Chart creation is available in the desktop app; this browser deployment has no transcriber connection.',
     });
   });
 

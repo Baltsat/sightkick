@@ -93,6 +93,7 @@ describe('listenMidi', () => {
     listenMidi(event as never, 1);
 
     expect(holder.instances[0].openPort).toHaveBeenCalledWith(1);
+    expect(lastReply(event, 'midi-ready').args[0]).toEqual({ port: 1 });
   });
 
   it('forwards note-on messages to the renderer', () => {

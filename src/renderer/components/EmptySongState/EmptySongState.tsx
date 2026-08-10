@@ -8,6 +8,7 @@ interface Props {
   hasFolder: boolean;
   hasSongs: boolean;
   query: string;
+  onlineDownloadsAvailable?: boolean;
   onClearFilter: () => void;
   onBrowseOnline: () => void;
 }
@@ -17,6 +18,7 @@ export function EmptySongState({
   hasFolder,
   hasSongs,
   query,
+  onlineDownloadsAvailable = true,
   onClearFilter,
   onBrowseOnline,
 }: Props) {
@@ -45,6 +47,23 @@ export function EmptySongState({
   }
 
   if (hasFolder) {
+    if (!onlineDownloadsAvailable) {
+      return (
+        <section className="m-auto flex max-w-md flex-col items-center gap-3 px-6 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-fill text-accent-text">
+            <FontAwesomeIcon icon={faFolder} />
+          </div>
+          <h2 className="font-display text-2xl font-semibold text-text-body">
+            Your browser song library is empty
+          </h2>
+          <p className="text-sm leading-relaxed text-text-muted">
+            Play the complete lesson path in Journey. Add authorized audio and
+            prepared charts with the signed desktop app.
+          </p>
+        </section>
+      );
+    }
+
     return (
       <section className="m-auto flex max-w-md flex-col items-center gap-3 px-6 text-center">
         <div className="flex size-12 items-center justify-center rounded-full bg-fill text-accent-text">

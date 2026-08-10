@@ -24,6 +24,41 @@
   pointer-events: none;
 }
 
+/* The color/name key is a learning control, especially for Tom 1/2/3. Keep
+ * it in the same bottom dock as Tutor without letting either surface cover
+ * the other. The media offsets follow the HUD's responsive row changes. */
+.drumroll-reference--above-tutor {
+  bottom: calc(
+    clamp(1rem, 2.1vw, 1.75rem) + clamp(6.6rem, 12vh, 8rem) + 0.85rem
+  );
+  z-index: 17;
+  max-width: none;
+  padding-inline: 0.45rem;
+  font-size: clamp(0.7rem, 1.05vw, 0.88rem);
+  scale: 0.9;
+  transform-origin: center;
+}
+
+.drumroll-reference--above-tutor > div .px-2 {
+  gap: clamp(0.24rem, 0.48vw, 0.5rem);
+  padding-inline: clamp(0.25rem, 0.58vw, 0.55rem);
+}
+
+.drumroll-reference--above-tutor .ant-divider-vertical {
+  margin-inline: clamp(0.12rem, 0.3vw, 0.3rem);
+}
+
+.drumroll-reference--above-tutor svg {
+  font-size: 1em;
+}
+
+/* Practice keeps the eight lane colors at drum-distance size. Dynamic marks
+ * remain available in Classic/reference mode, but are secondary to the
+ * pad-name memory aid while Tutor occupies the lower dock. */
+.drumroll-reference--above-tutor > div:nth-last-child(-n + 2) {
+  display: none;
+}
+
 .drumroll-tutor-hud::after {
   content: '';
   position: absolute;
@@ -212,11 +247,27 @@
     grid-auto-columns: minmax(0, 1fr);
     padding-left: calc(clamp(3.4rem, 5vw, 4.5rem) + 1rem);
   }
+
+  .drumroll-reference--above-tutor {
+    bottom: 13.25rem;
+    scale: 0.72;
+  }
+}
+
+@media (min-width: 1440px) {
+  .drumroll-reference--above-tutor {
+    scale: 1;
+  }
 }
 
 @media (max-width: 620px) {
   .drumroll-tutor-hud {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .drumroll-reference--above-tutor {
+    bottom: 18.5rem;
+    scale: 0.52;
   }
 
   .drumroll-tutor-hud__signal {

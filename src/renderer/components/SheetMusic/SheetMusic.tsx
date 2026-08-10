@@ -387,7 +387,14 @@ export function SheetMusic({
       </div>
 
       {enableColors && showReference && (
-        <Reference className="fixed bottom-10 left-1/2 -translate-x-1/2" />
+        <Reference
+          className={cn(
+            'fixed left-1/2 -translate-x-1/2',
+            gameMode === 'practice'
+              ? 'drumroll-reference--above-tutor'
+              : 'bottom-10',
+          )}
+        />
       )}
     </div>
   );

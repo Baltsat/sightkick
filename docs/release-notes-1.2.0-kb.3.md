@@ -1,5 +1,10 @@
 # Drumroll 1.2.0-kb.3
 
+> Superseded by `1.2.0-kb.4` after the final independent audit found a
+> Practice legend collision, finite MIDI reconnect retries, an unconfigured
+> browser transcriber claim, and a deployed-source provenance mismatch. The
+> proof below remains the immutable historical record for `kb.3`.
+
 Drumroll is an adaptive drum tutor and performance game built around one
 practical promise: place the Mac beside a MIDI drum kit, start once, and keep
 practising without walking back to the computer between tasks.
@@ -55,7 +60,15 @@ validated camera-based review path.
 
 ## Distribution proof
 
-The public release is accepted only after the final Apple Silicon app and DMG
-pass Developer ID signature validation, Apple notarization, stapled-ticket
-validation, Gatekeeper assessment, exact lesson/Yandex manifest checks, and a
-clean-download SHA-256 replay against the immutable GitHub release assets.
+The final Apple Silicon app and DMG pass Developer ID signature validation,
+Apple notarization, stapled-ticket validation, Gatekeeper assessment, exact
+lesson/Yandex manifest checks, and the bundled transcriber smoke test. Apple
+accepted the independently submitted DMG under notarization request
+`33a352ad-c19e-4083-8db7-9db8911367f8`; its SHA-256 is
+`94aa3122c1e8c7b521c64901c32db36b5e4b2cfaf93a88ff8ff57b0d01163916`.
+
+The seven public assets were downloaded into a clean directory from immutable
+tag `v1.2.0-kb.3`; all seven matched the local release bytes, the six payloads
+replayed `SHA256SUMS.txt`, and the downloaded DMG independently passed the full
+bundle, signature, ticket, Gatekeeper, curriculum, library, transcriber, and
+FFmpeg verifier.

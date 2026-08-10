@@ -19,6 +19,7 @@ export interface SongFilterProps {
   className?: string;
   filteredSongsCount: number;
   libraryMode: LibraryMode;
+  onlineDownloadsAvailable?: boolean;
   onChangeLibraryMode: (value: LibraryMode) => void;
   difficulty: Difficulty;
   setDifficulty: (newDifficulty: Difficulty) => void;
@@ -28,48 +29,51 @@ export function SongFilter({
   onChangeFilter,
   onChangeLibraryMode,
   libraryMode = 'local',
+  onlineDownloadsAvailable = true,
   nameFilter,
   className,
   difficulty,
   setDifficulty,
   filteredSongsCount,
 }: SongFilterProps) {
-  const options = [
-    {
-      icon: <FontAwesomeIcon icon={faFolder} />,
-      value: 'local',
-      label: 'Local songs',
-      visibleLabel: 'Local',
-      count: undefined,
-      tooltipText: "Songs you've already got on your machine",
-    },
-    {
-      icon: <FontAwesomeIcon icon={faListUl} />,
-      value: 'drums',
-      label: 'Drums',
-      visibleLabel: 'Drums',
-      count: 13,
-      tooltipText:
-        '13 captured Yandex Music rows. Metadata only until you add lawful local audio and a chart.',
-    },
-    {
-      icon: <FontAwesomeIcon icon={faHeart} />,
-      value: 'favorites',
-      label: 'Favorites',
-      visibleLabel: 'Favorites',
-      count: 230,
-      tooltipText:
-        '230 captured Yandex Music rows. Metadata only; no playback or downloads are available here.',
-    },
-    {
-      icon: <FontAwesomeIcon icon={faGlobe} />,
-      value: 'online',
-      label: 'Online songs',
-      visibleLabel: 'Online',
-      count: undefined,
-      tooltipText: 'Go hunting for new songs to download',
-    },
-  ] as const;
+  const options = (
+    [
+      {
+        icon: <FontAwesomeIcon icon={faFolder} />,
+        value: 'local',
+        label: 'Local songs',
+        visibleLabel: 'Local',
+        count: undefined,
+        tooltipText: "Songs you've already got on your machine",
+      },
+      {
+        icon: <FontAwesomeIcon icon={faListUl} />,
+        value: 'drums',
+        label: 'Drums',
+        visibleLabel: 'Drums',
+        count: 13,
+        tooltipText:
+          '13 captured Yandex Music rows. Metadata only until you add lawful local audio and a chart.',
+      },
+      {
+        icon: <FontAwesomeIcon icon={faHeart} />,
+        value: 'favorites',
+        label: 'Favorites',
+        visibleLabel: 'Favorites',
+        count: 230,
+        tooltipText:
+          '230 captured Yandex Music rows. Metadata only; no playback or downloads are available here.',
+      },
+      {
+        icon: <FontAwesomeIcon icon={faGlobe} />,
+        value: 'online',
+        label: 'Online songs',
+        visibleLabel: 'Online',
+        count: undefined,
+        tooltipText: 'Go hunting for new songs to download',
+      },
+    ] as const
+  ).filter((option) => option.value !== 'online' || onlineDownloadsAvailable);
 
   return (
     <div

@@ -254,7 +254,7 @@ Each saved session has:
 - stable session and song identifiers,
 - mode and configuration,
 - start and end time,
-- speed changes,
+- final playback speed plus every Tutor-authored recovery speed intervention,
 - canonical hit records,
 - resolved misses,
 - wrong-pad hits,
@@ -262,7 +262,7 @@ Each saved session has:
 - streak and score,
 - lane summaries,
 - recovery summaries,
-- checkpoint and life events,
+- Tutor checkpoint windows, remaining lives, and recovery-attempt outcomes,
 - app and schema version.
 
 Recovery summaries are compact.

@@ -5,6 +5,7 @@ export interface PlatformCapabilities {
   indexedDbImports: boolean;
   webMidi: boolean;
   youtubeImport: boolean;
+  onlineSongDownloads: boolean;
   localFolderImport: boolean;
   localAudioImport: boolean;
   stemSplit: boolean;

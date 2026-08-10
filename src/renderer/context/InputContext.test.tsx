@@ -13,6 +13,7 @@ import {
   InputProvider,
   MIDI_HEALTH_CHECK_DELAY_MS,
   MIDI_RECONNECT_DELAY_MS,
+  midiReconnectDelayMs,
   useInput,
 } from './InputContext';
 
@@ -36,6 +37,10 @@ function listenPorts() {
 
 function stopCount() {
   return ipc.sent.filter((s) => s.channel === 'stop-listen-midi').length;
+}
+
+function acknowledgeMidi(port: number) {
+  act(() => ipc.emit('midi-ready', { port }));
 }
 
 // inputBus.listDevices() chains through InputBus -> MidiSource's IPC
@@ -91,37 +96,43 @@ describe('InputContext midi stream ownership', () => {
     expect(listenPorts()).toEqual([]);
   });
 
-  it('starts listening when a device is selected', () => {
+  it('starts listening only after the selected device is present', async () => {
     const { result } = renderHook(() => useInput(), { wrapper });
 
     act(() => result.current.setSelectedDevice(DEVICE_A));
+    expect(listenPorts()).toEqual([]);
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
 
     expect(listenPorts()).toEqual([2]);
   });
 
-  it('restarts on the new port when the device changes', () => {
+  it('restarts on the new port when the device changes', async () => {
     const { result } = renderHook(() => useInput(), { wrapper });
 
     act(() => result.current.setSelectedDevice(DEVICE_A));
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
     act(() => result.current.setSelectedDevice(DEVICE_B));
+    await respondWithMidiDevices([{ name: 'Pad B', port: 5 }]);
 
     expect(listenPorts()).toEqual([2, 5]);
     expect(stopCount()).toBe(1);
   });
 
-  it('stops listening when the device is cleared', () => {
+  it('stops listening when the device is cleared', async () => {
     const { result } = renderHook(() => useInput(), { wrapper });
 
     act(() => result.current.setSelectedDevice(DEVICE_A));
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
     act(() => result.current.setSelectedDevice(null));
 
     expect(stopCount()).toBe(1);
   });
 
-  it('stops listening on unmount', () => {
+  it('stops listening on unmount', async () => {
     const { result, unmount } = renderHook(() => useInput(), { wrapper });
 
     act(() => result.current.setSelectedDevice(DEVICE_A));
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
     unmount();
 
     expect(stopCount()).toBe(1);
@@ -131,6 +142,7 @@ describe('InputContext midi stream ownership', () => {
     const { result } = renderHook(() => useInput(), { wrapper });
 
     act(() => result.current.setSelectedDevice(DEVICE_A));
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
     act(() => ipc.emit('midi-error', { error: 'device unavailable' }));
 
     expect(
@@ -138,10 +150,11 @@ describe('InputContext midi stream ownership', () => {
     ).toBeInTheDocument();
   });
 
-  it('stops listening for connect errors once the device is cleared', () => {
+  it('stops listening for connect errors once the device is cleared', async () => {
     const { result } = renderHook(() => useInput(), { wrapper });
 
     act(() => result.current.setSelectedDevice(DEVICE_A));
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
 
     expect(ipc.onCount('midi-error')).toBe(1);
 
@@ -555,10 +568,44 @@ describe('InputContext MIDI auto-select', () => {
         await vi.advanceTimersByTimeAsync(MIDI_RECONNECT_DELAY_MS);
       });
       await flushMidiResponse([{ name: 'Pad A', port: 7 }]);
+      acknowledgeMidi(7);
 
       expect(result.current.selectedDevice).toEqual({ ...DEVICE_A, port: 7 });
       expect(result.current.inputReadiness).toBe('connected');
       expect(listenPorts()).toEqual([7]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps looking beyond the old three-attempt window and reconnects without manual input', async () => {
+    vi.useFakeTimers();
+    localStorage.setItem('settings.selectedDevice', JSON.stringify(DEVICE_A));
+
+    try {
+      const { result } = renderHook(() => useInput(), { wrapper });
+
+      await flushMidiResponse([]);
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(midiReconnectDelayMs(attempt));
+        });
+        await flushMidiResponse([]);
+      }
+
+      expect(result.current.inputReadiness).toBe('reconnecting');
+      expect(result.current.selectedDevice).toEqual(DEVICE_A);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(midiReconnectDelayMs(5));
+      });
+      await flushMidiResponse([{ name: 'Pad A', port: 11 }]);
+      acknowledgeMidi(11);
+
+      expect(result.current.selectedDevice).toEqual({ ...DEVICE_A, port: 11 });
+      expect(result.current.inputReadiness).toBe('connected');
+      expect(listenPorts()).toEqual([11]);
     } finally {
       vi.useRealTimers();
     }
@@ -570,6 +617,7 @@ describe('InputContext MIDI auto-select', () => {
     const { result } = renderHook(() => useInput(), { wrapper });
 
     await respondWithMidiDevices([{ name: 'Pad A', port: 9 }]);
+    acknowledgeMidi(9);
 
     expect(result.current.selectedDevice).toEqual({ ...DEVICE_A, port: 9 });
     expect(result.current.inputReadiness).toBe('connected');
@@ -584,6 +632,7 @@ describe('InputContext MIDI auto-select', () => {
       const { result } = renderHook(() => useInput(), { wrapper });
 
       await flushMidiResponse([{ name: 'Pad A', port: 2 }]);
+      acknowledgeMidi(2);
       expect(result.current.inputReadiness).toBe('connected');
       expect(listenPorts()).toEqual([2]);
 
@@ -608,6 +657,7 @@ describe('InputContext MIDI auto-select', () => {
 
       act(() => result.current.setSelectedDevice(DEVICE_A));
       await flushMidiResponse([{ name: 'Pad A', port: 2 }]);
+      acknowledgeMidi(2);
       expect(listenPorts()).toEqual([2]);
       expect(ipc.onCount('midi-error')).toBe(1);
 
@@ -623,6 +673,7 @@ describe('InputContext MIDI auto-select', () => {
         await vi.advanceTimersByTimeAsync(MIDI_RECONNECT_DELAY_MS);
       });
       await flushMidiResponse([{ name: 'Pad A', port: 6 }]);
+      acknowledgeMidi(6);
 
       expect(result.current.selectedDevice).toEqual({ ...DEVICE_A, port: 6 });
       expect(result.current.inputReadiness).toBe('connected');
@@ -632,6 +683,35 @@ describe('InputContext MIDI auto-select', () => {
       unmount();
       expect(stopCount()).toBe(2);
       expect(ipc.onCount('midi-error')).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never reports Ready for an enumerable but locked port and backs off until open acknowledgement', async () => {
+    vi.useFakeTimers();
+    localStorage.setItem('settings.selectedDevice', JSON.stringify(DEVICE_A));
+
+    try {
+      const { result } = renderHook(() => useInput(), { wrapper });
+
+      await flushMidiResponse([{ name: 'Pad A', port: 2 }]);
+      expect(result.current.inputReadiness).toBe('reconnecting');
+      expect(listenPorts()).toEqual([2]);
+
+      act(() => ipc.emit('midi-error', { error: 'port is already in use' }));
+      expect(result.current.inputReadiness).toBe('reconnecting');
+      expect(stopCount()).toBe(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(midiReconnectDelayMs(0));
+      });
+      await flushMidiResponse([{ name: 'Pad A', port: 2 }]);
+      expect(listenPorts()).toEqual([2, 2]);
+      expect(result.current.inputReadiness).toBe('reconnecting');
+
+      acknowledgeMidi(2);
+      expect(result.current.inputReadiness).toBe('connected');
     } finally {
       vi.useRealTimers();
     }

@@ -27,6 +27,7 @@ interface Props {
   nextLabel?: string;
   autoContinueEnabled?: boolean;
   autoContinueSeconds?: number;
+  persistenceState?: 'saving' | 'saved' | 'failed' | 'no-evidence';
   onCoach?: () => void;
   songData: Song | undefined;
   difficulty: Difficulty;
@@ -119,6 +120,7 @@ export function ScoreSummary({
   nextLabel = 'Back to library',
   autoContinueEnabled = false,
   autoContinueSeconds = 8,
+  persistenceState,
   onCoach,
   songData,
   difficulty,
@@ -152,6 +154,10 @@ export function ScoreSummary({
     : 0;
   const streakCurrent =
     gamification?.streak.current ?? runResult?.streakCurrent ?? 0;
+  // A player may explicitly continue after an honest failure/no-evidence
+  // warning, but never while the main-process write is still unresolved:
+  // leaving then would tear down the only acknowledgement listener.
+  const continuationBlocked = persistenceState === 'saving';
   const header = (
     <>
       <div className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
@@ -171,6 +177,34 @@ export function ScoreSummary({
   );
   const footer = (
     <div className="flex w-full flex-col gap-3">
+      {isOpen && persistenceState === 'saving' && (
+        <div
+          className="rounded-xl border border-accent-soft-border bg-accent-soft-bg px-3 py-2 text-sm text-text-muted"
+          role="status"
+          data-testid="score-persistence-status"
+        >
+          Saving this run before the next practice starts…
+        </div>
+      )}
+      {isOpen && persistenceState === 'failed' && (
+        <div
+          className="rounded-xl border border-red/30 bg-red/8 px-3 py-2 text-sm text-red"
+          role="alert"
+          data-testid="score-persistence-status"
+        >
+          Practice history was not saved. Automatic continuation is paused so
+          this run is not silently lost.
+        </div>
+      )}
+      {isOpen && persistenceState === 'no-evidence' && (
+        <div
+          className="rounded-xl border border-border-soft bg-fill px-3 py-2 text-sm text-text-muted"
+          role="status"
+          data-testid="score-persistence-status"
+        >
+          No scored kit input was captured. Automatic continuation is paused.
+        </div>
+      )}
       {isOpen && autoContinueEnabled && (
         <AutoContinueCountdown
           label={nextLabel}
@@ -203,6 +237,7 @@ export function ScoreSummary({
           data-testid="score-next"
           className="grow"
           type="primary"
+          disabled={continuationBlocked}
           onClick={() => onNextSong()}
           size="large"
         >

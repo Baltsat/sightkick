@@ -81,6 +81,33 @@ describe('ScoreSummary', () => {
     expect(onCoach).toHaveBeenCalledOnce();
   });
 
+  it('blocks explicit continuation only while the run save is unresolved', () => {
+    const onNextSong = vi.fn();
+    const { modal } = renderSummary({
+      onNextSong,
+      persistenceState: 'saving',
+    });
+
+    expect(modal.getByTestId('score-next')).toBeDisabled();
+    fireEvent.click(modal.getByTestId('score-next'));
+    expect(onNextSong).not.toHaveBeenCalled();
+  });
+
+  it.each(['saved', 'failed', 'no-evidence'] as const)(
+    'allows an explicit player choice after the run reaches the %s state',
+    (persistenceState) => {
+      const onNextSong = vi.fn();
+      const { modal } = renderSummary({
+        onNextSong,
+        persistenceState,
+      });
+
+      expect(modal.getByTestId('score-next')).toBeEnabled();
+      fireEvent.click(modal.getByTestId('score-next'));
+      expect(onNextSong).toHaveBeenCalledOnce();
+    },
+  );
+
   it('shows a visible countdown and automatically starts the next Practice task', async () => {
     vi.useFakeTimers();
 

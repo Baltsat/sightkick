@@ -140,7 +140,46 @@ All filenames in this table are relative to
   remain visual evidence; final interaction proof will come from the signed
   packaged desktop application rather than a browser-policy workaround.
 
-## Final gate
+## Release acceptance
 
-Final installed-app result: **passed**. Public-site visual and release readback
-remain release gates rather than desktop-design gates.
+### kb.3 historical installed and public acceptance
+
+The final pass uses the installed `1.2.0 (1.2.3)` application, the real
+preserved profile, the production Cloudflare site, and the site's shared web
+app in the user's desktop Chrome. It does not complete a synthetic run.
+
+| Surface                | Evidence                                       | Result                                                                                                                                  |
+| ---------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Installed Home         | `50-installed-kb3-home.jpg`                    | Dominant bass-drum Play, demoted utility actions, interpretable recent lane evidence, and no control collision.                         |
+| Long-horizon Profile   | `51-installed-kb3-profile-history.jpg`         | Lifetime runs, scored notes, hit-weighted accuracy, sample-weighted timing, monthly evidence, and retired curriculum are readable.      |
+| Installed Journey      | `52-installed-kb3-journey.jpg`                 | Bright spatial route, real 170-exercise state, and two-line lesson nodes remain legible at the compact installed viewport.              |
+| Installed library      | `53-installed-kb3-library.jpg`                 | Local catalog, difficulty, source filters, and add-music actions retain a clear hierarchy.                                              |
+| Yandex Drums           | `54-installed-kb3-yandex-drums.jpg`            | All 13 source rows are visible as honest metadata candidates with a reviewed handoff.                                                   |
+| Yandex Favorites       | `55-installed-kb3-yandex-favorites.jpg`        | All 230 source rows are represented without implying copyrighted audio is bundled.                                                      |
+| Source-to-chart        | `56-installed-kb3-source-to-chart.jpg`         | The selected source pre-fills a reviewed YouTube result picker before local chart creation.                                             |
+| Practice Flow          | `57-installed-kb3-practice-flow.jpg`           | Enlarged horizontal score and Tutor HUD read clearly, but the later independent audit found the drum-reference key was covered.         |
+| Classic + Tutor        | `58-installed-kb3-classic-tutor.jpg`           | The synchronized traditional score retains colored and positional lane identity plus the same tutor state.                              |
+| Zero-touch settings    | `59-installed-kb3-zero-touch-settings.jpg`     | Tutor, rewind, lives, auto-continue, and kit controls are explicit, independently labelled toggles.                                     |
+| Public landing         | `60-public-kb3-landing.jpg`                    | The production hero is bright, original, editorial, and anchored by the current installed cockpit.                                      |
+| Public Flow story      | `61-public-kb3-flow-story.jpg`                 | The real Tutor/Flow capture is shown without cropping it into a decorative mock.                                                        |
+| Public Journey + Coach | `62-public-kb3-journey-coach.jpg`              | Product imagery and evidence-led copy alternate with deliberate editorial rhythm.                                                       |
+| Public release callout | `63-public-kb3-download.jpg`                   | The signed Apple Silicon download and checksum are the only dominant conversion actions.                                                |
+| Shared web app         | `64-public-kb3-web-app-flow.jpg`               | Web MIDI permission, 170-lesson Journey, lesson fetch, Flow, and Tutor HUD work in production Chrome.                                   |
+| UNKNW comparison       | `65-unknw-reference-vs-public-kb3-landing.jpg` | Drumroll keeps the reference's typographic confidence while using distinct copy, bright palette, product imagery, layout, and identity. |
+
+All filenames in this table are relative to
+`docs/design-qa/2026-08-09-epoch5/`.
+
+The initial kb.3 visual pass was accepted, but the independent closure audit
+correctly reopened it: the color/name reference key sat behind the Tutor HUD.
+That makes this table historical proof, not the current release gate.
+
+### kb.4 audit remediation
+
+| Surface                   | Evidence                          | Result                                                                                                                               |
+| ------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Practice Flow + Tutor key | `66-preview-kb4-tutor-legend.png` | The eight pad-name colors form a dedicated, centered dock above Tutor; Tom 1/2/3 remain visible and neither surface clips the score. |
+
+The kb.4 source preview passes the reopened collision check. Final acceptance
+remains **pending** until the exact signed/notarized kb.4 installation and its
+clean-HEAD public deployment reproduce the accepted source surfaces.

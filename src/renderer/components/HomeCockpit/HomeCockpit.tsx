@@ -181,7 +181,7 @@ export function HomeCockpit({
   onOpenJourney,
   onOpenCoach,
 }: HomeCockpitProps) {
-  const { inputMapping } = useInput();
+  const { inputMapping, inputReadiness, selectedDevice } = useInput();
   const [activeLane, setActiveLane] = useState<KitElement>();
   const clearPulseRef = useRef<number | undefined>(undefined);
   const currentSong = useMemo(
@@ -227,12 +227,19 @@ export function HomeCockpit({
     }, 530);
   }, []);
   const handleStartRecommended = useCallback(() => {
+    if (inputReadiness !== 'connected') {
+      return;
+    }
+
     pulseLane('kick');
     onStartRecommended();
-  }, [onStartRecommended, pulseLane]);
+  }, [inputReadiness, onStartRecommended, pulseLane]);
 
   useDrumGestures({
-    enabled: surface === 'home' && recommendation !== undefined,
+    enabled:
+      surface === 'home' &&
+      recommendation !== undefined &&
+      inputReadiness === 'connected',
     surface: 'home',
     mapping: inputMapping,
     onAction: (action) => {
@@ -274,6 +281,14 @@ export function HomeCockpit({
       : latestRunForSong
       ? `${currentAccuracy}% latest run`
       : `${currentAccuracy}% best at ${difficulty}`;
+  const inputStatus =
+    inputReadiness === 'connected'
+      ? `${selectedDevice?.name ?? 'Input'} ready`
+      : inputReadiness === 'reconnecting'
+      ? `Waiting for ${
+          selectedDevice?.name ?? 'your kit'
+        } · reconnect USB and Drumroll will resume automatically`
+      : 'Choose an input in Settings before starting';
   const rootStyle = {
     '--drumstick-cursor': `url(${drumstickCursor}) 14 14`,
   } as CSSProperties;
@@ -414,6 +429,15 @@ export function HomeCockpit({
               ? `${currentSong.artist} · ${currentAccuracyLabel}`
               : 'Your kit is ready. Pick a chart to make the bass drum your Play button.'}
           </p>
+          <p
+            className="home-cockpit__input-readiness"
+            data-state={inputReadiness}
+            data-testid="home-input-readiness"
+            role="status"
+          >
+            <span aria-hidden="true" />
+            {inputStatus}
+          </p>
           <div className="home-cockpit__actions">
             {recommendation && (
               <Button
@@ -421,6 +445,7 @@ export function HomeCockpit({
                 data-testid="home-start-practice"
                 className="home-cockpit__start-secondary"
                 icon={<FontAwesomeIcon icon={faBolt} />}
+                disabled={inputReadiness !== 'connected'}
                 onClick={handleStartRecommended}
               >
                 Start practice
@@ -500,6 +525,11 @@ export function HomeCockpit({
                   `home-kit-hotspot--${hotspot.position}`,
                   isActive && 'home-kit-hotspot--active',
                 )}
+                disabled={
+                  hotspot.element === 'kick' &&
+                  recommendation !== undefined &&
+                  inputReadiness !== 'connected'
+                }
                 aria-label={`${hotspot.label}: ${signal.ariaDescription} ${
                   hotspot.element === 'kick'
                     ? recommendation
@@ -526,7 +556,11 @@ export function HomeCockpit({
                 <span className="home-kit-hotspot__ring" aria-hidden="true" />
                 <span className="home-kit-hotspot__copy">
                   <strong>
-                    {hotspot.element === 'kick' ? 'Play' : hotspot.label}
+                    {hotspot.element === 'kick'
+                      ? inputReadiness === 'connected'
+                        ? 'Play'
+                        : 'Waiting'
+                      : hotspot.label}
                   </strong>
                   <small>
                     {hotspot.element === 'kick'
@@ -552,6 +586,8 @@ export function HomeCockpit({
           {activeLane
             ? `${KIT_HOTSPOTS.find((item) => item.element === activeLane)
                 ?.label} hit`
+            : inputReadiness !== 'connected'
+            ? inputStatus
             : recommendation
             ? 'After a short silence: kick, crash, kick, crash starts the recommendation.'
             : 'Tap a drum, use its keyboard or MIDI mapping, or choose a song.'}
@@ -563,7 +599,9 @@ export function HomeCockpit({
           aria-atomic="true"
           data-testid="home-session-status"
         >
-          {recommendation
+          {inputReadiness !== 'connected'
+            ? inputStatus
+            : recommendation
             ? `Practice recommendation ready: ${
                 recommendation.candidate.title
               } at ${recommendation.suggestedSpeed.toFixed(1)} times speed.`

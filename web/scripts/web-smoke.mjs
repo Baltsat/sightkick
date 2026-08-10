@@ -12,7 +12,7 @@ const systemChrome =
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const expectedLessonCount = 170;
 const expectedPublicRelease =
-  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.3/Drumroll-1.2.0-kb.3-arm64.dmg';
+  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.4/Drumroll-1.2.0-kb.4-arm64.dmg';
 
 mkdirSync(shotDir, { recursive: true });
 
