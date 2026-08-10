@@ -183,3 +183,15 @@ That makes this table historical proof, not the current release gate.
 The kb.4 source preview passes the reopened collision check. Final acceptance
 remains **pending** until the exact signed/notarized kb.4 installation and its
 clean-HEAD public deployment reproduce the accepted source surfaces.
+
+### kb.4 final light-notation polish
+
+| Surface                  | Evidence                       | Result                                                                                                                                                |
+| ------------------------ | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Flow                     | `74-preview-light-flow.png`    | Continuous notation now sits on a warm beige horizontal score strip with ink staff lines, restrained lane color, and no dark stage.                   |
+| Classic                  | `75-preview-classic-warm.png`  | The traditional score keeps the same warm-paper material, tutor state, lane key, and authored practice controls.                                      |
+| Same-viewport comparison | `76-classic-vs-light-flow.png` | Classic and Flow form one coherent light visual system at the same 1225 × 768 viewport; the Flow strip remains the distinct zero-scroll playing mode. |
+
+This final pass follows the Impeccable craft checks for hierarchy, typography,
+material restraint, control grouping, and non-generic surface treatment. It
+does not change scoring, playback, Tutor behavior, or saved-run semantics.

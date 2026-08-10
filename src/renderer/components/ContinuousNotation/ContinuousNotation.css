@@ -1,15 +1,25 @@
 .drumroll-flow-notation {
-  --flow-glow: color-mix(in srgb, var(--color-accent-bright) 46%, transparent);
+  --flow-glow: color-mix(in srgb, var(--color-accent-bright) 28%, transparent);
   position: relative;
-  min-height: 100%;
+  display: flex;
+  min-height: auto;
+  flex-direction: column;
+  justify-content: center;
   isolation: isolate;
 }
 
 .drumroll-flow-viewport {
-  align-items: flex-start !important;
-  padding: 0 !important;
-  background: linear-gradient(145deg, #101723, #182432 54%, #111722);
-  scrollbar-color: rgb(255 173 47 / 42%) rgb(17 23 34 / 88%);
+  align-items: center !important;
+  justify-content: center;
+  padding: clamp(4.75rem, 10vh, 7rem) 0 clamp(9.5rem, 18vh, 12rem) !important;
+  background: radial-gradient(
+      circle at 12% 6%,
+      rgb(255 208 100 / 18%),
+      transparent 28%
+    ),
+    radial-gradient(circle at 88% 0%, rgb(86 216 242 / 14%), transparent 30%),
+    linear-gradient(180deg, #fbf8f1 0%, #f2ecdf 100%);
+  scrollbar-color: rgb(247 53 134 / 42%) rgb(238 232 220 / 74%);
 }
 
 .drumroll-flow-hud-anchor {
@@ -25,24 +35,24 @@
 
 .drumroll-flow-hud {
   display: flex;
-  width: min(600px, calc(100% - 40px));
-  min-height: 68px;
+  width: min(760px, calc(100% - 48px));
+  min-height: 62px;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin: 20px;
-  padding: 11px 14px;
-  border: 1px solid rgb(248 245 239 / 18%);
-  border-radius: 14px;
-  color: #f8f5ef;
-  background: rgb(17 23 34 / 84%);
-  backdrop-filter: blur(18px);
+  margin: 18px auto;
+  padding: 0 2px 12px;
+  border: 0;
+  border-bottom: 1px solid rgb(17 23 34 / 16%);
+  border-radius: 0;
+  color: var(--color-ink);
+  background: transparent;
 }
 
 .drumroll-flow-hud__title {
   max-width: 34rem;
   margin: 0;
-  color: #f8f5ef;
+  color: var(--color-ink);
   font-family: var(--font-display);
   font-size: clamp(1.15rem, 1.7vw, 1.5rem);
   font-weight: 400;
@@ -52,7 +62,7 @@
 
 .drumroll-flow-hud__artist {
   margin: 5px 0 0;
-  color: rgb(248 245 239 / 82%);
+  color: var(--color-text-muted);
   font-family: var(--font-ui);
   font-size: 0.8rem;
   font-weight: 500;
@@ -60,7 +70,7 @@
 
 .drumroll-flow-hud__mode,
 .drumroll-flow-hud__status {
-  color: #ffdca3;
+  color: var(--color-accent-text);
   font-family: var(--font-ui);
   font-size: 0.72rem;
   font-weight: 700;
@@ -72,11 +82,15 @@
 .drumroll-flow-hud__mode {
   padding: 0.42rem 0.55rem;
   border-radius: 999px;
-  background: rgb(255 173 47 / 14%);
+  background: color-mix(
+    in srgb,
+    var(--color-accent) 9%,
+    var(--color-paper-light)
+  );
 }
 
 .drumroll-flow-hud__status {
-  color: rgb(248 245 239 / 78%);
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 
@@ -84,34 +98,24 @@
   position: relative;
   z-index: 0;
   overflow: hidden;
-  min-height: calc(100vh - 5.75rem);
-  padding: 34px 54px 64px;
-  border: 0;
-  border-top: 1px solid color-mix(in srgb, var(--color-accent-bright) 46%, #fff);
-  border-bottom: 1px solid
-    color-mix(in srgb, var(--color-accent-bright) 46%, #fff);
-  border-radius: 0;
-  color: #f8f5ef;
+  min-height: clamp(12.5rem, 27vh, 16.5rem);
+  padding: 28px 54px 34px;
+  border: 1px solid rgb(17 23 34 / 12%);
+  border-radius: 18px;
+  color: var(--color-ink);
   background: radial-gradient(
-      ellipse at 48% 48%,
-      color-mix(in srgb, var(--color-accent-bright) 21%, transparent),
-      transparent 37%
+      ellipse at 50% 52%,
+      color-mix(in srgb, var(--color-coral) 8%, transparent),
+      transparent 48%
     ),
-    radial-gradient(
-      circle at 80% 12%,
-      color-mix(in srgb, var(--color-orange) 18%, transparent),
-      transparent 23%
-    ),
-    linear-gradient(128deg, #101723 0%, #192433 48%, #111722 100%);
+    linear-gradient(180deg, #f8f3e8 0%, #ece4d5 100%);
   box-shadow:
-    0 26px 64px rgba(17, 23, 34, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    inset 0 0 48px
-      color-mix(in srgb, var(--color-accent-bright) 7%, transparent);
+    0 28px 54px -38px rgb(17 23 34 / 34%),
+    inset 0 1px 0 rgb(255 255 255 / 78%);
 }
 
 .drumroll-flow-stage > div:last-child {
-  margin-top: clamp(8rem, 18vh, 11rem);
+  margin-top: clamp(2.75rem, 6vh, 4.25rem);
 }
 
 .drumroll-flow-stage::before {
@@ -120,46 +124,43 @@
   top: 50%;
   right: 54px;
   left: 54px;
-  height: 2px;
+  height: 1px;
   content: '';
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--color-accent-bright) 72%, white),
+    color-mix(in srgb, var(--color-accent-bright) 56%, var(--color-ink)),
     transparent
   );
   box-shadow:
-    0 0 18px var(--flow-glow),
-    0 0 48px color-mix(in srgb, var(--color-accent-bright) 22%, transparent);
+    0 0 12px var(--flow-glow),
+    0 0 28px color-mix(in srgb, var(--color-accent-bright) 14%, transparent);
 }
 
 .drumroll-flow-stage svg {
-  filter: drop-shadow(0 0 1.5px rgb(248 245 239 / 58%))
-    drop-shadow(
-      0 0 10px color-mix(in srgb, var(--color-accent-bright) 18%, transparent)
-    );
+  filter: drop-shadow(0 2px 2px rgb(17 23 34 / 8%));
 }
 
 .drumroll-flow-stage .vf-note-uncolored {
-  fill: #f8f5ef;
+  fill: var(--color-ink);
 }
 
 .drumroll-flow-notation::before {
   position: absolute;
   z-index: -1;
-  inset: 30% 0 10%;
+  inset: 26% 0 14%;
   content: '';
   pointer-events: none;
   background: linear-gradient(
     90deg,
     transparent,
-    var(--flow-glow) 18%,
+    color-mix(in srgb, var(--color-amber) 16%, transparent) 18%,
     transparent 47%,
-    color-mix(in srgb, var(--color-orange) 24%, transparent) 74%,
+    color-mix(in srgb, var(--color-cyan) 14%, transparent) 74%,
     transparent
   );
-  filter: blur(30px);
-  opacity: 0.76;
+  filter: blur(38px);
+  opacity: 0.58;
 }
 
 .drumroll-flow-notation [data-testid='playhead-cursor'] {
@@ -212,6 +213,6 @@
   }
 
   .drumroll-flow-stage > div:last-child {
-    margin-top: clamp(7.5rem, 17vh, 9.5rem);
+    margin-top: clamp(2.5rem, 6vh, 3.5rem);
   }
 }

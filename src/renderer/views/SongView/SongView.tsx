@@ -84,6 +84,7 @@ import { DrumGestureAction, DrumGestureSurface } from '../../services/gestures';
 import { TutorState } from '../../services/tutor';
 import { SettingLabel } from '../../components/SettingsButton/SettingLabel';
 import { PracticeOutletContext } from '../practice-context';
+import './SongView.css';
 
 interface PracticeRunIdentity {
   sessionId: string;
@@ -1198,7 +1199,7 @@ export function SongView() {
   );
 
   return (
-    <Layout className="h-full pointer-events-auto">
+    <Layout className="drumroll-practice-shell h-full pointer-events-auto">
       <ScoreSummary
         isOpen={isScoreModalOpen}
         onNextSong={onNextSong}
@@ -1255,10 +1256,7 @@ export function SongView() {
           onTrainSkill={onTrainSkill}
         />
       </Drawer>
-      <header
-        className="flex min-h-20 items-center gap-4 border-b border-divider px-5 py-3"
-        style={{ background: 'var(--gradient-header)' }}
-      >
+      <header className="drumroll-practice-toolbar flex min-h-20 items-center gap-4 px-5 py-3">
         <Button
           icon={<FontAwesomeIcon icon={faArrowLeft} />}
           data-testid="back-button"
@@ -1347,7 +1345,7 @@ export function SongView() {
           }}
         />
         <div
-          className="flex shrink-0 items-center gap-1 rounded-xl border border-border-soft bg-surface-raised p-1"
+          className="drumroll-practice-toolbar__view-switch flex shrink-0 items-center gap-1 p-1"
           role="group"
           aria-label="Notation view"
         >
@@ -1371,7 +1369,7 @@ export function SongView() {
           </Button>
         </div>
         {(policy.speedControl || policy.looping) && (
-          <div className="flex shrink-0 items-center gap-2 rounded-xl bg-fill px-3 py-2">
+          <div className="drumroll-practice-toolbar__controls flex shrink-0 items-center gap-2 px-3 py-2">
             {policy.speedControl && (
               <div className="flex gap-2 items-center">
                 <div className="text-text-faint">Speed:</div>
@@ -1549,7 +1547,7 @@ export function SongView() {
           <TutorHud state={tutorSession.state} message={tutorHudMessage} />
         )}
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-10 backdrop-blur-xs">
+          <div className="absolute inset-0 flex items-center justify-center bg-bg/80 z-10 backdrop-blur-xs">
             <Spin size="large" />
           </div>
         )}

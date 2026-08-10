@@ -72,14 +72,14 @@ button,
 }
 
 ::-webkit-scrollbar-track {
-  background: #141517;
-  border: 1px solid #232428;
+  background: var(--color-paper);
+  border: 1px solid var(--color-border-soft);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgb(17 23 34 / 18%);
   border-radius: 999px;
-  border: 2px solid #16140f;
+  border: 2px solid var(--color-paper);
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -87,7 +87,7 @@ button,
 }
 
 ::-webkit-scrollbar-corner {
-  background: #141517;
+  background: var(--color-paper);
 }
 
 @media (prefers-reduced-motion: reduce) {

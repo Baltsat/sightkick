@@ -97,7 +97,8 @@ The Coach does not invent a weak bar or a practice loop.
 ### 7. Bright world, deep focus
 
 The shell uses the bright Daybreak Arena world.
-Gameplay can use a dark focus stage for readable glowing notation.
+Gameplay keeps notation on warm, light paper so the score stays legible from
+the kit without dropping the player into a separate dark visual world.
 The visual system uses pearl, ink, amber, coral, magenta, and cyan.
 It avoids the dim brown cast in the World Tour reference.
 
