@@ -8,9 +8,9 @@ import './web.css';
 
 const root = document.getElementById('root');
 const publicReleaseHref =
-  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.8/Drumroll-1.2.0-kb.8-arm64.dmg';
+  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.9/Drumroll-1.2.0-kb.9-arm64.dmg';
 const publicChecksumHref =
-  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.8/SHA256SUMS.txt';
+  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.9/SHA256SUMS.txt';
 
 if (!root) {
   throw new Error('Missing app root.');
@@ -129,7 +129,7 @@ function showLanding(): void {
         <div class="web-download-copy">
           <p class="web-section-index">The desktop release</p>
           <h2 id="web-download-title">Bring the studio to the kit.</h2>
-          <p>Drumroll 1.2.0-kb.8 is the Apple Silicon macOS preview. The public artifact is Developer ID signed, Apple notarized, and published with a reproducible SHA-256 checksum.</p>
+          <p>Drumroll 1.2.0-kb.9 is the Apple Silicon macOS preview. The public artifact is Developer ID signed, Apple notarized, and published with a reproducible SHA-256 checksum.</p>
         </div>
         <div class="web-download-action">
           <a id="desktop-download" href="${publicReleaseHref}">Download Drumroll for Apple Silicon</a>
@@ -143,7 +143,7 @@ function showLanding(): void {
         <div class="web-faq-list">
           <details><summary>Does it require an electronic drum kit?</summary><p>Drumroll is designed around MIDI input from an electronic kit. Keyboard and pointer controls remain available for setup and accessibility.</p></details>
           <details><summary>Will Coach always show trouble bars?</summary><p>No. Exact trouble bars and targeted loops require a saved run with full hit records. When they exist, every weak loop stays linked to the original review until two consecutive full-coverage, zero-error passes clear it. Summary-only runs can still report their recorded accuracy, timing, lane, wrong-hit, speed, and date.</p></details>
-          <details><summary>Is this download link public?</summary><p>Yes. It points to the exact v1.2.0-kb.8 GitHub release asset; SHA256SUMS.txt is published beside it.</p></details>
+          <details><summary>Is this download link public?</summary><p>Yes. It points to the exact v1.2.0-kb.9 GitHub release asset; SHA256SUMS.txt is published beside it.</p></details>
         </div>
       </section>
 

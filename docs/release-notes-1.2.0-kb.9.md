@@ -1,10 +1,9 @@
 # Drumroll 1.2.0-kb.9
 
 `kb.9` makes the kit the centre of Drumroll again: sit down, see one useful
-next action, and begin it with one deliberate mapped-pad hit. It is prepared
-from source commit `8544ff5`. This note does not claim a signed, notarized, or
-published kb.9 package until the distribution placeholders below are replaced
-with the release receipt.
+next action, and begin it with one deliberate mapped-pad hit. It is built from
+source commit `8544ff5` and published as a signed, notarized Apple Silicon
+macOS prerelease.
 
 ## Kit home and one-hit start
 
@@ -83,8 +82,8 @@ captured 1224×768 and 1024×700 routes. See
 ## Distribution
 
 - Source commit: `8544ff5`
-- Release: <RELEASE-URL>
-- Apple Silicon DMG SHA-256: `<DMG-SHA256>`
+- Release: [GitHub v1.2.0-kb.9](https://github.com/Baltsat/sightkick/releases/tag/v1.2.0-kb.9)
+- Apple Silicon DMG SHA-256: `2f47539ec27b874312440baccf65fea6049556d4e0624e544db676b5a898fa91`
 
 ## Evidence boundary
 
