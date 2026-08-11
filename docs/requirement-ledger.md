@@ -1,6 +1,6 @@
 # Drumroll requirement and proof ledger
 
-Last reconciled: 2026-08-11, kb.7 released and live; kb.8 source integrated at `1ec1a4f` with publication still in flight
+Last reconciled: 2026-08-11, kb.8 published and live; kb.9 source integrated at `8544ff5` with package publication still pending
 
 This is the release contract for the Drumroll redesign. It maps the active
 session into sequential epochs and requires evidence, not implementation
@@ -33,7 +33,7 @@ learner studies support that claim.
 | ID   | Requirement                                                                     | State  | Evidence / remaining gate                                                                                                                                                                                                                  |
 | ---- | ------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | R.01 | English product UI, technical copy, docs, release notes, and work updates.      | passed | User-facing copy scan is English; original Yandex track/artist names remain source data.                                                                                                                                                   |
-| R.02 | Work autonomously and resolve normal implementation choices from this contract. | passed | Nine gated epochs and bounded implementation lanes are recorded; no routine product choice is waiting on the user.                                                                                                                         |
+| R.02 | Work autonomously and resolve normal implementation choices from this contract. | passed | Ten gated epochs and bounded implementation lanes are recorded; no routine product choice is waiting on the user.                                                                                                                          |
 | R.03 | Preserve `~/box`, unrelated worktrees, and real user data.                      | passed | Product work stayed inside this repo. The pre-kb.3 live-profile backup and post-QA file are byte-identical at SHA-256 `8eca08d0db32a4a6512b33475085793e7f6c434314d5a9c2a1f9f59e7ee8d554`; scored history and personal songs are unchanged. |
 | R.04 | One canonical tree with bounded agent lanes and independent verification.       | passed | The exact tagged source, signed installed app, fresh remote download, and production site passed independent product, visual, technical, and transcript audits.                                                                            |
 | R.05 | Close only after every intent is passed or has a narrow outside blocker.        | passed | Every software contract is closed in kb.5; only the physical Yamaha observation, human longitudinal pedagogy, and protected-content rights remain explicitly outside local proof.                                                          |
@@ -46,7 +46,7 @@ learner studies support that claim.
 | E1.01 | Reconcile every active-session instruction, supplied reference, playlist, prior coding result, and method source.             | passed | `PRODUCT.md`, this ledger, design research, curriculum docs, and source manifests cover the complete brief. |
 | E1.02 | Lock the zero-touch tutor contract, safe scope, and proof vocabulary.                                                         | passed | `PRODUCT.md` and tutor research match implementation terms and bounded claims.                              |
 | E1.03 | Audit incumbent code, curriculum, user data, installed app, public site, signing identity, and deployment before replacement. | passed | The old installed/public kb.1 state and sparse live-profile counts were read without mutation.              |
-| E1.04 | Deliver work as sequential, binary-gated epochs.                                                                              | passed | This ledger and the active plan use nine ordered epochs.                                                    |
+| E1.04 | Deliver work as sequential, binary-gated epochs.                                                                              | passed | This ledger and the active plan use ten ordered epochs.                                                     |
 
 ## Epoch 2 — Kit readiness and hands-free control
 
@@ -146,6 +146,23 @@ learner studies support that claim.
 | E9.02 | Close every P0/P1 and triage each P2.                                                | passed | Product/transcript, visual, and technical reviewers each issued GO with no P0/P1; the three visual P2s are bounded compact-layout polish and stale-doc P2s were corrected. |
 | E9.03 | Report proof states precisely and retain external limits.                            | passed | Release notes and this ledger retain explicit physical-kit, longitudinal-pedagogy, and protected-content boundaries without weakening software proof.                      |
 
+## Epoch 10 — kb.9 practice, evidence, and playable-song truth
+
+`passed` in this epoch means direct proof from the current integrated source
+tree at `8544ff5`, its named regression tests, or the captured kb.9 dossier. It
+does not claim that a kb.9 DMG has been signed, notarized, published, or
+checksum-replayed.
+
+| ID     | Requirement                                                                                                                                                                       | State   | Evidence / remaining gate                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E10.01 | Make Home the armed physical kit, with one dominant next action and a one-kick session composer.                                                                                  | passed  | `2026-08-11-kb9-home/proof-composer.json` captures Learn and Songs intents at 1225×768 and 1024×700 with no overflow; `8286532` wires the armed home target, and the integration capture proves a pad launch.                                                                                                                                                                                                     |
+| E10.02 | Give Practice crisp Ready, count-in, playing, pause, recovery, and hit-feedback chrome.                                                                                           | passed  | `2026-08-11-kb9-practice/` captures each named state, while the dossier records current-note motion only during playing, judged-hit feedback, reduced-motion suppression, no outer scroll, and no console or page errors. Physical Yamaha observation remains separate under E2/E8 and K7.                                                                                                                        |
+| E10.03 | Use pedagogy engine v2: atomic graph coverage over all 170 exercises, replayable learner state, separated acquisition/retention/transfer, ZPD receipts, and favourite-song paths. | passed  | `docs/pedagogy-engine-v2.md` defines the evidence model and implementation contract; `620ea73` adds its core and `8544ff5` integrates the gates. This is a transparent practice-selection model, not longitudinal proof of learning efficacy or a MIDI claim about unobservable technique.                                                                                                                        |
+| E10.04 | Expose the learner evidence through a dedicated Insights route.                                                                                                                   | passed  | `5abdfc4` adds the surface; `2026-08-11-kb9-profile/insights-primary-1224x768.png`, `insights-primary-1024x700.png`, and `2026-08-11-kb9-integration/01-insights-from-shell.png` capture it in the current app.                                                                                                                                                                                                   |
+| E10.05 | Enforce the five-gate playable-song contract and state the Drums result honestly.                                                                                                 | partial | `2026-08-11-kb9-songs/status.md` binds identity, lawful local audio hash, approved chart provenance, drum scan, and headless load. Three of 13 rows are playable with certificates; eight exact rows lack lawful local audio and remain blocked; two rows are identity-incomplete. Dropping lawful local audio unlocks the auto-chart route for the eight blocked identities, subject to its scan and load gates. |
+| E10.06 | Use the premium snare icon and motion that is bound to musical events rather than decorative idle looping.                                                                        | passed  | `5abdfc4` adds both; `2026-08-11-kb9-dossier/current/app-icon-finder-context.png` and `app-icon-scale-matrix.png` cover the icon, while the dossier’s playing, hit, and reduced-motion captures prove event-bound motion.                                                                                                                                                                                         |
+| E10.07 | Retain a regression dossier for the current Home, Journey, Practice, Profile, icon, and compact layouts.                                                                          | passed  | `2026-08-11-kb9-dossier/README.md`, `proof.json`, and `before-after-board.png` retain 1224×768 and 1024×700 captures, motion states, fit checks, and zero recorded console/page errors.                                                                                                                                                                                                                           |
+
 ## kb.5 corrective acceptance matrix — every active-session remark
 
 This matrix is the transcript-level guard against declaring a polished release
@@ -236,15 +253,20 @@ its `app.asar` SHA-256 is
 
 ## Current release verdict
 
-Drumroll `1.2.0-kb.7` is released, installed, notarized, and live from exact
-commit `7294392`, tag `v1.2.0-kb.7`. The final4 bundle provenance, installed
-app, fresh remote DMG checksum, and public site form one verified distribution
-chain. kb.8 is being built from exact commit `1ec1a4f`: it closes the
-recorded manual-speed, kit-maturity, lives/form, idle/ready, direct-remediation,
-finite-remediation, deadline-pacing, viewport, and forbidden-copy defects with
-named regressions. kb.8 build, notarization, publication, and remote-download
-proof remain in flight; this ledger does not treat source integration as a
-released artifact.
+Drumroll `1.2.0-kb.8` is published and live from exact commit `1ec1a4f`, tag
+`v1.2.0-kb.8`. Its Apple Silicon DMG SHA-256 is
+`5f50c38afcd22fd00c9cd89014e03dca7ebdd486f5b2c4b2cea8b3c4949c8244`; the
+site serves kb.8 and the published package is Developer ID signed, Apple
+notarized, stapled, and Gatekeeper-verified.
+
+kb.9 is integrated at `8544ff5`. It adds the kit-as-home composer and intent
+switch, performance chrome, pedagogy engine v2, Insights, a five-gate song
+contract, premium snare icon, event-bound motion, and the regression dossier.
+Its three certified playable Drums rows are Loyal, Made To Love, and What I
+Like About You; eight rows await exact lawful local audio and two cannot enter
+the resolver until source identity is completed. kb.9 package build,
+notarization, publication, and remote-download checksum proof are still
+pending, so source integration is not described here as a released artifact.
 
 Three outside proof limits remain and are not inferred from software tests: a
 real Yamaha cable-cycle and complete physical playing session, longitudinal
