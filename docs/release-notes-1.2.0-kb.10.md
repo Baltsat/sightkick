@@ -60,12 +60,8 @@ schedule reminders, create a menu-bar presence, or export performance data.
 ## Distribution
 
 - Source commits: `a6e69ea`, `455e898`
-- Release: `<RELEASE-URL>`
-- Apple Silicon DMG SHA-256: `<DMG-SHA256>`
-
-The distribution placeholders are intentional. This note records integrated
-source and visual proof, not a kb.10 signing, notarization, publication, or
-remote-download checksum receipt.
+- Release: [GitHub v1.2.0-kb.10](https://github.com/Baltsat/sightkick/releases/tag/v1.2.0-kb.10)
+- Apple Silicon DMG SHA-256: `ea3e58f7d75e3a889713929cc8db61e24fa935fcec725d445ed62caaedc70e66`
 
 ## Evidence boundary
 
