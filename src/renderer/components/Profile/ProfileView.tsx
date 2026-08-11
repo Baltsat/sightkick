@@ -13,11 +13,20 @@ import { last7Dates } from '../../hooks/useGamification';
 import { localDateKey } from '../../services/streaks';
 import {
   ATOMIC_SKILL_GRAPH,
+  PracticeCardOption,
+  PracticeCardSet,
+  PracticeRhythm,
   curriculumItemManifest,
   skillConfidence,
   skillNodeById,
+  WeeklyPracticeSet,
 } from '../../services/pedagogy';
 import type { AtomicSkillState, SkillReview } from '../../services/pedagogy';
+import type {
+  SavedSongSectionAudition,
+  WeeklyMusicalRecap,
+  WeeklyRhythm,
+} from '../../services/pedagogy';
 import type {
   DeadlinePacingSummary,
   RankedPracticeCandidate,
@@ -33,6 +42,7 @@ import { SkillBars } from './SkillBars';
 import { useMastery } from './useMastery';
 import { useRetiredLessons } from './useRetiredLessons';
 import { AtomicSkillRadar } from './AtomicSkillRadar';
+import { EvidencePracticeCards } from '../PracticeCards';
 
 export interface ProfileInsights {
   recommendation?: RankedPracticeCandidate;
@@ -41,6 +51,12 @@ export interface ProfileInsights {
   deadlinePacing?: DeadlinePacingSummary;
   rejectedAtomicEvidenceCount?: number;
   latestRun?: RunSummary;
+  practiceCards?: PracticeCardSet;
+  weeklySet?: WeeklyPracticeSet;
+  weeklyRhythm?: WeeklyRhythm;
+  weeklyRecap?: WeeklyMusicalRecap;
+  bestAudition?: SavedSongSectionAudition;
+  auditionAvailable?: boolean;
 }
 
 export interface ProfileViewProps {
@@ -52,6 +68,10 @@ export interface ProfileViewProps {
   gamification: UseGamificationResult;
   insights?: ProfileInsights;
   onStartTargetedPractice?: () => void;
+  onStartPracticeCard?: (option: PracticeCardOption) => void;
+  onPracticeRhythmChange?: (rhythm: PracticeRhythm) => void;
+  onRefreshPracticeSet?: () => void;
+  onStartAudition?: () => void;
 }
 
 const STAGE_INDEX: Record<AtomicSkillState['stage'], number> = {
@@ -319,6 +339,185 @@ function DeadlineTargets({
   );
 }
 
+function WeeklyRhythmPanel({
+  set,
+  rhythm,
+  calendar,
+  onRhythmChange,
+  onRefresh,
+}: {
+  set: WeeklyPracticeSet | undefined;
+  rhythm: PracticeRhythm | undefined;
+  calendar: WeeklyRhythm | undefined;
+  onRhythmChange?: (rhythm: PracticeRhythm) => void;
+  onRefresh?: () => void;
+}) {
+  if (!set || !calendar || !rhythm) {
+    return null;
+  }
+
+  return (
+    <section
+      className="border-t border-border-soft pt-5"
+      data-testid="weekly-practice-rhythm"
+      aria-labelledby="weekly-practice-rhythm-title"
+    >
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
+            Weekly rhythm
+          </p>
+          <h2
+            id="weekly-practice-rhythm-title"
+            className="mt-1 font-display text-3xl font-semibold tracking-[-0.04em] text-text"
+          >
+            One review, one build, one musical application.
+          </h2>
+        </div>
+        <div className="flex gap-1 rounded-md border border-border-soft p-1">
+          {(['daily', 'weekly'] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              data-testid={`practice-rhythm-${option}`}
+              aria-pressed={rhythm === option}
+              className={cn(
+                'rounded px-2 py-1 text-xs font-semibold capitalize',
+                rhythm === option
+                  ? 'bg-signal-ember text-surface-studio'
+                  : 'text-text-muted hover:text-text',
+              )}
+              onClick={() => onRhythmChange?.(option)}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mt-4 divide-y divide-border-soft">
+        {set.cards.map(({ kind, option }) => (
+          <article
+            key={kind}
+            className="grid gap-1 py-3 sm:grid-cols-[5.5rem_minmax(0,1fr)_minmax(13rem,0.85fr)] sm:items-baseline"
+          >
+            <p className="m-0 text-xs font-semibold uppercase tracking-[0.12em] text-signal-wine">
+              {kind}
+            </p>
+            <strong className="truncate text-sm text-text">
+              {option.title}
+            </strong>
+            <span className="text-xs leading-relaxed text-text-muted">
+              {option.source_label}
+            </span>
+          </article>
+        ))}
+      </div>
+      <div
+        className="mt-4 grid grid-cols-7 gap-1"
+        aria-label={`${rhythm} practice rhythm`}
+        data-testid="weekly-rhythm-calendar"
+      >
+        {calendar.days.map((day) => (
+          <div
+            key={day.key}
+            className={cn(
+              'grid min-h-13 place-items-center rounded border px-1 text-center text-[10px] font-semibold',
+              day.state === 'played'
+                ? 'border-signal-green/40 bg-signal-green/10 text-text'
+                : day.state === 'planned'
+                ? 'border-signal-ember/35 bg-signal-ember/8 text-text-muted'
+                : 'border-border-soft bg-fill text-text-faint',
+            )}
+            data-state={day.state}
+          >
+            <span>{day.label}</span>
+            <span className="mt-0.5 text-[9px] font-normal capitalize">
+              {day.state}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-150 text-xs leading-relaxed text-text-muted">
+          Next available session: {calendar.next_available}. Planned rests stay
+          unscored; they are part of the rhythm, not a failure.
+        </p>
+        {onRefresh && (
+          <button
+            type="button"
+            className="text-xs font-semibold text-signal-wine hover:text-signal-ember"
+            data-testid="refresh-weekly-practice-set"
+            onClick={onRefresh}
+          >
+            Choose a new set
+          </button>
+        )}
+      </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-text-faint">
+        This set changes only when its source evidence changes or you choose a
+        new set.
+      </p>
+    </section>
+  );
+}
+
+function WeeklyMusicalRecapPanel({
+  recap,
+}: {
+  recap: WeeklyMusicalRecap | undefined;
+}) {
+  if (!recap) {
+    return null;
+  }
+
+  return (
+    <section
+      className="border-t border-border-soft pt-5"
+      data-testid="weekly-musical-recap"
+      aria-labelledby="weekly-musical-recap-title"
+    >
+      <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
+        This week in your hands
+      </p>
+      <h2
+        id="weekly-musical-recap-title"
+        className="mt-1 font-display text-3xl font-semibold tracking-[-0.04em] text-text"
+      >
+        {recap.sessions} saved session{recap.sessions === 1 ? '' : 's'} across{' '}
+        {recap.played_days} played day{recap.played_days === 1 ? '' : 's'}.
+      </h2>
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <article className="border-l border-border-soft pl-3">
+          <p className="text-xs font-semibold text-text">{recap.skill.label}</p>
+          <p className="mt-1 text-xs leading-relaxed text-text-muted">
+            {recap.skill.detail}
+          </p>
+        </article>
+        <article className="border-l border-border-soft pl-3">
+          <p className="text-xs font-semibold text-text">
+            {recap.section?.label ?? 'No saved section audition'}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-text-muted">
+            {recap.section?.detail ??
+              'A section result appears here only after a saved audition run.'}
+          </p>
+        </article>
+        <article className="border-l border-border-soft pl-3">
+          <p className="text-xs font-semibold text-text">Next route</p>
+          <p className="mt-1 text-xs leading-relaxed text-text-muted">
+            {recap.next}
+          </p>
+        </article>
+      </div>
+      {recap.evidence_state === 'not_enough_saved_evidence' && (
+        <p className="mt-3 text-xs text-text-faint">
+          Not enough saved evidence for a musical progress claim yet.
+        </p>
+      )}
+    </section>
+  );
+}
+
 export function ProfileView({
   songList,
   goals,
@@ -328,6 +527,10 @@ export function ProfileView({
   gamification,
   insights,
   onStartTargetedPractice,
+  onStartPracticeCard,
+  onPracticeRhythmChange,
+  onRefreshPracticeSet,
+  onStartAudition,
 }: ProfileViewProps) {
   const [selectedGoalId, setSelectedGoalId] = useState<string | undefined>(
     undefined,
@@ -506,6 +709,33 @@ export function ProfileView({
           targetDate={activeGoal?.targetDate}
           pacing={insights?.deadlinePacing}
         />
+        <WeeklyRhythmPanel
+          set={insights?.weeklySet}
+          rhythm={insights?.weeklySet?.rhythm}
+          calendar={insights?.weeklyRhythm}
+          onRhythmChange={onPracticeRhythmChange}
+          onRefresh={onRefreshPracticeSet}
+        />
+        {insights?.practiceCards && (
+          <section
+            className="border-t border-border-soft pt-5"
+            data-testid="evidence-practice-cards"
+          >
+            <div className="mb-4">
+              <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
+                Today’s evidence-backed routes
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-text-muted">
+                Each option names its source and saves one real practice run.
+              </p>
+            </div>
+            <EvidencePracticeCards
+              cards={insights.practiceCards.cards}
+              onStart={onStartPracticeCard}
+            />
+          </section>
+        )}
+        <WeeklyMusicalRecapPanel recap={insights?.weeklyRecap} />
 
         {!activeGoal && (
           <section
@@ -581,6 +811,9 @@ export function ProfileView({
                   needleLine={mastery.needleLine}
                   isLoaded={mastery.isLoaded}
                   onEdit={openEditGoalModal}
+                  bestAudition={insights?.bestAudition}
+                  auditionAvailable={insights?.auditionAvailable}
+                  onStartAudition={onStartAudition}
                 />
                 {activeRetiredLesson && (
                   <p
@@ -620,7 +853,10 @@ export function ProfileView({
               </div>
             </section>
 
-            <PracticeHistory progress={gamification.longitudinalProgress} />
+            <PracticeHistory
+              progress={gamification.longitudinalProgress}
+              weeklyRecap={insights?.weeklyRecap}
+            />
 
             {retiredLessons.length > 0 && (
               <section

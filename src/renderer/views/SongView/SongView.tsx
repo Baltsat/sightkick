@@ -68,8 +68,10 @@ import {
   learningEvidenceForTutorRun,
   PracticeAttemptCheckpoint,
   PRACTICE_RUN_SCHEMA_VERSION,
+  PracticeCardRunEvidence,
   RunSummary,
   SCORING_POLICY_VERSION,
+  SongSectionAuditionEvidence,
   StoredPracticeRun,
   TutorRunEvidence,
 } from '../../services/practice-stats';
@@ -139,6 +141,75 @@ function createPracticeRunIdentity(): PracticeRunIdentity {
     sessionId:
       randomId ??
       `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+  };
+}
+
+function boundedText(
+  value: string | null,
+  maximum: number,
+): string | undefined {
+  const trimmed = value?.trim();
+
+  return trimmed && trimmed.length <= maximum ? trimmed : undefined;
+}
+
+function parsePracticeCardEvidence(
+  params: URLSearchParams,
+  songId: string | undefined,
+): PracticeCardRunEvidence | undefined {
+  const kind = params.get('practiceCardKind');
+  const candidate_id = params.get('practiceCardCandidate');
+  const source_label = boundedText(params.get('practiceCardSource'), 220);
+
+  if (
+    !songId ||
+    candidate_id !== songId ||
+    !source_label ||
+    !['review', 'build', 'apply'].includes(kind ?? '')
+  ) {
+    return undefined;
+  }
+
+  return {
+    kind: kind as PracticeCardRunEvidence['kind'],
+    candidate_id,
+    source_label,
+  };
+}
+
+function parseSongSectionAudition(
+  params: URLSearchParams,
+  songId: string | undefined,
+  speed: number,
+): SongSectionAuditionEvidence | undefined {
+  const start_bar = Number(params.get('auditionStart'));
+  const end_bar = Number(params.get('auditionEnd'));
+  const section_label = boundedText(params.get('auditionLabel'), 100);
+  const test_label = boundedText(params.get('auditionTest'), 180);
+  const required_skill_id = boundedText(params.get('auditionSkill'), 120);
+
+  if (
+    params.get('audition') !== '1' ||
+    !songId ||
+    !Number.isInteger(start_bar) ||
+    !Number.isInteger(end_bar) ||
+    start_bar <= 0 ||
+    end_bar < start_bar ||
+    !section_label ||
+    !test_label ||
+    !required_skill_id
+  ) {
+    return undefined;
+  }
+
+  return {
+    song_id: songId,
+    start_bar,
+    end_bar,
+    speed,
+    section_label,
+    test_label,
+    required_skill_id,
   };
 }
 
@@ -275,6 +346,14 @@ export function SongView() {
       ? Math.min(2, Math.max(0.3, value))
       : 1;
   }, [gameMode, searchParams]);
+  const practiceCardEvidence = useMemo(
+    () => parsePracticeCardEvidence(searchParams, id),
+    [id, searchParams],
+  );
+  const audition = useMemo(
+    () => parseSongSectionAudition(searchParams, id, requestedPracticeSpeed),
+    [id, requestedPracticeSpeed, searchParams],
+  );
   const policy = useMemo(() => resolveModePolicy(gameMode), [gameMode]);
   // usePracticeSession (below) owns playbackSpeed, but it needs `engine`
   // from useEngine (below that), and useEngine's onEnded (right here) needs
@@ -295,6 +374,10 @@ export function SongView() {
   // itself lives in `useStreakEngine` (below, after `engine` exists) - see
   // that ref-sync effect further down.
   const bestStreakRef = useRef(0);
+  const practiceCardRef = useRef<PracticeCardRunEvidence | undefined>(
+    practiceCardEvidence,
+  );
+  const auditionRef = useRef<SongSectionAuditionEvidence | undefined>(audition);
   const [runIdentity, setRunIdentity] = useState<PracticeRunIdentity>(
     createPracticeRunIdentity,
   );
@@ -327,6 +410,14 @@ export function SongView() {
   });
   const navigate = useNavigate();
   const { fileData, format, songData, trackData } = useSongLoader(id);
+
+  useEffect(() => {
+    practiceCardRef.current = practiceCardEvidence;
+  }, [practiceCardEvidence]);
+  useEffect(() => {
+    auditionRef.current = audition;
+  }, [audition]);
+
   const adaptiveTiming = useMemo(
     () =>
       deriveAdaptiveTimingWindow({
@@ -590,6 +681,17 @@ export function SongView() {
         timingWindowMs: Math.round(hitToleranceSeconds * 1000),
         ...(songData?.lesson?.skills
           ? { authoredSkills: [...songData.lesson.skills] }
+          : {}),
+        ...(practiceCardRef.current
+          ? { practiceCard: { ...practiceCardRef.current } }
+          : {}),
+        ...(auditionRef.current
+          ? {
+              audition: {
+                ...auditionRef.current,
+                speed: runPlaybackSpeed,
+              },
+            }
           : {}),
       };
       const coachEvidence =
@@ -1084,6 +1186,29 @@ export function SongView() {
       setPlaybackSpeed,
     ],
   );
+  const appliedAuditionRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (gameMode !== 'practice' || !audition) {
+      return;
+    }
+
+    const token = [
+      audition.song_id,
+      audition.start_bar,
+      audition.end_bar,
+      audition.speed,
+    ].join(':');
+
+    if (appliedAuditionRef.current === token) {
+      return;
+    }
+
+    if (applyCoachLoop(audition.start_bar, audition.end_bar, audition.speed)) {
+      appliedAuditionRef.current = token;
+    }
+  }, [applyCoachLoop, audition, gameMode]);
+
   const remediationStorageKey = id
     ? remediationQueueSlotKey(id, currentChartRevision)
     : undefined;
@@ -2595,6 +2720,9 @@ export function SongView() {
               practicePresentationPhase === 'ready'
                 ? interruptedResumeMeasure
                 : undefined
+            }
+            audition={
+              practicePresentationPhase === 'ready' ? audition : undefined
             }
           />
         )}

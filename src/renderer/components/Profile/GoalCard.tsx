@@ -11,6 +11,7 @@ import {
 import { Goal } from '../Goals';
 import { MasteryRing } from './MasteryRing';
 import { MasteryGraph } from './MasteryGraph';
+import type { SavedSongSectionAudition } from '../../services/pedagogy';
 
 export interface GoalCardProps {
   goal: Goal;
@@ -22,6 +23,9 @@ export interface GoalCardProps {
   needleLine: string | undefined;
   isLoaded: boolean;
   onEdit: () => void;
+  bestAudition?: SavedSongSectionAudition;
+  auditionAvailable?: boolean;
+  onStartAudition?: () => void;
 }
 
 function TermBar({ label, value }: { label: string; value: number }) {
@@ -59,6 +63,9 @@ export function GoalCard({
   needleLine,
   isLoaded,
   onEdit,
+  bestAudition,
+  auditionAvailable = false,
+  onStartAudition,
 }: GoalCardProps) {
   if (!isLoaded || !breakdown) {
     return (
@@ -170,6 +177,46 @@ export function GoalCard({
           </div>
         )}
       </div>
+
+      {(bestAudition || (auditionAvailable && onStartAudition)) && (
+        <section
+          className="flex flex-wrap items-end justify-between gap-3 border-y border-border-soft py-3"
+          data-testid="goal-section-audition"
+        >
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-accent-text">
+              Section audition
+            </p>
+            {bestAudition ? (
+              <>
+                <p className="mt-1 text-sm font-semibold text-text">
+                  Best saved: {bestAudition.section_label} ·{' '}
+                  {Math.round(bestAudition.overall_accuracy * 100)}% at{' '}
+                  {bestAudition.speed.toFixed(1)}×
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-text-muted">
+                  Tests {bestAudition.test_label}. This is a section result, not
+                  a full-song readiness claim.
+                </p>
+              </>
+            ) : (
+              <p className="mt-1 text-sm leading-relaxed text-text-muted">
+                A retained prerequisite makes a short, scaffolded section
+                audition available.
+              </p>
+            )}
+          </div>
+          {auditionAvailable && onStartAudition && (
+            <Button
+              size="small"
+              data-testid="goal-start-audition"
+              onClick={onStartAudition}
+            >
+              Start section audition
+            </Button>
+          )}
+        </section>
+      )}
 
       {needleLine && (
         <div

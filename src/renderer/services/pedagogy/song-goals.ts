@@ -1,4 +1,5 @@
 import { hardPrerequisitesForManifest } from './item-manifest';
+import { skillNodeById } from './skill-graph';
 import { skillProbability } from './skill-state';
 import { shortestUnmetHardPrerequisitePath } from './unlock-path';
 import {
@@ -128,6 +129,7 @@ function safeProbe(
   goal: SongGoal,
   song: ZpdCandidate,
   ranking: readonly ZpdRankedCandidate[],
+  states: readonly AtomicSkillState[],
 ): UnlockPath['next_song_probe'] {
   if (song.manifest.assessment_confidence < 0.6) {
     return undefined;
@@ -146,12 +148,29 @@ function safeProbe(
   const decision = ranking.find(
     ({ candidate }) => candidate.item_id === song.item_id,
   )?.decision;
+  const required_skill = blockerSkillIds(song.manifest)
+    .map((skill_id) => states.find((state) => state.skill_id === skill_id))
+    .find(
+      (state) => state?.stage === 'retained' || state?.stage === 'transferable',
+    );
+
+  if (!required_skill) {
+    return undefined;
+  }
+
+  const section_label = `Bars ${section.start_bar}–${section.end_bar}`;
+  const skill_label =
+    skillNodeById().get(required_skill.skill_id)?.label ??
+    required_skill.skill_id;
 
   return {
     song_id: goal.song_id,
     start_bar: section.start_bar,
     end_bar: section.end_bar,
     speed: decision?.scaffold.speed ?? 0.7,
+    section_label,
+    test_label: `${skill_label} in this section`,
+    required_skill_id: required_skill.skill_id,
   };
 }
 
@@ -167,13 +186,15 @@ export function buildSongUnlockPath({
     states,
     targetFor(goal),
   );
-  const next_song_probe = safeProbe(goal, song, ranking);
+  const next_song_probe = safeProbe(goal, song, ranking, states);
   const confidence_note =
     song.manifest.assessment_confidence < 0.6
       ? 'Chart assessment confidence is too low for a trustworthy section probe.'
       : next_song_probe
       ? undefined
-      : 'A chart section is needed before this goal can receive a safe probe.';
+      : !goal.target_section && !song.manifest.section
+      ? 'A chart section is needed before this goal can receive a safe probe.'
+      : 'Retain a goal skill before this section audition becomes available.';
 
   return {
     goal,

@@ -107,3 +107,28 @@ export const MusicalReceipt: Story = {
     },
   },
 };
+
+export const SectionAudition: Story = {
+  args: {
+    scoreData: undefined,
+    practiceSummary: {
+      ...receiptRun,
+      mode: 'practice',
+      playbackSpeed: 0.7,
+      practiceCard: {
+        kind: 'apply',
+        candidate_id: 'song:favourite',
+        source_label: 'Eligible goal path · Eighth-note pulse in this section',
+      },
+      audition: {
+        song_id: 'song:favourite',
+        start_bar: 5,
+        end_bar: 8,
+        speed: 0.7,
+        section_label: 'Bars 5–8',
+        test_label: 'Eighth-note pulse in this section',
+        required_skill_id: 'pulse.eighth',
+      },
+    },
+  },
+};

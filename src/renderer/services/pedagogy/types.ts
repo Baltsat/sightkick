@@ -197,9 +197,48 @@ export interface UnlockPath {
     start_bar: number;
     end_bar: number;
     speed: number;
+    section_label: string;
+    test_label: string;
+    required_skill_id: string;
   };
   free_play_available: true;
   confidence_note?: string;
+}
+
+export type PracticeCardKind = 'review' | 'build' | 'apply';
+
+export interface PracticeCardOption {
+  id: string;
+  kind: PracticeCardKind;
+  candidate_id: string;
+  title: string;
+  speed: number;
+  source_label: string;
+  completion_label: string;
+  bar_range?: { start: number; end: number };
+  audition?: NonNullable<UnlockPath['next_song_probe']>;
+}
+
+export interface PracticeCard {
+  kind: PracticeCardKind;
+  label: string;
+  options: readonly PracticeCardOption[];
+}
+
+export interface PracticeCardSet {
+  cards: readonly PracticeCard[];
+  evidence_signature: string;
+}
+
+export type PracticeRhythm = 'daily' | 'weekly';
+
+export interface WeeklyPracticeSet {
+  rhythm: PracticeRhythm;
+  cards: readonly {
+    kind: PracticeCardKind;
+    option: PracticeCardOption;
+  }[];
+  evidence_signature: string;
 }
 
 export type SessionIntent =

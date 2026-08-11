@@ -344,6 +344,80 @@ async function captureStorybook() {
             .scrollIntoViewIfNeeded();
         },
       },
+      {
+        name: 'p1-home-evidence-cards',
+        url: storyUrl('home-cockpit-evidence-cards--p-1-evidence-cards'),
+        selector: '[data-testid="home-cockpit"]',
+        settle: async () => {
+          await page
+            .getByTestId('home-practice-card-review')
+            .waitFor({ timeout: 60_000 });
+          await page
+            .getByTestId('home-practice-card-apply')
+            .waitFor({ timeout: 60_000 });
+        },
+      },
+      {
+        name: 'p1-profile-weekly-rhythm',
+        url: storyUrl('insights-profile-view--evidence-backed-route'),
+        selector: '[data-testid="profile-view"]',
+        settle: async () => {
+          await page
+            .getByTestId('weekly-practice-rhythm')
+            .scrollIntoViewIfNeeded();
+          await page
+            .getByTestId('weekly-musical-recap')
+            .waitFor({ timeout: 60_000 });
+        },
+      },
+      {
+        name: 'p1-weekly-musical-recap',
+        url: storyUrl('insights-profile-view--evidence-backed-route'),
+        selector: '[data-testid="profile-view"]',
+        settle: async () => {
+          await page
+            .getByTestId('weekly-musical-recap')
+            .scrollIntoViewIfNeeded();
+        },
+      },
+      {
+        name: 'p1-section-audition',
+        url: storyUrl('song-view-score-summary--section-audition'),
+        selector: '[data-testid="score-modal"]',
+        settle: async () => {
+          await page
+            .getByTestId('song-section-audition-receipt')
+            .waitFor({ timeout: 60_000 });
+        },
+      },
+      {
+        name: 'p1-audition-ready',
+        url: storyUrl(
+          'song-view-practice-readiness-cue--section-audition-ready',
+        ),
+        selector: '[data-testid="practice-readiness-cue"]',
+        settle: async () => {
+          await page
+            .getByTestId('practice-readiness-cue')
+            .waitFor({ timeout: 60_000 });
+        },
+      },
+      {
+        name: 'p1-phrase-tier',
+        url: storyUrl('song-view-phrase-tier--clean-hits'),
+        selector: '[data-testid="streak-meter"]',
+        settle: async () => {
+          await page.getByTestId('streak-count').waitFor({ timeout: 60_000 });
+        },
+      },
+      {
+        name: 'p1-phrase-return',
+        url: storyUrl('song-view-phrase-tier--return-to-phrase'),
+        selector: '[data-testid="streak-return"]',
+        settle: async () => {
+          await page.getByTestId('streak-return').waitFor({ timeout: 60_000 });
+        },
+      },
     ];
 
     for (const capture of captures) {

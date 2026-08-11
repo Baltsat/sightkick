@@ -33,11 +33,15 @@ import {
 } from '../../services/next-practice';
 import type {
   AtomicSkillState,
+  PracticeCardOption,
   SessionEnergy,
+  SkillReview,
   SongGoal,
   ZpdRankedCandidate,
 } from '../../services/pedagogy/types';
+import { composePracticeCards } from '../../services/pedagogy';
 import { KitElement } from '../../services/practice-stats';
+import { EvidencePracticeCards } from '../PracticeCards';
 import { playKitPreview } from '../../services/kit-preview-audio';
 import homeKitStudio from '../../assets/daybreak/home-kit-studio.png';
 import drumstickCursor from '../../assets/daybreak/drumstick-cursor-reversed.png';
@@ -61,10 +65,12 @@ interface HomeCockpitProps {
   goalTargetDate?: string;
   deadlinePacing?: DeadlinePacingSummary;
   atomicStates?: readonly AtomicSkillState[];
+  dueReviews?: readonly SkillReview[];
   sessionEnergy?: SessionEnergy;
   recentEarlyExits?: number;
   onStartRecommended: () => void;
   onStartSession?: (session: OneKickHomeSession) => void;
+  onStartPracticeCard?: (option: PracticeCardOption) => void;
   onOpenSongs: () => void;
   onOpenJourney: () => void;
   onOpenCoach: () => void;
@@ -165,10 +171,12 @@ export function HomeCockpit({
   goalTargetDate,
   deadlinePacing,
   atomicStates,
+  dueReviews,
   sessionEnergy,
   recentEarlyExits,
   onStartRecommended,
   onStartSession,
+  onStartPracticeCard,
   onOpenSongs,
   onOpenJourney,
 }: HomeCockpitProps) {
@@ -234,6 +242,16 @@ export function HomeCockpit({
     ],
   );
   const targetRecommendation = homeSession?.launch ?? recommendation;
+  const homePracticeCards = useMemo(
+    () =>
+      composePracticeCards({
+        plan: homeSession?.plan,
+        ranking: pedagogyRanking ?? [],
+        due_reviews: dueReviews ?? [],
+        ...(homeSession?.goalPath ? { goal_path: homeSession.goalPath } : {}),
+      }),
+    [dueReviews, homeSession, pedagogyRanking],
+  );
   const recommendedSong = songList.find(
     (song) => song.id === targetRecommendation?.candidate.id,
   );
@@ -648,6 +666,14 @@ export function HomeCockpit({
             {homeSession?.focus.detail ??
               'Start with one counted phrase after a playable target is selected.'}
           </span>
+          <EvidencePracticeCards
+            compact
+            cards={homePracticeCards.cards.filter(
+              (card) => card.kind === 'review',
+            )}
+            onStart={onStartPracticeCard}
+            testId="home-practice-card"
+          />
         </article>
         <article
           className="kit-home__wave-cell"
@@ -661,6 +687,14 @@ export function HomeCockpit({
             {homeSession?.build.detail ??
               'Two clean passes make the next musical payoff useful.'}
           </span>
+          <EvidencePracticeCards
+            compact
+            cards={homePracticeCards.cards.filter(
+              (card) => card.kind === 'build',
+            )}
+            onStart={onStartPracticeCard}
+            testId="home-practice-card"
+          />
         </article>
         <article
           className="kit-home__wave-cell"
@@ -672,6 +706,14 @@ export function HomeCockpit({
             {homeSession?.payoff.detail ??
               'A playable song becomes the session finish when available.'}
           </span>
+          <EvidencePracticeCards
+            compact
+            cards={homePracticeCards.cards.filter(
+              (card) => card.kind === 'apply',
+            )}
+            onStart={onStartPracticeCard}
+            testId="home-practice-card"
+          />
         </article>
       </section>
 

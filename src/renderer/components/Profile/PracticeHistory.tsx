@@ -13,6 +13,7 @@ import {
   LongitudinalMonth,
   LongitudinalProgress,
 } from '../../services/practice-stats';
+import type { WeeklyMusicalRecap } from '../../services/pedagogy';
 
 const integerFormatter = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
@@ -138,8 +139,10 @@ function HistoryMetric({
  */
 export function PracticeHistory({
   progress,
+  weeklyRecap,
 }: {
   progress: LongitudinalProgress | undefined;
+  weeklyRecap?: WeeklyMusicalRecap;
 }) {
   if (!progress) {
     return (
@@ -183,6 +186,24 @@ export function PracticeHistory({
           All retained evidence · {evidenceRange}
         </p>
       </div>
+
+      {weeklyRecap && (
+        <section
+          className="border-y border-border-soft py-3"
+          data-testid="profile-practice-history-weekly-recap"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-accent-text">
+            This week in your hands
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-text-muted">
+            {weeklyRecap.sessions} saved session
+            {weeklyRecap.sessions === 1 ? '' : 's'} across{' '}
+            {weeklyRecap.played_days} played day
+            {weeklyRecap.played_days === 1 ? '' : 's'} ·{' '}
+            {weeklyRecap.skill.label}. {weeklyRecap.next}
+          </p>
+        </section>
+      )}
 
       {allTime.runCount === 0 ? (
         <div

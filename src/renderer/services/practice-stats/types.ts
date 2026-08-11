@@ -147,6 +147,22 @@ export interface RunLearningEvidence {
   bars?: Record<string, RunLearningEvidenceCount>;
 }
 
+export interface PracticeCardRunEvidence {
+  kind: 'review' | 'build' | 'apply';
+  candidate_id: string;
+  source_label: string;
+}
+
+export interface SongSectionAuditionEvidence {
+  song_id: string;
+  start_bar: number;
+  end_bar: number;
+  speed: number;
+  section_label: string;
+  test_label: string;
+  required_skill_id: string;
+}
+
 /**
  * Compact, deterministic Coach evidence produced while the full hit records
  * for a newly finished run are still available. This is intentionally an
@@ -229,6 +245,8 @@ export interface RunSummary {
   /** Authored lesson skills stamped for longitudinal atomic-skill evidence. */
   authoredSkills?: string[];
   atomicSkillEvidence?: SkillEvidenceEvent[];
+  practiceCard?: PracticeCardRunEvidence;
+  audition?: SongSectionAuditionEvidence;
 }
 
 export interface RunTrendPoint {

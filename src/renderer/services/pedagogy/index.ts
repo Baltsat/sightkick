@@ -4,6 +4,8 @@ export * from './evidence-receipt';
 
 export * from './review-scheduler';
 
+export * from './engagement';
+
 export * from './session-composer';
 
 export * from './skill-graph';

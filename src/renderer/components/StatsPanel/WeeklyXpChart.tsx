@@ -31,6 +31,7 @@ export function weeklyBarHeights(
 interface Props {
   points: WeeklyXpPoint[];
   goalXp: number;
+  rhythm?: 'daily' | 'weekly';
   width?: number;
   height?: number;
 }
@@ -38,6 +39,7 @@ interface Props {
 export function WeeklyXpChart({
   points,
   goalXp,
+  rhythm,
   width = DEFAULT_WIDTH,
   height = DEFAULT_HEIGHT,
 }: Props) {
@@ -54,8 +56,9 @@ export function WeeklyXpChart({
       width={width}
       height={height}
       data-testid="weekly-xp-chart"
+      data-rhythm={rhythm}
       role="img"
-      aria-label={`This week's XP: ${points
+      aria-label={`${rhythm ? `${rhythm} rhythm. ` : ''}This week's XP: ${points
         .map((point) => point.xp)
         .join(', ')}`}
     >

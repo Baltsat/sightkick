@@ -38,6 +38,30 @@ describe('PracticeReadinessCue', () => {
     expect(screen.queryByRole('heading')).not.toBeInTheDocument();
   });
 
+  it('names the section, scaffold, and tested skill before an audition starts', () => {
+    render(
+      <PracticeReadinessCue
+        phase="ready"
+        audition={{
+          song_id: 'song:favourite',
+          start_bar: 5,
+          end_bar: 8,
+          speed: 0.7,
+          section_label: 'Bars 5–8',
+          test_label: 'Eighth-note pulse in this section',
+          required_skill_id: 'pulse.eighth',
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('practice-readiness-cue')).toHaveTextContent(
+      'Bars 5–8 audition · kick to count in',
+    );
+    expect(screen.getByTestId('practice-readiness-cue')).toHaveTextContent(
+      'Tests Eighth-note pulse in this section at 0.7×',
+    );
+  });
+
   it('leaves the notation unblocked while playing', () => {
     render(<PracticeReadinessCue phase="playing" />);
 

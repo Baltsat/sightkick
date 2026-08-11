@@ -648,6 +648,22 @@ button,
     0 0.5rem 1.2rem #ff4ca2;
 }
 
+.sk-streak-return {
+  max-width: min(25rem, calc(100vw - 2rem));
+  padding: 0.38rem 0.72rem;
+  border: 1px solid
+    color-mix(in srgb, var(--signal-ember) 32%, var(--line-soft));
+  border-radius: 999px;
+  color: var(--ink-muted);
+  background: color-mix(in srgb, var(--surface-raised) 90%, transparent);
+  box-shadow: 0 8px 18px -16px rgb(17 23 34 / 45%);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 720;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sk-streak-meter.sk-streak-tier-up .sk-streak-title,
   .sk-streak-meter.sk-streak-tier-up .sk-streak-proof,

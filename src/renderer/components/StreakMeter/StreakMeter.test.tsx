@@ -15,7 +15,7 @@ describe('StreakMeter', () => {
     expect(screen.queryByTestId('streak-meter')).not.toBeInTheDocument();
   });
 
-  it('hides immediately when the current streak breaks, even when a best streak remains', () => {
+  it('returns attention to the phrase and preserves the best clean-hit count after a miss', () => {
     render(
       <StreakMeter
         ui={uiWithStreak({
@@ -26,11 +26,15 @@ describe('StreakMeter', () => {
             countedNoteIds: new Set(),
           },
           shatterSeq: 1,
+          returnSeq: 1,
+          returnBest: 18,
         })}
       />,
     );
 
-    expect(screen.queryByTestId('streak-meter')).not.toBeInTheDocument();
+    expect(screen.getByTestId('streak-return')).toHaveTextContent(
+      'Back to the phrase · best 18 clean hits',
+    );
   });
 
   it('shows the current count once the streak has started, even below the first stage', () => {
@@ -167,7 +171,7 @@ describe('StreakMeter', () => {
     expect(screen.getByTestId('streak-announce')).toHaveTextContent(stage.name);
   });
 
-  it('applies the shatter class only when animated (default true)', () => {
+  it('keeps phrase-tier feedback free of a loss animation after a reset', () => {
     const ui = uiWithStreak({
       streak: {
         count: 1,
@@ -179,15 +183,12 @@ describe('StreakMeter', () => {
     });
     const { rerender } = render(<StreakMeter ui={ui} />);
 
-    expect(screen.getByTestId('streak-meter-pill').className).toContain(
+    expect(screen.getByTestId('streak-meter-pill').className).not.toContain(
       'sk-streak-shatter',
     );
 
     rerender(<StreakMeter ui={ui} animated={false} />);
 
-    expect(screen.getByTestId('streak-meter-pill').className).not.toContain(
-      'sk-streak-shatter',
-    );
     expect(screen.getByTestId('streak-meter-pill').className).not.toContain(
       'sk-streak-pulse',
     );

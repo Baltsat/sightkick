@@ -55,12 +55,12 @@ function ranked(
   return { candidate, decision };
 }
 
-const weak_state: AtomicSkillState = {
+const retained_state: AtomicSkillState = {
   skill_id: 'pulse.eighth',
   alpha: 2,
   beta: 6,
   effective_trials: 4,
-  stage: 'assessed',
+  stage: 'retained',
   evidence_boundary: 'midi',
 };
 
@@ -76,7 +76,7 @@ describe('favourite-song goal paths', () => {
       },
       song: song.candidate,
       ranking: [ranked('lesson:pulse', 'lesson'), song],
-      states: [weak_state],
+      states: [retained_state],
     });
 
     expect(path.free_play_available).toBe(true);
@@ -86,6 +86,8 @@ describe('favourite-song goal paths', () => {
       song_id: 'song:favourite',
       start_bar: 5,
       end_bar: 8,
+      section_label: 'Bars 5–8',
+      required_skill_id: 'pulse.eighth',
     });
   });
 
@@ -99,10 +101,28 @@ describe('favourite-song goal paths', () => {
       },
       song: song.candidate,
       ranking: [song],
-      states: [weak_state],
+      states: [retained_state],
     });
 
     expect(path.next_song_probe).toBeUndefined();
     expect(path.confidence_note).toContain('too low');
+  });
+
+  it('waits for a retained goal skill before offering a section audition', () => {
+    const song = ranked('song:building', 'song');
+    const path = buildSongUnlockPath({
+      goal: {
+        song_id: 'song:building',
+        preferred: true,
+        target_section: { start_bar: 5, end_bar: 8 },
+        goal_kind: 'first_playable_pass',
+      },
+      song: song.candidate,
+      ranking: [song],
+      states: [{ ...retained_state, stage: 'provisional' }],
+    });
+
+    expect(path.next_song_probe).toBeUndefined();
+    expect(path.confidence_note).toContain('Retain a goal skill');
   });
 });

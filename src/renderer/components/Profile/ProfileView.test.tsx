@@ -363,4 +363,81 @@ describe('ProfileView', () => {
     );
     expect(screen.getAllByText('Lesson 05.06 — Roadhouse Cat')).toHaveLength(2);
   });
+
+  it('shows an evidence-backed weekly set, planned rests, and a guilt-free recap', () => {
+    const onStartPracticeCard = vi.fn();
+    const onPracticeRhythmChange = vi.fn();
+    const card = {
+      id: 'review:lesson:pulse',
+      kind: 'review' as const,
+      candidate_id: 'lesson:pulse',
+      title: 'Delayed pulse recall',
+      speed: 0.7,
+      source_label: 'Saved review queue · Eighth-note pulse',
+      completion_label: 'One saved review run',
+    };
+
+    render(
+      <ProfileView
+        songList={[song()]}
+        goals={[]}
+        isGoalsLoaded
+        onSaveGoal={() => {}}
+        onSetPrimaryGoal={() => {}}
+        gamification={gamification()}
+        insights={{
+          practiceCards: {
+            cards: [{ kind: 'review', label: 'Review', options: [card] }],
+            evidence_signature: 'saved-review',
+          },
+          weeklySet: {
+            rhythm: 'weekly',
+            cards: [{ kind: 'review', option: card }],
+            evidence_signature: 'saved-review|weekly',
+          },
+          weeklyRhythm: {
+            next_available: 'Thursday',
+            days: [
+              { key: '2026-08-10', label: 'Mon', state: 'rest' },
+              { key: '2026-08-11', label: 'Tue', state: 'played' },
+            ],
+          },
+          weeklyRecap: {
+            week_start: '2026-08-05',
+            week_end: '2026-08-11',
+            sessions: 1,
+            played_days: 1,
+            evidence_state: 'measured',
+            skill: {
+              state: 'uncertain',
+              label: 'Eighth-note pulse',
+              detail: 'Saved evidence is still building.',
+            },
+            next: 'Delayed pulse recall at 0.7× from the current evidence route.',
+          },
+        }}
+        onStartPracticeCard={onStartPracticeCard}
+        onPracticeRhythmChange={onPracticeRhythmChange}
+      />,
+    );
+
+    expect(screen.getByTestId('weekly-practice-rhythm')).toHaveTextContent(
+      'Next available session: Thursday',
+    );
+    expect(screen.getByTestId('weekly-rhythm-calendar')).toHaveTextContent(
+      'rest',
+    );
+    expect(screen.getByTestId('weekly-musical-recap')).toHaveTextContent(
+      '1 saved session across 1 played day',
+    );
+    expect(screen.getByTestId('weekly-musical-recap')).not.toHaveTextContent(
+      'missed',
+    );
+
+    screen.getByTestId('practice-card-review-start').click();
+    screen.getByTestId('practice-rhythm-daily').click();
+
+    expect(onStartPracticeCard).toHaveBeenCalledWith(card);
+    expect(onPracticeRhythmChange).toHaveBeenCalledWith('daily');
+  });
 });

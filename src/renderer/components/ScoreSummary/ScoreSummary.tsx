@@ -332,6 +332,40 @@ export function ScoreSummary({
             </p>
           </section>
         )}
+        {practiceSummary?.practiceCard && (
+          <section
+            className="w-full border-l-2 border-signal-ember pl-3 text-left"
+            data-testid="practice-card-run-receipt"
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-accent-text">
+              {practiceSummary.practiceCard.kind} saved
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-text-muted">
+              {practiceSummary.practiceCard.source_label}. This run completes
+              the card’s practice record; it does not create a separate prize.
+            </p>
+          </section>
+        )}
+        {practiceSummary?.audition && (
+          <section
+            className="w-full rounded-2xl border border-accent-soft-border bg-accent-soft-bg p-4 text-left"
+            data-testid="song-section-audition-receipt"
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-text">
+              Section audition saved
+            </p>
+            <h3 className="mt-1 font-display text-2xl font-semibold tracking-[-0.035em] text-text">
+              {practiceSummary.audition.section_label} ·{' '}
+              {Math.round(practiceSummary.overallAccuracy * 100)}% at{' '}
+              {practiceSummary.audition.speed.toFixed(1)}×
+            </h3>
+            <p className="mt-1 text-sm leading-relaxed text-text-muted">
+              Tests {practiceSummary.audition.test_label}. The result updates
+              this saved section path only; full-song readiness remains
+              separate.
+            </p>
+          </section>
+        )}
         {scoreData ? (
           // Star rating, accuracy headline and the hit/missed/false-hit grid
           // are all derived from `scoreData` — Perform-only (see

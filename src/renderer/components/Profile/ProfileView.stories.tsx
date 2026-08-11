@@ -222,6 +222,128 @@ const insights: ProfileInsights = {
   },
   rejectedAtomicEvidenceCount: 1,
   latestRun,
+  practiceCards: {
+    cards: [
+      {
+        kind: 'review',
+        label: 'Review',
+        options: [
+          {
+            id: 'review:lesson:07.03',
+            kind: 'review',
+            candidate_id: song.id,
+            title: 'Tom handoff recall',
+            speed: 0.72,
+            source_label: 'Saved review queue · Mid-to-floor tom movement',
+            completion_label: 'One saved review run',
+          },
+        ],
+      },
+      {
+        kind: 'build',
+        label: 'Build',
+        options: [
+          {
+            id: 'build:lesson:07.03',
+            kind: 'build',
+            candidate_id: song.id,
+            title: 'Tom handoff loop',
+            speed: 0.72,
+            source_label: 'Current acquisition block · Build the handoff.',
+            completion_label: 'One saved loop or lesson block',
+          },
+        ],
+      },
+      {
+        kind: 'apply',
+        label: 'Apply',
+        options: [
+          {
+            id: 'apply:lesson:07.03',
+            kind: 'apply',
+            candidate_id: song.id,
+            title: 'Tom handoff phrase',
+            speed: 0.72,
+            source_label: 'Current musical application route',
+            completion_label: 'One saved musical application run',
+          },
+        ],
+      },
+    ],
+    evidence_signature: 'profile-story-p1',
+  },
+  weeklySet: {
+    rhythm: 'weekly',
+    cards: [
+      {
+        kind: 'review',
+        option: {
+          id: 'review:lesson:07.03',
+          kind: 'review',
+          candidate_id: song.id,
+          title: 'Tom handoff recall',
+          speed: 0.72,
+          source_label: 'Saved review queue · Mid-to-floor tom movement',
+          completion_label: 'One saved review run',
+        },
+      },
+      {
+        kind: 'build',
+        option: {
+          id: 'build:lesson:07.03',
+          kind: 'build',
+          candidate_id: song.id,
+          title: 'Tom handoff loop',
+          speed: 0.72,
+          source_label: 'Current acquisition block · Build the handoff.',
+          completion_label: 'One saved loop or lesson block',
+        },
+      },
+      {
+        kind: 'apply',
+        option: {
+          id: 'apply:lesson:07.03',
+          kind: 'apply',
+          candidate_id: song.id,
+          title: 'Tom handoff phrase',
+          speed: 0.72,
+          source_label: 'Current musical application route',
+          completion_label: 'One saved musical application run',
+        },
+      },
+    ],
+    evidence_signature: 'profile-story-p1|weekly',
+  },
+  weeklyRhythm: {
+    next_available: 'Thursday',
+    days: [
+      { key: '2026-08-05', label: 'Wed', state: 'rest' },
+      { key: '2026-08-06', label: 'Thu', state: 'played' },
+      { key: '2026-08-07', label: 'Fri', state: 'rest' },
+      { key: '2026-08-08', label: 'Sat', state: 'played' },
+      { key: '2026-08-09', label: 'Sun', state: 'rest' },
+      { key: '2026-08-10', label: 'Mon', state: 'rest' },
+      { key: '2026-08-11', label: 'Tue', state: 'planned' },
+    ],
+  },
+  weeklyRecap: {
+    week_start: '2026-08-05',
+    week_end: '2026-08-11',
+    sessions: 3,
+    played_days: 2,
+    evidence_state: 'measured',
+    skill: {
+      state: 'reliable',
+      label: 'Eighth-note pulse',
+      detail: 'A saved retained run strengthened this skill.',
+    },
+    section: {
+      state: 'attempted',
+      label: 'Bars 5–8',
+      detail: '76% at 0.7×. This is a section result, not full-song readiness.',
+    },
+    next: 'Tom handoff at 0.7× from the current evidence route.',
+  },
 };
 const meta: Meta<typeof ProfileView> = {
   title: 'Insights/Profile view',

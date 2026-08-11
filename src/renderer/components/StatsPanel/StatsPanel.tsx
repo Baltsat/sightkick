@@ -6,6 +6,7 @@ import { AchievementViewModel } from '../../hooks/useGamification';
 import { LaneAccuracyBars } from '../PracticeStats/LaneAccuracyBars';
 import { WeeklyXpChart, WeeklyXpPoint } from './WeeklyXpChart';
 import { AchievementGrid } from './AchievementGrid';
+import type { PracticeRhythm } from '../../services/pedagogy';
 
 export interface StatsPanelProps {
   streak: StreakInfo;
@@ -14,6 +15,7 @@ export interface StatsPanelProps {
   totalStars: number;
   laneAccuracy: LaneAccuracy[];
   achievements: AchievementViewModel[] | undefined;
+  practiceRhythm?: PracticeRhythm;
 }
 
 function StatTile({
@@ -52,6 +54,7 @@ export function StatsPanel({
   totalStars,
   laneAccuracy,
   achievements,
+  practiceRhythm,
 }: StatsPanelProps) {
   return (
     <div className="flex flex-col gap-6" data-testid="stats-panel">
@@ -100,7 +103,11 @@ export function StatsPanel({
           This is today&apos;s effort target. A practice streak counts
           consecutive qualifying saved practice days.
         </p>
-        <WeeklyXpChart points={weeklyXp} goalXp={goalXp} />
+        <WeeklyXpChart
+          points={weeklyXp}
+          goalXp={goalXp}
+          rhythm={practiceRhythm}
+        />
       </section>
 
       <section className="flex flex-col gap-2">

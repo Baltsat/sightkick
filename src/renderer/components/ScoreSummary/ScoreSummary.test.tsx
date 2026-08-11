@@ -101,6 +101,40 @@ describe('ScoreSummary', () => {
     );
   });
 
+  it('keeps a saved section audition scoped to the measured section', () => {
+    const { modal } = renderSummary({
+      practiceSummary: {
+        ...multiLaneRunFixture(),
+        overallAccuracy: 0.84,
+        practiceCard: {
+          kind: 'apply',
+          candidate_id: 'song:favourite',
+          source_label:
+            'Eligible goal path · Eighth-note pulse in this section',
+        },
+        audition: {
+          song_id: 'song:favourite',
+          start_bar: 5,
+          end_bar: 8,
+          speed: 0.7,
+          section_label: 'Bars 5–8',
+          test_label: 'Eighth-note pulse in this section',
+          required_skill_id: 'pulse.eighth',
+        },
+      },
+    });
+
+    expect(modal.getByTestId('practice-card-run-receipt')).toHaveTextContent(
+      'apply saved',
+    );
+    expect(
+      modal.getByTestId('song-section-audition-receipt'),
+    ).toHaveTextContent('Bars 5–8 · 84% at 0.7×');
+    expect(
+      modal.getByTestId('song-section-audition-receipt'),
+    ).toHaveTextContent('full-song readiness remains separate');
+  });
+
   it('opens the coach from a completed run', () => {
     const onCoach = vi.fn();
     const { modal } = renderSummary({

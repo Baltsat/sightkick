@@ -1,11 +1,4 @@
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Drawer, Modal, Spin, Tooltip } from 'antd';
 import { Difficulty } from 'scan-chart';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -53,6 +46,7 @@ import {
   useInputControls,
 } from '../../hooks/useInputControls';
 import { useGameModeSelector } from '../../hooks/useGameModeSelector';
+import { usePersisted } from '../../hooks/usePersisted';
 import {
   highestAvailableDifficulty,
   isLessonSong,
@@ -70,9 +64,11 @@ import { SaveGoalInput, SetGoalModal, useGoals } from '../../components/Goals';
 import { AppShell, ArenaView } from '../../components/AppShell';
 import { HomeCockpit } from '../../components/HomeCockpit';
 import { KitCommandPrompt } from '../../components/KitCommandPrompt';
+import ProfileView from '../../components/Profile';
 import { buildDrumLearningProfile } from '../../services/learning-profile';
 import {
   buildPracticeWave,
+  composeHomeSession,
   OneKickHomeSession,
   PracticeCandidate,
   PracticeHistoryEntry,
@@ -81,10 +77,20 @@ import {
   recommendNextPractice,
 } from '../../services/next-practice';
 import {
+  bestSongSectionAudition,
+  buildWeeklyMusicalRecap,
+  buildWeeklyRhythm,
+  composePracticeCards,
   CURRICULUM_ITEM_MANIFESTS,
   dueReviews,
   replayAtomicSkillState,
+  selectWeeklyPracticeSet,
   SongGoal,
+} from '../../services/pedagogy';
+import type {
+  PracticeCardKind,
+  PracticeCardOption,
+  PracticeRhythm,
 } from '../../services/pedagogy';
 import { PracticeOutletContext } from '../practice-context';
 import {
@@ -102,8 +108,12 @@ import {
 import { resolveLibraryControls } from './library-controls';
 import { isPlayableEvidence } from '../../../library-sources/playability';
 
-const ProfileView = lazy(() => import('../../components/Profile'));
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard', 'expert'];
+
+interface PracticeLaunchContext {
+  card?: PracticeCardOption;
+  audition?: NonNullable<PracticeCardOption['audition']>;
+}
 
 function LibraryInputControls({
   mapping,
@@ -486,6 +496,110 @@ export function SongListView() {
       }),
     [nextPractice.ranking, practiceHistory],
   );
+  const [practiceRhythm, setPracticeRhythm] = usePersisted<PracticeRhythm>(
+    'practice.rhythm',
+    'weekly',
+  );
+  const [practiceSetRotation, setPracticeSetRotation] = usePersisted<
+    Partial<Record<PracticeCardKind, number>>
+  >('practice.weeklySetRotation', {});
+  const profileHomeSession = useMemo(
+    () =>
+      composeHomeSession({
+        intent: 'learning',
+        size: 'full',
+        ranking: nextPractice.ranking,
+        pedagogyRanking: nextPractice.pedagogyRanking,
+        practiceWave,
+        activeGoal,
+        goalPayoffCandidate: activeGoalPayoffCandidate,
+        goalTargetDate: activeGoalRecord?.targetDate,
+        deadlinePacing: nextPractice.deadlinePacing,
+        atomicStates,
+        now: new Date(recommendationNowMs).toISOString(),
+      }),
+    [
+      activeGoal,
+      activeGoalPayoffCandidate,
+      activeGoalRecord?.targetDate,
+      atomicStates,
+      nextPractice.deadlinePacing,
+      nextPractice.pedagogyRanking,
+      nextPractice.ranking,
+      practiceWave,
+      recommendationNowMs,
+    ],
+  );
+  const practiceCards = useMemo(() => {
+    const composed = composePracticeCards({
+      plan: profileHomeSession?.plan,
+      ranking: nextPractice.pedagogyRanking ?? [],
+      due_reviews: atomicReviews,
+      ...(profileHomeSession?.goalPath
+        ? { goal_path: profileHomeSession.goalPath }
+        : {}),
+    });
+    const playable = composed.cards.flatMap((card) => {
+      const options = card.options.filter((option) =>
+        nextPractice.ranking.some(
+          (ranked) => ranked.candidate.id === option.candidate_id,
+        ),
+      );
+
+      return options.length > 0 ? [{ ...card, options }] : [];
+    });
+
+    return {
+      cards: playable,
+      evidence_signature: composed.evidence_signature,
+    };
+  }, [
+    atomicReviews,
+    nextPractice.pedagogyRanking,
+    nextPractice.ranking,
+    profileHomeSession,
+  ]);
+  const weeklyPracticeSet = useMemo(
+    () =>
+      selectWeeklyPracticeSet({
+        cards: practiceCards,
+        rhythm: practiceRhythm,
+        rotation: practiceSetRotation,
+      }),
+    [practiceCards, practiceRhythm, practiceSetRotation],
+  );
+  const weeklyRhythm = useMemo(
+    () =>
+      buildWeeklyRhythm({
+        days: gamification.days,
+        rhythm: practiceRhythm,
+        now: new Date(recommendationNowMs),
+      }),
+    [gamification.days, practiceRhythm, recommendationNowMs],
+  );
+  const weeklyRecap = useMemo(
+    () =>
+      buildWeeklyMusicalRecap({
+        runs: practiceHistory.map(({ summary }) => summary),
+        states: atomicStates,
+        recommendation: nextPractice.recommendation,
+        now: new Date(recommendationNowMs),
+      }),
+    [
+      atomicStates,
+      nextPractice.recommendation,
+      practiceHistory,
+      recommendationNowMs,
+    ],
+  );
+  const bestAudition = useMemo(
+    () =>
+      bestSongSectionAudition(
+        practiceHistory.map(({ summary }) => summary),
+        activeGoal?.song_id,
+      ),
+    [activeGoal?.song_id, practiceHistory],
+  );
   const [activePracticeWave, setActivePracticeWave] = useState<{
     result: PracticeWaveResult;
     index: number;
@@ -760,7 +874,11 @@ export function SongListView() {
     ],
   );
   const launchPractice = useCallback(
-    (recommendation: RankedPracticeCandidate, practiceSpeed: number) => {
+    (
+      recommendation: RankedPracticeCandidate,
+      practiceSpeed: number,
+      context?: PracticeLaunchContext,
+    ) => {
       const waveIndex = practiceWave.stops.findIndex(
         ({ recommendation: waveRecommendation }) =>
           waveRecommendation.candidate.id === recommendation.candidate.id,
@@ -784,9 +902,27 @@ export function SongListView() {
 
       const params = new URLSearchParams({
         gameMode: 'practice',
-        autoStart: '1',
         practiceSpeed: practiceSpeed.toFixed(1),
       });
+
+      if (!context?.audition) {
+        params.set('autoStart', '1');
+      }
+
+      if (context?.card) {
+        params.set('practiceCardKind', context.card.kind);
+        params.set('practiceCardCandidate', context.card.candidate_id);
+        params.set('practiceCardSource', context.card.source_label);
+      }
+
+      if (context?.audition) {
+        params.set('audition', '1');
+        params.set('auditionStart', String(context.audition.start_bar));
+        params.set('auditionEnd', String(context.audition.end_bar));
+        params.set('auditionLabel', context.audition.section_label);
+        params.set('auditionTest', context.audition.test_label);
+        params.set('auditionSkill', context.audition.required_skill_id);
+      }
 
       navigate(`/${recommendation.candidate.id}?${params.toString()}`);
     },
@@ -805,6 +941,44 @@ export function SongListView() {
       );
     }
   }, [launchPractice, nextPractice.recommendation]);
+  const startPracticeCard = useCallback(
+    (option: PracticeCardOption) => {
+      const recommendation = nextPractice.ranking.find(
+        (ranked) => ranked.candidate.id === option.candidate_id,
+      );
+
+      if (recommendation) {
+        launchPractice(recommendation, option.speed, {
+          card: option,
+          ...(option.audition ? { audition: option.audition } : {}),
+        });
+      }
+    },
+    [launchPractice, nextPractice.ranking],
+  );
+  const startSectionAudition = useCallback(() => {
+    const audition = profileHomeSession?.goalPath?.next_song_probe;
+    const recommendation = audition
+      ? nextPractice.ranking.find(
+          (ranked) => ranked.candidate.id === audition.song_id,
+        )
+      : undefined;
+
+    if (audition && recommendation) {
+      launchPractice(recommendation, audition.speed, { audition });
+    }
+  }, [launchPractice, nextPractice.ranking, profileHomeSession?.goalPath]);
+  const refreshPracticeSet = useCallback(() => {
+    setPracticeSetRotation(
+      (current) =>
+        Object.fromEntries(
+          ['review', 'build', 'apply'].map((kind) => [
+            kind,
+            (current[kind as PracticeCardKind] ?? 0) + 1,
+          ]),
+        ) as Partial<Record<PracticeCardKind, number>>,
+    );
+  }, [setPracticeSetRotation]);
 
   useEffect(() => {
     const lessonId = searchParams.get('coachLesson');
@@ -946,6 +1120,7 @@ export function SongListView() {
             onChangeGoal={gamification.setGoalOption}
             weekActivity={gamification.weekActivity}
             totalStars={gamification.totalStars}
+            practiceRhythm={practiceRhythm}
             onOpenStats={() => {
               gamification.loadAchievements();
               setIsStatsOpen(true);
@@ -976,8 +1151,10 @@ export function SongListView() {
             goalTargetDate={activeGoalRecord?.targetDate}
             deadlinePacing={nextPractice.deadlinePacing}
             atomicStates={atomicStates}
+            dueReviews={atomicReviews}
             onStartRecommended={() => startRecommendedPractice()}
             onStartSession={startComposedSession}
+            onStartPracticeCard={startPracticeCard}
             onOpenSongs={() => setView('songs')}
             onOpenJourney={() => setView('journey')}
             onOpenCoach={openHomeCoach}
@@ -1004,8 +1181,10 @@ export function SongListView() {
             goalTargetDate={activeGoalRecord?.targetDate}
             deadlinePacing={nextPractice.deadlinePacing}
             atomicStates={atomicStates}
+            dueReviews={atomicReviews}
             onStartRecommended={() => startRecommendedPractice()}
             onStartSession={startComposedSession}
+            onStartPracticeCard={startPracticeCard}
             onOpenSongs={() => setView('songs')}
             onOpenJourney={() => setView('journey')}
             onOpenCoach={openHomeCoach}
@@ -1017,32 +1196,41 @@ export function SongListView() {
         )}
 
         {!songOpen && view === 'insights' && (
-          <Suspense
-            fallback={
-              <div className="flex min-h-64 items-center justify-center">
-                <Spin size="large" />
-              </div>
-            }
-          >
-            <ProfileView
-              songList={librarySongs}
-              goals={goals.goals}
-              isGoalsLoaded={goals.isLoaded}
-              onSaveGoal={goals.saveGoal}
-              onSetPrimaryGoal={goals.setPrimaryGoal}
-              gamification={gamification}
-              insights={{
-                recommendation: nextPractice.recommendation,
-                atomicStates,
-                dueReviews: atomicReviews,
-                deadlinePacing: nextPractice.deadlinePacing,
-                rejectedAtomicEvidenceCount:
-                  atomicStateReplay.rejected_events.length,
-                latestRun: gamification.latestRun?.summary,
-              }}
-              onStartTargetedPractice={startTargetedPractice}
-            />
-          </Suspense>
+          <ProfileView
+            songList={librarySongs}
+            goals={goals.goals}
+            isGoalsLoaded={goals.isLoaded}
+            onSaveGoal={goals.saveGoal}
+            onSetPrimaryGoal={goals.setPrimaryGoal}
+            gamification={gamification}
+            insights={{
+              recommendation: nextPractice.recommendation,
+              atomicStates,
+              dueReviews: atomicReviews,
+              deadlinePacing: nextPractice.deadlinePacing,
+              rejectedAtomicEvidenceCount:
+                atomicStateReplay.rejected_events.length,
+              latestRun: gamification.latestRun?.summary,
+              practiceCards,
+              weeklySet: weeklyPracticeSet,
+              weeklyRhythm,
+              weeklyRecap,
+              bestAudition,
+              auditionAvailable: Boolean(
+                profileHomeSession?.goalPath?.next_song_probe &&
+                  nextPractice.ranking.some(
+                    (ranked) =>
+                      ranked.candidate.id ===
+                      profileHomeSession.goalPath?.next_song_probe?.song_id,
+                  ),
+              ),
+            }}
+            onStartTargetedPractice={startTargetedPractice}
+            onStartPracticeCard={startPracticeCard}
+            onPracticeRhythmChange={setPracticeRhythm}
+            onRefreshPracticeSet={refreshPracticeSet}
+            onStartAudition={startSectionAudition}
+          />
         )}
 
         {!songOpen && view === 'journey' && (
@@ -1429,6 +1617,7 @@ export function SongListView() {
           totalStars={gamification.totalStars}
           laneAccuracy={gamification.laneAccuracy ?? []}
           achievements={gamification.achievements}
+          practiceRhythm={practiceRhythm}
         />
       </Drawer>
 

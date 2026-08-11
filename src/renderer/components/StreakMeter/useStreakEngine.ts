@@ -26,6 +26,8 @@ export interface StreakUiState {
    * by an administrative seek/restart reset (see `resetForSeek` in
    * `services/streak`) - that one is silent by design. */
   shatterSeq: number;
+  returnSeq: number;
+  returnBest: number | undefined;
 }
 
 export const INITIAL_STREAK_UI_STATE: StreakUiState = {
@@ -33,6 +35,8 @@ export const INITIAL_STREAK_UI_STATE: StreakUiState = {
   announceSeq: 0,
   announceStage: undefined,
   shatterSeq: 0,
+  returnSeq: 0,
+  returnBest: undefined,
 };
 
 /**
@@ -74,7 +78,13 @@ export function useStreakEngine(engine: Engine | undefined): StreakUiState {
           return { ...prev, streak: state };
         }
 
-        return { ...prev, streak: state, shatterSeq: prev.shatterSeq + 1 };
+        return {
+          ...prev,
+          streak: state,
+          shatterSeq: prev.shatterSeq + 1,
+          returnSeq: prev.returnSeq + 1,
+          returnBest: prev.streak.best,
+        };
       });
     const offJudgement = engine.onJudgement((judgement) => {
       if (judgement.verdict === 'hit' && judgement.expectedTick !== undefined) {
@@ -88,12 +98,13 @@ export function useStreakEngine(engine: Engine | undefined): StreakUiState {
           const { state, stageUp } = registerHit(prev.streak, noteId);
 
           if (!stageUp) {
-            return { ...prev, streak: state };
+            return { ...prev, streak: state, returnBest: undefined };
           }
 
           return {
             ...prev,
             streak: state,
+            returnBest: undefined,
             announceSeq: prev.announceSeq + 1,
             announceStage: stageUp,
           };
@@ -110,7 +121,11 @@ export function useStreakEngine(engine: Engine | undefined): StreakUiState {
       }
     });
     const offReset = engine.onReset(() =>
-      setUi((prev) => ({ ...prev, streak: resetForSeek(prev.streak).state })),
+      setUi((prev) => ({
+        ...prev,
+        streak: resetForSeek(prev.streak).state,
+        returnBest: undefined,
+      })),
     );
 
     return () => {

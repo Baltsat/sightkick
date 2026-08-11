@@ -34,14 +34,36 @@ export function StreakMeter({
   animated = true,
   className,
 }: StreakMeterProps) {
-  const { streak, announceSeq, announceStage, shatterSeq } = ui;
+  const { streak, announceSeq, announceStage, returnSeq, returnBest } = ui;
 
   // The meter represents a live streak, not run history. Once the current
   // streak is broken, the best value remains available in Results; keeping a
   // 0/best pill over the score is both distracting and visually collides with
   // the location HUD at exactly the moment the player needs to recover.
-  if (streak.count <= 0) {
+  if (streak.count <= 0 && !returnBest) {
     return null;
+  }
+
+  if (streak.count <= 0) {
+    return (
+      <div
+        className={cn(
+          'pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center',
+          className,
+        )}
+        data-testid="streak-meter"
+      >
+        <div
+          key={`sk-streak-return-${returnSeq}`}
+          className="sk-streak-return"
+          data-testid="streak-return"
+          aria-live="polite"
+        >
+          Back to the phrase · best {returnBest} clean hit
+          {returnBest === 1 ? '' : 's'}
+        </div>
+      </div>
+    );
   }
 
   const tier = streak.stage?.tier ?? -1;
@@ -56,11 +78,10 @@ export function StreakMeter({
     >
       <div className="relative">
         <div
-          key={`sk-streak-vfx-${announceSeq}-${shatterSeq}`}
+          key={`sk-streak-vfx-${announceSeq}`}
           className={cn(
             'sk-streak-meter',
             animated && 'sk-streak-pulse',
-            animated && shatterSeq > 0 && 'sk-streak-shatter',
             animated && announceSeq > 0 && 'sk-streak-tier-up',
           )}
           data-tier={tier}
@@ -73,8 +94,8 @@ export function StreakMeter({
             </strong>
           )}
           <span key={streak.count} className="sk-streak-proof">
-            Streak · <b data-testid="streak-count">{streak.count}</b>
-            {' · hits'}
+            Phrase tier · <b data-testid="streak-count">{streak.count}</b>
+            {' clean hits'}
           </span>
           {streak.best > streak.count && (
             <span className="sk-streak-best" data-testid="streak-best">

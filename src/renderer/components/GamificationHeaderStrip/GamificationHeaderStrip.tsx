@@ -4,6 +4,7 @@ import { faStar } from '@fortawesome/free-solid-svg-icons';
 import { StreakInfo } from '../../services/streaks';
 import { GoalOption } from '../../hooks/useGamification';
 import { cn } from '../../cn';
+import type { PracticeRhythm } from '../../services/pedagogy';
 import { StreakFlame } from './StreakFlame';
 import { WeekDots } from './WeekDots';
 import { GoalPopover } from './GoalPopover';
@@ -19,6 +20,7 @@ export interface GamificationHeaderStripProps {
   totalStars: number;
   justCrossedGoal?: boolean;
   onOpenStats: () => void;
+  practiceRhythm?: PracticeRhythm;
   className?: string;
 }
 
@@ -33,6 +35,7 @@ export function GamificationHeaderStrip({
   totalStars,
   justCrossedGoal = false,
   onOpenStats,
+  practiceRhythm,
   className,
 }: GamificationHeaderStripProps) {
   const [isGoalPopoverOpen, setIsGoalPopoverOpen] = useState(false);
@@ -93,6 +96,14 @@ export function GamificationHeaderStrip({
             >
               {practiceStreakLabel}
             </span>
+            {practiceRhythm && (
+              <span
+                className="text-xs text-text-faint"
+                data-testid="practice-rhythm-label"
+              >
+                {practiceRhythm} rhythm
+              </span>
+            )}
             <WeekDots activity={weekActivity} />
             <div
               className="flex items-center gap-1 text-xs text-text-faint"
