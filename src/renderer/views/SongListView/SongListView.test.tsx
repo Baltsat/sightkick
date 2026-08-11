@@ -1152,6 +1152,42 @@ describe('SongListView — liking', () => {
 });
 
 describe('SongListView — opening a song', () => {
+  const failedHardPractice = {
+    completedAt: '2026-08-08T12:00:00.000Z',
+    totalHits: 55,
+    totalMisses: 45,
+    totalWrong: 0,
+    overallAccuracy: 0.55,
+    laneAccuracy: [],
+    laneBias: [],
+    wrongHitCounts: [],
+    timingBias: {
+      meanMs: 0,
+      medianMs: 0,
+      spreadMs: 0,
+      earlyCount: 0,
+      lateCount: 0,
+      onTimeCount: 0,
+      sampleCount: 0,
+    },
+    mode: 'practice' as const,
+    playbackSpeed: 1,
+    difficulty: 'hard' as const,
+  };
+
+  async function loadFailedHardPractice(
+    view: ReturnType<typeof setupSongListView>,
+  ) {
+    await waitFor(() =>
+      expect(view.sentChannels()).toContain('load-all-practice-runs'),
+    );
+    view.emit('load-all-practice-runs', {
+      runs: [failedHardPractice],
+      runsBySong: { 'hard-song': [failedHardPractice] },
+      archiveBySong: {},
+    });
+  }
+
   it('opens the perform mode selector and navigates', async () => {
     const view = setupSongListView();
 
@@ -1170,6 +1206,34 @@ describe('SongListView — opening a song', () => {
     view.chooseGameMode('practice');
 
     expect(await screen.findByTestId('song-view-stub')).toBeInTheDocument();
+  });
+
+  it('routes a manual Practice launch through the adaptive start-speed recommendation', async () => {
+    const view = setupSongListView({ settings: { difficulty: 'hard' } });
+
+    view.loadSongs([makeListSong('hard-song')]);
+    await loadFailedHardPractice(view);
+    view.clickSong('hard-song');
+    view.chooseGameMode('practice');
+
+    expect(await screen.findByTestId('song-view-stub')).toHaveAttribute(
+      'data-search',
+      '?gameMode=practice&practiceSpeed=0.8',
+    );
+  });
+
+  it('keeps a manual Perform launch at its strict default speed', async () => {
+    const view = setupSongListView({ settings: { difficulty: 'hard' } });
+
+    view.loadSongs([makeListSong('hard-song')]);
+    await loadFailedHardPractice(view);
+    view.clickSong('hard-song');
+    view.chooseGameMode('perform');
+
+    expect(await screen.findByTestId('song-view-stub')).toHaveAttribute(
+      'data-search',
+      '?gameMode=perform',
+    );
   });
 
   it('shows Practice as the primary, default-focused game mode', () => {
@@ -1702,7 +1766,10 @@ describe('SongListView — fresh-profile kit navigation', () => {
     const opened = await screen.findByTestId('song-view-stub');
 
     expect(opened).toHaveAttribute('data-song-id', 'a');
-    expect(opened).toHaveAttribute('data-search', '?gameMode=practice');
+    expect(opened).toHaveAttribute(
+      'data-search',
+      '?gameMode=practice&practiceSpeed=0.7',
+    );
     expect(opened).toHaveAttribute('data-difficulty', 'easy');
     expect(
       screen.queryByTestId('game-mode-selector-modal'),
@@ -1790,7 +1857,10 @@ describe('SongListView — fresh-profile kit navigation', () => {
     const opened = await screen.findByTestId('song-view-stub');
 
     expect(opened).toHaveAttribute('data-song-id', 'a');
-    expect(opened).toHaveAttribute('data-search', '?gameMode=practice');
+    expect(opened).toHaveAttribute(
+      'data-search',
+      '?gameMode=practice&practiceSpeed=0.7',
+    );
     expect(
       screen.queryByTestId('game-mode-selector-modal'),
     ).not.toBeInTheDocument();

@@ -1,7 +1,8 @@
 .home-cockpit,
 .coach-desk {
   height: 100%;
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 88% 10%,
       rgb(86 216 242 / 14%),
       transparent 26rem
@@ -49,7 +50,8 @@
 
 .home-cockpit__wash {
   pointer-events: none;
-  background: linear-gradient(
+  background:
+    linear-gradient(
       90deg,
       rgb(17 23 34 / 82%) 0%,
       rgb(17 23 34 / 54%) 28%,
@@ -147,6 +149,30 @@
   flex: 1 1 0;
   padding-inline: 0.62rem;
   font-size: 0.78rem;
+}
+
+.home-cockpit__color-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  margin-top: 0.5rem;
+  color: rgb(255 250 242 / 66%);
+  font-size: 0.58rem;
+  font-weight: 760;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.home-cockpit__color-control select {
+  min-width: 7.3rem;
+  padding: 0.28rem 1.45rem 0.28rem 0.48rem;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 0.55rem;
+  color: #fffaf2;
+  background: rgb(17 23 34 / 48%);
+  font: inherit;
+  letter-spacing: 0.04em;
 }
 
 .home-cockpit__input-readiness {
@@ -366,8 +392,16 @@
 }
 
 .home-kit-hotspot {
-  --kit-lane-color: var(--color-yellow);
-  --kit-lane-dark: var(--color-yellow-dark);
+  --kit-lane-color: color-mix(
+    in srgb,
+    var(--color-yellow) var(--kit-color-vividness, 100%),
+    #050608
+  );
+  --kit-lane-dark: color-mix(
+    in srgb,
+    var(--color-yellow-dark) var(--kit-color-vividness, 100%),
+    #050608
+  );
   position: absolute;
   display: grid;
   width: clamp(4.25rem, 9.2vw, 7.4rem);
@@ -381,32 +415,73 @@
   font: inherit;
   pointer-events: auto;
   cursor: var(--drumstick-cursor), pointer;
+  filter: saturate(var(--kit-color-saturation, 100%));
   isolation: isolate;
 }
 
 .home-kit-hotspot[data-color-lane='orange'] {
-  --kit-lane-color: var(--color-orange);
-  --kit-lane-dark: var(--color-orange-dark);
+  --kit-lane-color: color-mix(
+    in srgb,
+    var(--color-orange) var(--kit-color-vividness, 100%),
+    #050608
+  );
+  --kit-lane-dark: color-mix(
+    in srgb,
+    var(--color-orange-dark) var(--kit-color-vividness, 100%),
+    #050608
+  );
 }
 
 .home-kit-hotspot[data-color-lane='red'] {
-  --kit-lane-color: var(--color-red);
-  --kit-lane-dark: var(--color-red-dark);
+  --kit-lane-color: color-mix(
+    in srgb,
+    var(--color-red) var(--kit-color-vividness, 100%),
+    #050608
+  );
+  --kit-lane-dark: color-mix(
+    in srgb,
+    var(--color-red-dark) var(--kit-color-vividness, 100%),
+    #050608
+  );
 }
 
 .home-kit-hotspot[data-color-lane='yellow'] {
-  --kit-lane-color: var(--color-yellow);
-  --kit-lane-dark: var(--color-yellow-dark);
+  --kit-lane-color: color-mix(
+    in srgb,
+    var(--color-yellow) var(--kit-color-vividness, 100%),
+    #050608
+  );
+  --kit-lane-dark: color-mix(
+    in srgb,
+    var(--color-yellow-dark) var(--kit-color-vividness, 100%),
+    #050608
+  );
 }
 
 .home-kit-hotspot[data-color-lane='blue'] {
-  --kit-lane-color: var(--color-blue);
-  --kit-lane-dark: var(--color-blue-dark);
+  --kit-lane-color: color-mix(
+    in srgb,
+    var(--color-blue) var(--kit-color-vividness, 100%),
+    #050608
+  );
+  --kit-lane-dark: color-mix(
+    in srgb,
+    var(--color-blue-dark) var(--kit-color-vividness, 100%),
+    #050608
+  );
 }
 
 .home-kit-hotspot[data-color-lane='green'] {
-  --kit-lane-color: var(--color-green);
-  --kit-lane-dark: var(--color-green-dark);
+  --kit-lane-color: color-mix(
+    in srgb,
+    var(--color-green) var(--kit-color-vividness, 100%),
+    #050608
+  );
+  --kit-lane-dark: color-mix(
+    in srgb,
+    var(--color-green-dark) var(--kit-color-vividness, 100%),
+    #050608
+  );
 }
 
 .home-kit-hotspot__ring {
@@ -797,12 +872,17 @@
   overflow: hidden;
   border: 1px solid rgb(17 23 34 / 10%);
   border-radius: 1.75rem;
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 82% 36%,
       rgb(247 53 134 / 22%),
       transparent 13rem
     ),
-    radial-gradient(circle at 71% 72%, rgb(255 173 47 / 29%), transparent 16rem),
+    radial-gradient(
+      circle at 71% 72%,
+      rgb(255 173 47 / 29%),
+      transparent 16rem
+    ),
     var(--color-ink);
   box-shadow: 0 1.5rem 3.5rem rgb(17 23 34 / 16%);
 }
@@ -868,12 +948,8 @@
 
 .coach-desk__card--focus {
   border-color: rgb(247 53 134 / 26%);
-  background: linear-gradient(
-      145deg,
-      rgb(247 53 134 / 11%),
-      rgb(255 173 47 / 12%)
-    ),
-    #fff;
+  background:
+    linear-gradient(145deg, rgb(247 53 134 / 11%), rgb(255 173 47 / 12%)), #fff;
 }
 
 .coach-desk__card h2 {

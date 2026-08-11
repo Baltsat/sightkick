@@ -227,8 +227,8 @@ export function SongListView() {
     libraryMode === 'drums'
       ? yandexSources?.drums
       : libraryMode === 'favorites'
-      ? yandexSources?.favorites
-      : undefined;
+        ? yandexSources?.favorites
+        : undefined;
   const filteredLibraryCandidates = useMemo(
     () => filterLibraryCandidates(candidateSource?.tracks ?? [], nameFilter),
     [candidateSource?.tracks, nameFilter],
@@ -511,6 +511,23 @@ export function SongListView() {
     setFocusedSortIndex(sortIndexForKey(sort.key));
     setIsSortOpen(true);
   };
+  const openManualPractice = (id: string) => {
+    const recommendation = recommendNextPractice({
+      candidates: practiceCandidates.filter((candidate) => candidate.id === id),
+      history: practiceHistory,
+      coachEvidence: persistedCoachEvidence,
+      weakLanes: gamification.laneAccuracy,
+      nowMs: Date.now(),
+      limit: 1,
+    }).recommendation;
+    const params = new URLSearchParams({ gameMode: 'practice' });
+
+    if (recommendation) {
+      params.set('practiceSpeed', recommendation.suggestedSpeed.toFixed(1));
+    }
+
+    navigate(`/${id}?${params.toString()}`);
+  };
   const play = async (id: string) => {
     if (gameModeSelector.isOpen) {
       return;
@@ -519,7 +536,9 @@ export function SongListView() {
     const song = songList.find((s) => s.id === id);
     const gameMode = await gameModeSelector.open(song?.drumDifficulties);
 
-    if (gameMode) {
+    if (gameMode === 'practice') {
+      openManualPractice(id);
+    } else if (gameMode) {
       navigate(`/${id}?gameMode=${gameMode}`);
     }
   };
@@ -685,7 +704,7 @@ export function SongListView() {
 
           if (libraryMode === 'local') {
             if (libraryControls.kitActions.includes('confirm')) {
-              navigate(`/${song.id}?gameMode=practice`);
+              openManualPractice(song.id);
             } else {
               play(song.id);
             }
@@ -923,9 +942,9 @@ export function SongListView() {
                         isYandexMode
                           ? filteredLibraryCandidates.length
                           : libraryMode === 'online' &&
-                            onlineTotal !== undefined
-                          ? onlineTotal
-                          : filteredSongList.length
+                              onlineTotal !== undefined
+                            ? onlineTotal
+                            : filteredSongList.length
                       }
                       libraryMode={libraryMode}
                       onlineDownloadsAvailable={onlineDownloadsAvailable}
@@ -999,10 +1018,10 @@ export function SongListView() {
                       {libraryControls.source === 'kit-lanes'
                         ? 'Kit navigation'
                         : libraryControls.source === 'mixed'
-                        ? 'Mixed navigation'
-                        : libraryControls.source === 'explicit'
-                        ? 'Mapped navigation'
-                        : 'Navigation unavailable'}
+                          ? 'Mixed navigation'
+                          : libraryControls.source === 'explicit'
+                            ? 'Mapped navigation'
+                            : 'Navigation unavailable'}
                     </span>
                     {(libraryControls.source === 'kit-lanes' ||
                       libraryControls.source === 'mixed') && (

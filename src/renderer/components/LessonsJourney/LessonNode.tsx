@@ -1,6 +1,6 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faLock } from '@fortawesome/free-solid-svg-icons';
-import { useEffect, useRef, useState } from 'react';
+import { CSSProperties, useEffect, useRef, useState } from 'react';
 import { cn } from '../../cn';
 import { Stars } from '../Stars';
 import { Tooltip } from '../Tooltip';
@@ -8,6 +8,10 @@ import { LessonEntry, lockedHint } from '../../hooks/useLessons';
 import { NodeState } from './journey';
 import { playKitPreview } from '../../services/kit-preview-audio';
 import drumstickCursor from '../../assets/daybreak/drumstick-cursor-reversed.png';
+import {
+  lessonKitColorProperties,
+  useKitColorMaturity,
+} from '../../services/kit-color-maturity';
 import pearlSnare from '../../assets/daybreak/journey-nodes/pearl-snare.png';
 import meshPad from '../../assets/daybreak/journey-nodes/mesh-pad.png';
 import bronzeCymbal from '../../assets/daybreak/journey-nodes/bronze-cymbal.png';
@@ -175,6 +179,7 @@ export function LessonNode({
   const readableHint = hint.replaceAll('\u2b50', 'stars');
   const [pointerStriking, setPointerStriking] = useState(false);
   const pointerTimerRef = useRef<number | undefined>(undefined);
+  const kitColors = useKitColorMaturity();
   const activate = (fromPointer = false) => {
     if (unlocked) {
       if (fromPointer) {
@@ -210,10 +215,10 @@ export function LessonNode({
     state === 'next-up'
       ? 'Next up'
       : state === 'done'
-      ? 'Cleared'
-      : state === 'available'
-      ? 'Ready'
-      : 'Locked';
+        ? 'Cleared'
+        : state === 'available'
+          ? 'Ready'
+          : 'Locked';
 
   return (
     <div
@@ -239,14 +244,18 @@ export function LessonNode({
       data-node-state={state}
       data-node-instrument={visual.instrument}
       data-color-lane={visual.colorLane}
+      data-kit-color-mode={kitColors.override}
       data-kit-focused={isKitFocused ? 'true' : undefined}
       data-in-journey-viewport={isInViewport ? 'true' : 'false'}
       aria-hidden={isInViewport ? undefined : true}
-      style={{
-        left: `${xPercent}%`,
-        top: `${yPercent}%`,
-        cursor: `url(${drumstickCursor}) 6 6, pointer`,
-      }}
+      style={
+        {
+          ...lessonKitColorProperties(visual.colorLane, kitColors.presentation),
+          left: `${xPercent}%`,
+          top: `${yPercent}%`,
+          cursor: `url(${drumstickCursor}) 6 6, pointer`,
+        } as CSSProperties
+      }
       className={cn(
         'daybreak-lesson-node absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer',
         !unlocked && 'daybreak-lesson-node--locked',

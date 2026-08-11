@@ -39,6 +39,10 @@ import {
 } from '../../services/next-practice';
 import { KitElement, RunSummary } from '../../services/practice-stats';
 import { playKitPreview } from '../../services/kit-preview-audio';
+import {
+  useKitColorMaturity,
+  type KitColorOverride,
+} from '../../services/kit-color-maturity';
 import homeKitStudio from '../../assets/daybreak/home-kit-studio.png';
 import drumstickCursor from '../../assets/daybreak/drumstick-cursor-reversed.png';
 import './HomeCockpit.css';
@@ -296,6 +300,11 @@ export function HomeCockpit({
     () => recentCompletedSongs(songList, gamification.runsBySong),
     [gamification.runsBySong, songList],
   );
+  const kitColorRuns = useMemo(
+    () => Object.values(gamification.runsBySong ?? {}).flat(),
+    [gamification.runsBySong],
+  );
+  const kitColors = useKitColorMaturity(kitColorRuns);
   const elementByControlId = useMemo(() => {
     const map = new Map<string, KitElement>();
 
@@ -404,30 +413,31 @@ export function HomeCockpit({
     currentAccuracy === undefined
       ? 'no saved score yet'
       : latestRunForSong
-      ? `${currentAccuracy}% latest run`
-      : `${currentAccuracy}% best at ${difficulty}`;
+        ? `${currentAccuracy}% latest run`
+        : `${currentAccuracy}% best at ${difficulty}`;
   const inputStatus =
     inputReadiness === 'connected'
       ? `Connected · ${selectedDevice?.name ?? 'Input'}`
       : inputReadiness === 'reconnecting'
-      ? `Reconnecting · ${
-          selectedDevice?.name ?? 'your kit'
-        } · Drumroll will resume automatically`
-      : 'Waiting for a MIDI drum kit';
+        ? `Reconnecting · ${
+            selectedDevice?.name ?? 'your kit'
+          } · Drumroll will resume automatically`
+        : 'Waiting for a MIDI drum kit';
   const inputStateLabel =
     inputReadiness === 'connected'
       ? 'Connected'
       : inputReadiness === 'reconnecting'
-      ? 'Reconnecting'
-      : 'Waiting for kit';
+        ? 'Reconnecting'
+        : 'Waiting for kit';
   const inputStateDetail =
     inputReadiness === 'connected'
-      ? selectedDevice?.name ?? 'Drum input ready'
+      ? (selectedDevice?.name ?? 'Drum input ready')
       : inputReadiness === 'reconnecting'
-      ? `${selectedDevice?.name ?? 'Remembered kit'} · automatic retry`
-      : 'Connect USB MIDI · auto-detect is on';
+        ? `${selectedDevice?.name ?? 'Remembered kit'} · automatic retry`
+        : 'Connect USB MIDI · auto-detect is on';
   const rootStyle = {
     '--drumstick-cursor': `url(${drumstickCursor}) 6 6`,
+    ...kitColors.properties,
   } as CSSProperties;
 
   if (surface === 'coach') {
@@ -535,6 +545,8 @@ export function HomeCockpit({
       className="home-cockpit"
       style={rootStyle}
       data-testid="home-cockpit"
+      data-kit-color-mode={kitColors.override}
+      data-kit-color-maturity={kitColors.presentation.maturity.toFixed(3)}
       aria-labelledby="home-cockpit-title"
     >
       <div className="home-cockpit__hero">
@@ -574,8 +586,8 @@ export function HomeCockpit({
                   currentSong.artist
                 } · ${recommendation.suggestedSpeed.toFixed(1)}× adaptive start`
               : currentSong
-              ? `${currentSong.artist} · ${currentAccuracyLabel}`
-              : 'Choose a chart once; after that, your kit starts the session.'}
+                ? `${currentSong.artist} · ${currentAccuracyLabel}`
+                : 'Choose a chart once; after that, your kit starts the session.'}
           </p>
           <div className="home-cockpit__actions">
             {recommendation && (
@@ -599,6 +611,21 @@ export function HomeCockpit({
               {currentSong ? 'Change song' : 'Choose song'}
             </Button>
           </div>
+          <label className="home-cockpit__color-control">
+            <span>Kit colour</span>
+            <select
+              data-testid="home-kit-color-override"
+              value={kitColors.override}
+              onChange={(event) =>
+                kitColors.setOverride(event.target.value as KitColorOverride)
+              }
+            >
+              <option value="auto">Auto</option>
+              <option value="full-color">Full colour</option>
+              <option value="faded">Faded</option>
+              <option value="near-black">Near-black</option>
+            </select>
+          </label>
         </div>
 
         <div className="home-cockpit__status" aria-label="Practice status">
@@ -676,10 +703,10 @@ export function HomeCockpit({
                         )} times speed.`
                       : 'Choose a song.'
                     : HOME_KIT_NAV_LABEL[hotspot.element]
-                    ? `Hit this pad on your physical kit to open ${
-                        HOME_KIT_NAV_LABEL[hotspot.element]
-                      }.`
-                    : `Pulse ${hotspot.label}.`
+                      ? `Hit this pad on your physical kit to open ${
+                          HOME_KIT_NAV_LABEL[hotspot.element]
+                        }.`
+                      : `Pulse ${hotspot.label}.`
                 }`}
                 onClick={() => {
                   handlePointerStrike(hotspot.element);
@@ -716,11 +743,11 @@ export function HomeCockpit({
                       ? inputReadiness === 'reconnecting'
                         ? 'auto-connect armed'
                         : inputReadiness === 'waiting'
-                        ? 'connect MIDI'
-                        : currentSong && recommendation
-                        ? `${recommendation.suggestedSpeed.toFixed(1)}× · ready`
-                        : 'pick a chart'
-                      : HOME_KIT_NAV_LABEL[hotspot.element] ?? signal.compact}
+                          ? 'connect MIDI'
+                          : currentSong && recommendation
+                            ? `${recommendation.suggestedSpeed.toFixed(1)}× · ready`
+                            : 'pick a chart'
+                      : (HOME_KIT_NAV_LABEL[hotspot.element] ?? signal.compact)}
                   </small>
                   {hotspot.element !== 'kick' && (
                     <small className="home-kit-hotspot__evidence">
@@ -737,8 +764,9 @@ export function HomeCockpit({
 
         <p className="home-cockpit__live" data-testid="home-hit-feedback">
           {activeLane
-            ? `${KIT_HOTSPOTS.find((item) => item.element === activeLane)
-                ?.label} hit`
+            ? `${
+                KIT_HOTSPOTS.find((item) => item.element === activeLane)?.label
+              } hit`
             : ''}
         </p>
         <p
@@ -751,10 +779,10 @@ export function HomeCockpit({
           {inputReadiness !== 'connected'
             ? inputStatus
             : recommendation
-            ? `Practice recommendation ready: ${
-                recommendation.candidate.title
-              } at ${recommendation.suggestedSpeed.toFixed(1)} times speed.`
-            : 'No practice recommendation is ready. Choose a song to begin.'}
+              ? `Practice recommendation ready: ${
+                  recommendation.candidate.title
+                } at ${recommendation.suggestedSpeed.toFixed(1)} times speed.`
+              : 'No practice recommendation is ready. Choose a song to begin.'}
         </p>
       </div>
 
