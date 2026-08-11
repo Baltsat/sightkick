@@ -69,6 +69,8 @@ export function useDownload(
         name: song.name,
         artist: song.artist,
         charter: song.charter,
+        chartSource: song.chartSource,
+        reviewed: song.reviewed === true,
       });
     },
     [onlineResults],

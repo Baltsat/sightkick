@@ -30,6 +30,8 @@ export type LibraryView = 'songs' | 'lessons';
 
 export interface OnlineSong {
   source: 'online';
+  chartSource?: 'chorus-encore';
+  reviewed?: boolean;
   id: string;
   downloadUrl: string;
   albumCover?: string;
@@ -37,6 +39,7 @@ export interface OnlineSong {
   artist: string;
   charter: string;
   drumDifficulty: number;
+  durationSeconds?: number;
 }
 
 export type GameMode = 'perform' | 'practice';

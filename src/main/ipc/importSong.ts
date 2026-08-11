@@ -20,6 +20,10 @@ import {
   toSong,
   writeSongIdFile,
 } from '../util';
+import {
+  persistPlayabilityEvidence,
+  validatePlayabilityEvidence,
+} from '../playability';
 
 export function validateSongDir(dir: string): SongData {
   const song = buildSongFromDir(dir);
@@ -134,6 +138,7 @@ export async function selectImportSong(event: IpcMainEvent): Promise<void> {
 export async function importPreparedSong({
   sourceDir,
   artworkUrl,
+  playability,
 }: IpcImportSongRequest): Promise<Song> {
   let outputDir: string | undefined;
   let outputCreated = false;
@@ -178,10 +183,24 @@ export async function importPreparedSong({
 
     writeSongIdFile(outputDir, id);
 
-    const songData = buildSongFromDir(outputDir, { id });
+    let songData = buildSongFromDir(outputDir, { id });
 
     if (!songData) {
       throw new Error('Imported files could not be read as a song');
+    }
+
+    if (playability) {
+      validatePlayabilityEvidence(outputDir, playability);
+      persistPlayabilityEvidence(outputDir, playability);
+      songData = buildSongFromDir(outputDir, { id });
+
+      if (!songData?.playability) {
+        throw new Error('Playable proof could not be persisted with the song');
+      }
+    }
+
+    if (songData.playability) {
+      validatePlayabilityEvidence(outputDir, songData.playability);
     }
 
     const songs = (appState.store.get('songs') as StorageSchema['songs']) ?? {};

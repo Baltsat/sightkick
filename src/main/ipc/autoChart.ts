@@ -13,11 +13,13 @@ import {
   IpcCreateAutoChartRequest,
   IpcImportSongPreview,
   LibrarySourceTrackProvenance,
+  PlayabilityEvidence,
   Song,
 } from '../../types';
 import { caCertEnv, getBinaryPath } from '../stemTools';
 import { ingestSongCover } from '../songCover';
 import { normalizeLibrarySourceProvenance } from '../../library-sources/provenance';
+import { createLocalAutoChartEvidence } from '../playability';
 import { importPreparedSong, previewPreparedSong } from './importSong';
 import {
   createRemoteAutoChartRunner,
@@ -149,7 +151,11 @@ interface AutoChartDependencies {
     sourceDir: string,
     thumbnailUrl?: string,
   ) => Promise<IpcImportSongPreview>;
-  importSong: (sourceDir: string, artworkUrl?: string) => Promise<Song>;
+  importSong: (
+    sourceDir: string,
+    artworkUrl?: string,
+    playability?: PlayabilityEvidence,
+  ) => Promise<Song>;
   cleanup: (tempDir?: string) => Promise<void>;
   applyMetadata: (
     sourceDir: string,
@@ -950,6 +956,7 @@ function upsertIniField(
     | 'sk_source_track_id'
     | 'sk_source_title'
     | 'sk_source_artists'
+    | 'sk_source_duration'
     | 'sk_source_url',
   value: string,
 ): string {
@@ -1004,6 +1011,11 @@ export async function applyOfficialMetadata(
       ['sk_source_track_id', sourceProvenance.trackId],
       ['sk_source_title', sourceProvenance.title],
       ['sk_source_artists', JSON.stringify(sourceProvenance.artists)],
+      ...(sourceProvenance.durationSeconds
+        ? ([
+            ['sk_source_duration', String(sourceProvenance.durationSeconds)],
+          ] as const)
+        : []),
       ...(sourceProvenance.sourceUrl
         ? ([['sk_source_url', sourceProvenance.sourceUrl]] as const)
         : []),
@@ -1095,8 +1107,8 @@ function defaultDependencies(): AutoChartDependencies {
     remoteRunner: createRemoteAutoChartRunner(),
     preview: (sourceDir, thumbnailUrl) =>
       previewPreparedSong(sourceDir, { thumbnailUrl }),
-    importSong: (sourceDir, artworkUrl) =>
-      importPreparedSong({ sourceDir, artworkUrl }),
+    importSong: (sourceDir, artworkUrl, playability) =>
+      importPreparedSong({ sourceDir, artworkUrl, playability }),
     cleanup: cleanupTempDir,
     applyMetadata: applyOfficialMetadata,
     makeId: randomUUID,
@@ -1130,6 +1142,19 @@ export class AutoChartQueue {
       job.sourceProvenance = normalizeLibrarySourceProvenance(
         request?.sourceProvenance,
       );
+
+      if (job.sourceProvenance && !request?.localFile) {
+        throw new Error(
+          'Source-linked charts require lawful local audio; YouTube search cannot establish that proof',
+        );
+      }
+
+      if (job.sourceProvenance && !job.sourceProvenance.durationSeconds) {
+        throw new Error(
+          'Source-linked charts require a known duration before auto-charting',
+        );
+      }
+
       job.backend = this.resolveBackend(
         request?.backend,
         await this.dependencies.detectBackends(),
@@ -1292,10 +1317,23 @@ export class AutoChartQueue {
     );
 
     try {
-      const song = await this.dependencies.importSong(
-        job.preparedDir,
-        job.metadata?.thumbnailUrl,
-      );
+      const playability = job.sourceProvenance
+        ? createLocalAutoChartEvidence(
+            job.preparedDir,
+            job.sourceProvenance,
+            job.id,
+          )
+        : undefined;
+      const song = playability
+        ? await this.dependencies.importSong(
+            job.preparedDir,
+            job.metadata?.thumbnailUrl,
+            playability,
+          )
+        : await this.dependencies.importSong(
+            job.preparedDir,
+            job.metadata?.thumbnailUrl,
+          );
 
       job.preview = undefined;
       job.song = song;

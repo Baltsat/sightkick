@@ -1,4 +1,5 @@
 import type {
+  LibraryCandidateResolution,
   YandexPlaylistCandidate,
   YandexPlaylistCandidateCollection,
 } from '../../../types';
@@ -25,8 +26,11 @@ export interface LibraryCandidateListProps {
   tracks: readonly YandexPlaylistCandidate[];
   query: string;
   linkedTrackIds?: ReadonlySet<string>;
-  canFindAndChart: boolean;
-  onFindAndChart: (track: YandexPlaylistCandidate) => void;
+  resolutions?: Readonly<Record<string, LibraryCandidateResolution>>;
+  resolvingTrackIds?: ReadonlySet<string>;
+  canUseLocalAudio: boolean;
+  onResolve: (track: YandexPlaylistCandidate) => void;
+  onUseLocalAudio: (track: YandexPlaylistCandidate) => void;
 }
 
 export function LibraryCandidateList({
@@ -34,8 +38,11 @@ export function LibraryCandidateList({
   tracks,
   query,
   linkedTrackIds,
-  canFindAndChart,
-  onFindAndChart,
+  resolutions,
+  resolvingTrackIds,
+  canUseLocalAudio,
+  onResolve,
+  onUseLocalAudio,
 }: LibraryCandidateListProps) {
   if (tracks.length === 0) {
     return (
@@ -65,8 +72,8 @@ export function LibraryCandidateList({
             {source.playlist.name} · Yandex Music
           </h2>
           <p className="mt-0.5 text-sm text-text-muted">
-            Metadata only. Add lawful local audio and a drum chart before
-            practice.
+            A row becomes playable only after identity, lawful audio, reviewed
+            drums, scan-chart, and launch proof are green.
           </p>
         </div>
         <div className="shrink-0 text-sm tabular-nums text-text-muted">
@@ -80,6 +87,10 @@ export function LibraryCandidateList({
           const unavailable = track.practiceStatus === 'unavailable';
           const privateOnly = track.sourceAvailability === 'private';
           const linked = linkedTrackIds?.has(track.id) ?? false;
+          const resolution = resolutions?.[track.id];
+          const resolving = resolvingTrackIds?.has(track.id) ?? false;
+          const canAutoChart =
+            canUseLocalAudio && track.durationSeconds !== null;
 
           return (
             <li
@@ -112,39 +123,63 @@ export function LibraryCandidateList({
                     }
                     data-testid={`library-candidate-state-${track.ordinal}`}
                   >
-                    {libraryCandidateState(track, linked)}
+                    {libraryCandidateState(track, linked, resolution)}
                   </span>
                 </div>
               </div>
-              <Tooltip
-                title={
-                  linked
-                    ? 'This source row is linked to a playable local chart'
-                    : canFindAndChart
-                    ? 'Review matching YouTube results, then create a local practice chart'
-                    : 'Select a local library folder first'
-                }
-              >
-                <Button
-                  className="shrink-0"
-                  icon={
-                    <FontAwesomeIcon
-                      icon={linked ? faCheck : faMagnifyingGlass}
-                    />
-                  }
-                  disabled={linked || !canFindAndChart}
-                  aria-label={
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <Tooltip
+                  title={
                     linked
-                      ? `${track.title} is linked to a local chart`
-                      : `Find audio and create a chart for ${
-                          track.title
-                        } by ${track.artists.join(', ')}`
+                      ? 'This source row passed every playable proof gate'
+                      : 'Check Chorus Encore and RhythmVerse for an exact reviewed drum chart'
                   }
-                  onClick={() => onFindAndChart(track)}
                 >
-                  {linked ? 'Linked' : 'Find & chart'}
-                </Button>
-              </Tooltip>
+                  <Button
+                    icon={
+                      <FontAwesomeIcon
+                        icon={linked ? faCheck : faMagnifyingGlass}
+                      />
+                    }
+                    disabled={linked || resolving}
+                    aria-label={
+                      linked
+                        ? `${track.title} is playable`
+                        : `Check reviewed public drum charts for ${
+                            track.title
+                          } by ${track.artists.join(', ')}`
+                    }
+                    onClick={() => onResolve(track)}
+                  >
+                    {linked
+                      ? 'Playable'
+                      : resolving
+                      ? 'Checking…'
+                      : resolution?.status === 'exact-reviewed-chart'
+                      ? 'Chart found'
+                      : 'Check charts'}
+                  </Button>
+                </Tooltip>
+                <Tooltip
+                  title={
+                    track.durationSeconds === null
+                      ? 'This source row has no duration, so its identity cannot pass the safety gate'
+                      : canUseLocalAudio
+                      ? 'Choose audio you own or are allowed to process; Drumroll will chart it locally'
+                      : 'Select a local library folder first'
+                  }
+                >
+                  <Button
+                    disabled={linked || !canAutoChart}
+                    aria-label={`Use lawful local audio for ${
+                      track.title
+                    } by ${track.artists.join(', ')}`}
+                    onClick={() => onUseLocalAudio(track)}
+                  >
+                    Use local audio
+                  </Button>
+                </Tooltip>
+              </div>
             </li>
           );
         })}

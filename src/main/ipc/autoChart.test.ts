@@ -920,11 +920,16 @@ describe('auto-chart queue — sightkick backend', () => {
   });
 
   it('carries reviewed source provenance through the chart preparation boundary', async () => {
+    const sourceRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'auto-chart-audio-'),
+    );
+    const audioPath = writeAudio(sourceRoot, 'local.mp3');
     const harness = createHarness({
+      audioPaths: [audioPath],
       backends: { sightkick: true, octave: false },
     });
 
-    cleanup.push(harness.root);
+    cleanup.push(sourceRoot, harness.root);
 
     const event = makeEvent();
     const sourceProvenance = {
@@ -934,14 +939,16 @@ describe('auto-chart queue — sightkick backend', () => {
       trackId: 'yandex:drums-playlist:2',
       title: 'Natural Villain',
       artists: ['Mokita'],
+      durationSeconds: 199,
       sourceUrl: 'https://music.yandex.ru/album/123/track/456',
     };
 
     await harness.queue.create(event as never, {
-      youtubeUrl: 'https://youtu.be/abcdefghijk',
+      localFile: true,
       sourceProvenance,
     });
     await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+    expect(harness.skRuns[0].input.audioPath).toBe(fs.realpathSync(audioPath));
 
     const songDir = path.join(harness.skRuns[0].input.tempDir, 'prepared');
 
@@ -962,6 +969,36 @@ describe('auto-chart queue — sightkick backend', () => {
     );
 
     harness.skRuns[0].finish();
+  });
+
+  it('rejects source-linked YouTube requests before any download or audio prompt', async () => {
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+      sourceProvenance: {
+        provider: 'yandex-music',
+        collectionId: 'drums-playlist',
+        collectionName: 'drums',
+        trackId: 'yandex:drums-playlist:2',
+        title: 'Natural Villain',
+        artists: ['Mokita'],
+        durationSeconds: 199,
+      },
+    });
+
+    expect(harness.skRuns).toHaveLength(0);
+    expect(harness.selectAudioCalls).toBe(0);
+    expect(latestJob(event)).toMatchObject({
+      stage: 'failed',
+      error: expect.stringContaining('lawful local audio'),
+    });
   });
 
   it('downloads audio automatically from a pasted YouTube URL without prompting for a local file', async () => {

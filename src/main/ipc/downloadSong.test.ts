@@ -86,11 +86,13 @@ function okFetch() {
 }
 
 const baseProps = {
-  url: 'https://example.com/song.sng',
+  url: 'https://files.enchor.us/hash123.sng',
   md5: 'hash123',
   name: 'Song',
   artist: 'Artist',
   charter: 'Charter',
+  chartSource: 'chorus-encore' as const,
+  reviewed: true as const,
 };
 
 describe('downloadSong', () => {
@@ -140,6 +142,24 @@ describe('downloadSong', () => {
 
     expect(reply.success).toBe(false);
     expect(reply.error).toContain('404');
+  });
+
+  it('rejects an unreviewed chart before downloading it', async () => {
+    storeHolder.current = makeStore({ lastOpenedPath: library });
+
+    const fetchSpy = vi.fn();
+
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const event = makeEvent();
+
+    await downloadSong(event as never, { ...baseProps, reviewed: false });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(lastReply(event, 'download-song')!.args[0]).toMatchObject({
+      success: false,
+      error: expect.stringContaining('quality-reviewed'),
+    });
   });
 
   it('writes the unpacked song, persists it and replies success', async () => {

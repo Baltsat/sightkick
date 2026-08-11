@@ -356,6 +356,17 @@ describe('toSong', () => {
     ).toBeUndefined();
   });
 
+  it('keeps malformed source metadata behind the renderer proof gate', () => {
+    expect(
+      toSong(
+        stored({
+          sk_source_provider: 'yandex-music',
+          sk_source_artists: 'not-json',
+        }),
+      ).sourceLinked,
+    ).toBe(true);
+  });
+
   it('keeps auto-chart provenance separate from a human charter', () => {
     const song = toSong(
       stored({

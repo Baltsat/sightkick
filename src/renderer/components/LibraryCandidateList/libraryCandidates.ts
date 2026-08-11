@@ -1,4 +1,7 @@
-import type { YandexPlaylistCandidate } from '../../../types';
+import type {
+  LibraryCandidateResolution,
+  YandexPlaylistCandidate,
+} from '../../../types';
 
 export function filterLibraryCandidates(
   tracks: readonly YandexPlaylistCandidate[],
@@ -20,9 +23,22 @@ export function filterLibraryCandidates(
 export function libraryCandidateState(
   track: YandexPlaylistCandidate,
   linked = false,
+  resolution?: LibraryCandidateResolution,
 ): string {
   if (linked) {
-    return 'Linked · local chart ready';
+    return 'Playable · proof gates green';
+  }
+
+  if (resolution?.status === 'exact-reviewed-chart') {
+    return 'Reviewed chart found · local audio still required';
+  }
+
+  if (resolution?.status === 'identity-incomplete') {
+    return 'Blocked · source identity lacks duration';
+  }
+
+  if (resolution?.status === 'no-exact-reviewed-chart') {
+    return 'No reviewed exact chart · local audio can be auto-charted';
   }
 
   if (
@@ -40,5 +56,5 @@ export function libraryCandidateState(
     return 'Metadata only · source link not visible';
   }
 
-  return 'Metadata only · needs local audio + chart';
+  return 'Needs proof · local audio + reviewed chart';
 }

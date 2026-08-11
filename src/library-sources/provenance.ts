@@ -25,6 +25,15 @@ export function normalizeLibrarySourceProvenance(
   const trackId = normalizedRequiredString(source.trackId);
   const title = normalizedRequiredString(source.title);
   const sourceUrl = normalizedRequiredString(source.sourceUrl);
+  const durationSeconds =
+    typeof source.durationSeconds === 'number'
+      ? source.durationSeconds
+      : undefined;
+  const invalidDuration =
+    source.durationSeconds !== undefined &&
+    (typeof source.durationSeconds !== 'number' ||
+      !Number.isFinite(source.durationSeconds) ||
+      source.durationSeconds <= 0);
   const rawArtists = source.artists;
   const artists = Array.isArray(rawArtists)
     ? rawArtists.map(normalizedRequiredString)
@@ -38,6 +47,7 @@ export function normalizeLibrarySourceProvenance(
     !title ||
     !Array.isArray(rawArtists) ||
     artists.length !== rawArtists.length ||
+    invalidDuration ||
     (source.sourceUrl !== undefined && !sourceUrl)
   ) {
     throw new Error('Source provenance has an invalid metadata shape');
@@ -50,6 +60,7 @@ export function normalizeLibrarySourceProvenance(
     trackId,
     title,
     artists: artists as string[],
+    ...(durationSeconds !== undefined ? { durationSeconds } : {}),
     ...(sourceUrl ? { sourceUrl } : {}),
   };
 }

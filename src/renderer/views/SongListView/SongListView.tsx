@@ -17,7 +17,17 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import appIcon from '../../../../assets/icon.png';
-import { ControlMapping, Song, YandexPlaylistCandidate } from '../../../types';
+import {
+  ControlMapping,
+  IpcResolveLibraryCandidatesResponse,
+  IpcResult,
+  isIpcError,
+  LibraryCandidateResolution,
+  LibrarySourceTrackProvenance,
+  Song,
+  YandexPlaylistCandidate,
+  YandexPlaylistCandidateCollection,
+} from '../../../types';
 import type { LibraryMode } from '../../types';
 import { SongFilter } from '../../components/SongFilter';
 import { SongList } from '../../components/SongList';
@@ -28,7 +38,6 @@ import { EmptySongState } from '../../components/EmptySongState';
 import { AutoChart } from '../../components/AutoChart';
 import { SongImport } from '../../components/SongImport';
 import { SongSearch } from '../../components/SongSearch';
-import type { SongSearchRequest } from '../../components/SongSearch';
 import { MyMusic } from '../../components/MyMusic';
 import { LessonsView } from '../../components/LessonsView';
 import { useApp } from '../../context/AppContext';
@@ -82,6 +91,7 @@ import {
   wrapSortIndex,
 } from './helpers';
 import { resolveLibraryControls } from './library-controls';
+import { isPlayableEvidence } from '../../../library-sources/playability';
 
 // Lazy-loaded: recharts (the Profile's mastery graph) is a meaningfully
 // sized dependency the library header/song list never otherwise needs, so
@@ -136,6 +146,24 @@ function appendCompletedRun(
   );
 
   return exists ? history : [...history, completedRun];
+}
+
+function candidateProvenance(
+  source: YandexPlaylistCandidateCollection,
+  track: YandexPlaylistCandidate,
+): LibrarySourceTrackProvenance {
+  return {
+    provider: 'yandex-music',
+    collectionId: source.playlist.id,
+    collectionName: source.playlist.name,
+    trackId: track.id,
+    title: track.title,
+    artists: [...track.artists],
+    ...(track.durationSeconds !== null
+      ? { durationSeconds: track.durationSeconds }
+      : {}),
+    ...(track.sourceTrackUrl ? { sourceUrl: track.sourceTrackUrl } : {}),
+  };
 }
 
 export function SongListView() {
@@ -240,6 +268,7 @@ export function SongListView() {
 
     return new Set(
       songList
+        .filter((song) => isPlayableEvidence(song.playability))
         .map((song) => song.sourceProvenance)
         .filter(
           (source) =>
@@ -266,8 +295,12 @@ export function SongListView() {
   const gameModeSelector = useGameModeSelector();
   const [view, setView] = useState<ArenaView>('home');
   const [myMusicOpen, setMyMusicOpen] = useState(false);
-  const [requestedSongSearch, setRequestedSongSearch] =
-    useState<SongSearchRequest>();
+  const [candidateResolutions, setCandidateResolutions] = useState<
+    Record<string, LibraryCandidateResolution>
+  >({});
+  const [resolvingCandidateIds, setResolvingCandidateIds] = useState<
+    Set<string>
+  >(new Set());
   const [recommendationNowMs, setRecommendationNowMs] = useState(() =>
     Date.now(),
   );
@@ -446,27 +479,58 @@ export function SongListView() {
     },
     [addSong, setLibraryMode],
   );
-  const findAndChartCandidate = useCallback(
+
+  useEffect(() => {
+    return window.electron.ipcRenderer.on<
+      IpcResult<IpcResolveLibraryCandidatesResponse>
+    >('resolve-library-candidates', (response) => {
+      if (isIpcError(response)) {
+        setResolvingCandidateIds(new Set());
+
+        return;
+      }
+
+      setCandidateResolutions((previous) => ({
+        ...previous,
+        ...Object.fromEntries(
+          response.results.map((result) => [result.trackId, result]),
+        ),
+      }));
+      setResolvingCandidateIds((previous) => {
+        const next = new Set(previous);
+
+        for (const result of response.results) {
+          next.delete(result.trackId);
+        }
+
+        return next;
+      });
+    });
+  }, []);
+
+  const resolveCandidate = useCallback(
     (track: YandexPlaylistCandidate) => {
       if (!candidateSource) {
         return;
       }
 
-      const query = [track.title, ...track.artists].filter(Boolean).join(' ');
+      setResolvingCandidateIds((previous) => new Set(previous).add(track.id));
+      window.electron.ipcRenderer.sendMessage('resolve-library-candidates', {
+        sources: [candidateProvenance(candidateSource, track)],
+      });
+    },
+    [candidateSource],
+  );
+  const autoChartCandidate = useCallback(
+    (track: YandexPlaylistCandidate) => {
+      if (!candidateSource || track.durationSeconds === null) {
+        return;
+      }
 
-      setRequestedSongSearch((previous) => ({
-        id: (previous?.id ?? 0) + 1,
-        query,
-        sourceProvenance: {
-          provider: 'yandex-music',
-          collectionId: candidateSource.playlist.id,
-          collectionName: candidateSource.playlist.name,
-          trackId: track.id,
-          title: track.title,
-          artists: [...track.artists],
-          ...(track.sourceTrackUrl ? { sourceUrl: track.sourceTrackUrl } : {}),
-        },
-      }));
+      window.electron.ipcRenderer.sendMessage('create-auto-chart', {
+        localFile: true,
+        sourceProvenance: candidateProvenance(candidateSource, track),
+      });
     },
     [candidateSource],
   );
@@ -864,7 +928,7 @@ export function SongListView() {
                       {isYandexMode
                         ? `${
                             candidateSource?.tracks.length ?? 0
-                          } metadata candidates · not playable yet`
+                          } source rows · ${linkedCandidateIds.size} playable`
                         : `${librarySongs.length} ${
                             librarySongs.length === 1 ? 'song' : 'songs'
                           } · ${songsWithProgress} with progress on ${difficulty}`}
@@ -960,10 +1024,7 @@ export function SongListView() {
                           Add music
                         </span>
                         {youtubeImportAvailable && (
-                          <SongSearch
-                            disabled={currentPath === null}
-                            requestedSearch={requestedSongSearch}
-                          />
+                          <SongSearch disabled={currentPath === null} />
                         )}
                         {localFolderImportAvailable && (
                           <SongImport
@@ -1120,10 +1181,11 @@ export function SongListView() {
                     tracks={filteredLibraryCandidates}
                     query={nameFilter}
                     linkedTrackIds={linkedCandidateIds}
-                    canFindAndChart={
-                      youtubeImportAvailable && currentPath !== null
-                    }
-                    onFindAndChart={findAndChartCandidate}
+                    resolutions={candidateResolutions}
+                    resolvingTrackIds={resolvingCandidateIds}
+                    canUseLocalAudio={currentPath !== null}
+                    onResolve={resolveCandidate}
+                    onUseLocalAudio={autoChartCandidate}
                   />
                 ) : (
                   <div

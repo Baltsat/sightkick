@@ -7,11 +7,13 @@ import {
   AudioData,
   LessonTargetLane,
   LibrarySourceTrackProvenance,
+  PlayabilityEvidence,
   Song,
   SongData,
   SongLessonInfo,
 } from '../types';
 import { ALL_DIFFICULTIES } from '../constants';
+import { isPlayableEvidence } from '../library-sources/playability';
 
 export const SONG_ID_FILE = '.sightkick';
 
@@ -155,6 +157,7 @@ export function parseLibrarySourceProvenance(
   }
 
   const sourceUrl = stored.sk_source_url?.trim();
+  const durationSeconds = Number(stored.sk_source_duration);
 
   return {
     provider: 'yandex-music',
@@ -163,8 +166,29 @@ export function parseLibrarySourceProvenance(
     trackId,
     title,
     artists: [...artists],
+    ...(Number.isFinite(durationSeconds) && durationSeconds > 0
+      ? { durationSeconds }
+      : {}),
     ...(sourceUrl ? { sourceUrl } : {}),
   };
+}
+
+function parsePlayabilityEvidence(
+  value: unknown,
+): PlayabilityEvidence | undefined {
+  if (typeof value !== 'string' || !value) {
+    return undefined;
+  }
+
+  try {
+    const evidence = JSON.parse(
+      Buffer.from(value, 'base64url').toString('utf8'),
+    ) as PlayabilityEvidence;
+
+    return isPlayableEvidence(evidence) ? evidence : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function toSong(stored: SongData): Song {
@@ -194,6 +218,10 @@ export function toSong(stored: SongData): Song {
     updatedAt: stored.updatedAt,
     scoreData: stored.scoreData,
     sourceProvenance: parseLibrarySourceProvenance(stored),
+    sourceLinked:
+      stored.sk_source_provider !== undefined ||
+      stored.sk_source_track_id !== undefined,
+    playability: stored.playability,
     lesson: parseLessonInfo(stored),
   };
 }
@@ -313,6 +341,7 @@ export function buildSongFromDir(
 
   const format: 'mid' | 'chart' = hasMid ? 'mid' : 'chart';
   const meta = info.song ?? info.Song ?? info;
+  const playability = parsePlayabilityEvidence(meta.sk_playability);
   const drumDifficulties =
     existing?.drumDifficulties && existing.drumDifficulties.length > 0
       ? existing.drumDifficulties
@@ -346,6 +375,7 @@ export function buildSongFromDir(
     format,
     audio,
     drumDifficulties,
+    ...(playability ? { playability } : {}),
     ...(existing?.liked !== undefined ? { liked: existing.liked } : {}),
     ...(existing?.scoreData !== undefined
       ? { scoreData: existing.scoreData }

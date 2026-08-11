@@ -66,9 +66,19 @@ function SongSearchInner({ disabled, requestedSearch }: Props) {
   }
 
   const select = (result: IpcYoutubeSearchResult) => {
+    if (sourceProvenance) {
+      notification.warning({
+        title: 'Use lawful local audio',
+        description:
+          'A source-linked row cannot use a YouTube match as its audio proof.',
+        placement: 'bottomRight',
+      });
+
+      return;
+    }
+
     window.electron.ipcRenderer.sendMessage('create-auto-chart', {
       youtubeUrl: result.watchUrl,
-      ...(sourceProvenance ? { sourceProvenance } : {}),
     });
     notification.info({
       title: 'Creating a chart',

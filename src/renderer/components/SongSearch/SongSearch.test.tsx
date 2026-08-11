@@ -172,7 +172,7 @@ describe('SongSearch', () => {
     });
   });
 
-  it('carries the reviewed Yandex source row into the selected chart job', () => {
+  it('rejects a YouTube match for a source-linked row', () => {
     renderSongSearch(false, {
       id: 3,
       query: 'Natural Villain Mokita',
@@ -190,15 +190,9 @@ describe('SongSearch', () => {
 
     fireEvent.click(screen.getByTestId('song-search-result-abcdefghijk'));
 
-    expect(ipc.sent).toContainEqual({
-      channel: 'create-auto-chart',
-      args: [
-        {
-          youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
-          sourceProvenance: yandexProvenance,
-        },
-      ],
-    });
+    expect(
+      ipc.sent.some((message) => message.channel === 'create-auto-chart'),
+    ).toBe(false);
   });
 
   it('drops source linkage when the reviewed query is edited', () => {

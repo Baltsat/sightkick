@@ -19,6 +19,7 @@ import { Difficulty } from 'scan-chart';
 import { calculateAccuracy, getStarRating } from '../../scoring';
 import { DifficultyRing } from './DifficultyRing';
 import { OnlineSong } from '../../types';
+import { isPlayableEvidence } from '../../../library-sources/playability';
 
 export interface SongListItemProps {
   songData: Song | OnlineSong;
@@ -52,6 +53,9 @@ export function SongListItem({
   focused,
 }: SongListItemProps) {
   const local = 'source' in songData ? undefined : songData;
+  const playable =
+    !(local?.sourceLinked || local?.sourceProvenance) ||
+    isPlayableEvidence(local.playability);
   const { albumCover, id, name, artist, charter, drumDifficulty } = songData;
   const autoChartTool =
     'autoChartTool' in songData ? songData.autoChartTool : undefined;
@@ -151,10 +155,11 @@ export function SongListItem({
   return (
     <div className="relative inline-flex w-full">
       <div
-        onClick={onClick}
+        onClick={playable ? onClick : undefined}
         onKeyDown={(event) => {
           if (
             local &&
+            playable &&
             event.currentTarget === event.target &&
             (event.key === 'Enter' || event.key === ' ')
           ) {
@@ -162,16 +167,17 @@ export function SongListItem({
             onClick();
           }
         }}
-        role={local ? 'button' : undefined}
-        tabIndex={local ? 0 : undefined}
-        aria-label={local ? `Play ${name}` : undefined}
+        role={local && playable ? 'button' : undefined}
+        tabIndex={local && playable ? 0 : undefined}
+        aria-label={local && playable ? `Play ${name}` : undefined}
+        aria-disabled={local && !playable ? true : undefined}
         data-testid={`song-item-${id}`}
         data-focused={focused ? 'true' : undefined}
         className={cn(
           'flex min-w-0 border border-border-soft grow no-underline bg-surface rounded-xl duration-100 ease-out cursor-default p-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
           {
             'hover:bg-accent-soft-bg hover:border-accent-soft-border cursor-pointer transition-[background-color,border-color,box-shadow]':
-              Boolean(local),
+              Boolean(local && playable),
             'bg-accent-soft-bg border-accent-soft-border outline-2 outline-accent shadow-accent-soft':
               focused,
           },
@@ -269,6 +275,17 @@ export function SongListItem({
                 </div>
               </Tooltip>
             </div>
+          )}
+
+          {local && !playable && (
+            <Tooltip title="This source-linked song still needs identity, lawful audio, reviewed chart, scan-chart, and launch proof">
+              <span
+                className="text-xs text-orange"
+                aria-label={`${name} is not playable yet`}
+              >
+                Needs proof
+              </span>
+            </Tooltip>
           )}
 
           <DifficultyRing value={drumDifficulty} />

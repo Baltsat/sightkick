@@ -87,7 +87,10 @@ export interface SongData {
   sk_source_track_id?: string;
   sk_source_title?: string;
   sk_source_artists?: string;
+  sk_source_duration?: string;
   sk_source_url?: string;
+  sk_playability?: string;
+  playability?: PlayabilityEvidence;
 }
 
 export interface Song {
@@ -113,6 +116,8 @@ export interface Song {
   scoreData?: Partial<Record<Difficulty, ScoreData>>;
   /** Discovery metadata linked to this playable local chart, when available. */
   sourceProvenance?: LibrarySourceTrackProvenance;
+  sourceLinked?: boolean;
+  playability?: PlayabilityEvidence;
   // Present only for SightKick Method lesson songs.
   lesson?: SongLessonInfo;
 }
@@ -373,6 +378,7 @@ export interface IpcSelectImportSongResponse {
 export interface IpcImportSongRequest {
   sourceDir: string;
   artworkUrl?: string;
+  playability?: PlayabilityEvidence;
 }
 
 export interface IpcImportSongResponse {
@@ -577,7 +583,88 @@ export interface LibrarySourceTrackProvenance {
   trackId: string;
   title: string;
   artists: string[];
+  durationSeconds?: number;
   sourceUrl?: string;
+}
+
+export type PlayabilityAudioSource =
+  | 'local-user-attested'
+  | 'public-chart-package';
+
+export type PlayabilityChartSource =
+  | 'local-auto-chart'
+  | 'chorus-encore'
+  | 'rhythmverse';
+
+export interface PlayabilityEvidence {
+  identity: {
+    title: string;
+    artists: string[];
+    durationSeconds: number;
+  };
+  audio: {
+    source: PlayabilityAudioSource;
+    sha256: string;
+  };
+  chart: {
+    source: PlayabilityChartSource;
+    id: string;
+    sha256: string;
+    reviewed: true;
+  };
+  scan: {
+    passed: true;
+    format: 'mid' | 'chart';
+    drumDifficulties: Difficulty[];
+  };
+  launch: {
+    passed: true;
+    mode: 'headless-load';
+    verifiedAt: string;
+  };
+}
+
+export type PlayabilityBlocker =
+  | 'identity'
+  | 'lawful-audio'
+  | 'chart-provenance'
+  | 'scan-chart'
+  | 'launch-proof';
+
+export interface PublicDrumChartCandidate {
+  source: Exclude<PlayabilityChartSource, 'local-auto-chart'>;
+  id: string;
+  title: string;
+  artists: string[];
+  durationSeconds?: number;
+  hasDrums: boolean;
+  reviewed: boolean;
+  sourceUrl: string;
+  downloadUrl?: string;
+}
+
+export interface ChartMatchRejection {
+  candidate: PublicDrumChartCandidate;
+  reason: 'title' | 'artist' | 'duration' | 'no-drums' | 'unreviewed';
+}
+
+export interface LibraryCandidateResolution {
+  trackId: string;
+  status:
+    | 'exact-reviewed-chart'
+    | 'no-exact-reviewed-chart'
+    | 'identity-incomplete';
+  match?: PublicDrumChartCandidate;
+  rejected: ChartMatchRejection[];
+  blockers: string[];
+}
+
+export interface IpcResolveLibraryCandidatesRequest {
+  sources: LibrarySourceTrackProvenance[];
+}
+
+export interface IpcResolveLibraryCandidatesResponse {
+  results: LibraryCandidateResolution[];
 }
 
 export interface YandexPlaylistCandidateCollection {

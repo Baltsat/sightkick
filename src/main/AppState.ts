@@ -43,6 +43,7 @@ import {
 import { searchYoutube } from './ipc/searchYoutube';
 import { fetchMyMusic } from './ipc/myMusic';
 import { loadLibraryCandidates } from './ipc/loadLibraryCandidates';
+import { resolveLibraryCandidates } from './ipc/resolveLibraryCandidates';
 import { bootstrapLessonLibrary } from './lessonLibrary';
 import { applyLessonProfileMigration } from './lessonIdentityMigration';
 import {
@@ -177,6 +178,7 @@ class AppState {
     ipcMain.on('load-library-candidates', (event) => {
       loadLibraryCandidates(event, this.librarySourcesDirectory());
     });
+    ipcMain.on('resolve-library-candidates', resolveLibraryCandidates);
 
     ipcMain.on('check-stem-tools', checkStemTools);
     ipcMain.on('check-stem-tools-update', checkStemToolsUpdate);
@@ -289,6 +291,8 @@ class AppState {
           ? getAssetPath('icon.ico')
           : process.platform === 'linux'
           ? getAssetPath('icons', '512x512.png')
+          : process.platform === 'darwin'
+          ? getAssetPath('icon.icns')
           : getAssetPath('icon.png'),
       webPreferences: {
         preload: path.join(__dirname, '../preload/index.js'),

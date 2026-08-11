@@ -26,6 +26,7 @@ export type Channels =
   | 'search-youtube'
   | 'my-music-fetch'
   | 'load-library-candidates'
+  | 'resolve-library-candidates'
   | 'check-stem-tools'
   | 'check-stem-tools-update'
   | 'download-stem-tools'
