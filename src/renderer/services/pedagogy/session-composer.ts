@@ -168,7 +168,7 @@ function composeShort(
     block(
       primary.decision.state === 'too_easy' ? 'retain' : 'acquire',
       primary,
-      'Use the shortest evidence-backed dose for the current frontier.',
+      'Keep this part short and focused.',
     ),
     block(
       'celebrate',

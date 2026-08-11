@@ -91,14 +91,14 @@ describe('SongListView — loading the library', () => {
     );
     expect(screen.getByTestId('home-choose-song')).toBeEnabled();
 
-    fireEvent.click(screen.getByTestId('kit-hotspot-snare'));
+    fireEvent.click(screen.getByTestId('kit-hotspot-hihat'));
 
     expect(playKitPreviewMock).toHaveBeenCalledOnce();
-    expect(playKitPreviewMock).toHaveBeenCalledWith('snare');
+    expect(playKitPreviewMock).toHaveBeenCalledWith('hihat');
 
     expect(
       screen
-        .getByTestId('kit-hotspot-snare')
+        .getByTestId('kit-hotspot-hihat')
         .querySelector('.kit-home__pad-stick'),
     ).toHaveAttribute('data-active', 'true');
   });
@@ -522,7 +522,7 @@ describe('SongListView — loading the library', () => {
     expect(screen.queryByTestId(/home-recent-song-/)).not.toBeInTheDocument();
   });
 
-  it('launches the composed songs-intent target from a pad hit', async () => {
+  it('launches the composed default target from a pad hit', async () => {
     const view = mountSongListView();
 
     view.loadSongs([
@@ -533,18 +533,11 @@ describe('SongListView — loading the library', () => {
       }),
       makeListSong('song-a', { liked: true }),
     ]);
-    fireEvent.click(screen.getByTestId('home-intent-songs'));
-
-    await waitFor(() =>
-      expect(screen.getByTestId('home-session-manifest')).toHaveTextContent(
-        'Name song-a',
-      ),
-    );
     fireEvent.click(screen.getByTestId('kit-hotspot-kick'));
 
     expect(await screen.findByTestId('song-view-stub')).toHaveAttribute(
       'data-song-id',
-      'song-a',
+      'lesson-1',
     );
   });
 

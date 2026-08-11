@@ -1104,9 +1104,9 @@ function atomicFactors(decision: PracticeDecision): RecommendationFactor[] {
       value: round(1 - decision.uncertainty, 4),
       weight: 10,
       contribution: round((1 - decision.uncertainty) * 10),
-      detail: `Atomic evidence confidence is ${Math.round(
+      detail: `This suggestion is based on ${Math.round(
         (1 - decision.uncertainty) * 100,
-      )}%.`,
+      )}% of the practice data available.`,
     },
   ];
 }

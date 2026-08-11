@@ -183,18 +183,18 @@ function SkillSpine({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
-            Current skill spine
+            What to work on
           </p>
           <h2
             id="insights-skill-spine-title"
             className="mt-1 font-display text-3xl font-semibold tracking-[-0.04em] text-text"
           >
-            Build the layer that makes the next phrase easier.
+            Build the skill that makes the next phrase easier.
           </h2>
         </div>
         <p className="max-w-75 text-sm leading-relaxed text-text-muted">
-          Each mark is an atomic MIDI claim. Unknown stays unknown until a
-          scored chart gives it evidence.
+          Each skill updates after a practice run. Blank means it has not been
+          measured enough yet.
         </p>
       </div>
 
@@ -212,7 +212,7 @@ function SkillSpine({
               <div>
                 <h3 className="font-semibold text-text">{node.label}</h3>
                 <p className="mt-1 text-xs capitalize text-text-muted">
-                  {node.family} · {node.evidence_boundary.replace('_', ' ')}
+                  {node.family}
                 </p>
               </div>
               <div
@@ -242,7 +242,7 @@ function SkillSpine({
                   {STAGE_COPY[stage]}
                 </strong>
                 <span className="ml-2 tabular-nums">
-                  {confidence}% confidence
+                  {confidence}% measured
                 </span>
               </div>
             </article>
@@ -263,11 +263,11 @@ function ReviewQueue({ reviews }: { reviews: readonly SkillReview[] }) {
       data-testid="profile-review-queue"
     >
       <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
-        Review queue
+        Next review
       </p>
       {next ? (
         <p className="mt-2 text-sm leading-relaxed text-text-muted">
-          {next.overdue ? 'Due now: ' : 'Next review: '}
+          {next.overdue ? 'Due now: ' : 'Next up: '}
           <strong className="font-semibold text-text">
             {node?.label ?? next.skill_id}
           </strong>
@@ -276,11 +276,11 @@ function ReviewQueue({ reviews }: { reviews: readonly SkillReview[] }) {
             month: 'short',
             day: 'numeric',
           })}
-          . Delayed retrieval is tracked separately from a fresh pass.
+          . A spaced revisit keeps this skill fresh.
         </p>
       ) : (
         <p className="mt-2 text-sm leading-relaxed text-text-muted">
-          No atomic review is due from the saved evidence yet.
+          Nothing is due to revisit yet.
         </p>
       )}
     </section>
@@ -304,11 +304,10 @@ function DeadlineTargets({
       data-testid="profile-deadline-targets"
     >
       <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
-        Goal runway
+        Target pace
       </p>
       <p className="mt-2 text-sm leading-relaxed text-text-muted">
-        Target date: {targetDate}. Weekly pace is based only on retained
-        practice evidence.
+        Target date: {targetDate}. Weekly pace comes from completed runs.
       </p>
       {pacing?.targets.length ? (
         <div className="mt-3 divide-y divide-border-soft">
@@ -331,8 +330,7 @@ function DeadlineTargets({
         </div>
       ) : (
         <p className="mt-2 text-sm leading-relaxed text-text-muted">
-          Building evidence for a weekly pace. The date is saved, but there is
-          not enough retained run evidence for a weekly target yet.
+          Play a few more runs before Drumroll sets a weekly pace.
         </p>
       )}
     </section>
@@ -454,8 +452,7 @@ function WeeklyRhythmPanel({
         )}
       </div>
       <p className="mt-2 text-[11px] leading-relaxed text-text-faint">
-        This set changes only when its source evidence changes or you choose a
-        new set.
+        This refreshes after a new run or when you choose a new set.
       </p>
     </section>
   );
@@ -511,7 +508,7 @@ function WeeklyMusicalRecapPanel({
       </div>
       {recap.evidence_state === 'not_enough_saved_evidence' && (
         <p className="mt-3 text-xs text-text-faint">
-          Not enough saved evidence for a musical progress claim yet.
+          Play a few more runs to see a weekly trend.
         </p>
       )}
     </section>
@@ -578,12 +575,12 @@ export function ProfileView({
       : activeRetiredLesson
       ? 'Build toward ' + activeRetiredLesson.name
       : undefined) ??
-    'Your next scored phrase';
+    'Your next practice';
   const targetReason =
     target?.reason ??
     (activeGoal
-      ? 'Your active goal stays visible while Drumroll waits for a concrete scored route.'
-      : 'Finish one scored phrase so Drumroll can establish the first honest practice route.');
+      ? 'Your goal stays here while Drumroll chooses the next practice.'
+      : 'Finish one song section and Drumroll will suggest what to play next.');
   const targetDetail = target
     ? 'Start at ' +
       Math.round(target.suggestedSpeed * 100) +
@@ -704,18 +701,29 @@ export function ProfileView({
         )}
 
         <SkillSpine states={states} focusSkillIds={focusSkillIds} />
-        <ReviewQueue reviews={insights?.dueReviews ?? []} />
-        <DeadlineTargets
-          targetDate={activeGoal?.targetDate}
-          pacing={insights?.deadlinePacing}
-        />
-        <WeeklyRhythmPanel
-          set={insights?.weeklySet}
-          rhythm={insights?.weeklySet?.rhythm}
-          calendar={insights?.weeklyRhythm}
-          onRhythmChange={onPracticeRhythmChange}
-          onRefresh={onRefreshPracticeSet}
-        />
+        <details
+          className="border-t border-border-soft pt-5"
+          data-testid="profile-plan-details"
+        >
+          <summary className="cursor-pointer font-display text-2xl font-semibold tracking-[-0.03em] text-text">
+            Practice plan
+          </summary>
+          <div className="mt-5 flex flex-col gap-7">
+            <ReviewQueue reviews={insights?.dueReviews ?? []} />
+            <DeadlineTargets
+              targetDate={activeGoal?.targetDate}
+              pacing={insights?.deadlinePacing}
+            />
+            <WeeklyRhythmPanel
+              set={insights?.weeklySet}
+              rhythm={insights?.weeklySet?.rhythm}
+              calendar={insights?.weeklyRhythm}
+              onRhythmChange={onPracticeRhythmChange}
+              onRefresh={onRefreshPracticeSet}
+            />
+            <WeeklyMusicalRecapPanel recap={insights?.weeklyRecap} />
+          </div>
+        </details>
         {insights?.practiceCards && (
           <section
             className="border-t border-border-soft pt-5"
@@ -723,10 +731,10 @@ export function ProfileView({
           >
             <div className="mb-4">
               <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
-                Today’s evidence-backed routes
+                Today’s practice
               </p>
               <p className="mt-1 text-sm leading-relaxed text-text-muted">
-                Each option names its source and saves one real practice run.
+                Each option starts a real practice run.
               </p>
             </div>
             <EvidencePracticeCards
@@ -735,8 +743,6 @@ export function ProfileView({
             />
           </section>
         )}
-        <WeeklyMusicalRecapPanel recap={insights?.weeklyRecap} />
-
         {!activeGoal && (
           <section
             className="border-t border-border-soft pt-6"
@@ -765,7 +771,7 @@ export function ProfileView({
           data-testid="profile-evidence-history"
         >
           <summary className="cursor-pointer font-display text-2xl font-semibold tracking-[-0.03em] text-text">
-            Evidence, history, and goal detail
+            Past runs and goal details
           </summary>
           <div className="mt-6 flex flex-col gap-8">
             <LearningEvidenceReceipt
@@ -777,15 +783,14 @@ export function ProfileView({
                 className="border-l-2 border-signal-ember pl-3 text-sm leading-relaxed text-text-muted"
                 data-testid="profile-rejected-atomic-evidence"
               >
-                {insights.rejectedAtomicEvidenceCount} stale atomic receipt
+                {insights.rejectedAtomicEvidenceCount} older run record
                 {insights.rejectedAtomicEvidenceCount === 1 ? '' : 's'} stay
-                excluded because the chart or manifest revision no longer
-                matches.
+                hidden because this chart has changed.
               </p>
             ) : null}
             <details data-testid="atomic-radar-disclosure">
               <summary className="cursor-pointer text-sm font-semibold text-text">
-                Open atomic skill radar and text table
+                Open skill map
               </summary>
               <div className="mt-5">
                 <AtomicSkillRadar
@@ -838,15 +843,13 @@ export function ProfileView({
 
             <section className="border-t border-border-soft pt-5">
               <h3 className="font-display text-2xl font-semibold tracking-[-0.03em] text-text">
-                Per-drum evidence
+                Per-drum accuracy
               </h3>
               <p
                 className="mt-1 text-sm leading-relaxed text-text-muted"
                 data-testid="profile-lane-accuracy-definition"
               >
-                Unweighted hit / (hit + miss) across scored lane notes in the
-                last 30 days. The next practice route uses its own stated
-                evidence receipt.
+                Accuracy from your scored notes in the last 30 days.
               </p>
               <div className="mt-4">
                 <SkillBars laneAccuracy={mastery.last30DaysLaneAccuracy} />
@@ -867,8 +870,7 @@ export function ProfileView({
                   Archived curriculum history
                 </h3>
                 <p className="mt-1 text-sm leading-relaxed text-text-muted">
-                  Replaced exercises keep their original evidence without being
-                  assigned to new material.
+                  Older exercises keep their past results.
                 </p>
                 <div className="mt-4 divide-y divide-border-soft">
                   {retiredLessons.map((lesson) => {

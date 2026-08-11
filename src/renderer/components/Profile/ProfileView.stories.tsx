@@ -140,7 +140,7 @@ const insights: ProfileInsights = {
       value: 0.71,
       level: 'medium',
       evidenceRuns: 3,
-      detail: 'Three saved scored runs support this route.',
+      detail: 'Three saved practice runs support this route.',
     },
     decisionReceipt: {
       policy_version: 'pedagogy-v2.0',
@@ -342,7 +342,7 @@ const insights: ProfileInsights = {
       label: 'Bars 5–8',
       detail: '76% at 0.7×. This is a section result, not full-song readiness.',
     },
-    next: 'Tom handoff at 0.7× from the current evidence route.',
+    next: 'Tom handoff at 0.7× from the current practice plan.',
   },
 };
 const meta: Meta<typeof ProfileView> = {

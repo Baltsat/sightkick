@@ -217,7 +217,8 @@ export function ScoreSummary({
           role="status"
           data-testid="score-persistence-status"
         >
-          No scored kit input was captured. Automatic continuation is paused.
+          No scored notes were captured. Choose what to play next when you are
+          ready.
         </div>
       )}
       {isOpen && autoContinueEnabled && !continuationBlocked && (
@@ -313,7 +314,7 @@ export function ScoreSummary({
             data-changed={receipt.changed}
           >
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-text">
-              Musical receipt
+              What changed
             </p>
             <h3 className="mt-1 font-display text-2xl font-semibold tracking-[-0.035em] text-text">
               {receipt.headline}
@@ -341,8 +342,8 @@ export function ScoreSummary({
               {practiceSummary.practiceCard.kind} saved
             </p>
             <p className="mt-1 text-sm leading-relaxed text-text-muted">
-              {practiceSummary.practiceCard.source_label}. This run completes
-              the card’s practice record; it does not create a separate prize.
+              {practiceSummary.practiceCard.source_label}. This counts toward
+              the practice you chose.
             </p>
           </section>
         )}
@@ -352,7 +353,7 @@ export function ScoreSummary({
             data-testid="song-section-audition-receipt"
           >
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-text">
-              Section audition saved
+              Section saved
             </p>
             <h3 className="mt-1 font-display text-2xl font-semibold tracking-[-0.035em] text-text">
               {practiceSummary.audition.section_label} ·{' '}
@@ -360,9 +361,8 @@ export function ScoreSummary({
               {practiceSummary.audition.speed.toFixed(1)}×
             </h3>
             <p className="mt-1 text-sm leading-relaxed text-text-muted">
-              Tests {practiceSummary.audition.test_label}. The result updates
-              this saved section path only; full-song readiness remains
-              separate.
+              This checks {practiceSummary.audition.test_label}. It measures
+              this section, not the full song.
             </p>
           </section>
         )}
@@ -434,16 +434,16 @@ export function ScoreSummary({
             </div>
             <div className="mt-1 text-xs leading-5 text-text-muted">
               {lessonProgression.qualifies
-                ? `Complete coverage and 82%+ accuracy saved. The next Method step can unlock${
+                ? `You finished every note at 82%+. The next lesson can open${
                     lessonProgression.atTargetSpeed
-                      ? '; full-tempo mastery also earned.'
-                      : ', while full-tempo mastery stays as your next goal.'
+                      ? '; you also earned the full-tempo mark.'
+                      : ', and full tempo is still there when you want it.'
                   }`
                 : !lessonProgression.fullCoverage
-                ? 'Start from bar 1 and reach the end. Tutor rewinds are allowed and remain part of the learning evidence.'
+                ? 'Start from bar 1 and reach the end. Tutor rewinds are okay.'
                 : !lessonProgression.meetsLearningTempo
-                ? 'Complete the lesson at 0.7× or faster. Slower exploration still saves as Practice evidence.'
-                : 'Reach at least 82% scored accuracy on the complete pass. Full mastery remains 90%+ at 1.0×.'}
+                ? 'Finish at 0.7× or faster.'
+                : 'Reach 82% accuracy on the full pass. The full-tempo mark is 90%+ at 1.0×.'}
             </div>
           </div>
         )}

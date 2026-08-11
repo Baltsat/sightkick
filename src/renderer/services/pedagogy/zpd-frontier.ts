@@ -303,7 +303,7 @@ function explanationFor(
   independent_eligible: boolean,
 ): string {
   if (state === 'assessment') {
-    return 'A short scored phrase will establish the missing atomic evidence before progression is claimed.';
+    return 'Play a short phrase so your next lesson has a clear starting point.';
   }
 
   if (state === 'goal_preview_only') {

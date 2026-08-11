@@ -25,7 +25,7 @@ describe('GamificationHeaderStrip', () => {
     expect(screen.queryByTestId('today-xp-label')).not.toBeInTheDocument();
   });
 
-  it('renders the no-data state: no streak, 0 XP, all week dots unfilled', () => {
+  it('renders the no-data state with one calm daily progress control', () => {
     render(<GamificationHeaderStrip {...baseProps} />);
 
     expect(screen.getByTestId('streak-flame')).toHaveAttribute(
@@ -36,19 +36,9 @@ describe('GamificationHeaderStrip', () => {
     expect(screen.getByTestId('today-xp-label')).toHaveTextContent(
       'Today’s set · 0 / 50 XP',
     );
-    expect(screen.getByTestId('practice-streak-label')).toHaveTextContent(
-      'Practice streak',
-    );
-
-    for (let i = 0; i < 7; i += 1) {
-      expect(screen.getByTestId(`week-dot-${i}`)).toHaveAttribute(
-        'data-practiced',
-        'false',
-      );
-    }
   });
 
-  it('renders an active streak: flame lit, count shown, some week dots filled', () => {
+  it('renders an active streak without a header chip cluster', () => {
     render(
       <GamificationHeaderStrip
         {...baseProps}
@@ -64,14 +54,8 @@ describe('GamificationHeaderStrip', () => {
       'true',
     );
     expect(screen.getByTestId('streak-count')).toHaveTextContent('4');
-    expect(screen.getByTestId('practice-streak-label')).toHaveTextContent(
-      'Practice streak · 4 days',
-    );
-    expect(screen.getByTestId('week-dot-1')).toHaveAttribute(
-      'data-practiced',
-      'true',
-    );
-    expect(screen.getByTestId('total-stars')).toHaveTextContent('42');
+    expect(screen.queryByTestId('week-dots')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('total-stars')).not.toBeInTheDocument();
   });
 
   it('renders the goal-crossed state: ring reads goal-crossed, XP label reflects it', () => {

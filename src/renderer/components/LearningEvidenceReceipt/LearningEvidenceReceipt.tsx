@@ -11,21 +11,21 @@ function timingDetail(
   recorded: number,
 ): string {
   return (
-    ' Judged within ±' +
+    ' Timing uses ±' +
     Math.round(windowMs) +
     ' ms; ' +
     normalizedAtomicReceipts +
     '/' +
     recorded +
-    ' receipt' +
-    (recorded === 1 ? '' : 's') +
-    ' record the window used to normalize timing.'
+    (recorded === 1
+      ? ' saved run includes the timing window.'
+      : ' saved runs include the timing window.')
   );
 }
 
 export function LearningEvidenceReceipt({
   summary,
-  heading = 'Evidence receipt',
+  heading = 'Run details',
 }: {
   summary?: RunSummary;
   heading?: string;
@@ -58,12 +58,12 @@ export function LearningEvidenceReceipt({
       <dl className="mt-3 grid gap-y-3 text-sm leading-relaxed">
         {hasAtomicEvidence && (
           <div className="grid gap-1 sm:grid-cols-[8.5rem_1fr] sm:gap-4">
-            <dt className="font-semibold text-text">Atomic evidence</dt>
+            <dt className="font-semibold text-text">Saved practice</dt>
             <dd className="text-text-muted">
-              {plural(receipt.atomic.recorded, 'atomic receipt')} ·{' '}
-              {receipt.atomic.acquisition} acquisition ·{' '}
-              {receipt.atomic.retention} retention · {receipt.atomic.transfer}{' '}
-              transfer.
+              {plural(receipt.atomic.recorded, 'saved result')} ·{' '}
+              {receipt.atomic.acquisition} new skill ·{' '}
+              {receipt.atomic.retention} revisit · {receipt.atomic.transfer} in
+              a new song.
               {receipt.timing &&
                 timingDetail(
                   receipt.timing.windowMs,
@@ -80,8 +80,8 @@ export function LearningEvidenceReceipt({
               {plural(receipt.tutor.interventions, 'intervention')} ·{' '}
               {plural(receipt.tutor.cleanAttempts, 'clean loop')} ·{' '}
               {plural(receipt.tutor.retryAttempts, 'retry')} ·{' '}
-              {plural(receipt.tutor.deferredAttempts, 'deferral')}. Recovery is
-              practice scaffolding, not a mastery claim.
+              {plural(receipt.tutor.deferredAttempts, 'pause')}. This helps
+              guide practice; it does not change your level yet.
             </dd>
           </div>
         )}

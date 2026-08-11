@@ -1679,7 +1679,7 @@ export function SongView() {
         lastAttempt && !lastAttempt.hasSufficientCoverage
           ? 'Finish every authored note in the loop.'
           : lastAttempt && !lastAttempt.qualifiesAsCleanPass
-          ? 'That attempt was kept as evidence; settle the pattern and try once more.'
+          ? 'That attempt was saved. Settle the pattern and try once more.'
           : 'A good-enough pass can include one developing hit; useful progress is retained.';
 
       return {
@@ -1695,22 +1695,22 @@ export function SongView() {
     if (handsFreeControlsEnabled && drumGestureSurface === 'ready') {
       if (interruptedAttempt && interruptedResumeMeasure !== undefined) {
         return {
-          title: 'Interrupted attempt saved',
+          title: 'Interrupted run saved',
           detail: `${
             interruptedAttempt.records.length
-          } scored outcomes are preserved separately. Kick once to pick up from bar ${
+          } scored notes were saved. Kick once to resume from bar ${
             interruptedResumeMeasure + 1
-          } with a fresh count-in; this creates a new attempt without relabelling the interrupted one as complete.`,
+          } with a new count-in.`,
           tone: 'steady' as const,
         };
       }
 
       const lessonDetail = songData?.lesson
         ? playbackSpeed < 0.999
-          ? `Kick once to start. A complete ${playbackSpeed.toFixed(
+          ? `Kick once to start. Finish at ${playbackSpeed.toFixed(
               1,
-            )}× pass at 82%+ unlocks the next learning step; 1.0× and 90%+ remains the mastery goal.`
-          : 'Kick once to start. Finish from the beginning at 82%+; Tutor rewinds are allowed and full-tempo mastery stays visible.'
+            )}× with 82%+ to open the next lesson; the full-tempo mark is 90%+ at 1.0×.`
+          : 'Kick once to start. Finish from the beginning at 82%+; Tutor rewinds are okay, and the full-tempo mark is still there.'
         : countIn
         ? 'Kick once to start the count-in.'
         : 'Kick once to start.';

@@ -95,8 +95,8 @@ export function SummaryCoachCard({ summary }: { summary: RunSummary }) {
         </p>
       </div>
       <p className="border-t border-accent-soft-border pt-3 text-sm leading-relaxed text-text">
-        This run predates per-hit history, so Coach will not invent trouble bars
-        or a loop. Play it again to unlock bar-level guidance.
+        This saved run has no note-by-note detail. Play it again for help with
+        specific bars.
       </p>
     </article>
   );

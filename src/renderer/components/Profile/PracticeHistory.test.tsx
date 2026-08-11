@@ -74,7 +74,7 @@ describe('PracticeHistory', () => {
   it('provides a readable monthly table in addition to the chart', () => {
     render(<PracticeHistory progress={progress()} />);
 
-    fireEvent.click(screen.getByText('Monthly evidence table'));
+    fireEvent.click(screen.getByText('Monthly progress table'));
 
     expect(screen.getByRole('table')).toHaveTextContent('Jul 26');
     expect(screen.getByRole('table')).toHaveTextContent('Aug 26');
@@ -91,7 +91,7 @@ describe('PracticeHistory', () => {
 
     expect(
       screen.getByTestId('profile-practice-history-loading'),
-    ).toHaveTextContent('Loading your retained practice evidence');
+    ).toHaveTextContent('Loading your saved practice…');
 
     view.rerender(
       <PracticeHistory
@@ -112,7 +112,7 @@ describe('PracticeHistory', () => {
 
     expect(
       screen.getByTestId('profile-practice-history-empty'),
-    ).toHaveTextContent('Finish a scored run');
+    ).toHaveTextContent('Finish a practice run');
   });
 });
 

@@ -229,7 +229,7 @@ function buildOptions({
     optionFor({
       kind: 'build',
       ranked,
-      source_label: 'Current evidence-backed learning route',
+      source_label: 'Current learning route',
       completion_label: 'One saved loop or lesson block',
     }),
   );
@@ -533,8 +533,8 @@ export function buildWeeklyMusicalRecap({
           recommendation.candidate.title
         } at ${recommendation.suggestedSpeed.toFixed(
           1,
-        )}× from the current evidence route.`
-      : 'No next route yet; one saved scored run will make the next recommendation concrete.',
+        )}× from the current practice plan.`
+      : 'Play once and save it to get a clear next suggestion.',
   };
 }
 

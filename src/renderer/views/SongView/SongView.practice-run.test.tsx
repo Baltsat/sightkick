@@ -751,7 +751,7 @@ describe('practice mode analytics', () => {
       await runToEnd(view);
 
       expect(screen.getByTestId('lesson-progression-result')).toHaveTextContent(
-        'Complete the lesson at 0.7× or faster',
+        'Finish at 0.7× or faster.',
       );
 
       await act(async () => {

@@ -102,7 +102,7 @@ const practiceRanking: RankedPracticeCandidate[] = [
       value: 0.8,
       level: 'high',
       evidenceRuns: 3,
-      detail: 'Three saved scored runs support this route.',
+      detail: 'Three saved practice runs support this route.',
     },
   },
   {
@@ -124,7 +124,7 @@ const practiceRanking: RankedPracticeCandidate[] = [
       value: 0.8,
       level: 'high',
       evidenceRuns: 3,
-      detail: 'Three saved scored runs support this route.',
+      detail: 'Three saved practice runs support this route.',
     },
   },
 ];

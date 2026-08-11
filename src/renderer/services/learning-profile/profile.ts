@@ -615,7 +615,7 @@ function trendFor(
     return {
       direction: 'unknown',
       delta: 0,
-      detail: 'At least two scored runs are needed for a trend.',
+      detail: 'Play twice to see a trend.',
     };
   }
 

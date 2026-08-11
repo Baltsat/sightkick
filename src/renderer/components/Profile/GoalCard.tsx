@@ -173,7 +173,7 @@ export function GoalCard({
         {breakdown.evidence.coverage !== 'measured' && (
           <div data-testid="mastery-coverage-unknown">
             Chart coverage is {breakdown.evidence.coverage}: the chart total is
-            not available, so no full-coverage claim is made.
+            not available yet.
           </div>
         )}
       </div>
@@ -195,8 +195,8 @@ export function GoalCard({
                   {bestAudition.speed.toFixed(1)}×
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-text-muted">
-                  Tests {bestAudition.test_label}. This is a section result, not
-                  a full-song readiness claim.
+                  This checks {bestAudition.test_label}. It measures this
+                  section, not the full song.
                 </p>
               </>
             ) : (

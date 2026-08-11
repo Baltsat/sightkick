@@ -114,11 +114,11 @@ export function AtomicSkillRadar({
           id="atomic-skill-profile-title"
           className="font-display text-2xl font-semibold tracking-[-0.03em] text-text"
         >
-          Atomic skill map
+          Skill map
         </h3>
         <p className="mt-1 max-w-[70ch] text-sm leading-relaxed text-text-muted">
-          Six observable skills nearest to the current target. An unmeasured
-          axis is a missing receipt, not a weakness.
+          Six skills closest to the current target. Blank means we have not
+          measured it yet.
         </p>
       </div>
 
@@ -200,7 +200,7 @@ export function AtomicSkillRadar({
           })}
         </svg>
         <figcaption id="atomic-skill-radar-caption" className="sr-only">
-          Skill radar drawn from atomic MIDI evidence states.
+          Skill map drawn from saved practice.
         </figcaption>
       </figure>
 
@@ -220,7 +220,7 @@ export function AtomicSkillRadar({
               <dd className="mt-1 flex flex-wrap gap-x-2 text-text-muted">
                 <span>{STAGE_LABEL[skill.state?.stage ?? 'unknown']}</span>
                 <span aria-hidden="true">·</span>
-                <span>{confidence}% evidence confidence</span>
+                <span>{confidence}% measured</span>
               </dd>
             </div>
           );

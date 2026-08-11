@@ -48,7 +48,7 @@ export function EvidencePracticeCards({
           : 'practice-card-controls',
       )}
       data-testid={`${testId}-set`}
-      aria-label="Evidence-backed practice cards"
+      aria-label="Suggested practice"
     >
       {cards.map((card) => {
         const index = optionIndex(selected, card.kind, card.options.length);
@@ -67,7 +67,7 @@ export function EvidencePracticeCards({
               {option.title}
             </strong>
             <span className="practice-card-control__source">
-              Evidence: {option.source_label}
+              Based on: {option.source_label}
             </span>
             {isDeferred ? (
               <div className="practice-card-control__actions">
@@ -112,7 +112,7 @@ export function EvidencePracticeCards({
                     disabled={card.options.length < 2}
                     title={
                       card.options.length < 2
-                        ? 'No other evidence-backed option is available.'
+                        ? 'No other saved option is available.'
                         : undefined
                     }
                   >

@@ -154,7 +154,7 @@ export function PracticeHistory({
           Practice history
         </h3>
         <p className="mt-2 text-sm text-text-muted">
-          Loading your retained practice evidence…
+          Loading your saved practice…
         </p>
       </section>
     );
@@ -167,7 +167,7 @@ export function PracticeHistory({
       ? `${formatDate(progress.firstEvidenceDate)} – ${formatDate(
           progress.lastEvidenceDate,
         )}`
-      : 'No dated evidence yet';
+      : 'No dated runs yet';
 
   return (
     <section
@@ -183,7 +183,7 @@ export function PracticeHistory({
           Practice history
         </h3>
         <p className="mt-1 text-xs leading-relaxed text-text-muted">
-          All retained evidence · {evidenceRange}
+          All saved runs · {evidenceRange}
         </p>
       </div>
 
@@ -210,7 +210,7 @@ export function PracticeHistory({
           className="rounded-xl border border-dashed border-border-soft bg-fill px-4 py-6 text-center text-sm text-text-faint"
           data-testid="profile-practice-history-empty"
         >
-          Finish a scored run to start your long-term record.
+          Finish a practice run to start your long-term record.
         </div>
       ) : (
         <>
@@ -250,7 +250,7 @@ export function PracticeHistory({
               <div className="mb-2 flex items-end justify-between gap-3">
                 <div>
                   <h4 className="text-sm font-semibold text-text-body">
-                    Monthly evidence
+                    Monthly progress
                   </h4>
                   <p className="text-[11px] text-text-faint">
                     Latest {progress.months.length} active month
@@ -334,7 +334,7 @@ export function PracticeHistory({
 
           <details className="rounded-xl border border-border-soft bg-fill px-3 py-2">
             <summary className="cursor-pointer text-xs font-semibold text-text-body">
-              Monthly evidence table
+              Monthly progress table
             </summary>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-96 text-left text-xs">

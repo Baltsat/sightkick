@@ -80,13 +80,14 @@ export function AICoach({
     <div className="flex flex-col gap-4" data-testid="ai-coach">
       <div>
         <div className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
-          Practice intelligence
+          Coach
         </div>
         <h2 className="font-display text-2xl font-semibold text-text">
           Your next useful reps
         </h2>
         <p className="mt-1 text-sm text-text-muted">
-          {result?.analyzedRuns ?? 0} full-resolution runs analyzed.
+          {result?.analyzedRuns ?? 0} detailed run
+          {(result?.analyzedRuns ?? 0) === 1 ? '' : 's'} checked.
         </p>
       </div>
       {showSummaryOnly ? (
@@ -94,7 +95,7 @@ export function AICoach({
       ) : findings.length === 0 ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="Finish a scored run to give the coach enough evidence."
+          description="Finish a practice run so the coach can help."
         />
       ) : (
         findings.map((finding) => (

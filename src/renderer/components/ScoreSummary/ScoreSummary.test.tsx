@@ -132,7 +132,7 @@ describe('ScoreSummary', () => {
     ).toHaveTextContent('Bars 5–8 · 84% at 0.7×');
     expect(
       modal.getByTestId('song-section-audition-receipt'),
-    ).toHaveTextContent('full-song readiness remains separate');
+    ).toHaveTextContent('It measures this section, not the full song.');
   });
 
   it('opens the coach from a completed run', () => {

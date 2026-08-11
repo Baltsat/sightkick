@@ -42,11 +42,10 @@ export function GoalPopover({
           data-testid="goal-popover-menu"
         >
           <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-[0.12em] text-text-faint">
-            Today’s set · daily XP
+            Daily goal
           </div>
           <p className="px-2 pb-2 text-xs leading-relaxed text-text-muted">
-            This changes today’s effort target. Practice streaks come from
-            qualifying saved practice days.
+            Choose how much XP you want to earn today.
           </p>
           {GOAL_OPTIONS.map((option) => (
             <button

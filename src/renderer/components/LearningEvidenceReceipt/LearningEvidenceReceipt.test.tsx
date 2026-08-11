@@ -66,7 +66,7 @@ describe('LearningEvidenceReceipt', () => {
     render(<LearningEvidenceReceipt summary={summary()} />);
 
     expect(screen.getByTestId('learning-evidence-receipt')).toHaveTextContent(
-      '1 atomic receipt',
+      '1 saved result',
     );
     expect(screen.getByTestId('learning-evidence-receipt')).toHaveTextContent(
       '±120 ms',
@@ -75,7 +75,7 @@ describe('LearningEvidenceReceipt', () => {
       'bars 4–5',
     );
     expect(screen.getByTestId('learning-evidence-receipt')).toHaveTextContent(
-      'not a mastery claim',
+      'does not change your level yet',
     );
   });
 

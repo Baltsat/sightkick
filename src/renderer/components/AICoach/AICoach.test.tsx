@@ -53,9 +53,7 @@ describe('AICoach', () => {
       </AntdApp>,
     );
 
-    expect(
-      screen.getByText('3 full-resolution runs analyzed.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('3 detailed runs checked.')).toBeInTheDocument();
     expect(screen.getByTestId('coach-notation')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('coach-practice-bars'));
@@ -146,7 +144,9 @@ describe('AICoach', () => {
     expect(card).toHaveTextContent('12 ms early');
     expect(card).toHaveTextContent('Weakest lane: Snare at 71%');
     expect(card).toHaveTextContent('Wrong hits: 3');
-    expect(card).toHaveTextContent('will not invent trouble bars or a loop');
+    expect(card).toHaveTextContent(
+      'has no note-by-note detail. Play it again for help with specific bars.',
+    );
     expect(
       within(card).queryByTestId('coach-practice-bars'),
     ).not.toBeInTheDocument();

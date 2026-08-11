@@ -180,8 +180,8 @@ describe('HomeCockpit kit home', () => {
       'data-state',
       'count-in',
     );
-    expect(screen.getByTestId('home-session-manifest')).toHaveTextContent(
-      'Count-in',
+    expect(screen.getByTestId('home-session-status')).toHaveTextContent(
+      'Count-in for Practice song',
     );
   });
 
@@ -240,7 +240,7 @@ describe('HomeCockpit kit home', () => {
     );
   });
 
-  it('keeps pads on the armed home when no target is selected', () => {
+  it('uses the restored Songs zone when no target is selected', () => {
     const onOpenSongs = vi.fn();
 
     render(
@@ -262,15 +262,15 @@ describe('HomeCockpit kit home', () => {
 
     fireEvent.click(screen.getByTestId('kit-hotspot-snare'));
 
-    expect(onOpenSongs).not.toHaveBeenCalled();
+    expect(onOpenSongs).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('home-choose-song')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('home-choose-song'));
 
-    expect(onOpenSongs).toHaveBeenCalledTimes(1);
+    expect(onOpenSongs).toHaveBeenCalledTimes(2);
   });
 
-  it('rearms the composed song application with one intent gesture', () => {
+  it('keeps one composed session behind the compact disclosure', () => {
     const onStartSession = vi.fn();
 
     render(
@@ -294,42 +294,21 @@ describe('HomeCockpit kit home', () => {
       </InputProvider>,
     );
 
-    expect(screen.getByTestId('home-session-contract')).toHaveTextContent(
-      'Focus',
-    );
-    expect(screen.getByTestId('home-session-focus')).toHaveTextContent(
-      'Kick independence',
-    );
-    expect(screen.getByTestId('home-session-build')).toHaveTextContent(
-      'Build the phrase',
-    );
-    expect(screen.getByTestId('home-session-payoff')).toHaveTextContent(
+    expect(screen.getByTestId('home-session-summary')).toHaveTextContent(
       'Practice song',
     );
-
-    fireEvent.click(screen.getByTestId('home-session-size-short'));
-
-    expect(screen.getByTestId('home-session-manifest')).toHaveAttribute(
-      'data-size',
-      'short',
+    expect(screen.getByTestId('home-session-summary')).not.toHaveTextContent(
+      'Californication',
     );
-
-    fireEvent.click(screen.getByTestId('home-intent-songs'));
-
-    expect(screen.getByTestId('home-session-manifest')).toHaveAttribute(
-      'data-intent',
-      'songs',
-    );
-    expect(screen.getByRole('heading')).toHaveTextContent('Practice song');
 
     fireEvent.click(screen.getByTestId('kit-hotspot-kick'));
 
     expect(onStartSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        intent: 'songs',
-        size: 'short',
+        intent: 'learning',
+        size: 'full',
         launch: expect.objectContaining({
-          candidate: expect.objectContaining({ id: song.id }),
+          candidate: expect.objectContaining({ id: lessonSong.id }),
         }),
       }),
     );

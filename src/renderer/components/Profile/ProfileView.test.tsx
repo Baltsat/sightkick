@@ -98,9 +98,7 @@ describe('ProfileView', () => {
     expect(screen.getByTestId('no-goals-empty-state')).toBeInTheDocument();
     expect(
       screen.getByTestId('profile-lane-accuracy-definition'),
-    ).toHaveTextContent(
-      'Unweighted hit / (hit + miss) across scored lane notes in the last 30 days.',
-    );
+    ).toHaveTextContent('Accuracy from your scored notes in the last 30 days.');
     expect(
       screen.getByRole('button', { name: /set your first goal/i }),
     ).toBeInTheDocument();
@@ -194,13 +192,13 @@ describe('ProfileView', () => {
     );
 
     expect(screen.getByTestId('profile-deadline-targets')).toHaveTextContent(
-      'Goal runway',
+      'Target pace',
     );
     expect(screen.getByTestId('profile-deadline-targets')).toHaveTextContent(
       'Target date: 2026-09-10',
     );
     expect(screen.getByTestId('profile-deadline-targets')).toHaveTextContent(
-      'Building evidence for a weekly pace',
+      'Play a few more runs before Drumroll sets a weekly pace.',
     );
   });
 
