@@ -90,6 +90,10 @@ import {
   summarizeCoachFindings,
 } from '../../services/coach';
 import { TutorHud } from '../../components/TutorHud';
+import {
+  PracticeReadinessCue,
+  PracticeReadinessPhase,
+} from '../../components/PracticeReadinessCue';
 import { KitCommandPrompt } from '../../components/KitCommandPrompt';
 import { useTutorSession } from '../../hooks/useTutorSession';
 import { usePracticeAttemptCheckpoint } from '../../hooks/usePracticeAttemptCheckpoint';
@@ -2103,6 +2107,11 @@ export function SongView() {
       : practicePresentationPhase === 'recovery-explain'
       ? 'recovery-explain'
       : undefined;
+  const practiceReadinessPhase: PracticeReadinessPhase = isLoading
+    ? 'idle'
+    : practicePresentationPhase === 'ready'
+    ? 'ready'
+    : 'playing';
 
   return (
     <Layout
@@ -2522,6 +2531,9 @@ export function SongView() {
             />
           )}
         </Content>
+        {gameMode === 'practice' && (
+          <PracticeReadinessCue phase={practiceReadinessPhase} />
+        )}
         {gameMode === 'practice' && (
           <TutorHud
             state={tutorSession.state}

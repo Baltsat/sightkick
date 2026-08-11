@@ -113,6 +113,7 @@ describe('tutor machine', () => {
       targetSpeed: 0.8,
       currentSpeed: 0.8,
       livesRemaining: 3,
+      settings: { livesEnabled: false },
     });
   });
 
@@ -127,15 +128,15 @@ describe('tutor machine', () => {
     ).toBe(6);
   });
 
-  it('arms one recovery and burns one life for one material failure', () => {
+  it('arms one recovery without draining energy in relaxed practice', () => {
     const result = beginFailedSession();
 
     expect(result.state.phase).toBe('recovering');
-    expect(result.state.livesRemaining).toBe(2);
+    expect(result.state.livesRemaining).toBe(3);
     expect(result.state.interventions).toHaveLength(1);
     expect(result.state.interventions[0]).toMatchObject({
       startedAtSpeed: 1,
-      livesRemaining: 2,
+      livesRemaining: 3,
       trigger: { reason: 'three-distinct-errors' },
     });
     expect(result.state.recovery?.region).toMatchObject({
@@ -209,10 +210,13 @@ describe('tutor machine', () => {
   });
 
   it('does not rewind when auto-rewind is disabled', () => {
-    let state = dispatch(createTutorState({ autoRewind: false }), {
-      type: 'start',
-      targetSpeed: 1,
-    }).state;
+    let state = dispatch(
+      createTutorState({ autoRewind: false, livesEnabled: true }),
+      {
+        type: 'start',
+        targetSpeed: 1,
+      },
+    ).state;
 
     state = addMeasure(state, 0, ['miss', 'miss', 'miss', 'miss']);
 
@@ -253,6 +257,30 @@ describe('tutor machine', () => {
     });
 
     expect(result.state.livesRemaining).toBe(3);
+  });
+
+  it('burns one challenge life only when the player opts in', () => {
+    let state = dispatch(createTutorState({ livesEnabled: true }), {
+      type: 'start',
+      targetSpeed: 1,
+    }).state;
+
+    state = addMeasure(state, 0, ['miss', 'miss', 'miss', 'miss']);
+
+    const result = dispatch(state, {
+      type: 'measure-complete',
+      measureIndex: 0,
+    });
+
+    expect(result.state.livesRemaining).toBe(2);
+    expect(result.commands).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'material-failure',
+          livesRemaining: 2,
+        }),
+      ]),
+    );
   });
 
   it('honors all smart-rewind and lives toggle combinations independently', () => {

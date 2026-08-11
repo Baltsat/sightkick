@@ -6,6 +6,11 @@ import {
   PersistedCoachFindingEvidence,
   RunSummary,
 } from '../practice-stats';
+import type {
+  DrumLearningProfile,
+  DrumSkillAxisId,
+  SkillTrendDirection,
+} from '../learning-profile';
 
 export type PracticeCandidateKind = 'song' | 'lesson';
 
@@ -78,6 +83,8 @@ export interface NextPracticeInput {
   weakLanes?: readonly LaneAccuracy[];
   /** Explicit clock keeps the service pure and tests deterministic. */
   nowMs: number;
+  goalDate?: string;
+  learningProfile?: DrumLearningProfile;
   limit?: number;
 }
 
@@ -91,6 +98,7 @@ export type RecommendationFactorKey =
   | 'difficulty-fit'
   | 'preference'
   | 'curriculum-progress'
+  | 'deadline-pacing'
   | 'same-song-fatigue'
   | 'recent-mastery';
 
@@ -113,12 +121,55 @@ export interface RecommendationConfidence {
   detail: string;
 }
 
+export interface DirectRemediationRoute {
+  findingCount: number;
+}
+
+export interface DeadlineWeeklyTarget {
+  week: number;
+  dueDate: string;
+  targetScore: number;
+}
+
+export interface DeadlineSkillTarget {
+  axisId: DrumSkillAxisId;
+  label: string;
+  prerequisiteAxisIds: readonly DrumSkillAxisId[];
+  currentScore: number;
+  deadlineTarget: number;
+  weeklyTargets: readonly DeadlineWeeklyTarget[];
+  weeklyTarget: number;
+  behindBy: number;
+  pacingValue: number;
+  trend: SkillTrendDirection;
+  trendDelta: number;
+  evidenceRuns: number;
+  detail: string;
+}
+
+export interface DeadlinePacingSummary {
+  goalDate: string;
+  weeksRemaining: number;
+  targets: readonly DeadlineSkillTarget[];
+}
+
+export interface CandidateDeadlinePacing {
+  axisId: DrumSkillAxisId;
+  label: string;
+  weeklyTarget: number;
+  behindBy: number;
+  value: number;
+  detail: string;
+}
+
 export interface RankedPracticeCandidate {
   candidate: PracticeCandidate;
   score: number;
   predictedSuccess: number;
   suggestedSpeed: number;
   mastery: number;
+  directRemediation?: DirectRemediationRoute;
+  deadlinePacing?: CandidateDeadlinePacing;
   /** The authored lesson metadata rendered by Home/Journey. */
   lessonPlan?: {
     cue: string;
@@ -138,4 +189,5 @@ export interface NextPracticeResult {
   strategy: 'evidence-ranked' | 'deterministic-fallback' | 'none-available';
   recommendation?: RankedPracticeCandidate;
   ranking: RankedPracticeCandidate[];
+  deadlinePacing?: DeadlinePacingSummary;
 }

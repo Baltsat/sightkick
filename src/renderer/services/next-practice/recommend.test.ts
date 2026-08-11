@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CoachFinding } from '../coach';
+import { DRUM_SKILL_AXES } from '../learning-profile';
+import type { DrumLearningProfile, DrumSkillAxisId } from '../learning-profile';
 import { RunSummary } from '../practice-stats';
 import { recommendNextPractice } from './recommend';
 import {
@@ -9,6 +11,8 @@ import {
 } from './types';
 
 const NOW = Date.parse('2026-08-09T12:00:00.000Z');
+const PACING_NOW = Date.parse('2026-08-27T12:00:00.000Z');
+const PACING_GOAL_DATE = '2026-09-10T12:00:00.000Z';
 
 function makeCandidate(
   id: string,
@@ -80,6 +84,39 @@ function coachFinding(overrides: Partial<CoachFinding> = {}): CoachFinding {
       sampleCount: 12,
     },
     ...overrides,
+  };
+}
+
+function learningProfile(
+  overrides: Partial<Record<DrumSkillAxisId, number>> = {},
+): DrumLearningProfile {
+  return {
+    axes: DRUM_SKILL_AXES.map((axis) => ({
+      ...axis,
+      score: overrides[axis.id] ?? 70,
+      confidence: {
+        level: 'medium',
+        label: 'Medium confidence',
+        evidenceCount: 4,
+        evidenceWeight: 6,
+        detail: 'Measured across four scored runs.',
+      },
+      trend: {
+        direction: axis.id === 'hand-control' ? 'stable' : 'improving',
+        delta: axis.id === 'hand-control' ? 0 : 5,
+        detail: 'Fixture trend.',
+      },
+      limitingFactor: {
+        key: 'fixture',
+        label: 'Fixture',
+        detail: 'Fixture evidence.',
+        score: overrides[axis.id] ?? 70,
+      },
+    })),
+    evidenceRuns: 4,
+    computedThrough: '2026-08-27T10:00:00.000Z',
+    strongestAxis: 'pulse-timing',
+    focusAxis: 'hand-control',
   };
 }
 
@@ -417,6 +454,218 @@ describe('recommendNextPractice', () => {
         (factor) => factor.key === 'weak-skill-match',
       )?.value,
     ).toBeGreaterThan(0.5);
+  });
+
+  it('routes three persisted direct findings ahead of better-scoring generic songs when lesson taxonomy differs', () => {
+    const result = recommend({
+      candidates: [
+        makeCandidate('generic-timing-song', {
+          liked: true,
+          skills: ['timing'],
+          targetSpeed: 0.8,
+        }),
+        makeCandidate('generic-timing-song-2', {
+          liked: true,
+          skills: ['timing'],
+          targetSpeed: 0.8,
+        }),
+        makeCandidate('lesson-01-01', {
+          kind: 'lesson',
+          curriculumId: '01.01',
+          skills: ['sixteenth-notes'],
+          difficulty: 'expert',
+          challengeLevel: 0.1,
+          sequence: 1,
+        }),
+      ],
+      history: [
+        history('generic-timing-song', '2026-08-08T12:00:00.000Z', {
+          overallAccuracy: 0.96,
+          totalHits: 96,
+          totalMisses: 4,
+          playbackSpeed: 0.8,
+        }),
+      ],
+      coachEvidence: ['timing-1', 'timing-2', 'timing-3'].map((id) => ({
+        id,
+        kind: 'timing-bias',
+        severity: 'high' as const,
+        skillTag: 'timing',
+        sampleCount: 12,
+        remediationLessonId: '01.01',
+      })),
+    });
+    const direct = result.ranking.find(
+      ({ candidate }) => candidate.id === 'lesson-01-01',
+    );
+    const generic = result.ranking.find(
+      ({ candidate }) => candidate.id === 'generic-timing-song',
+    );
+
+    expect(result.recommendation?.candidate.id).toBe('lesson-01-01');
+    expect(direct).toMatchObject({
+      directRemediation: { findingCount: 3 },
+      reason: '3 saved Coach findings route directly to this lesson.',
+    });
+    expect(direct?.score).toBeLessThan(generic?.score ?? 0);
+    expect(
+      [...result.ranking]
+        .sort((left, right) => right.score - left.score)
+        .map(({ candidate }) => candidate.id)[0],
+    ).toMatch(/^generic-timing-song/);
+  });
+
+  it('does not route cleared lessons or resolved findings as current remediation', () => {
+    const candidates = [
+      makeCandidate('generic-timing-song', {
+        liked: true,
+        skills: ['timing'],
+        targetSpeed: 0.8,
+      }),
+      makeCandidate('lesson-01-01', {
+        kind: 'lesson',
+        curriculumId: '01.01',
+        skills: ['sixteenth-notes'],
+        challengeLevel: 0.1,
+        sequence: 1,
+      }),
+    ];
+    const historyEntries = [
+      history('generic-timing-song', '2026-08-08T12:00:00.000Z', {
+        overallAccuracy: 0.96,
+        totalHits: 96,
+        totalMisses: 4,
+        playbackSpeed: 0.8,
+      }),
+    ];
+    const finding = {
+      id: 'timing-1',
+      kind: 'timing-bias',
+      severity: 'high' as const,
+      skillTag: 'timing',
+      sampleCount: 12,
+      remediationLessonId: '01.01',
+    };
+    const cleared = recommend({
+      candidates: candidates.map((candidate) =>
+        candidate.id === 'lesson-01-01'
+          ? { ...candidate, mastered: true }
+          : candidate,
+      ),
+      history: historyEntries,
+      coachEvidence: [finding],
+    });
+    const resolved = recommend({
+      candidates,
+      history: historyEntries,
+      coachEvidence: [{ ...finding, resolved: true }],
+    });
+
+    expect(
+      cleared.ranking.find(({ candidate }) => candidate.id === 'lesson-01-01')
+        ?.directRemediation,
+    ).toBeUndefined();
+    expect(
+      resolved.ranking.find(({ candidate }) => candidate.id === 'lesson-01-01')
+        ?.directRemediation,
+    ).toBeUndefined();
+  });
+
+  it('orders direct remediation before deadline pacing before generic evidence', () => {
+    const result = recommend({
+      candidates: [
+        makeCandidate('generic-song', {
+          liked: true,
+          targetSpeed: 0.8,
+        }),
+        makeCandidate('hihat-control-song', {
+          skills: ['sixteenth-hihat'],
+          targetSpeed: 0.8,
+        }),
+        makeCandidate('direct-lesson', {
+          kind: 'lesson',
+          curriculumId: 'deadline-route',
+          skills: ['timing'],
+          challengeLevel: 0.2,
+          sequence: 1,
+        }),
+      ],
+      history: [
+        history('generic-song', '2026-08-26T12:00:00.000Z', {
+          overallAccuracy: 0.96,
+          totalHits: 96,
+          totalMisses: 4,
+          playbackSpeed: 0.8,
+        }),
+      ],
+      coachEvidence: [
+        {
+          id: 'route-first',
+          kind: 'timing-bias',
+          severity: 'high',
+          skillTag: 'timing',
+          sampleCount: 12,
+          remediationLessonId: 'deadline-route',
+        },
+      ],
+      goalDate: PACING_GOAL_DATE,
+      learningProfile: learningProfile({ 'hand-control': 40 }),
+      nowMs: PACING_NOW,
+    });
+    const paced = result.ranking.find(
+      ({ candidate }) => candidate.id === 'hihat-control-song',
+    );
+
+    expect(result.ranking.map(({ candidate }) => candidate.id)).toEqual([
+      'direct-lesson',
+      'hihat-control-song',
+      'generic-song',
+    ]);
+    expect(paced?.deadlinePacing).toMatchObject({
+      axisId: 'hand-control',
+      weeklyTarget: 60,
+      behindBy: 20,
+    });
+    expect(
+      paced?.factors.find((factor) => factor.key === 'deadline-pacing'),
+    ).toMatchObject({ value: 1 });
+    expect(paced?.reason).toContain(
+      '2 weeks left: Hand Control is 20 points behind its weekly target of 60/100.',
+    );
+    expect(result.deadlinePacing?.targets).toContainEqual(
+      expect.objectContaining({
+        axisId: 'hand-control',
+        prerequisiteAxisIds: ['pulse-timing'],
+      }),
+    );
+  });
+
+  it('keeps current ranking behavior when deadline pacing lacks goal or profile evidence', () => {
+    const input = {
+      candidates: [
+        makeCandidate('generic-song', { liked: true }),
+        makeCandidate('other-song'),
+      ],
+      history: [history('generic-song', '2026-08-08T12:00:00.000Z')],
+      nowMs: NOW,
+    };
+    const current = recommendNextPractice(input);
+    const withoutProfile = recommendNextPractice({
+      ...input,
+      goalDate: PACING_GOAL_DATE,
+    });
+    const insufficientProfile = recommendNextPractice({
+      ...input,
+      goalDate: PACING_GOAL_DATE,
+      learningProfile: { ...learningProfile(), evidenceRuns: 2 },
+    });
+
+    expect(withoutProfile).toEqual(current);
+    expect(insufficientProfile).toEqual(current);
+    expect(withoutProfile.deadlinePacing).toBeUndefined();
+    expect(
+      withoutProfile.ranking.some(({ deadlinePacing }) => deadlinePacing),
+    ).toBe(false);
   });
 
   it('penalizes same-song fatigue across the last three sessions', () => {

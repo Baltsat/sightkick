@@ -1416,7 +1416,13 @@ describe('the score summary', () => {
         'data-selected',
         'true',
       );
-      expect(screen.getByTestId('remediation-task')).toHaveTextContent('1 / 1');
+      expect(screen.getByTestId('loop-escape-runway')).toHaveAttribute(
+        'data-phase',
+        'control',
+      );
+      expect(screen.getByTestId('tutor-recovery-caption')).toHaveTextContent(
+        'Coach loop armed',
+      );
     });
     expect(window.localStorage.getItem(TEST_REMEDIATION_STORAGE_KEY)).toContain(
       '"status":"active"',

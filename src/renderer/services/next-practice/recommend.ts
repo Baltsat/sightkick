@@ -15,6 +15,7 @@ import {
 } from '../practice-stats';
 import {
   CandidateLaneDemand,
+  DeadlinePacingSummary,
   NextPracticeInput,
   NextPracticeResult,
   PracticeCandidate,
@@ -24,6 +25,10 @@ import {
   RecommendationFactor,
   RecommendationFactorKey,
 } from './types';
+import {
+  deadlinePacingForSkills,
+  deriveDeadlinePacing,
+} from './deadline-pacing';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LANE_HALF_LIFE_DAYS = 14;
@@ -78,6 +83,10 @@ interface CoachSkillEvidence {
   skillTag: CoachSkillTag;
   evidence: Pick<CoachFinding['evidence'], 'sampleCount'>;
   remediationLessonId?: string;
+}
+
+interface DirectRemediationEvidence {
+  findingIds: readonly string[];
 }
 
 function clamp01(value: number): number {
@@ -384,6 +393,51 @@ function persistedSkillEvidence(
   );
 }
 
+function directRemediationEvidence(
+  findings: readonly PersistedCoachFindingEvidence[],
+): Map<string, DirectRemediationEvidence> {
+  const findingIdsByLessonId = new Map<string, Set<string>>();
+
+  findings.forEach((finding) => {
+    const lessonId = finding.remediationLessonId?.trim();
+
+    if (
+      !lessonId ||
+      finding.resolved === true ||
+      !Number.isFinite(finding.sampleCount) ||
+      finding.sampleCount <= 0
+    ) {
+      return;
+    }
+
+    const findingIds = findingIdsByLessonId.get(lessonId) ?? new Set<string>();
+
+    findingIds.add(finding.id);
+    findingIdsByLessonId.set(lessonId, findingIds);
+  });
+
+  return new Map(
+    [...findingIdsByLessonId.entries()].map(([lessonId, findingIds]) => [
+      lessonId,
+      { findingIds: [...findingIds].sort() },
+    ]),
+  );
+}
+
+function currentDirectRemediation(
+  candidate: PracticeCandidate,
+  isMastered: boolean,
+  evidence: Map<string, DirectRemediationEvidence>,
+) {
+  if (candidate.kind !== 'lesson' || !candidate.curriculumId || isMastered) {
+    return undefined;
+  }
+
+  const route = evidence.get(candidate.curriculumId);
+
+  return route ? { findingCount: route.findingIds.length } : undefined;
+}
+
 function skillEvidence(
   findings: readonly CoachSkillEvidence[],
 ): Map<CoachSkillTag, SkillEvidence> {
@@ -437,13 +491,8 @@ function matchingSkillEvidence(
         right.strength - left.strength ||
         left.finding.id.localeCompare(right.finding.id),
     );
-  const directRoute = matches.find(
-    (value) =>
-      candidate.curriculumId !== undefined &&
-      value.finding.remediationLessonId === candidate.curriculumId,
-  );
 
-  return directRoute ?? matches[0];
+  return matches[0];
 }
 
 function laneMatch(
@@ -628,6 +677,8 @@ function rankCandidate({
   globalRecentAccuracy,
   lanes,
   skills,
+  directRemediations,
+  deadlinePacing,
 }: {
   candidate: PracticeCandidate;
   history: readonly PracticeHistoryEntry[];
@@ -638,6 +689,8 @@ function rankCandidate({
   globalRecentAccuracy: number;
   lanes: Map<KitElement, LaneEvidence>;
   skills: Map<CoachSkillTag, SkillEvidence>;
+  directRemediations: Map<string, DirectRemediationEvidence>;
+  deadlinePacing: DeadlinePacingSummary | undefined;
 }): RankedPracticeCandidate {
   const candidateHistory = history.filter(
     (entry) => entry.candidateId === candidate.id,
@@ -665,13 +718,31 @@ function rankCandidate({
   const difficultyFit = clamp01(
     1 - Math.abs(challenge - (playerCapability + 0.08)) / 0.55,
   );
+  const masteryBreakdown = computeMastery({
+    goal: { songId: candidate.id, difficulty: candidate.difficulty },
+    songRuns: candidateRuns,
+    allRuns,
+    songDifficulties: candidate.availableDifficulties
+      ? [...candidate.availableDifficulties]
+      : undefined,
+    chartTotalNotes: candidate.chartTotalNotes,
+    nowMs,
+  });
+  const isMastered = candidate.mastered ?? masteryBreakdown.mastery >= 90;
+  const directRemediation = currentDirectRemediation(
+    candidate,
+    isMastered,
+    directRemediations,
+  );
+  const pacing = deadlinePacingForSkills(
+    candidate.skills ?? [],
+    deadlinePacing,
+  );
   const demand = normalizedLaneDemand(candidate, scopedRuns);
   const lane = laneMatch(demand, lanes);
   const matchedSkill = matchingSkillEvidence(candidate, skills);
   const skillWeakness = matchedSkill?.strength ?? 0;
   const skillReadiness = matchedSkill ? 1 - matchedSkill.strength : 0.7;
-  const isDirectRemediation =
-    matchedSkill?.finding.remediationLessonId === candidate.curriculumId;
   const recentRuns = [...scopedRuns]
     .sort((left, right) => timestamp(left) - timestamp(right))
     .slice(-3);
@@ -698,17 +769,6 @@ function rankCandidate({
           lane.readiness * 0.15 +
           skillReadiness * 0.15,
   );
-  const masteryBreakdown = computeMastery({
-    goal: { songId: candidate.id, difficulty: candidate.difficulty },
-    songRuns: candidateRuns,
-    allRuns,
-    songDifficulties: candidate.availableDifficulties
-      ? [...candidate.availableDifficulties]
-      : undefined,
-    chartTotalNotes: candidate.chartTotalNotes,
-    nowMs,
-  });
-  const isMastered = candidate.mastered ?? masteryBreakdown.mastery >= 90;
   const lastRunMs = candidateHistory
     .map(({ summary }) => timestamp(summary))
     .filter(Number.isFinite)
@@ -801,10 +861,8 @@ function rankCandidate({
       key: 'weak-skill-match',
       label: 'Weak-skill match',
       value: skillWeakness,
-      weight: isDirectRemediation ? 40 : 16,
-      detail: isDirectRemediation
-        ? `Matches the exact supported Coach remediation for ${matchedSkill.finding.skillTag}.`
-        : `Targets ${matchedSkill.finding.skillTag}, the strongest matching Coach weakness.`,
+      weight: 16,
+      detail: `Targets ${matchedSkill.finding.skillTag}, the strongest matching Coach weakness.`,
     });
   }
 
@@ -831,6 +889,16 @@ function rankCandidate({
       detail: isMastered
         ? 'This lesson is already cleared.'
         : 'This unlocked lesson advances the structured learning path.',
+    });
+  }
+
+  if (pacing) {
+    positives.push({
+      key: 'deadline-pacing',
+      label: 'Deadline pacing',
+      value: pacing.value,
+      weight: 14,
+      detail: pacing.detail,
     });
   }
 
@@ -870,8 +938,18 @@ function rankCandidate({
       recentAccuracy,
     ),
     mastery: candidate.mastered === true ? 100 : masteryBreakdown.mastery,
+    ...(directRemediation ? { directRemediation } : {}),
+    ...(pacing ? { deadlinePacing: pacing } : {}),
     lessonPlan: lessonPlanFor(candidate),
-    reason: reasonFromFactors(factors),
+    reason: directRemediation
+      ? `${directRemediation.findingCount} saved Coach finding${
+          directRemediation.findingCount === 1 ? '' : 's'
+        } route directly to this lesson.`
+      : pacing
+      ? `${pacing.detail} ${reasonFromFactors(
+          factors.filter((factor) => factor.key !== 'deadline-pacing'),
+        )}`
+      : reasonFromFactors(factors),
     factors,
     confidence: confidenceFor(
       scopedRuns.length,
@@ -963,6 +1041,29 @@ function evidenceTieBreak(
   );
 }
 
+function directRemediationTieBreak(
+  left: RankedPracticeCandidate,
+  right: RankedPracticeCandidate,
+): number {
+  return (
+    (right.directRemediation?.findingCount ?? 0) -
+      (left.directRemediation?.findingCount ?? 0) ||
+    evidenceTieBreak(left, right)
+  );
+}
+
+function deadlinePacingTieBreak(
+  left: RankedPracticeCandidate,
+  right: RankedPracticeCandidate,
+): number {
+  return (
+    (right.deadlinePacing?.value ?? 0) - (left.deadlinePacing?.value ?? 0) ||
+    (right.deadlinePacing?.behindBy ?? 0) -
+      (left.deadlinePacing?.behindBy ?? 0) ||
+    evidenceTieBreak(left, right)
+  );
+}
+
 /**
  * Pure, explainable next-practice ranking. Availability and lesson locks are
  * hard gates; all softer decisions remain visible as signed factors.
@@ -1004,32 +1105,57 @@ export function recommendNextPractice(
   const nowMs = normalizedNowMs(input.nowMs, sortedHistory);
   const allRuns = sortedHistory.map(({ summary }) => summary);
   const lanes = recentLaneEvidence(sortedHistory, nowMs, input.weakLanes);
+  const directRemediations = directRemediationEvidence(
+    input.coachEvidence ?? [],
+  );
+  const deadlinePacing = deriveDeadlinePacing({
+    goalDate: input.goalDate,
+    learningProfile: input.learningProfile,
+    nowMs,
+  });
   const skills = skillEvidence([
     ...(input.coachFindings ?? []),
     ...persistedSkillEvidence(input.coachEvidence ?? []),
   ]);
   const playerCapability = estimatePlayerCapability(sortedHistory);
   const globalRecentAccuracy = weightedRecentAccuracy(allRuns);
-  const ranking = eligible
-    .map((candidate) =>
-      rankCandidate({
-        candidate,
-        history: sortedHistory,
-        sortedHistory,
-        allRuns,
-        nowMs,
-        playerCapability,
-        globalRecentAccuracy,
-        lanes,
-        skills,
-      }),
-    )
-    .sort(evidenceTieBreak)
-    .slice(0, limit);
+  const ranked = eligible.map((candidate) =>
+    rankCandidate({
+      candidate,
+      history: sortedHistory,
+      sortedHistory,
+      allRuns,
+      nowMs,
+      playerCapability,
+      globalRecentAccuracy,
+      lanes,
+      skills,
+      directRemediations,
+      deadlinePacing,
+    }),
+  );
+  const ranking = [
+    ...ranked
+      .filter(({ directRemediation }) => directRemediation !== undefined)
+      .sort(directRemediationTieBreak),
+    ...ranked
+      .filter(
+        ({ directRemediation, deadlinePacing: candidatePacing }) =>
+          directRemediation === undefined && candidatePacing !== undefined,
+      )
+      .sort(deadlinePacingTieBreak),
+    ...ranked
+      .filter(
+        ({ directRemediation, deadlinePacing: candidatePacing }) =>
+          directRemediation === undefined && candidatePacing === undefined,
+      )
+      .sort(evidenceTieBreak),
+  ].slice(0, limit);
 
   return {
     strategy: 'evidence-ranked',
     recommendation: ranking[0],
     ranking,
+    ...(deadlinePacing ? { deadlinePacing } : {}),
   };
 }

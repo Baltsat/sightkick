@@ -46,7 +46,7 @@ export interface TutorSettings {
 export const DEFAULT_TUTOR_SETTINGS: TutorSettings = {
   enabled: true,
   autoRewind: true,
-  livesEnabled: true,
+  livesEnabled: false,
   startingLives: 3,
   triggerAccuracy: 0.8,
   minimumResolvedEvents: 4,

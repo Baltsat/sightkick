@@ -9,6 +9,8 @@ export const REMEDIATION_QUEUE_VERSION = 1 as const;
 /** Every task needs two good-enough learning passes before it can clear. */
 export const REQUIRED_CONSECUTIVE_CLEAN_PASSES = 2;
 
+export const MAX_REMEDIATION_BARS = 4;
+
 /** Coach loops teach a pattern; they are not a zero-error audition. */
 export const REMEDIATION_QUALITY_ACCURACY = 0.82;
 

@@ -117,6 +117,13 @@ export function TutorHud({
     qualityProgress === undefined
       ? 0
       : Math.min(1, qualityProgress / state.settings.requiredCleanRepetitions);
+  const formLabel = recovery
+    ? 'Finding shape'
+    : completedRecovery?.status === 'mastered'
+    ? 'Locked in'
+    : completedRecovery?.status === 'deferred'
+    ? 'Reset'
+    : 'Open';
 
   return (
     <aside
@@ -221,6 +228,15 @@ export function TutorHud({
                 Best {Math.round(bestQuality * 100)}%
               </span>
             )}
+          </div>
+        )}
+        {!remediation && !state.settings.livesEnabled && (
+          <div className="drumroll-tutor-hud__metric">
+            <dt>Form</dt>
+            <dd data-testid="tutor-form">
+              <FontAwesomeIcon icon={faDrum} aria-hidden="true" />
+              {formLabel}
+            </dd>
           </div>
         )}
         {!remediation && state.settings.livesEnabled && (

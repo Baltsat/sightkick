@@ -15,7 +15,7 @@ describe('TutorHud', () => {
     expect(screen.queryByTestId('tutor-hud')).not.toBeInTheDocument();
   });
 
-  it('shows distance-readable state, speed, and numeric lives', () => {
+  it('shows distance-readable state, speed, and open-form energy by default', () => {
     render(
       <TutorHud
         state={{
@@ -37,10 +37,8 @@ describe('TutorHud', () => {
     );
     expect(screen.getByText('Adaptive tutor')).toBeInTheDocument();
     expect(screen.getByTestId('tutor-speed')).toHaveTextContent('0.8×');
-    expect(screen.getByTestId('tutor-lives')).toHaveAccessibleName(
-      '2 of 3 lives remaining',
-    );
-    expect(screen.getByTestId('tutor-lives')).toHaveTextContent('2/ 3');
+    expect(screen.getByTestId('tutor-form')).toHaveTextContent('Open');
+    expect(screen.queryByTestId('tutor-lives')).not.toBeInTheDocument();
   });
 
   it('makes recovery phase and retained pattern progress explicit', () => {
@@ -129,7 +127,7 @@ describe('TutorHud', () => {
     render(
       <TutorHud
         state={{
-          ...createTutorState(),
+          ...createTutorState({ livesEnabled: true }),
           livesRemaining: 3,
           lastRecoveryOutcome: {
             recoveryId: 'recovery-1',
@@ -155,6 +153,27 @@ describe('TutorHud', () => {
       '3 of 3 lives available after checkpoint reset',
     );
     expect(screen.getByTestId('tutor-lives')).toHaveTextContent('3/ 3');
+  });
+
+  it('keeps challenge lives available when explicitly enabled', () => {
+    render(
+      <TutorHud
+        state={{
+          ...createTutorState({ livesEnabled: true }),
+          livesRemaining: 2,
+        }}
+        message={{
+          title: 'Challenge run',
+          detail: 'One recovery point remains before the checkpoint.',
+          tone: 'steady',
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('tutor-lives')).toHaveAccessibleName(
+      '2 of 3 lives remaining',
+    );
+    expect(screen.queryByTestId('tutor-form')).not.toBeInTheDocument();
   });
 
   it('labels inactivity pause and its resume instruction explicitly', () => {

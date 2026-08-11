@@ -35,6 +35,7 @@ interface WaveCandidate {
   taskKey: string;
   skills: readonly string[];
   weakSkillSignal: number;
+  directRemediationFindingCount: number;
 }
 
 function finiteScore(value: number): number {
@@ -89,6 +90,14 @@ function weakSkillSignal(recommendation: RankedPracticeCandidate): number {
     finiteScore(factor.contribution),
     finiteScore(factor.value),
   );
+}
+
+function directRemediationFindingCount(
+  recommendation: RankedPracticeCandidate,
+): number {
+  const findingCount = recommendation.directRemediation?.findingCount ?? 0;
+
+  return Number.isFinite(findingCount) ? Math.max(0, findingCount) : 0;
 }
 
 function byRankedEvidence(left: WaveCandidate, right: WaveCandidate): number {
@@ -156,7 +165,9 @@ function chooseFocus(
 
   return pool.sort((left, right) => {
     const leftTier =
-      left.recommendation.candidate.kind === 'lesson'
+      left.directRemediationFindingCount > 0
+        ? 4
+        : left.recommendation.candidate.kind === 'lesson'
         ? left.weakSkillSignal > 0
           ? 3
           : 1
@@ -164,7 +175,9 @@ function chooseFocus(
         ? 2
         : 0;
     const rightTier =
-      right.recommendation.candidate.kind === 'lesson'
+      right.directRemediationFindingCount > 0
+        ? 4
+        : right.recommendation.candidate.kind === 'lesson'
         ? right.weakSkillSignal > 0
           ? 3
           : 1
@@ -174,6 +187,8 @@ function chooseFocus(
 
     return (
       rightTier - leftTier ||
+      right.directRemediationFindingCount -
+        left.directRemediationFindingCount ||
       right.weakSkillSignal - left.weakSkillSignal ||
       byRankedEvidence(left, right)
     );
@@ -232,6 +247,12 @@ function chooseConsolidation(
 }
 
 function focusReason(candidate: WaveCandidate): string {
+  if (candidate.directRemediationFindingCount > 0) {
+    return `${candidate.directRemediationFindingCount} saved Coach finding${
+      candidate.directRemediationFindingCount === 1 ? '' : 's'
+    } route directly to this lesson.`;
+  }
+
   if (candidate.weakSkillSignal > 0) {
     return candidate.recommendation.candidate.kind === 'lesson'
       ? 'Start with the highest-ranked lesson tied to current weak-skill evidence.'
@@ -290,6 +311,8 @@ export function buildPracticeWave({
       taskKey: taskKey(recommendation),
       skills: candidateSkills(recommendation),
       weakSkillSignal: weakSkillSignal(recommendation),
+      directRemediationFindingCount:
+        directRemediationFindingCount(recommendation),
     }))
     .filter(
       ({ recommendation }) =>

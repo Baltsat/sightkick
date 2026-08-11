@@ -2,6 +2,7 @@ import type { CoachFinding } from '../coach';
 import {
   DEFAULT_MINIMUM_RESOLVED_NOTES,
   DEFAULT_REMEDIATION_SPEED,
+  MAX_REMEDIATION_BARS,
   REMEDIATION_NEAR_MISS_ACCURACY,
   REMEDIATION_QUALITY_ACCURACY,
   REQUIRED_CONSECUTIVE_CLEAN_PASSES,
@@ -46,6 +47,22 @@ function hasBarRange(finding: CoachFinding): finding is CoachBarFinding {
 
 function taskId(barStart: number, barEnd: number): string {
   return `bars:${barStart}-${barEnd}`;
+}
+
+function splitBarRange(
+  barStart: number,
+  barEnd: number,
+): Array<{ barStart: number; barEnd: number }> {
+  const ranges: Array<{ barStart: number; barEnd: number }> = [];
+
+  for (let start = barStart; start <= barEnd; start += MAX_REMEDIATION_BARS) {
+    ranges.push({
+      barStart: start,
+      barEnd: Math.min(barEnd, start + MAX_REMEDIATION_BARS - 1),
+    });
+  }
+
+  return ranges;
 }
 
 function findingReference(finding: CoachFinding): RemediationFindingReference {
@@ -119,42 +136,34 @@ export function createRemediationQueue(
   }
 
   const tasks: RemediationTask[] = [...findingsByRange.values()]
-    .map((findings) => {
+    .flatMap((findings) => {
       const first = findings[0];
-      const minimumResolvedNotes = normalizedMinimumResolvedNotes(
-        input.minimumResolvedNotesForRange?.(
-          first.evidence.barStart,
-          first.evidence.barEnd,
-          findings,
-        ),
-      );
-      const playbackSpeed = normalizedPlaybackSpeed(
-        input.playbackSpeedForRange?.(
-          first.evidence.barStart,
-          first.evidence.barEnd,
-          findings,
-        ) ??
-          findings.find((finding) => finding.evidence.slowSpeed !== undefined)
-            ?.evidence.slowSpeed,
+      const references = sortReferences(
+        [
+          ...new Map(findings.map((finding) => [finding.id, finding])).values(),
+        ].map(findingReference),
       );
 
-      return {
-        id: taskId(first.evidence.barStart, first.evidence.barEnd),
-        barStart: first.evidence.barStart,
-        barEnd: first.evidence.barEnd,
-        findings: sortReferences(
-          [
-            ...new Map(
-              findings.map((finding) => [finding.id, finding]),
-            ).values(),
-          ].map(findingReference),
-        ),
-        minimumResolvedNotes,
-        playbackSpeed,
-        status: 'pending' as const,
-        consecutiveCleanPasses: 0,
-        attempts: [],
-      };
+      return splitBarRange(first.evidence.barStart, first.evidence.barEnd).map(
+        ({ barStart, barEnd }) => ({
+          id: taskId(barStart, barEnd),
+          barStart,
+          barEnd,
+          findings: references,
+          minimumResolvedNotes: normalizedMinimumResolvedNotes(
+            input.minimumResolvedNotesForRange?.(barStart, barEnd, findings),
+          ),
+          playbackSpeed: normalizedPlaybackSpeed(
+            input.playbackSpeedForRange?.(barStart, barEnd, findings) ??
+              findings.find(
+                (finding) => finding.evidence.slowSpeed !== undefined,
+              )?.evidence.slowSpeed,
+          ),
+          status: 'pending' as const,
+          consecutiveCleanPasses: 0,
+          attempts: [],
+        }),
+      );
     })
     .sort(
       (left, right) =>

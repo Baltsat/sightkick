@@ -166,6 +166,38 @@ describe('buildPracticeWave', () => {
     );
   });
 
+  it('puts a direct stored remediation first even when its authored tag differs from the finding tag', () => {
+    const result = buildPracticeWave({
+      ranking: [
+        ranked(
+          'generic-timing-song',
+          { liked: true, skills: ['timing'] },
+          { score: 95, factors: [weakSkillFactor()] },
+        ),
+        {
+          ...ranked(
+            'lesson-01-01',
+            {
+              kind: 'lesson',
+              curriculumId: '01.01',
+              skills: ['sixteenth-notes'],
+            },
+            { score: 40 },
+          ),
+          directRemediation: { findingCount: 3 },
+        },
+        ranked('transfer-song', { skills: ['sixteenth-notes'] }),
+      ],
+      history: [],
+    });
+
+    expect(result.stops[0]).toMatchObject({
+      role: 'focus',
+      recommendation: { candidate: { id: 'lesson-01-01' } },
+      reason: '3 saved Coach findings route directly to this lesson.',
+    });
+  });
+
   it('keeps fallback reasons honest when no skill link is proven', () => {
     const result = buildPracticeWave({
       ranking: [

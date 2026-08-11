@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CoachFinding } from '../coach';
 import {
   DEFAULT_MINIMUM_RESOLVED_NOTES,
+  MAX_REMEDIATION_BARS,
   REQUIRED_CONSECUTIVE_CLEAN_PASSES,
   createRemediationQueue,
   deserializeRemediationQueue,
@@ -113,6 +114,49 @@ describe('remediation queue', () => {
     expect(
       deserializeRemediationQueue(serializeRemediationQueue(queue!)),
     ).toEqual(queue);
+  });
+
+  it('splits a long Coach finding into four-bar loops without losing its review link', () => {
+    const queue = createRemediationQueue({
+      source,
+      findings: [finding('bars-76-89', 76, 89)],
+      createdAt: '2026-08-10T09:31:00.000Z',
+      minimumResolvedNotesForRange: (barStart, barEnd) =>
+        (barEnd - barStart + 1) * 4,
+    });
+
+    expect(MAX_REMEDIATION_BARS).toBe(4);
+    expect(queue?.tasks).toEqual([
+      expect.objectContaining({
+        id: 'bars:76-79',
+        barStart: 76,
+        barEnd: 79,
+        minimumResolvedNotes: 16,
+        status: 'active',
+        findings: [expect.objectContaining({ id: 'bars-76-89' })],
+      }),
+      expect.objectContaining({
+        id: 'bars:80-83',
+        barStart: 80,
+        barEnd: 83,
+        minimumResolvedNotes: 16,
+        status: 'pending',
+      }),
+      expect.objectContaining({
+        id: 'bars:84-87',
+        barStart: 84,
+        barEnd: 87,
+        minimumResolvedNotes: 16,
+        status: 'pending',
+      }),
+      expect.objectContaining({
+        id: 'bars:88-89',
+        barStart: 88,
+        barEnd: 89,
+        minimumResolvedNotes: 8,
+        status: 'pending',
+      }),
+    ]);
   });
 
   it('accepts a developing one-miss pass and reaches a finite terminal state', () => {

@@ -1005,6 +1005,13 @@ describe('practice mode analytics', () => {
       const originalSource = startedQueue.source;
 
       expect(screen.getByTestId('loop-toggle')).toBeChecked();
+      expect(screen.getByTestId('loop-escape-runway')).toHaveAttribute(
+        'data-phase',
+        'control',
+      );
+      expect(screen.getByTestId('tutor-recovery-caption')).toHaveTextContent(
+        'Coach loop armed',
+      );
       expect(startedQueue).toMatchObject({
         status: 'active',
         source: {
@@ -1030,8 +1037,15 @@ describe('practice mode analytics', () => {
         status: 'active',
         tasks: [{ consecutiveCleanPasses: 1 }],
       });
-      expect(screen.getByTestId('remediation-repetition')).toHaveTextContent(
-        '1 / 2',
+      expect(
+        screen.queryByTestId('remediation-repetition'),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId('loop-escape-runway')).toHaveAttribute(
+        'data-phase',
+        'lock',
+      );
+      expect(screen.getByTestId('tutor-recovery-caption')).toHaveTextContent(
+        'First anchor acquired',
       );
 
       await playCleanFirstBar(view, frames, 0.7);
@@ -1065,6 +1079,13 @@ describe('practice mode analytics', () => {
       });
       expect(completedQueue.source).toEqual(originalSource);
       expect(screen.getByTestId('loop-toggle')).not.toBeChecked();
+      expect(screen.getByTestId('loop-escape-runway')).toHaveAttribute(
+        'data-phase',
+        'release',
+      );
+      expect(screen.getByTestId('tutor-recovery-caption')).toHaveTextContent(
+        'Loop released',
+      );
 
       const review = screen.getByTestId('remediation-review');
 
