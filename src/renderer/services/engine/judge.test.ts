@@ -833,6 +833,10 @@ describe('Judge', () => {
       controlId: 'midi:38',
       element: 'snare',
       timeSeconds: expect.any(Number),
+      expectedTick: 480,
+      actualTick: 480,
+      expectedElement: 'kick',
+      actualElement: 'snare',
     });
   });
 

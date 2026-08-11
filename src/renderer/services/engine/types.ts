@@ -78,6 +78,10 @@ export interface FalseHitRecord {
   controlId: string;
   element: InputElement | undefined;
   timeSeconds: number;
+  expectedTick?: number;
+  actualTick?: number;
+  expectedElement?: InputElement;
+  actualElement?: InputElement;
 }
 
 export type JudgeFalseHitHandler = (record: FalseHitRecord) => void;

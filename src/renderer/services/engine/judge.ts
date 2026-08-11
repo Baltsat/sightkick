@@ -1,4 +1,4 @@
-import { Measure, Note, ParsedChart } from '../../../chart-parser/types';
+import { Measure, ParsedChart } from '../../../chart-parser/types';
 import { InputElement, InputMapping } from '../../../types';
 import { InputEvent } from '../../input/types';
 import { secondsToTicks, ticksToSeconds } from '../../../chart-parser/timing';
@@ -8,7 +8,6 @@ import {
   JudgeFalseHitHandler,
   JudgeHitHandler,
   NoteEntry,
-  NotePos,
   ResolvedJudgement,
   ResolvedJudgementHandler,
 } from './types';
@@ -335,6 +334,7 @@ export class Judge {
     toleranceTicks: number,
     controlId: string,
     timeSeconds: number,
+    expected: NoteEntry | undefined,
   ): void {
     // Visual honesty vs. scoring lenience: a wrong hit is shown at the
     // timing it was struck, unqualified — the player sees exactly what
@@ -357,11 +357,24 @@ export class Judge {
       return;
     }
 
+    const actualElement = this.resolveElement(controlId);
+    const expectedPrefixes = expected?.note.notes.map(keyPrefix) ?? [];
+    const expectedPrefix = expected
+      ? (expectedPrefixes.find(
+          (prefix) => !this.isHit(expected.tick, prefix),
+        ) ?? expectedPrefixes[0])
+      : undefined;
     const record: FalseHitRecord = {
       tick,
       controlId,
-      element: this.resolveElement(controlId),
+      element: actualElement,
       timeSeconds,
+      expectedTick: expected?.tick,
+      actualTick: tick,
+      expectedElement: expectedPrefix
+        ? KEY_TO_ELEMENT[expectedPrefix]
+        : undefined,
+      actualElement,
     };
 
     this.falseHitListeners.forEach((listener) => listener(record));
@@ -369,8 +382,10 @@ export class Judge {
     this.emitJudgement({
       id: `wrong:${this.wrongJudgementSequence}`,
       verdict: 'wrong',
-      actualTick: tick,
-      actualElement: record.element,
+      expectedTick: record.expectedTick,
+      actualTick: record.actualTick,
+      expectedElement: record.expectedElement,
+      actualElement: record.actualElement,
       measureIndex: this.containingMeasureIndex(tick),
       scoreable,
     });
@@ -411,8 +426,9 @@ export class Judge {
         chart.tempos,
       ) - tick;
     let bestDist = Infinity;
-    let bestNote: Note | undefined;
-    let bestPos: NotePos | undefined;
+    let nearestEntry: NoteEntry | undefined;
+    let nearestDist = Infinity;
+    let bestEntry: NoteEntry | undefined;
 
     for (
       let i = this.firstNoteAtOrAfter(tick - toleranceTicks);
@@ -426,6 +442,11 @@ export class Judge {
       }
 
       const dist = Math.abs(entry.tick - tick);
+
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearestEntry = entry;
+      }
 
       if (dist >= bestDist) {
         continue;
@@ -442,19 +463,24 @@ export class Judge {
 
       if (hasMatchingKey) {
         bestDist = dist;
-        bestNote = entry.note;
-        bestPos = entry.pos;
+        bestEntry = entry;
       }
     }
 
-    if (!bestNote || !bestPos) {
-      this.maybeRecordFalseHit(tick, toleranceTicks, controlId, currentTimeS);
+    if (!bestEntry) {
+      this.maybeRecordFalseHit(
+        tick,
+        toleranceTicks,
+        controlId,
+        currentTimeS,
+        nearestEntry,
+      );
 
       return;
     }
 
-    const hit = bestNote;
-    const pos = bestPos;
+    const hit = bestEntry.note;
+    const pos = bestEntry.pos;
     const accentPrefixes = new Set((hit.accents ?? []).map(keyPrefix));
     const ghostPrefixes = new Set((hit.ghosts ?? []).map(keyPrefix));
     const passesVelocity = (prefix: string) => {
@@ -478,7 +504,13 @@ export class Judge {
       );
 
     if (newPrefixes.length === 0) {
-      this.maybeRecordFalseHit(tick, toleranceTicks, controlId, currentTimeS);
+      this.maybeRecordFalseHit(
+        tick,
+        toleranceTicks,
+        controlId,
+        currentTimeS,
+        bestEntry,
+      );
 
       return;
     }

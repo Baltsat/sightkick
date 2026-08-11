@@ -322,8 +322,8 @@ describe('safe hands-free run intent', () => {
         ]),
         summary: expect.objectContaining({
           context: expect.objectContaining({
-            schemaVersion: 2,
-            scoringPolicyVersion: 'judge-resolved-v2',
+            schemaVersion: 3,
+            scoringPolicyVersion: 'judge-evidence-v3',
             deviceId: 'keyboard',
           }),
         }),

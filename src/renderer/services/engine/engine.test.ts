@@ -512,6 +512,17 @@ describe('Engine', () => {
     emitInput('midi:49');
 
     expect(overlayEl.querySelector('.vf-wronghit-marker')).not.toBeNull();
+    expect(engine.getRunRecords()).toEqual([
+      expect.objectContaining({
+        tick: 480,
+        element: 'crash',
+        verdict: 'wrong',
+        expectedTick: 480,
+        actualTick: 480,
+        expectedElement: 'snare',
+        actualElement: 'crash',
+      }),
+    ]);
   });
 
   it('prunes a false hit made ahead of a seek when seeking back', async () => {

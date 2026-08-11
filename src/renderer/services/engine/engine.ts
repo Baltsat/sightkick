@@ -177,12 +177,23 @@ export class Engine {
         return;
       }
 
+      const element = record.element;
       const resolvedRecord: HitRecord = {
         tick: record.tick,
         timeSeconds: record.timeSeconds,
         deltaMs: 0,
-        element: record.element,
+        element,
         verdict: 'wrong',
+        ...(record.expectedTick === undefined
+          ? {}
+          : { expectedTick: record.expectedTick }),
+        actualTick: record.actualTick ?? record.tick,
+        ...(isKitElement(record.expectedElement)
+          ? { expectedElement: record.expectedElement }
+          : {}),
+        actualElement: isKitElement(record.actualElement)
+          ? record.actualElement
+          : element,
       };
 
       this.runRecords.push(resolvedRecord);
