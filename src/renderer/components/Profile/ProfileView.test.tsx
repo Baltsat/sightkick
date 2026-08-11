@@ -4,7 +4,7 @@ import { installIpcMock, IpcMock } from '../../hooks/test-support';
 import { Song } from '../../../types';
 import { UseGamificationResult } from '../../hooks/useGamification';
 import { Goal } from '../Goals';
-import { ProfileView } from './ProfileView';
+import { ProfileInsights, ProfileView } from './ProfileView';
 
 let ipc: IpcMock;
 
@@ -191,6 +191,96 @@ describe('ProfileView', () => {
       'aria-selected',
       'true',
     );
+  });
+
+  it('puts one atomic target and its action ahead of the closed evidence archive', () => {
+    const onStartTargetedPractice = vi.fn();
+    const insights: ProfileInsights = {
+      recommendation: {
+        candidate: {
+          id: 'lesson-song',
+          title: 'Tom handoff',
+          kind: 'lesson',
+          difficulty: 'expert',
+          available: true,
+          curriculumId: '07.03',
+        },
+        score: 84,
+        predictedSuccess: 0.74,
+        suggestedSpeed: 0.7,
+        mastery: 0.3,
+        reason: 'Targets the tom handoff at a reachable tempo.',
+        factors: [],
+        confidence: {
+          value: 0.7,
+          level: 'medium',
+          evidenceRuns: 3,
+          detail: 'Stamped evidence is available.',
+        },
+        decisionReceipt: {
+          policy_version: 'pedagogy-v2.0',
+          item_id: 'lesson-song',
+          source_revision: 'curriculum:1',
+          predicted_success: 0.74,
+          learning_value: 0.84,
+          state: 'productive_acquisition',
+          independent_eligible: true,
+          skill_fit: 0.7,
+          prereq_fit: 0.8,
+          tempo_fit: 0.7,
+          transfer_fit: 0.2,
+          uncertainty: 0.3,
+          hard_prerequisites: ['pulse.eighth'],
+          scaffold: { speed: 0.7, steps: ['short_loop', 'Tutor'] },
+          factors: [],
+          explanation: 'Targets the tom handoff at a reachable tempo.',
+        },
+      },
+      atomicStates: [
+        {
+          skill_id: 'kit.tom_t2_t3',
+          alpha: 3,
+          beta: 1,
+          effective_trials: 2,
+          stage: 'provisional',
+          evidence_boundary: 'midi',
+        },
+      ],
+      dueReviews: [],
+    };
+
+    render(
+      <ProfileView
+        songList={[song()]}
+        goals={[goal()]}
+        isGoalsLoaded
+        onSaveGoal={() => {}}
+        onSetPrimaryGoal={() => {}}
+        gamification={gamification()}
+        insights={insights}
+        onStartTargetedPractice={onStartTargetedPractice}
+      />,
+    );
+
+    expect(screen.getByTestId('profile-insights-hero')).toHaveTextContent(
+      'Tom handoff',
+    );
+    expect(screen.getByTestId('profile-insights-hero')).toHaveTextContent(
+      'short loop, Tutor',
+    );
+    expect(screen.getByTestId('profile-insights-hero')).not.toHaveTextContent(
+      'short_loop',
+    );
+    expect(screen.getByTestId('insights-skill-spine')).toHaveTextContent(
+      'Mid-to-floor tom movement',
+    );
+    expect(screen.getByTestId('atomic-radar-disclosure')).not.toHaveAttribute(
+      'open',
+    );
+
+    screen.getByTestId('profile-target-action').click();
+
+    expect(onStartTargetedPractice).toHaveBeenCalledOnce();
   });
 
   it('keeps a retired lesson goal and its saved evidence readable', async () => {

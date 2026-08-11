@@ -69,6 +69,38 @@ describe('ScoreSummary', () => {
     expect(modal.getByTestId('lane-accuracy-bars')).toBeInTheDocument();
   });
 
+  it('keeps the persisted learning receipt visible beside the run statistics', () => {
+    const summary = {
+      ...multiLaneRunFixture(),
+      timingWindowMs: 120,
+      atomicSkillEvidence: [
+        {
+          run_id: 'run:receipt',
+          chart_revision: 'chart:receipt',
+          manifest_revision: 'manifest:receipt',
+          skill_id: 'kit.tom_t2_t3',
+          item_id: '07.03',
+          context_signature: 'rock',
+          evidence_kind: 'acquisition' as const,
+          quality: 0.84,
+          weight: 0.5,
+          playback_speed: 0.8,
+          completed_at: '2026-08-11T10:00:00.000Z',
+          judging_window_ms: 120,
+          normalized_timing_stability: 0.7,
+        },
+      ],
+    };
+    const { modal } = renderSummary({ practiceSummary: summary });
+
+    expect(modal.getByTestId('learning-evidence-receipt')).toHaveTextContent(
+      'What this run recorded',
+    );
+    expect(modal.getByTestId('learning-evidence-receipt')).toHaveTextContent(
+      '±120 ms',
+    );
+  });
+
   it('opens the coach from a completed run', () => {
     const onCoach = vi.fn();
     const { modal } = renderSummary({

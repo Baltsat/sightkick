@@ -21,6 +21,7 @@ import {
 import { AchievementToastQueue } from '../AchievementToastQueue';
 import type { LessonProgressionDecision } from '../../services/lesson-progression';
 import { KitCommandPrompt } from '../KitCommandPrompt';
+import { LearningEvidenceReceipt } from '../LearningEvidenceReceipt';
 
 interface Props {
   isOpen: boolean;
@@ -381,6 +382,10 @@ export function ScoreSummary({
           summary={practiceSummary}
           variant="inline"
           className="w-full"
+        />
+        <LearningEvidenceReceipt
+          summary={practiceSummary}
+          heading="What this run recorded"
         />
         {runResult && (
           <div

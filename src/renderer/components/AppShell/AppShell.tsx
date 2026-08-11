@@ -9,9 +9,10 @@ import {
   faWandMagicSparkles,
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '../../cn';
+import appIcon from '../../../../assets/icon.png';
 import './AppShell.css';
 
-export type ArenaView = 'home' | 'songs' | 'journey' | 'coach';
+export type ArenaView = 'home' | 'songs' | 'journey' | 'coach' | 'insights';
 
 interface AppShellProps {
   view: ArenaView;
@@ -45,6 +46,13 @@ const NAV_ITEMS: Array<{
     testId: 'view-coach',
   },
 ];
+const VIEW_LABELS: Record<ArenaView, string> = {
+  home: 'Practice',
+  songs: 'Songs',
+  journey: 'Journey',
+  coach: 'Coach',
+  insights: 'Insights',
+};
 
 /**
  * Persistent desktop/web chrome for Daybreak Arena. It owns navigation only:
@@ -69,7 +77,7 @@ export function AppShell({
           aria-label="Drumroll home"
         >
           <span className="arena-shell__brand-mark" aria-hidden="true">
-            <FontAwesomeIcon icon={faWandMagicSparkles} />
+            <img src={appIcon} alt="" />
           </span>
           <span>
             <strong>Drumroll</strong>
@@ -121,7 +129,7 @@ export function AppShell({
               icon={faSun}
               aria-hidden="true"
             />
-            <span>{view === 'home' ? 'Practice cockpit' : view}</span>
+            <span>{VIEW_LABELS[view]}</span>
           </div>
           <div className="arena-shell__actions">
             <div className="arena-shell__status">{statusSlot}</div>

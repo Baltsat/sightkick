@@ -15,11 +15,8 @@
   align-items: flex-start !important;
   justify-content: flex-start;
   padding: 0 0 9rem !important;
-  background: radial-gradient(
-      circle at 12% 6%,
-      rgb(255 208 100 / 18%),
-      transparent 28%
-    ),
+  background:
+    radial-gradient(circle at 12% 6%, rgb(255 208 100 / 18%), transparent 28%),
     radial-gradient(circle at 88% 0%, rgb(86 216 242 / 14%), transparent 30%),
     linear-gradient(180deg, #fbf8f1 0%, #f2ecdf 100%);
   scrollbar-color: rgb(247 53 134 / 42%) rgb(238 232 220 / 74%);
@@ -108,7 +105,8 @@
   border: 1px solid rgb(17 23 34 / 12%);
   border-radius: 18px;
   color: var(--color-ink);
-  background: radial-gradient(
+  background:
+    radial-gradient(
       ellipse at 50% 52%,
       color-mix(in srgb, var(--color-coral) 8%, transparent),
       transparent 48%
@@ -479,10 +477,16 @@
 }
 
 .drumroll-flow-notation .vf-note-active {
-  animation: drumroll-flow-current-note 0.7s ease-in-out infinite;
+  transform: scale(1.45);
   filter: drop-shadow(0 0 2px white)
     drop-shadow(0 0 7px var(--color-accent-bright))
     drop-shadow(0 0 18px var(--color-accent-bright));
+}
+
+.drumroll-practice-shell[data-session-phase='playing']
+  .drumroll-flow-notation
+  .vf-note-active {
+  animation: drumroll-flow-current-note 0.7s ease-in-out infinite;
 }
 
 .drumroll-flow-notation .vf-note-pop {
@@ -539,6 +543,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .drumroll-practice-shell[data-session-phase='playing']
+    .drumroll-flow-notation
+    .vf-note-active {
+    animation: none;
+    transform: scale(1.55);
+  }
+
   .drumroll-flow-notation::before {
     opacity: 0.25;
     filter: none;

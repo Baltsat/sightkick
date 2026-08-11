@@ -39,8 +39,8 @@ body {
   height: 100vh;
   padding: 0;
   margin: 0;
-  font-family: 'Instrument Sans Variable', 'Instrument Sans', system-ui,
-    sans-serif;
+  font-family:
+    'Instrument Sans Variable', 'Instrument Sans', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -209,8 +209,7 @@ button,
 }
 
 .sk-streak-meter.sk-streak-pulse {
-  animation: sk-streak-pulse var(--sk-streak-pulse-duration) ease-in-out
-    infinite;
+  animation: sk-streak-pulse var(--sk-streak-pulse-duration) ease-in-out 1;
 }
 
 .sk-streak-meter.sk-streak-shatter {
@@ -274,7 +273,7 @@ button,
   animation-name: sk-streak-pulse, sk-streak-flicker;
   animation-duration: var(--sk-streak-pulse-duration), 1.4s;
   animation-timing-function: ease-in-out, ease-in-out;
-  animation-iteration-count: infinite, infinite;
+  animation-iteration-count: 1, 1;
 }
 
 .sk-streak-meter[data-tier='7'] {
@@ -290,7 +289,7 @@ button,
   animation-name: sk-streak-pulse, sk-streak-flicker;
   animation-duration: var(--sk-streak-pulse-duration), 1.1s;
   animation-timing-function: ease-in-out, ease-in-out;
-  animation-iteration-count: infinite, infinite;
+  animation-iteration-count: 1, 1;
 }
 
 .sk-streak-meter[data-tier='8'] {
@@ -331,7 +330,7 @@ button,
   height: 4px;
   border-radius: 999px;
   background: var(--sk-streak-ink, #fff);
-  animation: sk-streak-particle 1.1s ease-out infinite;
+  animation: sk-streak-particle 1.1s ease-out 1;
 }
 
 .sk-streak-particle:nth-child(1) {

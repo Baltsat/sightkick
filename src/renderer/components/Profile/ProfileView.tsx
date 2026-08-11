@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faFire,
@@ -11,6 +11,19 @@ import { Song } from '../../../types';
 import { UseGamificationResult } from '../../hooks/useGamification';
 import { last7Dates } from '../../hooks/useGamification';
 import { localDateKey } from '../../services/streaks';
+import {
+  ATOMIC_SKILL_GRAPH,
+  curriculumItemManifest,
+  skillConfidence,
+  skillNodeById,
+} from '../../services/pedagogy';
+import type { AtomicSkillState, SkillReview } from '../../services/pedagogy';
+import type {
+  DeadlinePacingSummary,
+  RankedPracticeCandidate,
+} from '../../services/next-practice';
+import type { RunSummary } from '../../services/practice-stats';
+import { LearningEvidenceReceipt } from '../LearningEvidenceReceipt';
 import { cn } from '../../cn';
 import { Goal, SaveGoalInput, SetGoalModal } from '../Goals';
 import { GoalCard } from './GoalCard';
@@ -21,6 +34,15 @@ import { useMastery } from './useMastery';
 import { useRetiredLessons } from './useRetiredLessons';
 import { AtomicSkillRadar } from './AtomicSkillRadar';
 
+export interface ProfileInsights {
+  recommendation?: RankedPracticeCandidate;
+  atomicStates?: readonly AtomicSkillState[];
+  dueReviews?: readonly SkillReview[];
+  deadlinePacing?: DeadlinePacingSummary;
+  rejectedAtomicEvidenceCount?: number;
+  latestRun?: RunSummary;
+}
+
 export interface ProfileViewProps {
   songList: Song[];
   goals: Goal[];
@@ -28,42 +50,271 @@ export interface ProfileViewProps {
   onSaveGoal: (input: SaveGoalInput, onSaved?: (goals: Goal[]) => void) => void;
   onSetPrimaryGoal: (id: string) => void;
   gamification: UseGamificationResult;
+  insights?: ProfileInsights;
+  onStartTargetedPractice?: () => void;
 }
 
-function StatChip({
+const STAGE_INDEX: Record<AtomicSkillState['stage'], number> = {
+  unknown: 0,
+  assessed: 1,
+  provisional: 2,
+  retained: 3,
+  transferable: 4,
+};
+const STAGE_COPY: Record<AtomicSkillState['stage'], string> = {
+  unknown: 'Not measured',
+  assessed: 'Assessed',
+  provisional: 'Building',
+  retained: 'Retained',
+  transferable: 'Transferable',
+};
+const EMPTY_ATOMIC_STATES: readonly AtomicSkillState[] = [];
+
+function ProfileMetric({
   icon,
   label,
   value,
-  iconColor,
 }: {
   icon: typeof faFire;
   label: string;
   value: string | number;
-  iconColor: string;
 }) {
   return (
     <div
-      className="flex flex-1 flex-col items-center gap-1 rounded-xl bg-fill p-3"
+      className="flex min-w-0 items-center gap-3 border-r border-border-soft pr-5 last:border-r-0 last:pr-0"
       data-testid="profile-stat-chip"
     >
-      <FontAwesomeIcon icon={icon} style={{ color: iconColor }} />
-      <div className="font-display text-lg font-semibold tabular-nums text-text">
-        {value}
-      </div>
-      <div className="text-[10px] uppercase tracking-[0.1em] text-text-faint">
-        {label}
+      <FontAwesomeIcon className="text-signal-ember" icon={icon} />
+      <div className="min-w-0">
+        <div className="font-display text-xl font-semibold leading-none tabular-nums text-text">
+          {value}
+        </div>
+        <div className="mt-1 text-xs text-text-muted">{label}</div>
       </div>
     </div>
   );
 }
 
-/**
- * The Profile surface: the primary goal's mastery ring + convergence
- * graph, a goal switcher when more than one goal exists, the XP↔skill
- * link line, a streak/XP/achievements summary (read from the
- * already-mounted `gamification` hook — never a second instance of it),
- * and 30-day per-drum skill bars.
- */
+function atomicFocusIds(
+  recommendation: RankedPracticeCandidate | undefined,
+  states: readonly AtomicSkillState[],
+): readonly string[] {
+  const manifest =
+    recommendation?.candidate.itemManifest ??
+    (recommendation?.candidate.curriculumId
+      ? curriculumItemManifest(recommendation.candidate.curriculumId)
+      : undefined);
+
+  return [
+    ...(manifest?.demands
+      .slice()
+      .sort(
+        (left, right) =>
+          right.weight - left.weight ||
+          left.skill_id.localeCompare(right.skill_id),
+      )
+      .map((demand) => demand.skill_id) ?? []),
+    ...(recommendation?.decisionReceipt?.hard_prerequisites ?? []),
+    ...states
+      .filter((state) => state.stage !== 'unknown')
+      .sort(
+        (left, right) =>
+          right.effective_trials - left.effective_trials ||
+          left.skill_id.localeCompare(right.skill_id),
+      )
+      .map((state) => state.skill_id),
+    ...ATOMIC_SKILL_GRAPH.map((skill) => skill.id),
+  ].filter((id, index, all) => all.indexOf(id) === index);
+}
+
+function SkillSpine({
+  states,
+  focusSkillIds,
+}: {
+  states: readonly AtomicSkillState[];
+  focusSkillIds: readonly string[];
+}) {
+  const nodes = skillNodeById();
+  const statesById = new Map(states.map((state) => [state.skill_id, state]));
+  const skills = focusSkillIds
+    .map((id) => {
+      const node = nodes.get(id);
+
+      return node && node.evidence_boundary !== 'unsupported'
+        ? { node, state: statesById.get(id) }
+        : undefined;
+    })
+    .filter(
+      (
+        skill,
+      ): skill is {
+        node: (typeof ATOMIC_SKILL_GRAPH)[number];
+        state: AtomicSkillState | undefined;
+      } => skill !== undefined,
+    )
+    .slice(0, 4);
+
+  return (
+    <section
+      className="border-t border-border-soft pt-6"
+      aria-labelledby="insights-skill-spine-title"
+      data-testid="insights-skill-spine"
+    >
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
+            Current skill spine
+          </p>
+          <h2
+            id="insights-skill-spine-title"
+            className="mt-1 font-display text-3xl font-semibold tracking-[-0.04em] text-text"
+          >
+            Build the layer that makes the next phrase easier.
+          </h2>
+        </div>
+        <p className="max-w-75 text-sm leading-relaxed text-text-muted">
+          Each mark is an atomic MIDI claim. Unknown stays unknown until a
+          scored chart gives it evidence.
+        </p>
+      </div>
+
+      <div className="mt-5 divide-y divide-border-soft">
+        {skills.map(({ node, state }) => {
+          const stage = state?.stage ?? 'unknown';
+          const activeIndex = STAGE_INDEX[stage];
+          const confidence = Math.round(skillConfidence(state) * 100);
+
+          return (
+            <article
+              key={node.id}
+              className="grid gap-3 py-4 md:grid-cols-[minmax(13rem,0.9fr)_minmax(16rem,1.1fr)_minmax(8rem,0.45fr)] md:items-center"
+            >
+              <div>
+                <h3 className="font-semibold text-text">{node.label}</h3>
+                <p className="mt-1 text-xs capitalize text-text-muted">
+                  {node.family} · {node.evidence_boundary.replace('_', ' ')}
+                </p>
+              </div>
+              <div
+                className="grid grid-cols-5 gap-1"
+                aria-label={node.label + ': ' + STAGE_COPY[stage]}
+              >
+                {[
+                  'Observed',
+                  'Assessed',
+                  'Building',
+                  'Retained',
+                  'Transfer',
+                ].map((label, index) => (
+                  <span
+                    key={label}
+                    className={cn(
+                      'h-2 rounded-full bg-fill',
+                      index <= activeIndex &&
+                        stage !== 'unknown' &&
+                        (index >= 3 ? 'bg-signal-green' : 'bg-signal-wine'),
+                    )}
+                  />
+                ))}
+              </div>
+              <div className="text-sm text-text-muted">
+                <strong className="font-semibold text-text">
+                  {STAGE_COPY[stage]}
+                </strong>
+                <span className="ml-2 tabular-nums">
+                  {confidence}% confidence
+                </span>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ReviewQueue({ reviews }: { reviews: readonly SkillReview[] }) {
+  const next = reviews[0];
+  const node = next ? skillNodeById().get(next.skill_id) : undefined;
+
+  return (
+    <section
+      className="border-t border-border-soft pt-5"
+      data-testid="profile-review-queue"
+    >
+      <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
+        Review queue
+      </p>
+      {next ? (
+        <p className="mt-2 text-sm leading-relaxed text-text-muted">
+          {next.overdue ? 'Due now: ' : 'Next review: '}
+          <strong className="font-semibold text-text">
+            {node?.label ?? next.skill_id}
+          </strong>
+          {' · '}
+          {new Date(next.due_at).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+          })}
+          . Delayed retrieval is tracked separately from a fresh pass.
+        </p>
+      ) : (
+        <p className="mt-2 text-sm leading-relaxed text-text-muted">
+          No atomic review is due from the saved evidence yet.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function DeadlineTargets({
+  targetDate,
+  pacing,
+}: {
+  targetDate: string | undefined;
+  pacing: DeadlinePacingSummary | undefined;
+}) {
+  if (!targetDate) {
+    return null;
+  }
+
+  return (
+    <section
+      className="border-t border-border-soft pt-5"
+      data-testid="profile-deadline-targets"
+    >
+      <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
+        Weekly target
+      </p>
+      {pacing?.targets.length ? (
+        <div className="mt-3 divide-y divide-border-soft">
+          {pacing.targets.slice(0, 3).map((target) => (
+            <div
+              key={target.axisId}
+              className="grid gap-1 py-3 sm:grid-cols-[minmax(12rem,1fr)_auto]"
+            >
+              <div>
+                <strong className="text-sm text-text">{target.label}</strong>
+                <p className="mt-1 text-xs leading-relaxed text-text-muted">
+                  {target.detail}
+                </p>
+              </div>
+              <div className="text-sm tabular-nums text-text-muted">
+                {Math.round(target.weeklyTarget)} this week
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 text-sm leading-relaxed text-text-muted">
+          The date is saved, but there is not enough retained run evidence for a
+          weekly target yet.
+        </p>
+      )}
+    </section>
+  );
+}
+
 export function ProfileView({
   songList,
   goals,
@@ -71,6 +322,8 @@ export function ProfileView({
   onSaveGoal,
   onSetPrimaryGoal,
   gamification,
+  insights,
+  onStartTargetedPractice,
 }: ProfileViewProps) {
   const [selectedGoalId, setSelectedGoalId] = useState<string | undefined>(
     undefined,
@@ -79,8 +332,8 @@ export function ProfileView({
   const [editingGoal, setEditingGoal] = useState<Goal | undefined>(undefined);
   const retiredLessons = useRetiredLessons();
   const activeGoal =
-    goals.find((g) => g.id === selectedGoalId) ??
-    goals.find((g) => g.isPrimary) ??
+    goals.find((goal) => goal.id === selectedGoalId) ??
+    goals.find((goal) => goal.isPrimary) ??
     goals[0];
   const activeSong = songList.find((song) => song.id === activeGoal?.songId);
   const activeRetiredLesson = retiredLessons.find((lesson) =>
@@ -92,7 +345,49 @@ export function ProfileView({
     0,
   );
   const unlockedAchievements =
-    gamification.achievements?.filter((a) => a.unlocked).length ?? 0;
+    gamification.achievements?.filter((achievement) => achievement.unlocked)
+      .length ?? 0;
+  const states = insights?.atomicStates ?? EMPTY_ATOMIC_STATES;
+  const focusSkillIds = useMemo(
+    () => atomicFocusIds(insights?.recommendation, states),
+    [insights?.recommendation, states],
+  );
+  const latestRun = useMemo(
+    () =>
+      insights?.latestRun ??
+      mastery.allRuns
+        .slice()
+        .sort((left, right) =>
+          left.completedAt.localeCompare(right.completedAt),
+        )
+        .at(-1),
+    [insights?.latestRun, mastery.allRuns],
+  );
+  const target = insights?.recommendation;
+  const targetName =
+    target?.candidate.title ??
+    (activeSong
+      ? 'Build toward ' + activeSong.name
+      : activeRetiredLesson
+      ? 'Build toward ' + activeRetiredLesson.name
+      : undefined) ??
+    'Your next scored phrase';
+  const targetReason =
+    target?.reason ??
+    (activeGoal
+      ? 'Your active goal stays visible while Drumroll waits for a concrete scored route.'
+      : 'Finish one scored phrase so Drumroll can establish the first honest practice route.');
+  const targetDetail = target
+    ? 'Start at ' +
+      Math.round(target.suggestedSpeed * 100) +
+      '% speed' +
+      (target.decisionReceipt?.scaffold.steps.length
+        ? ' · ' +
+          target.decisionReceipt.scaffold.steps
+            .map((step) => step.replaceAll('_', ' '))
+            .join(', ')
+        : '')
+    : undefined;
   const openNewGoalModal = () => {
     setEditingGoal(undefined);
     setIsSetGoalOpen(true);
@@ -114,193 +409,272 @@ export function ProfileView({
   }
 
   return (
-    <div className="flex flex-col gap-6" data-testid="profile-view">
-      <section className="flex gap-2">
-        <StatChip
-          icon={faFire}
-          label="Day streak"
-          value={gamification.streak.current}
-          iconColor="var(--color-orange)"
-        />
-        <StatChip
-          icon={faStar}
-          label="Total stars"
-          value={gamification.totalStars}
-          iconColor="var(--color-yellow)"
-        />
-        <StatChip
-          icon={faTrophy}
-          label="Achievements"
-          value={unlockedAchievements}
-          iconColor="var(--color-accent)"
-        />
-      </section>
-
-      {activeGoal ? (
-        <>
-          <XpSkillLine
-            weekXp={weekXp}
-            dominantLaneProgress={mastery.dominantLaneProgress}
-          />
-
-          {goals.length > 1 && (
-            <div
-              className="flex flex-wrap gap-2"
-              role="tablist"
-              aria-label="Goals"
-              data-testid="goal-switcher"
-            >
-              {goals.map((g) => {
-                const goalSong = songList.find((song) => song.id === g.songId);
-
-                return (
-                  <button
-                    key={g.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={g.id === activeGoal.id}
-                    data-testid={`goal-tab-${g.id}`}
-                    className={cn(
-                      'rounded-full border px-3 py-1 text-xs transition-colors',
-                      g.id === activeGoal.id
-                        ? 'border-accent-soft-border bg-accent-soft-bg text-accent-text'
-                        : 'border-border-soft bg-surface text-text-muted hover:text-text',
-                    )}
-                    onClick={() => setSelectedGoalId(g.id)}
-                  >
-                    {goalSong?.name ?? g.songId}
-                    {g.isPrimary && ' ★'}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          <GoalCard
-            goal={activeGoal}
-            song={activeSong}
-            fallbackName={activeRetiredLesson?.name}
-            breakdown={mastery.breakdown}
-            timeline={mastery.timeline}
-            trend={mastery.trend}
-            needleLine={mastery.needleLine}
-            isLoaded={mastery.isLoaded}
-            onEdit={openEditGoalModal}
-          />
-
-          {activeRetiredLesson && (
-            <div
-              className="rounded-xl border border-accent-soft-border bg-accent-soft-bg px-4 py-3 text-sm leading-relaxed text-text-body"
-              data-testid="retired-goal-notice"
-            >
-              This goal belongs to a retired curriculum exercise. Its score and
-              practice history are preserved below, but it does not unlock the
-              new Journey. Edit the goal to point it at a current lesson or
-              song.
-            </div>
-          )}
-
-          {!activeGoal.isPrimary && (
-            <Button
-              data-testid="make-primary-button"
-              onClick={() => onSetPrimaryGoal(activeGoal.id)}
-            >
-              Make this my primary goal
-            </Button>
-          )}
-        </>
-      ) : (
-        <div
-          className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border-soft bg-fill p-8 text-center"
-          data-testid="no-goals-empty-state"
+    <div className="h-full min-h-0 overflow-y-auto" data-testid="profile-view">
+      <div className="mx-auto flex w-full max-w-300 flex-col gap-8 px-5 py-7 sm:px-8">
+        <header
+          className="border-b border-border-soft pb-7"
+          data-testid="profile-insights-hero"
         >
-          <p className="text-text-muted">
-            Set an ambitious goal — a song, at full difficulty, at 100% — and
-            watch the path to it build itself.
+          <p className="text-xs font-semibold tracking-[0.16em] text-signal-wine">
+            Insights
           </p>
-          <Button
-            type="primary"
-            icon={<FontAwesomeIcon icon={faPlus} />}
-            onClick={openNewGoalModal}
-          >
-            Set your first goal
-          </Button>
-        </div>
-      )}
-
-      <PracticeHistory progress={gamification.longitudinalProgress} />
-
-      <AtomicSkillRadar runs={mastery.allRuns} />
-
-      <section className="flex flex-col gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint">
-          Per-drum accuracy — raw 30-day window
-        </h3>
-        <p
-          className="text-xs leading-relaxed text-text-faint"
-          data-testid="profile-lane-accuracy-definition"
-        >
-          Unweighted hit / (hit + miss) across scored lane notes in the last 30
-          days. Home uses a separate 28-day time-decayed signal to guide the
-          next practice.
-        </p>
-        <SkillBars laneAccuracy={mastery.last30DaysLaneAccuracy} />
-      </section>
-
-      {retiredLessons.length > 0 && (
-        <section
-          className="flex flex-col gap-3 rounded-2xl border border-border-soft bg-surface p-5"
-          data-testid="retired-lessons-history"
-        >
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint">
-              Archived curriculum history
-            </h3>
-            <p className="mt-1 text-xs leading-relaxed text-text-muted">
-              These exercises were replaced, so Drumroll keeps their evidence
-              readable without assigning it to different new material.
-            </p>
+          <div className="mt-3 grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <div className="min-w-0">
+              <h1 className="font-display text-4xl font-semibold leading-[0.95] tracking-[-0.055em] text-text sm:text-5xl">
+                {targetName}
+              </h1>
+              <p
+                className="mt-3 max-w-150 text-base leading-relaxed text-text-muted"
+                data-testid="profile-target-reason"
+              >
+                {targetReason}
+              </p>
+              {targetDetail && (
+                <p className="mt-2 text-sm text-text-muted">{targetDetail}</p>
+              )}
+            </div>
+            {target && onStartTargetedPractice && (
+              <Button
+                type="primary"
+                size="large"
+                data-testid="profile-target-action"
+                onClick={onStartTargetedPractice}
+              >
+                Start targeted loop
+              </Button>
+            )}
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {retiredLessons.map((lesson) => {
-              const totalRuns = lesson.recentRunCount + lesson.archivedRunCount;
+          <div className="mt-7 flex flex-wrap gap-x-6 gap-y-4">
+            <ProfileMetric
+              icon={faFire}
+              label="day streak"
+              value={gamification.streak.current}
+            />
+            <ProfileMetric
+              icon={faStar}
+              label="total stars"
+              value={gamification.totalStars}
+            />
+            <ProfileMetric
+              icon={faTrophy}
+              label="achievements"
+              value={unlockedAchievements}
+            />
+          </div>
+        </header>
+
+        {goals.length > 1 && activeGoal && (
+          <div
+            className="flex flex-wrap gap-2"
+            role="tablist"
+            aria-label="Goals"
+            data-testid="goal-switcher"
+          >
+            {goals.map((goal) => {
+              const goalSong = songList.find((song) => song.id === goal.songId);
 
               return (
-                <article
-                  key={lesson.legacySongIds.join(':')}
-                  className="rounded-xl bg-fill px-3 py-3"
-                  data-testid="retired-lesson-row"
+                <button
+                  key={goal.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={goal.id === activeGoal.id}
+                  data-testid={'goal-tab-' + goal.id}
+                  className={cn(
+                    'border-b px-1 py-2 text-sm transition-colors',
+                    goal.id === activeGoal.id
+                      ? 'border-signal-wine text-text'
+                      : 'border-transparent text-text-muted hover:text-text',
+                  )}
+                  onClick={() => setSelectedGoalId(goal.id)}
                 >
-                  <div className="text-sm font-semibold text-text-body">
-                    {lesson.name}
-                  </div>
-                  <div className="mt-1 text-xs text-text-faint">
-                    Former lesson {lesson.lessonId ?? 'unlabelled'} ·{' '}
-                    {lesson.bestStars} star
-                    {lesson.bestStars === 1 ? '' : 's'} · {totalRuns} run
-                    {totalRuns === 1 ? '' : 's'}
-                    {lesson.goalCount > 0
-                      ? ` · ${lesson.goalCount} saved goal${
-                          lesson.goalCount === 1 ? '' : 's'
-                        }`
-                      : ''}
-                  </div>
-                </article>
+                  {goalSong?.name ?? goal.songId}
+                  {goal.isPrimary && ' ★'}
+                </button>
               );
             })}
           </div>
-        </section>
-      )}
+        )}
 
-      {activeGoal && (
-        <Button
-          data-testid="add-another-goal-button"
-          icon={<FontAwesomeIcon icon={faPlus} />}
-          onClick={openNewGoalModal}
+        <SkillSpine states={states} focusSkillIds={focusSkillIds} />
+        <ReviewQueue reviews={insights?.dueReviews ?? []} />
+        <DeadlineTargets
+          targetDate={activeGoal?.targetDate}
+          pacing={insights?.deadlinePacing}
+        />
+
+        {!activeGoal && (
+          <section
+            className="border-t border-border-soft pt-6"
+            data-testid="no-goals-empty-state"
+          >
+            <h2 className="font-display text-3xl font-semibold tracking-[-0.04em] text-text">
+              Give the work a musical destination.
+            </h2>
+            <p className="mt-2 max-w-130 text-sm leading-relaxed text-text-muted">
+              Save a song or lesson goal, then Drumroll can connect the next
+              phrase to something you want to play.
+            </p>
+            <Button
+              className="mt-4"
+              type="primary"
+              icon={<FontAwesomeIcon icon={faPlus} />}
+              onClick={openNewGoalModal}
+            >
+              Set your first goal
+            </Button>
+          </section>
+        )}
+
+        <details
+          className="border-t border-border-soft pt-5"
+          data-testid="profile-evidence-history"
         >
-          Add another goal
-        </Button>
-      )}
+          <summary className="cursor-pointer font-display text-2xl font-semibold tracking-[-0.03em] text-text">
+            Evidence, history, and goal detail
+          </summary>
+          <div className="mt-6 flex flex-col gap-8">
+            <LearningEvidenceReceipt
+              summary={latestRun}
+              heading="Latest saved run"
+            />
+            {insights?.rejectedAtomicEvidenceCount ? (
+              <p
+                className="border-l-2 border-signal-ember pl-3 text-sm leading-relaxed text-text-muted"
+                data-testid="profile-rejected-atomic-evidence"
+              >
+                {insights.rejectedAtomicEvidenceCount} stale atomic receipt
+                {insights.rejectedAtomicEvidenceCount === 1 ? '' : 's'} stay
+                excluded because the chart or manifest revision no longer
+                matches.
+              </p>
+            ) : null}
+            <details data-testid="atomic-radar-disclosure">
+              <summary className="cursor-pointer text-sm font-semibold text-text">
+                Open atomic skill radar and text table
+              </summary>
+              <div className="mt-5">
+                <AtomicSkillRadar
+                  states={states}
+                  focusSkillIds={focusSkillIds}
+                />
+              </div>
+            </details>
+
+            {activeGoal ? (
+              <>
+                <XpSkillLine
+                  weekXp={weekXp}
+                  dominantLaneProgress={mastery.dominantLaneProgress}
+                />
+                <GoalCard
+                  goal={activeGoal}
+                  song={activeSong}
+                  fallbackName={activeRetiredLesson?.name}
+                  breakdown={mastery.breakdown}
+                  timeline={mastery.timeline}
+                  trend={mastery.trend}
+                  needleLine={mastery.needleLine}
+                  isLoaded={mastery.isLoaded}
+                  onEdit={openEditGoalModal}
+                />
+                {activeRetiredLesson && (
+                  <p
+                    className="border-l-2 border-signal-ember pl-3 text-sm leading-relaxed text-text-muted"
+                    data-testid="retired-goal-notice"
+                  >
+                    This goal belongs to a retired curriculum exercise. Its
+                    score and practice history remain readable, but it does not
+                    unlock the new Journey.
+                  </p>
+                )}
+                {!activeGoal.isPrimary && (
+                  <Button
+                    data-testid="make-primary-button"
+                    onClick={() => onSetPrimaryGoal(activeGoal.id)}
+                  >
+                    Make this my primary goal
+                  </Button>
+                )}
+              </>
+            ) : null}
+
+            <section className="border-t border-border-soft pt-5">
+              <h3 className="font-display text-2xl font-semibold tracking-[-0.03em] text-text">
+                Per-drum evidence
+              </h3>
+              <p
+                className="mt-1 text-sm leading-relaxed text-text-muted"
+                data-testid="profile-lane-accuracy-definition"
+              >
+                Unweighted hit / (hit + miss) across scored lane notes in the
+                last 30 days. The next practice route uses its own stated
+                evidence receipt.
+              </p>
+              <div className="mt-4">
+                <SkillBars laneAccuracy={mastery.last30DaysLaneAccuracy} />
+              </div>
+            </section>
+
+            <PracticeHistory progress={gamification.longitudinalProgress} />
+
+            {retiredLessons.length > 0 && (
+              <section
+                className="border-t border-border-soft pt-5"
+                data-testid="retired-lessons-history"
+              >
+                <h3 className="font-display text-2xl font-semibold tracking-[-0.03em] text-text">
+                  Archived curriculum history
+                </h3>
+                <p className="mt-1 text-sm leading-relaxed text-text-muted">
+                  Replaced exercises keep their original evidence without being
+                  assigned to new material.
+                </p>
+                <div className="mt-4 divide-y divide-border-soft">
+                  {retiredLessons.map((lesson) => {
+                    const totalRuns =
+                      lesson.recentRunCount + lesson.archivedRunCount;
+
+                    return (
+                      <article
+                        key={lesson.legacySongIds.join(':')}
+                        className="py-3"
+                        data-testid="retired-lesson-row"
+                      >
+                        <div className="text-sm font-semibold text-text">
+                          {lesson.name}
+                        </div>
+                        <div className="mt-1 text-xs text-text-muted">
+                          Former lesson {lesson.lessonId ?? 'unlabelled'} ·{' '}
+                          {lesson.bestStars} star
+                          {lesson.bestStars === 1 ? '' : 's'} · {totalRuns} run
+                          {totalRuns === 1 ? '' : 's'}
+                          {lesson.goalCount > 0
+                            ? ' · ' +
+                              lesson.goalCount +
+                              ' saved goal' +
+                              (lesson.goalCount === 1 ? '' : 's')
+                            : ''}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {activeGoal && (
+              <Button
+                data-testid="add-another-goal-button"
+                icon={<FontAwesomeIcon icon={faPlus} />}
+                onClick={openNewGoalModal}
+              >
+                Add another goal
+              </Button>
+            )}
+          </div>
+        </details>
+      </div>
 
       <SetGoalModal
         open={isSetGoalOpen}

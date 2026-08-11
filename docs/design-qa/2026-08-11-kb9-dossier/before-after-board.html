@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Drumroll KB9 visual dossier</title>
+    <style>
+      :root { color: #171722; background: #f3eee4; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+      body { margin: 0; padding: 36px; }
+      h1 { margin: 0; font: 700 32px/1.1 Georgia, serif; }
+      p { max-width: 78ch; color: #534d46; line-height: 1.5; }
+      section { margin-top: 34px; }
+      h2 { margin: 0 0 12px; font-size: 16px; letter-spacing: 0.08em; text-transform: uppercase; }
+      .comparison { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+      figure { min-width: 0; margin: 0; padding: 10px; border: 1px solid #d8d0c4; border-radius: 12px; background: #fffdf8; box-shadow: 0 12px 24px rgb(23 23 34 / 8%); }
+      figcaption { margin: 0 0 8px; color: #6b6258; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+      img { display: block; width: 100%; height: auto; border-radius: 6px; background: #e8e0d5; }
+      @media (max-width: 1100px) { .comparison { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <h1>Drumroll KB9 visual dossier</h1>
+    <p>KB8 source captures are preserved as received. KB9 runs the current production Electron build at both supported desktop viewports. The KB8 archive contains only 1225 × 768 app captures, so the compact column is a current-tree regression check rather than a fabricated compact baseline.</p>
+    
+    <section>
+      <h2>app icon</h2>
+      <div class="comparison">
+        <figure><figcaption>KB8 Finder baseline</figcaption><img src="baseline/07-installed-app-icon-context.png" alt="app icon KB8 Finder baseline"></figure>
+        <figure><figcaption>KB9 Finder / Quick Look</figcaption><img src="current/app-icon-finder-context.png" alt="app icon Finder Quick Look context"></figure>
+        <figure><figcaption>KB9 16 → 1024 px</figcaption><img src="current/app-icon-scale-matrix.png" alt="app icon scale matrix from 16 to 1024 pixels"></figure>
+      </div>
+    </section>
+
+    <section>
+      <h2>home</h2>
+      <div class="comparison">
+        <figure><figcaption>KB8 baseline</figcaption><img src="baseline/01-installed-home.png" alt="home KB8 baseline"></figure>
+        <figure><figcaption>KB9 current · 1224 × 768</figcaption><img src="current/home-1224x768.png" alt="home current wide"></figure>
+        <figure><figcaption>KB9 current · 1024 × 700</figcaption><img src="current/home-1024x700.png" alt="home current compact"></figure>
+      </div>
+    </section>
+
+    <section>
+      <h2>journey</h2>
+      <div class="comparison">
+        <figure><figcaption>KB8 baseline</figcaption><img src="baseline/02-installed-journey.png" alt="journey KB8 baseline"></figure>
+        <figure><figcaption>KB9 current · 1224 × 768</figcaption><img src="current/journey-1224x768.png" alt="journey current wide"></figure>
+        <figure><figcaption>KB9 current · 1024 × 700</figcaption><img src="current/journey-1024x700.png" alt="journey current compact"></figure>
+      </div>
+    </section>
+
+    <section>
+      <h2>practice ready</h2>
+      <div class="comparison">
+        <figure><figcaption>KB8 baseline</figcaption><img src="baseline/04-installed-flow-ready.png" alt="practice ready KB8 baseline"></figure>
+        <figure><figcaption>KB9 current · 1224 × 768</figcaption><img src="current/practice-ready-1224x768.png" alt="practice ready current wide"></figure>
+        <figure><figcaption>KB9 current · 1024 × 700</figcaption><img src="current/practice-ready-1024x700.png" alt="practice ready current compact"></figure>
+      </div>
+    </section>
+
+    <section>
+      <h2>practice playing</h2>
+      <div class="comparison">
+        <figure><figcaption>KB8 baseline</figcaption><img src="baseline/05-installed-flow-playing.png" alt="practice playing KB8 baseline"></figure>
+        <figure><figcaption>KB9 current · 1224 × 768</figcaption><img src="current/practice-playing-1224x768.png" alt="practice playing current wide"></figure>
+        <figure><figcaption>KB9 current · 1024 × 700</figcaption><img src="current/practice-playing-1024x700.png" alt="practice playing current compact"></figure>
+      </div>
+    </section>
+
+    <section>
+      <h2>judged hit feedback</h2>
+      <div class="comparison">
+        <figure><figcaption>KB8 baseline</figcaption><img src="baseline/05-installed-flow-playing.png" alt="judged hit feedback KB8 baseline"></figure>
+        <figure><figcaption>KB9 current · 1224 × 768</figcaption><img src="current/practice-hit-1224x768.png" alt="judged hit feedback current wide"></figure>
+        <figure><figcaption>KB9 current · 1024 × 700</figcaption><img src="current/practice-hit-1024x700.png" alt="judged hit feedback current compact"></figure>
+      </div>
+    </section>
+
+    <section>
+      <h2>profile</h2>
+      <div class="comparison">
+        <figure><figcaption>KB8 baseline</figcaption><img src="baseline/06-installed-profile-radar.png" alt="profile KB8 baseline"></figure>
+        <figure><figcaption>KB9 current · 1224 × 768</figcaption><img src="current/profile-1224x768.png" alt="profile current wide"></figure>
+        <figure><figcaption>KB9 current · 1024 × 700</figcaption><img src="current/profile-1024x700.png" alt="profile current compact"></figure>
+      </div>
+    </section>
+  </body>
+</html>

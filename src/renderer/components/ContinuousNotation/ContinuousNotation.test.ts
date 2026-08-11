@@ -89,7 +89,6 @@ describe('ContinuousNotation camera viewport', () => {
       const geometry = flowFixedPlayheadGeometry({
         viewportLeft: 0,
         surfaceLeft,
-        surfaceTop: 169,
         horizontalScrollDelta,
         anchor: 272,
         scoreTop: 219,
@@ -101,7 +100,7 @@ describe('ContinuousNotation camera viewport', () => {
       const projectedSurfaceLeft = surfaceLeft - horizontalScrollDelta;
 
       expect(projectedSurfaceLeft + geometry.left * scale).toBeCloseTo(272);
-      expect(169 + geometry.top * scale).toBeCloseTo(219);
+      expect(geometry.top * scale).toBeCloseTo(219);
       expect(geometry.height * scale).toBeCloseTo(299);
       expect(219 + geometry.beatOffset * scale).toBeCloseTo(320);
     },

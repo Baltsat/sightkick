@@ -1,124 +1,231 @@
-import { useMemo } from 'react';
 import {
-  PolarAngleAxis,
-  PolarGrid,
-  Radar,
-  RadarChart,
-  ResponsiveContainer,
-  Tooltip,
-} from 'recharts';
-import { buildDrumLearningProfile } from '../../services/learning-profile';
-import { RunSummary } from '../../services/practice-stats';
+  ATOMIC_SKILL_GRAPH,
+  AtomicSkillState,
+  skillConfidence,
+  skillNodeById,
+  skillProbability,
+} from '../../services/pedagogy';
 
-const SPRINT_END = new Date('2026-09-10T23:59:59+08:00').getTime();
+const CENTER_X = 220;
+const CENTER_Y = 174;
+const OUTER_RADIUS = 92;
+const LABEL_RADIUS = 138;
+const STAGE_LABEL: Record<AtomicSkillState['stage'], string> = {
+  unknown: 'Not measured',
+  assessed: 'Assessed',
+  provisional: 'Provisional',
+  retained: 'Retained',
+  transferable: 'Transferable',
+};
 
-export function AtomicSkillRadar({ runs }: { runs: RunSummary[] }) {
-  const profile = useMemo(() => buildDrumLearningProfile(runs), [runs]);
-  const focus = profile.axes.find((axis) => axis.id === profile.focusAxis)!;
-  const remainingDays = Math.max(
-    0,
-    Math.ceil((SPRINT_END - new Date().getTime()) / (24 * 60 * 60 * 1000)),
+interface RadarSkill {
+  id: string;
+  label: string;
+  state: AtomicSkillState | undefined;
+}
+
+function point(index: number, total: number, radius: number) {
+  const angle = -Math.PI / 2 + (index * Math.PI * 2) / total;
+
+  return {
+    x: CENTER_X + Math.cos(angle) * radius,
+    y: CENTER_Y + Math.sin(angle) * radius,
+  };
+}
+
+function polygon(points: readonly { x: number; y: number }[]): string {
+  return points.map(({ x, y }) => `${x},${y}`).join(' ');
+}
+
+function labelLines(label: string): readonly string[] {
+  const words = label.split(' ');
+
+  if (words.length <= 2) {
+    return [label];
+  }
+
+  const split = Math.ceil(words.length / 2);
+
+  return [words.slice(0, split).join(' '), words.slice(split).join(' ')];
+}
+
+function stageValue(state: AtomicSkillState | undefined): number {
+  if (!state || state.stage === 'unknown') {
+    return 0;
+  }
+
+  return skillProbability(state) * skillConfidence(state);
+}
+
+function selectedSkills(
+  states: readonly AtomicSkillState[],
+  focusSkillIds: readonly string[],
+): readonly RadarSkill[] {
+  const byId = skillNodeById();
+  const statesById = new Map(states.map((state) => [state.skill_id, state]));
+  const ids = [
+    ...focusSkillIds,
+    ...states
+      .filter((state) => state.stage !== 'unknown')
+      .sort(
+        (left, right) =>
+          right.effective_trials - left.effective_trials ||
+          left.skill_id.localeCompare(right.skill_id),
+      )
+      .map((state) => state.skill_id),
+    ...ATOMIC_SKILL_GRAPH.map((skill) => skill.id),
+  ];
+
+  return [...new Set(ids)]
+    .map((id) => {
+      const skill = byId.get(id);
+
+      return skill && skill.evidence_boundary !== 'unsupported'
+        ? { id, label: skill.label, state: statesById.get(id) }
+        : undefined;
+    })
+    .filter((skill): skill is RadarSkill => skill !== undefined)
+    .slice(0, 6);
+}
+
+export function AtomicSkillRadar({
+  states,
+  focusSkillIds,
+}: {
+  states: readonly AtomicSkillState[];
+  focusSkillIds: readonly string[];
+}) {
+  const skills = selectedSkills(states, focusSkillIds);
+  const vertices = skills.map((skill, index) =>
+    point(index, skills.length, OUTER_RADIUS * stageValue(skill.state)),
   );
-  const chartData = profile.axes.map((axis) => ({
-    axis: axis.label.replace(' & ', ' / '),
-    score: axis.score,
-    confidence: axis.confidence.label,
-    evidence: axis.confidence.evidenceCount,
-  }));
+  const outer = skills.map((_, index) =>
+    point(index, skills.length, OUTER_RADIUS),
+  );
 
   return (
     <section
-      className="rounded-2xl bg-fill p-5"
+      className="border-t border-border-soft pt-5"
       data-testid="atomic-skill-profile"
       aria-labelledby="atomic-skill-profile-title"
     >
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h3
-            id="atomic-skill-profile-title"
-            className="font-display text-2xl font-semibold tracking-[-0.03em] text-text"
-          >
-            Your playing profile
-          </h3>
-          <p className="mt-1 max-w-[65ch] text-xs leading-relaxed text-text-muted">
-            Eight atomic drum skills, estimated from scored hits, timing, tempo,
-            Tutor recovery, and Coach evidence. Sparse evidence stays explicitly
-            low-confidence.
-          </p>
-        </div>
-        <div className="text-right text-xs text-text-muted">
-          <strong className="block font-display text-xl text-accent-text">
-            {remainingDays} days
-          </strong>
-          to the 10 Sep learning sprint
-        </div>
+      <div>
+        <h3
+          id="atomic-skill-profile-title"
+          className="font-display text-2xl font-semibold tracking-[-0.03em] text-text"
+        >
+          Atomic skill map
+        </h3>
+        <p className="mt-1 max-w-[70ch] text-sm leading-relaxed text-text-muted">
+          Six observable skills nearest to the current target. An unmeasured
+          axis is a missing receipt, not a weakness.
+        </p>
       </div>
 
-      <div className="mt-4 grid items-center gap-4 md:grid-cols-[minmax(0,1.25fr)_minmax(12rem,0.75fr)]">
-        <div className="h-72 min-w-0" aria-label="Atomic drum skill radar">
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart data={chartData} outerRadius="72%">
-              <PolarGrid stroke="rgb(17 23 34 / 16%)" />
-              <PolarAngleAxis
-                dataKey="axis"
-                tick={{ fill: '#4d5360', fontSize: 10 }}
-              />
-              <Radar
-                name="Demonstrated skill"
-                dataKey="score"
-                stroke="#f73586"
-                fill="#f73586"
-                fillOpacity={0.2}
-                strokeWidth={2}
-              />
-              <Tooltip
-                formatter={(value, _name, item) => [
-                  `${Math.round(Number(value))}/100 · ${String(
-                    item.payload.confidence,
-                  )} · ${String(item.payload.evidence)} runs`,
-                  'Evidence-adjusted score',
-                ]}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
-        </div>
+      <figure
+        className="mx-auto mt-2 w-full max-w-110"
+        data-testid="atomic-skill-radar"
+      >
+        <svg
+          className="h-auto w-full overflow-visible"
+          viewBox="0 0 440 350"
+          role="img"
+          aria-labelledby="atomic-skill-profile-title atomic-skill-radar-caption"
+        >
+          {[0.33, 0.66, 1].map((scale) => (
+            <polygon
+              key={scale}
+              points={polygon(
+                skills.map((_, index) =>
+                  point(index, skills.length, OUTER_RADIUS * scale),
+                ),
+              )}
+              fill="none"
+              stroke="var(--line-soft)"
+              strokeWidth="1"
+            />
+          ))}
+          {outer.map((end, index) => (
+            <line
+              key={skills[index].id}
+              x1={CENTER_X}
+              y1={CENTER_Y}
+              x2={end.x}
+              y2={end.y}
+              stroke="var(--line-soft)"
+              strokeWidth="1"
+            />
+          ))}
+          <polygon
+            points={polygon(vertices)}
+            fill="color-mix(in srgb, var(--signal-wine) 20%, transparent)"
+            stroke="var(--signal-wine)"
+            strokeWidth="2"
+          />
+          {vertices.map((vertex, index) => (
+            <circle
+              key={skills[index].id}
+              cx={vertex.x}
+              cy={vertex.y}
+              r="3"
+              fill="var(--signal-wine)"
+            />
+          ))}
+          {skills.map((skill, index) => {
+            const label = point(index, skills.length, LABEL_RADIUS);
+            const anchor =
+              label.x < CENTER_X - 20
+                ? 'end'
+                : label.x > CENTER_X + 20
+                ? 'start'
+                : 'middle';
 
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-accent-text">
-            Best next focus
-          </p>
-          <h4 className="mt-1 font-display text-3xl font-semibold leading-none tracking-[-0.04em] text-text">
-            {focus.label}
-          </h4>
-          <p className="mt-2 text-sm leading-relaxed text-text-muted">
-            {focus.limitingFactor.detail}
-          </p>
-          <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-            <div>
-              <dt className="text-text-faint">Estimate</dt>
-              <dd className="font-semibold text-text">{focus.score}/100</dd>
-            </div>
-            <div>
-              <dt className="text-text-faint">Confidence</dt>
-              <dd className="font-semibold text-text">
-                {focus.confidence.label}
+            return (
+              <text
+                key={skill.id}
+                x={label.x}
+                y={label.y}
+                fill="var(--ink-strong)"
+                fontSize="11"
+                fontWeight="600"
+                textAnchor={anchor}
+              >
+                {labelLines(skill.label).map((line, lineIndex) => (
+                  <tspan key={line} x={label.x} dy={lineIndex === 0 ? 0 : 13}>
+                    {line}
+                  </tspan>
+                ))}
+              </text>
+            );
+          })}
+        </svg>
+        <figcaption id="atomic-skill-radar-caption" className="sr-only">
+          Skill radar drawn from atomic MIDI evidence states.
+        </figcaption>
+      </figure>
+
+      <dl
+        className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2"
+        data-testid="atomic-skill-text-alternative"
+      >
+        {skills.map((skill) => {
+          const confidence = Math.round(skillConfidence(skill.state) * 100);
+
+          return (
+            <div
+              key={skill.id}
+              className="border-b border-border-soft pb-3 text-sm"
+            >
+              <dt className="font-semibold text-text">{skill.label}</dt>
+              <dd className="mt-1 flex flex-wrap gap-x-2 text-text-muted">
+                <span>{STAGE_LABEL[skill.state?.stage ?? 'unknown']}</span>
+                <span aria-hidden="true">·</span>
+                <span>{confidence}% evidence confidence</span>
               </dd>
             </div>
-            <div>
-              <dt className="text-text-faint">Evidence</dt>
-              <dd className="font-semibold text-text">
-                {focus.confidence.evidenceCount} completed runs
-              </dd>
-            </div>
-            <div>
-              <dt className="text-text-faint">Trend</dt>
-              <dd className="font-semibold capitalize text-text">
-                {focus.trend.direction}
-              </dd>
-            </div>
-          </dl>
-        </div>
-      </div>
+          );
+        })}
+      </dl>
     </section>
   );
 }

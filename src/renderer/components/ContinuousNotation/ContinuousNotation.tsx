@@ -41,7 +41,6 @@ export interface FlowFixedPlayheadGeometryInput {
   viewportLeft: number;
   /** Viewport-space origin of the playhead's actual zoomed parent. */
   surfaceLeft: number;
-  surfaceTop: number;
   /** Scroll applied later in the same frame moves the surface by this amount. */
   horizontalScrollDelta: number;
   anchor: number;
@@ -61,7 +60,6 @@ export interface FlowFixedPlayheadGeometryInput {
 export function flowFixedPlayheadGeometry({
   viewportLeft,
   surfaceLeft,
-  surfaceTop,
   horizontalScrollDelta,
   anchor,
   scoreTop,
@@ -76,7 +74,7 @@ export function flowFixedPlayheadGeometry({
 
   return {
     left: (viewportLeft + anchor - projectedSurfaceLeft) / safeHorizontalScale,
-    top: (scoreTop - surfaceTop) / safeVerticalScale,
+    top: scoreTop / safeVerticalScale,
     height: Math.max(1, scoreBottom - scoreTop) / safeVerticalScale,
     beatOffset: Math.max(0, beatY - scoreTop) / safeVerticalScale,
   };
@@ -581,7 +579,6 @@ export function ContinuousNotationCamera({
       const fixedGeometry = flowFixedPlayheadGeometry({
         viewportLeft: viewportRect.left,
         surfaceLeft: fixedSurfaceRect.left,
-        surfaceTop: fixedSurfaceRect.top,
         horizontalScrollDelta,
         anchor,
         scoreTop,

@@ -1,0 +1,863 @@
+{
+  "source": "current production Electron build with final QA fixture",
+  "baseline": {
+    "directory": "docs/design-qa/2026-08-11-kb8-final",
+    "files": [
+      "01-installed-home.png",
+      "02-installed-journey.png",
+      "03-installed-flow-idle-cue.png",
+      "04-installed-flow-ready.png",
+      "05-installed-flow-playing.png",
+      "06-installed-profile-radar.png",
+      "07-installed-app-icon-context.png"
+    ],
+    "capturedViewport": {
+      "width": 1225,
+      "height": 768
+    },
+    "compactBaseline": "not supplied by KB8; current compact captures are direct regression evidence"
+  },
+  "supportedViewports": {
+    "wide": {
+      "width": 1224,
+      "height": 768
+    },
+    "compact": {
+      "width": 1024,
+      "height": 700
+    }
+  },
+  "iconProof": {
+    "context": "native Finder Quick Look thumbnail of the shipped ICNS asset",
+    "finderContext": "current/app-icon-finder-context.png",
+    "scaleMatrix": "current/app-icon-scale-matrix.png",
+    "sizes": [
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024
+    ],
+    "icnsRoundTripFiles": [
+      "icon_128x128.png",
+      "icon_128x128@2x.png",
+      "icon_16x16.png",
+      "icon_16x16@2x.png",
+      "icon_256x256.png",
+      "icon_256x256@2x.png",
+      "icon_32x32.png",
+      "icon_32x32@2x.png",
+      "icon_512x512.png",
+      "icon_512x512@2x.png"
+    ]
+  },
+  "proofs": [
+    {
+      "label": "home-1224x768",
+      "viewport": {
+        "width": 1224,
+        "height": 768
+      },
+      "phase": null,
+      "outerScroll": {
+        "document": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "frame": {
+        "left": 0,
+        "top": 0,
+        "right": 1224,
+        "bottom": 768,
+        "fitsViewport": true
+      },
+      "surface": {
+        "present": true,
+        "display": "grid",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "motion": {
+        "reducedMotion": false,
+        "activeAnimation": null,
+        "judgedHit": false,
+        "wrongHit": false
+      },
+      "layout": {
+        "flowHud": null,
+        "playheadLabel": null,
+        "playheadOverlapsHud": false,
+        "camera": {
+          "flowStage": null,
+          "fixedSurface": null,
+          "fixedPlayheadTop": null
+        }
+      }
+    },
+    {
+      "label": "home-1024x700",
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "phase": null,
+      "outerScroll": {
+        "document": {
+          "width": 1024,
+          "height": 700,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1024,
+          "height": 700,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "frame": {
+        "left": 0,
+        "top": 0,
+        "right": 1024,
+        "bottom": 700,
+        "fitsViewport": true
+      },
+      "surface": {
+        "present": true,
+        "display": "grid",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "motion": {
+        "reducedMotion": false,
+        "activeAnimation": null,
+        "judgedHit": false,
+        "wrongHit": false
+      },
+      "layout": {
+        "flowHud": null,
+        "playheadLabel": null,
+        "playheadOverlapsHud": false,
+        "camera": {
+          "flowStage": null,
+          "fixedSurface": null,
+          "fixedPlayheadTop": null
+        }
+      }
+    },
+    {
+      "label": "journey-1224x768",
+      "viewport": {
+        "width": 1224,
+        "height": 768
+      },
+      "phase": null,
+      "outerScroll": {
+        "document": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "frame": {
+        "left": 0,
+        "top": 0,
+        "right": 1224,
+        "bottom": 768,
+        "fitsViewport": true
+      },
+      "surface": {
+        "present": true,
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "motion": {
+        "reducedMotion": false,
+        "activeAnimation": null,
+        "judgedHit": false,
+        "wrongHit": false
+      },
+      "layout": {
+        "flowHud": null,
+        "playheadLabel": null,
+        "playheadOverlapsHud": false,
+        "camera": {
+          "flowStage": null,
+          "fixedSurface": null,
+          "fixedPlayheadTop": null
+        }
+      }
+    },
+    {
+      "label": "journey-1024x700",
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "phase": null,
+      "outerScroll": {
+        "document": {
+          "width": 1024,
+          "height": 700,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1024,
+          "height": 700,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "frame": {
+        "left": 0,
+        "top": 0,
+        "right": 1024,
+        "bottom": 700,
+        "fitsViewport": true
+      },
+      "surface": {
+        "present": true,
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "motion": {
+        "reducedMotion": false,
+        "activeAnimation": null,
+        "judgedHit": false,
+        "wrongHit": false
+      },
+      "layout": {
+        "flowHud": null,
+        "playheadLabel": null,
+        "playheadOverlapsHud": false,
+        "camera": {
+          "flowStage": null,
+          "fixedSurface": null,
+          "fixedPlayheadTop": null
+        }
+      }
+    },
+    {
+      "label": "practice-ready-1224x768",
+      "viewport": {
+        "width": 1224,
+        "height": 768
+      },
+      "phase": "ready",
+      "outerScroll": {
+        "document": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "frame": {
+        "left": 0,
+        "top": 0,
+        "right": 1224,
+        "bottom": 768,
+        "fitsViewport": true
+      },
+      "surface": {
+        "present": true,
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "motion": {
+        "reducedMotion": false,
+        "activeAnimation": "none",
+        "judgedHit": false,
+        "wrongHit": false
+      },
+      "layout": {
+        "flowHud": {
+          "left": 232,
+          "top": 64,
+          "right": 992,
+          "bottom": 127
+        },
+        "playheadLabel": {
+          "left": 269,
+          "top": 208,
+          "right": 500,
+          "bottom": 250
+        },
+        "playheadOverlapsHud": false,
+        "camera": {
+          "flowStage": {
+            "left": -115,
+            "top": 126,
+            "right": 10816,
+            "bottom": 532
+          },
+          "fixedSurface": {
+            "left": -115,
+            "top": 126,
+            "right": 10816,
+            "bottom": 532
+          },
+          "fixedPlayheadTop": "181.231px"
+        }
+      }
+    },
+    {
+      "label": "practice-playing-1224x768",
+      "viewport": {
+        "width": 1224,
+        "height": 768
+      },
+      "phase": "playing",
+      "outerScroll": {
+        "document": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "frame": {
+        "left": 0,
+        "top": 0,
+        "right": 1224,
+        "bottom": 768,
+        "fitsViewport": true
+      },
+      "surface": {
+        "present": true,
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "motion": {
+        "reducedMotion": false,
+        "activeAnimation": "drumroll-flow-current-note",
+        "judgedHit": false,
+        "wrongHit": false
+      },
+      "layout": {
+        "flowHud": {
+          "left": 232,
+          "top": 64,
+          "right": 992,
+          "bottom": 127
+        },
+        "playheadLabel": {
+          "left": 290,
+          "top": 208,
+          "right": 521,
+          "bottom": 250
+        },
+        "playheadOverlapsHud": false,
+        "camera": {
+          "flowStage": {
+            "left": -136,
+            "top": 126,
+            "right": 10794,
+            "bottom": 532
+          },
+          "fixedSurface": {
+            "left": -136,
+            "top": 126,
+            "right": 10794,
+            "bottom": 532
+          },
+          "fixedPlayheadTop": "181.231px"
+        }
+      }
+    },
+    {
+      "label": "practice-hit-1224x768",
+      "viewport": {
+        "width": 1224,
+        "height": 768
+      },
+      "phase": "playing",
+      "outerScroll": {
+        "document": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "frame": {
+        "left": 0,
+        "top": 0,
+        "right": 1224,
+        "bottom": 768,
+        "fitsViewport": true
+      },
+      "surface": {
+        "present": true,
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "motion": {
+        "reducedMotion": false,
+        "activeAnimation": "drumroll-flow-current-note",
+        "judgedHit": true,
+        "wrongHit": false
+      },
+      "layout": {
+        "flowHud": {
+          "left": 232,
+          "top": 64,
+          "right": 992,
+          "bottom": 127
+        },
+        "playheadLabel": {
+          "left": 269,
+          "top": 208,
+          "right": 500,
+          "bottom": 250
+        },
+        "playheadOverlapsHud": false,
+        "camera": {
+          "flowStage": {
+            "left": -115,
+            "top": 126,
+            "right": 10816,
+            "bottom": 532
+          },
+          "fixedSurface": {
+            "left": -115,
+            "top": 126,
+            "right": 10816,
+            "bottom": 532
+          },
+          "fixedPlayheadTop": "181.231px"
+        }
+      }
+    },
+    {
+      "label": "practice-ready-1024x700",
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "phase": "ready",
+      "outerScroll": {
+        "document": {
+          "width": 1024,
+          "height": 700,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1024,
+          "height": 700,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "frame": {
+        "left": 0,
+        "top": 0,
+        "right": 1024,
+        "bottom": 700,
+        "fitsViewport": true
+      },
+      "surface": {
+        "present": true,
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "motion": {
+        "reducedMotion": false,
+        "activeAnimation": "none",
+        "judgedHit": false,
+        "wrongHit": false
+      },
+      "layout": {
+        "flowHud": {
+          "left": 132,
+          "top": 64,
+          "right": 892,
+          "bottom": 127
+        },
+        "playheadLabel": {
+          "left": 219,
+          "top": 208,
+          "right": 449,
+          "bottom": 249
+        },
+        "playheadOverlapsHud": false,
+        "camera": {
+          "flowStage": {
+            "left": -108,
+            "top": 126,
+            "right": 10772,
+            "bottom": 496
+          },
+          "fixedSurface": {
+            "left": -108,
+            "top": 126,
+            "right": 10772,
+            "bottom": 496
+          },
+          "fixedPlayheadTop": "180.871px"
+        }
+      }
+    },
+    {
+      "label": "practice-playing-1024x700",
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "phase": "playing",
+      "outerScroll": {
+        "document": {
+          "width": 1024,
+          "height": 700,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1024,
+          "height": 700,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "frame": {
+        "left": 0,
+        "top": 0,
+        "right": 1024,
+        "bottom": 700,
+        "fitsViewport": true
+      },
+      "surface": {
+        "present": true,
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "motion": {
+        "reducedMotion": false,
+        "activeAnimation": "drumroll-flow-current-note",
+        "judgedHit": false,
+        "wrongHit": false
+      },
+      "layout": {
+        "flowHud": {
+          "left": 132,
+          "top": 64,
+          "right": 892,
+          "bottom": 127
+        },
+        "playheadLabel": {
+          "left": 235,
+          "top": 208,
+          "right": 466,
+          "bottom": 249
+        },
+        "playheadOverlapsHud": false,
+        "camera": {
+          "flowStage": {
+            "left": -125,
+            "top": 126,
+            "right": 10755,
+            "bottom": 496
+          },
+          "fixedSurface": {
+            "left": -125,
+            "top": 126,
+            "right": 10755,
+            "bottom": 496
+          },
+          "fixedPlayheadTop": "180.871px"
+        }
+      }
+    },
+    {
+      "label": "practice-hit-1024x700",
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "phase": "playing",
+      "outerScroll": {
+        "document": {
+          "width": 1024,
+          "height": 700,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1024,
+          "height": 700,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "frame": {
+        "left": 0,
+        "top": 0,
+        "right": 1024,
+        "bottom": 700,
+        "fitsViewport": true
+      },
+      "surface": {
+        "present": true,
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "motion": {
+        "reducedMotion": false,
+        "activeAnimation": "drumroll-flow-current-note",
+        "judgedHit": true,
+        "wrongHit": false
+      },
+      "layout": {
+        "flowHud": {
+          "left": 132,
+          "top": 64,
+          "right": 892,
+          "bottom": 127
+        },
+        "playheadLabel": {
+          "left": 219,
+          "top": 208,
+          "right": 449,
+          "bottom": 249
+        },
+        "playheadOverlapsHud": false,
+        "camera": {
+          "flowStage": {
+            "left": -108,
+            "top": 126,
+            "right": 10772,
+            "bottom": 496
+          },
+          "fixedSurface": {
+            "left": -108,
+            "top": 126,
+            "right": 10772,
+            "bottom": 496
+          },
+          "fixedPlayheadTop": "180.871px"
+        }
+      }
+    },
+    {
+      "label": "practice-playing-reduced-1224x768",
+      "viewport": {
+        "width": 1224,
+        "height": 768
+      },
+      "phase": "playing",
+      "outerScroll": {
+        "document": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "frame": {
+        "left": 0,
+        "top": 0,
+        "right": 1224,
+        "bottom": 768,
+        "fitsViewport": true
+      },
+      "surface": {
+        "present": true,
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "motion": {
+        "reducedMotion": true,
+        "activeAnimation": "none",
+        "judgedHit": true,
+        "wrongHit": false
+      },
+      "layout": {
+        "flowHud": {
+          "left": 232,
+          "top": 64,
+          "right": 992,
+          "bottom": 127
+        },
+        "playheadLabel": {
+          "left": 252,
+          "top": 208,
+          "right": 483,
+          "bottom": 250
+        },
+        "playheadOverlapsHud": false,
+        "camera": {
+          "flowStage": {
+            "left": -105,
+            "top": 126,
+            "right": 10825,
+            "bottom": 532
+          },
+          "fixedSurface": {
+            "left": -105,
+            "top": 126,
+            "right": 10825,
+            "bottom": 532
+          },
+          "fixedPlayheadTop": "181.231px"
+        }
+      }
+    },
+    {
+      "label": "profile-1224x768",
+      "viewport": {
+        "width": 1224,
+        "height": 768
+      },
+      "phase": null,
+      "outerScroll": {
+        "document": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "frame": {
+        "left": 0,
+        "top": 0,
+        "right": 1224,
+        "bottom": 768,
+        "fitsViewport": true
+      },
+      "surface": {
+        "present": true,
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "motion": {
+        "reducedMotion": false,
+        "activeAnimation": null,
+        "judgedHit": false,
+        "wrongHit": false
+      },
+      "layout": {
+        "flowHud": null,
+        "playheadLabel": null,
+        "playheadOverlapsHud": false,
+        "camera": {
+          "flowStage": null,
+          "fixedSurface": null,
+          "fixedPlayheadTop": null
+        }
+      }
+    },
+    {
+      "label": "profile-1024x700",
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "phase": null,
+      "outerScroll": {
+        "document": {
+          "width": 1024,
+          "height": 700,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1024,
+          "height": 700,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "frame": {
+        "left": 0,
+        "top": 0,
+        "right": 1024,
+        "bottom": 700,
+        "fitsViewport": true
+      },
+      "surface": {
+        "present": true,
+        "display": "block",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "motion": {
+        "reducedMotion": false,
+        "activeAnimation": null,
+        "judgedHit": false,
+        "wrongHit": false
+      },
+      "layout": {
+        "flowHud": null,
+        "playheadLabel": null,
+        "playheadOverlapsHud": false,
+        "camera": {
+          "flowStage": null,
+          "fixedSurface": null,
+          "fixedPlayheadTop": null
+        }
+      }
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": []
+}

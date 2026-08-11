@@ -130,6 +130,10 @@
 .vf-note-active {
   transform-box: fill-box;
   transform-origin: center;
+  transform: scale(1.35);
+}
+
+.drumroll-practice-shell[data-session-phase='playing'] .vf-note-active {
   animation: sk-note-pulse 0.7s ease-in-out infinite;
 }
 
@@ -146,7 +150,7 @@
 .vf-note-pop {
   transform-box: fill-box;
   transform-origin: center;
-  animation: sk-note-pop 0.42s cubic-bezier(0.22, 0.9, 0.28, 1);
+  animation: sk-note-pop 120ms cubic-bezier(0.22, 0.9, 0.28, 1);
 }
 
 @keyframes sk-note-pop {
@@ -172,7 +176,7 @@
 .vf-note-miss {
   transform-box: fill-box;
   transform-origin: center;
-  animation: sk-note-miss 0.4s ease-out;
+  animation: sk-note-miss 180ms ease-out;
 }
 
 @keyframes sk-note-miss {
@@ -203,7 +207,21 @@
   left: 0;
   width: 13px;
   height: 13px;
+  transform-origin: center;
+  animation: sk-wronghit-arrive 180ms ease-out both;
   pointer-events: none;
+}
+
+@keyframes sk-wronghit-arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.72) rotate(-8deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
 }
 
 .vf-wronghit-marker::before,
@@ -225,4 +243,14 @@
 
 .vf-wronghit-marker::after {
   transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drumroll-practice-shell[data-session-phase='playing'] .vf-note-active,
+  .vf-note-active,
+  .vf-note-pop,
+  .vf-note-miss,
+  .vf-wronghit-marker {
+    animation: none;
+  }
 }

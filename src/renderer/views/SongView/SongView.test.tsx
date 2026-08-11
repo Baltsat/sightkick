@@ -1766,3 +1766,55 @@ describe('in-practice difficulty switching', () => {
     });
   });
 });
+
+describe('practice motion', () => {
+  it('starts active notation motion with transport and hit feedback only after a real strike', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      settings: { countIn: false },
+      keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+    });
+
+    await view.loadSong();
+
+    const shell = document.querySelector('.drumroll-practice-shell');
+
+    expect(shell).toHaveAttribute('data-session-phase', 'ready');
+    expect(document.querySelector('.vf-note-pop')).toBeNull();
+
+    view.clickPlay();
+    await waitFor(() =>
+      expect(shell).toHaveAttribute('data-session-phase', 'playing'),
+    );
+
+    await view.pressKey('KeyJ');
+
+    expect(document.querySelector('.vf-note-pop')).not.toBeNull();
+  });
+
+  it('adds wrong-hit feedback only for a mapped, judged wrong pad', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      settings: { countIn: false },
+      keyboard: {
+        kit: {
+          snare: ['keyboard:KeyJ'],
+          kick: ['keyboard:KeyK'],
+        },
+      },
+    });
+
+    await view.loadSong();
+    view.clickPlay();
+    await waitFor(() =>
+      expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+        'aria-label',
+        'Pause',
+      ),
+    );
+
+    await view.pressKey('KeyK');
+
+    expect(document.querySelector('.vf-wronghit-marker')).not.toBeNull();
+  });
+});
