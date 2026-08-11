@@ -45,15 +45,15 @@ if [[ -e "$output_dir" ]]; then
 fi
 
 cd "$repo_root"
-yarn package:prepare:mac
-yarn verify:ffmpeg:mac
-yarn verify:ffmpeg:transcriber
-yarn electron-builder build \
+corepack yarn package:prepare:mac
+corepack yarn verify:ffmpeg:mac
+corepack yarn verify:ffmpeg:transcriber
+corepack yarn electron-builder build \
     --mac \
     --arm64 \
     --publish never \
     --config.directories.output="$output_dir"
-yarn release:stage-ffmpeg-source "$output_dir"
+corepack yarn release:stage-ffmpeg-source "$output_dir"
 
 shopt -s nullglob
 disk_images=("$output_dir"/*.dmg)
@@ -62,19 +62,19 @@ if [[ "${#disk_images[@]}" -ne 1 ]]; then
     echo "Expected exactly one DMG after the local release build." >&2
     exit 1
 fi
-expected_disk_image="$output_dir/Drumroll-1.2.0-kb.7-arm64.dmg"
+expected_disk_image="$output_dir/Drumroll-1.2.0-kb.8-arm64.dmg"
 if [[ "${disk_images[0]}" != "$expected_disk_image" ]]; then
     echo "Unexpected DMG name: ${disk_images[0]}" >&2
     echo "Expected: $expected_disk_image" >&2
     exit 1
 fi
 
-yarn release:verify:mac "$output_dir/mac-arm64/Drumroll.app"
+corepack yarn release:verify:mac "$output_dir/mac-arm64/Drumroll.app"
 "$repo_root/scripts/notarize-macos-dmg.sh" "$expected_disk_image"
 node "$repo_root/scripts/finalize-macos-release-metadata.mjs" \
     "$output_dir" \
     --write
-yarn release:verify:mac "$expected_disk_image"
-yarn release:checksums "$output_dir"
+corepack yarn release:verify:mac "$expected_disk_image"
+corepack yarn release:checksums "$output_dir"
 
 echo "Verified local release artifacts are available at $output_dir"

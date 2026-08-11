@@ -2,17 +2,17 @@
   "schemaVersion": 2,
   "application": {
     "productName": "Drumroll",
-    "releaseVersion": "1.2.0-kb.7",
+    "releaseVersion": "1.2.0-kb.8",
     "shortVersion": "1.2.0",
-    "buildVersion": "1.2.7"
+    "buildVersion": "1.2.8"
   },
   "lessonLibrary": {
     "lessonCount": 170,
     "files": [
       {
         "path": "manifest.json",
-        "bytes": 399013,
-        "sha256": "257fb3492506fdcd79ab7b065dd1e2e96b11fc5e24302f2fdbcbbf343027d108"
+        "bytes": 399079,
+        "sha256": "0428dbd4ccb9d976a0edf5be75e46124cc73d13fc658cfd219398a14c3495133"
       },
       {
         "path": "SightKick Method - Lesson 01.01 - Alternating Singles Warm-Up/drums.ogg",
@@ -26,8 +26,8 @@
       },
       {
         "path": "SightKick Method - Lesson 01.01 - Alternating Singles Warm-Up/song.ini",
-        "bytes": 843,
-        "sha256": "8f94f3cb25c140b493fc69aee843dc5771de25f89e93a810539a83827b6362cb"
+        "bytes": 850,
+        "sha256": "0191de8e09a5c2eb867dbe44e2ecf59c17fb8e19eed363cc81f6ffe5b4876c26"
       },
       {
         "path": "SightKick Method - Lesson 01.01 - Alternating Singles Warm-Up/song.ogg",
@@ -46,8 +46,8 @@
       },
       {
         "path": "SightKick Method - Lesson 01.02 - Paired Doubles Warm-Up/song.ini",
-        "bytes": 840,
-        "sha256": "8a1309a6bd829c4f28c899db2161afcbc1ce5af3befbb637c6b274fcc4eb72fa"
+        "bytes": 847,
+        "sha256": "9a2579f71e01e74e24c5977d7413b515ee712080f16022ee66dcef4ebc78c065"
       },
       {
         "path": "SightKick Method - Lesson 01.02 - Paired Doubles Warm-Up/song.ogg",
@@ -66,8 +66,8 @@
       },
       {
         "path": "SightKick Method - Lesson 01.03 - Kick Drum Pulse/song.ini",
-        "bytes": 815,
-        "sha256": "c4c6c5d531ae4c39c5637283dae53f012253ef7d174002fc1c0293041837d3ad"
+        "bytes": 822,
+        "sha256": "7d1f76f9797b351573d3c7c753ff624d2321a8f5969b17e34b4bb2227a34a6d8"
       },
       {
         "path": "SightKick Method - Lesson 01.03 - Kick Drum Pulse/song.ogg",
