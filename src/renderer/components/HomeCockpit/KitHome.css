@@ -34,7 +34,8 @@
 
 .kit-home__wash {
   pointer-events: none;
-  background: linear-gradient(
+  background:
+    linear-gradient(
       90deg,
       color-mix(in srgb, var(--surface-studio) 92%, transparent) 0%,
       color-mix(in srgb, var(--surface-studio) 68%, transparent) 29%,
@@ -78,6 +79,36 @@
   letter-spacing: 0.09em;
   line-height: 1.2;
   text-transform: uppercase;
+}
+
+.kit-home__intent {
+  display: inline-flex;
+  gap: 0.15rem;
+  margin-top: 0.65rem;
+  padding: 0.15rem;
+  border: 1px solid color-mix(in srgb, var(--surface-raised) 24%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface-studio) 54%, transparent);
+}
+
+.kit-home__intent button {
+  min-width: 4.4rem;
+  padding: 0.32rem 0.52rem;
+  border: 0;
+  border-radius: 3px;
+  color: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+  background: transparent;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 760;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.kit-home__intent button[data-active='true'] {
+  color: var(--surface-studio);
+  background: var(--signal-ember);
 }
 
 .kit-home__manifest h1 {
@@ -180,7 +211,7 @@
 }
 
 .kit-home__choose-target:focus-visible,
-.kit-home__wave-cell button:focus-visible,
+.kit-home__intent button:focus-visible,
 .kit-home__pad:focus-visible {
   outline: 2px solid var(--signal-ember);
   outline-offset: 3px;
@@ -371,33 +402,14 @@
   white-space: nowrap;
 }
 
-.kit-home__wave-cell > span,
-.kit-home__wave-cell > button {
-  overflow: hidden;
+.kit-home__wave-cell > span {
   color: var(--ink-muted);
   font-size: 0.78rem;
   line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kit-home__wave-cell button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  width: fit-content;
-  padding: 0;
-  border: 0;
-  color: var(--signal-wine);
-  background: transparent;
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 720;
-  cursor: pointer;
-}
-
-.kit-home__wave-cell--goal strong {
-  color: var(--signal-green);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 @keyframes kit-home-pad-hit {

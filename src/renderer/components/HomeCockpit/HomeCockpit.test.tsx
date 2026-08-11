@@ -5,6 +5,10 @@ import type { LessonProgress } from '../../hooks/useLessons';
 import type { UseGamificationResult } from '../../hooks/useGamification';
 import { InputProvider } from '../../context/InputContext';
 import type { RunSummary } from '../../services/practice-stats';
+import type {
+  PracticeWaveResult,
+  RankedPracticeCandidate,
+} from '../../services/next-practice';
 import { installIpcMock, installLocalStorage } from '../../hooks/test-support';
 import { HomeCockpit } from './HomeCockpit';
 
@@ -70,6 +74,73 @@ const recommendation = {
   suggestedSpeed: 0.8,
   predictedSuccess: 0.78,
 } as never;
+const lessonSong = {
+  id: 'lesson-1',
+  name: 'Kick independence',
+  artist: 'Drumroll Method',
+  lesson: true,
+} as unknown as Song;
+const lessonRecommendation = {
+  candidate: {
+    id: lessonSong.id,
+    title: lessonSong.name,
+    kind: 'lesson',
+    difficulty: 'easy',
+    available: true,
+  },
+  score: 88,
+  predictedSuccess: 0.76,
+  suggestedSpeed: 0.8,
+  mastery: 20,
+  reason: '2 saved Coach findings route directly to this lesson.',
+  factors: [],
+  confidence: {
+    value: 0.7,
+    level: 'medium',
+    evidenceRuns: 2,
+    detail: 'Saved Coach evidence is available.',
+  },
+} satisfies RankedPracticeCandidate;
+const songRecommendation = {
+  candidate: {
+    id: song.id,
+    title: song.name,
+    kind: 'song',
+    difficulty: 'easy',
+    available: true,
+    liked: true,
+  },
+  score: 80,
+  predictedSuccess: 0.78,
+  suggestedSpeed: 0.9,
+  mastery: 28,
+  reason: 'A liked song is available for musical application.',
+  factors: [],
+  confidence: {
+    value: 0.7,
+    level: 'medium',
+    evidenceRuns: 2,
+    detail: 'Saved Coach evidence is available.',
+  },
+} satisfies RankedPracticeCandidate;
+const practiceWave: PracticeWaveResult = {
+  strategy: 'skill-linked',
+  stops: [
+    {
+      role: 'focus',
+      recommendation: lessonRecommendation,
+      reason: '2 saved Coach findings route directly to this lesson.',
+      linkedSkills: ['kick-independence'],
+    },
+    {
+      role: 'apply',
+      recommendation: songRecommendation,
+      reason: 'Apply the focused skill in a liked song.',
+      linkedSkills: ['kick-independence'],
+    },
+  ],
+  focusSkills: ['kick-independence'],
+};
 
 describe('HomeCockpit kit home', () => {
   beforeEach(() => {
@@ -192,10 +263,64 @@ describe('HomeCockpit kit home', () => {
     fireEvent.click(screen.getByTestId('kit-hotspot-snare'));
 
     expect(onOpenSongs).not.toHaveBeenCalled();
-    expect(screen.queryByText('Songs')).not.toBeInTheDocument();
+    expect(screen.getByTestId('home-choose-song')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('home-choose-song'));
 
     expect(onOpenSongs).toHaveBeenCalledTimes(1);
+  });
+
+  it('rearms the composed song application with one intent gesture', () => {
+    const onStartSession = vi.fn();
+
+    render(
+      <InputProvider>
+        <HomeCockpit
+          surface="home"
+          songList={[lessonSong, song]}
+          difficulty="easy"
+          lessonProgress={lessonProgress}
+          gamification={gamification}
+          recommendation={lessonRecommendation}
+          practiceRanking={[lessonRecommendation, songRecommendation]}
+          practiceWave={practiceWave}
+          onStartRecommended={vi.fn()}
+          onStartSession={onStartSession}
+          onOpenSongs={vi.fn()}
+          onOpenJourney={vi.fn()}
+          onOpenCoach={vi.fn()}
+          onOpenProfile={vi.fn()}
+        />
+      </InputProvider>,
+    );
+
+    expect(screen.getByTestId('home-why-now')).toHaveTextContent(
+      '2 saved Coach findings route directly to this lesson.',
+    );
+    expect(screen.getByTestId('home-next-unlock')).toHaveTextContent(
+      'Practice song',
+    );
+    expect(screen.getByTestId('home-payoff')).toHaveTextContent(
+      'Practice song',
+    );
+
+    fireEvent.click(screen.getByTestId('home-intent-songs'));
+
+    expect(screen.getByTestId('home-session-manifest')).toHaveAttribute(
+      'data-intent',
+      'songs',
+    );
+    expect(screen.getByRole('heading')).toHaveTextContent('Practice song');
+
+    fireEvent.click(screen.getByTestId('kit-hotspot-kick'));
+
+    expect(onStartSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        intent: 'songs',
+        launch: expect.objectContaining({
+          candidate: expect.objectContaining({ id: song.id }),
+        }),
+      }),
+    );
   });
 });

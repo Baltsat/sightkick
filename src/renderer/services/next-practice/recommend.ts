@@ -803,8 +803,8 @@ function rankCandidate({
         predictedSuccess < 0.7
           ? 'a stretch; use the suggested slower start.'
           : predictedSuccess <= 0.9
-          ? 'inside the productive challenge zone.'
-          : 'comfortable enough for consolidation.'
+            ? 'inside the productive challenge zone.'
+            : 'comfortable enough for consolidation.'
       }`,
     },
     {
@@ -889,8 +889,8 @@ function rankCandidate({
       value: isMastered
         ? 0
         : scopedRuns.length === 0
-        ? 1
-        : 1 - masteryBreakdown.mastery / 100,
+          ? 1
+          : 1 - masteryBreakdown.mastery / 100,
       weight: 5,
       detail: isMastered
         ? 'This lesson is already cleared.'
@@ -952,10 +952,10 @@ function rankCandidate({
           directRemediation.findingCount === 1 ? '' : 's'
         } route directly to this lesson.`
       : pacing
-      ? `${pacing.detail} ${reasonFromFactors(
-          factors.filter((factor) => factor.key !== 'deadline-pacing'),
-        )}`
-      : reasonFromFactors(factors),
+        ? `${pacing.detail} ${reasonFromFactors(
+            factors.filter((factor) => factor.key !== 'deadline-pacing'),
+          )}`
+        : reasonFromFactors(factors),
     factors,
     confidence: confidenceFor(
       scopedRuns.length,
@@ -973,17 +973,17 @@ function fallbackRank(
     const leftClass = left.mastered
       ? 3
       : left.kind === 'lesson'
-      ? 0
-      : left.liked
-      ? 1
-      : 2;
+        ? 0
+        : left.liked
+          ? 1
+          : 2;
     const rightClass = right.mastered
       ? 3
       : right.kind === 'lesson'
-      ? 0
-      : right.liked
-      ? 1
-      : 2;
+        ? 0
+        : right.liked
+          ? 1
+          : 2;
 
     return (
       leftClass - rightClass ||
@@ -998,8 +998,8 @@ function fallbackRank(
     const detail = isLesson
       ? 'Start with the earliest unlocked lesson to establish a trustworthy baseline.'
       : liked
-      ? 'Start with a liked playable song to establish a trustworthy baseline.'
-      : 'Start with a playable item to establish a trustworthy baseline.';
+        ? 'Start with a liked playable song to establish a trustworthy baseline.'
+        : 'Start with a playable item to establish a trustworthy baseline.';
 
     return {
       candidate,
@@ -1016,8 +1016,8 @@ function fallbackRank(
           key: isLesson
             ? 'curriculum-progress'
             : liked
-            ? 'preference'
-            : 'difficulty-fit',
+              ? 'preference'
+              : 'difficulty-fit',
           label: 'Deterministic starting point',
           value: 1,
           weight: 100,
@@ -1261,6 +1261,7 @@ function recommendAtomicPractice(
     strategy: 'atomic-evidence-ranked',
     recommendation: ranking[0],
     ranking,
+    pedagogyRanking: zpd,
     ...(deadlinePacing ? { deadlinePacing } : {}),
   };
 }

@@ -948,6 +948,9 @@ describe('recommendNextPractice', () => {
     expect(result.recommendation?.decisionReceipt).toMatchObject({
       policy_version: 'pedagogy-v2.0',
     });
+    expect(
+      result.pedagogyRanking?.map(({ candidate }) => candidate.item_id),
+    ).toEqual(expect.arrayContaining(['atomic-generic', 'atomic-remediation']));
   });
 
   it('keeps deadline pacing ahead of ordinary graph-aware receipts', () => {

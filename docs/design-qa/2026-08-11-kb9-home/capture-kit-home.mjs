@@ -7,6 +7,7 @@ import { _electron as electron } from '@playwright/test';
 const outputDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(outputDir, '../../..');
 const mainEntry = path.join(repoRoot, 'out', 'main', 'index.js');
+const composerCapture = process.argv.includes('--composer');
 const liveConfig = path.join(
   os.homedir(),
   'Library',
@@ -125,11 +126,14 @@ async function capture(page, name, viewport, readyTestId) {
   await page.getByTestId(readyTestId).waitFor({ timeout: 60_000 });
   await page.waitForTimeout(600);
   await page.screenshot({
-    path: path.join(outputDir, `${name}.png`),
+    path: path.join(
+      outputDir,
+      `${name}${composerCapture ? '-composer' : ''}.png`,
+    ),
     animations: 'disabled',
   });
 
-  return layoutProof(name)(page);
+  return layoutProof(`${name}${composerCapture ? '-composer' : ''}`)(page);
 }
 
 function assertNoOuterScroll(proofs) {
@@ -201,6 +205,43 @@ async function run() {
         'home-cockpit',
       ),
     );
+
+    if (composerCapture) {
+      await page.getByTestId('home-intent-songs').click();
+      proofs.push(
+        await capture(
+          page,
+          '02-after-home-songs-1225x768',
+          { width: 1225, height: 768 },
+          'home-cockpit',
+        ),
+      );
+      proofs.push(
+        await capture(
+          page,
+          '03-after-home-songs-1024x700',
+          { width: 1024, height: 700 },
+          'home-cockpit',
+        ),
+      );
+
+      assertNoOuterScroll(proofs);
+      fs.writeFileSync(
+        path.join(outputDir, 'proof-composer.json'),
+        `${JSON.stringify(
+          {
+            beforeSources,
+            proofs,
+            consoleErrors,
+            pageErrors,
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      return;
+    }
 
     await page.getByTestId('view-lessons').click();
     proofs.push(

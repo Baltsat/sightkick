@@ -22,10 +22,19 @@ import {
   RECENT_READINESS_WINDOW_DAYS,
 } from '../../services/mastery';
 import {
+  composeHomeSession,
+  HomeSessionIntent,
+  OneKickHomeSession,
   PracticeWaveResult,
   RankedPracticeCandidate,
 } from '../../services/next-practice';
-import { KitElement, RunSummary } from '../../services/practice-stats';
+import type {
+  AtomicSkillState,
+  SessionEnergy,
+  SongGoal,
+  ZpdRankedCandidate,
+} from '../../services/pedagogy/types';
+import { KitElement } from '../../services/practice-stats';
 import { playKitPreview } from '../../services/kit-preview-audio';
 import homeKitStudio from '../../assets/daybreak/home-kit-studio.png';
 import drumstickCursor from '../../assets/daybreak/drumstick-cursor-reversed.png';
@@ -41,8 +50,15 @@ interface HomeCockpitProps {
   lessonProgress: LessonProgress;
   gamification: UseGamificationResult;
   recommendation?: RankedPracticeCandidate;
+  practiceRanking?: readonly RankedPracticeCandidate[];
+  pedagogyRanking?: readonly ZpdRankedCandidate[];
   practiceWave?: PracticeWaveResult;
+  activeGoal?: SongGoal;
+  atomicStates?: readonly AtomicSkillState[];
+  sessionEnergy?: SessionEnergy;
+  recentEarlyExits?: number;
   onStartRecommended: () => void;
+  onStartSession?: (session: OneKickHomeSession) => void;
   onOpenSongs: () => void;
   onOpenJourney: () => void;
   onOpenCoach: () => void;
@@ -53,11 +69,6 @@ interface KitHotspot {
   element: KitElement;
   label: string;
   position: string;
-}
-
-interface RecentCompletedSong {
-  song: Song;
-  summary: RunSummary;
 }
 
 const KIT_COLOR_LANE: Record<KitElement, string> = {
@@ -80,52 +91,6 @@ const KIT_HOTSPOTS: KitHotspot[] = [
   { element: 'tom3', label: 'Floor tom', position: 'tom3' },
   { element: 'kick', label: 'Kick', position: 'kick' },
 ];
-
-function completedAtMs(summary: RunSummary) {
-  const completedAt = Date.parse(summary.completedAt);
-
-  return Number.isFinite(completedAt) ? completedAt : Number.NEGATIVE_INFINITY;
-}
-
-export function recentCompletedSongs(
-  songList: Song[],
-  runsBySong: Readonly<Record<string, RunSummary[]>> | undefined,
-): RecentCompletedSong[] {
-  if (!runsBySong) {
-    return [];
-  }
-
-  const songsById = new Map(
-    songList.filter((song) => !song.lesson).map((song) => [song.id, song]),
-  );
-
-  return Object.entries(runsBySong)
-    .flatMap(([songId, runs]) => {
-      const song = songsById.get(songId);
-
-      if (!song || runs.length === 0) {
-        return [];
-      }
-
-      const summary = runs.reduce((latest, candidate) =>
-        completedAtMs(candidate) > completedAtMs(latest) ? candidate : latest,
-      );
-
-      return [{ song, summary }];
-    })
-    .sort(
-      (left, right) =>
-        completedAtMs(right.summary) - completedAtMs(left.summary),
-    )
-    .slice(0, 3);
-}
-
-function recentRunLabel(summary: RunSummary) {
-  const accuracy = Math.round(summary.overallAccuracy * 100);
-  const mode = summary.mode === 'perform' ? 'perform' : 'practice';
-
-  return `${accuracy}% · ${mode}`;
-}
 
 function trendSummary(trendPp: number | undefined) {
   if (trendPp === undefined) {
@@ -186,8 +151,15 @@ export function HomeCockpit({
   lessonProgress,
   gamification,
   recommendation,
+  practiceRanking,
+  pedagogyRanking,
   practiceWave,
+  activeGoal,
+  atomicStates,
+  sessionEnergy,
+  recentEarlyExits,
   onStartRecommended,
+  onStartSession,
   onOpenSongs,
   onOpenJourney,
 }: HomeCockpitProps) {
@@ -197,10 +169,55 @@ export function HomeCockpit({
   const [sessionState, setSessionState] = useState<'armed' | 'count-in'>(
     'armed',
   );
+  const [sessionIntent, setSessionIntent] =
+    useState<HomeSessionIntent>('learning');
   const clearPulseRef = useRef<number | undefined>(undefined);
   const clearPointerStrikeRef = useRef<number | undefined>(undefined);
+  const homeRanking = useMemo(() => {
+    const ranked: RankedPracticeCandidate[] = [];
+    const seen = new Set<string>();
+
+    [
+      ...(practiceRanking ?? []),
+      ...(practiceWave?.stops.map(
+        ({ recommendation: candidate }) => candidate,
+      ) ?? []),
+      ...(recommendation ? [recommendation] : []),
+    ].forEach((candidate) => {
+      if (!seen.has(candidate.candidate.id)) {
+        seen.add(candidate.candidate.id);
+        ranked.push(candidate);
+      }
+    });
+
+    return ranked;
+  }, [practiceRanking, practiceWave, recommendation]);
+  const homeSession = useMemo(
+    () =>
+      composeHomeSession({
+        intent: sessionIntent,
+        ranking: homeRanking,
+        pedagogyRanking,
+        practiceWave,
+        activeGoal,
+        atomicStates,
+        energy: sessionEnergy,
+        recentEarlyExits,
+      }),
+    [
+      activeGoal,
+      atomicStates,
+      homeRanking,
+      pedagogyRanking,
+      practiceWave,
+      recentEarlyExits,
+      sessionEnergy,
+      sessionIntent,
+    ],
+  );
+  const targetRecommendation = homeSession?.launch ?? recommendation;
   const recommendedSong = songList.find(
-    (song) => song.id === recommendation?.candidate.id,
+    (song) => song.id === targetRecommendation?.candidate.id,
   );
   const currentSong = useMemo(
     () =>
@@ -212,12 +229,8 @@ export function HomeCockpit({
     lessonProgress.continueEntry ??
     lessonProgress.entries.find((entry) => entry.unlocked);
   const weakest = weakestLane(gamification.recentLaneSignals);
-  const recentSongs = useMemo(
-    () => recentCompletedSongs(songList, gamification.runsBySong),
-    [gamification.runsBySong, songList],
-  );
-  const practiceTarget = recommendation ? recommendedSong : undefined;
-  const hasPracticeTarget = Boolean(practiceTarget && recommendation);
+  const practiceTarget = targetRecommendation ? recommendedSong : undefined;
+  const hasPracticeTarget = Boolean(practiceTarget && targetRecommendation);
   const elementByControlId = useMemo(() => {
     const map = new Map<string, KitElement>();
 
@@ -240,9 +253,16 @@ export function HomeCockpit({
     (element: KitElement) => {
       pulseLane(element);
       setSessionState('count-in');
+
+      if (homeSession && onStartSession) {
+        onStartSession(homeSession);
+
+        return;
+      }
+
       onStartRecommended();
     },
-    [onStartRecommended, pulseLane],
+    [homeSession, onStartRecommended, onStartSession, pulseLane],
   );
   const handlePointerStrike = useCallback(
     (element: KitElement) => {
@@ -423,10 +443,41 @@ export function HomeCockpit({
           className="kit-home__manifest"
           data-testid="home-session-manifest"
           data-state={sessionState}
+          data-intent={sessionIntent}
         >
           <p className="kit-home__eyebrow">
             <FontAwesomeIcon icon={faDrum} aria-hidden="true" /> Current room
           </p>
+          <div
+            className="kit-home__intent"
+            role="group"
+            aria-label="Practice intent"
+          >
+            <button
+              type="button"
+              data-testid="home-intent-learning"
+              data-active={sessionIntent === 'learning'}
+              aria-pressed={sessionIntent === 'learning'}
+              onClick={() => {
+                setSessionIntent('learning');
+                setSessionState('armed');
+              }}
+            >
+              Learn
+            </button>
+            <button
+              type="button"
+              data-testid="home-intent-songs"
+              data-active={sessionIntent === 'songs'}
+              aria-pressed={sessionIntent === 'songs'}
+              onClick={() => {
+                setSessionIntent('songs');
+                setSessionState('armed');
+              }}
+            >
+              Songs
+            </button>
+          </div>
           <p className="kit-home__session-state">
             {sessionState === 'count-in'
               ? 'Count-in'
@@ -438,11 +489,14 @@ export function HomeCockpit({
             {practiceTarget?.name ?? 'Choose a song'}
           </h1>
           <p className="kit-home__target-meta">
-            {practiceTarget && recommendation
-              ? `${
-                  practiceTarget.artist
-                } · ${recommendation.suggestedSpeed.toFixed(1)}× · ${
-                  nextLesson?.lesson.cue ?? 'one clean bar at a time'
+            {practiceTarget && targetRecommendation
+              ? `${practiceTarget.artist} · ${(
+                  homeSession?.launchSpeed ??
+                  targetRecommendation.suggestedSpeed
+                ).toFixed(1)}× · ${
+                  homeSession?.reason ??
+                  nextLesson?.lesson.cue ??
+                  'one clean bar at a time'
                 }`
               : 'Choose one practice target. Your next hit begins it.'}
           </p>
@@ -524,41 +578,27 @@ export function HomeCockpit({
       </section>
 
       <section className="kit-home__wave" aria-label="Practice wave">
-        <article className="kit-home__wave-cell">
-          <p>Next lesson</p>
-          <strong>
-            {nextLesson?.lesson.title ?? 'Your first lesson is waiting'}
-          </strong>
-          <button type="button" onClick={onOpenJourney}>
-            Open journey{' '}
-            <FontAwesomeIcon icon={faArrowRight} aria-hidden="true" />
-          </button>
-        </article>
-        <article
-          className="kit-home__wave-cell"
-          data-testid="home-recent-songs"
-        >
-          <p>Last completed pass</p>
-          {recentSongs[0] ? (
-            <>
-              <strong>{recentSongs[0].song.name}</strong>
-              <span>{recentRunLabel(recentSongs[0].summary)}</span>
-            </>
-          ) : (
-            <span>Your first scored pass will appear here.</span>
-          )}
-        </article>
-        <article className="kit-home__wave-cell kit-home__wave-cell--goal">
-          <p>Today</p>
-          <strong>
-            {gamification.todayXp} / {gamification.goalXp} XP
-          </strong>
+        <article className="kit-home__wave-cell" data-testid="home-why-now">
+          <p>Why this now</p>
+          <strong>{practiceTarget?.name ?? 'Choose a target'}</strong>
           <span>
-            {practiceWave?.stops[1]?.recommendation.candidate.title ??
-              `${Math.max(
-                0,
-                gamification.goalXp - gamification.todayXp,
-              )} XP to your goal`}
+            {homeSession?.reason ?? 'No playable practice target is armed yet.'}
+          </span>
+        </article>
+        <article className="kit-home__wave-cell" data-testid="home-next-unlock">
+          <p>Next unlock</p>
+          <strong>{homeSession?.next.title ?? 'No next move yet'}</strong>
+          <span>
+            {homeSession?.next.detail ??
+              'A next step appears after a playable target is selected.'}
+          </span>
+        </article>
+        <article className="kit-home__wave-cell" data-testid="home-payoff">
+          <p>Musical payoff</p>
+          <strong>{homeSession?.payoff.title ?? 'Choose a song'}</strong>
+          <span>
+            {homeSession?.payoff.detail ??
+              'A playable song becomes the session finish when available.'}
           </span>
         </article>
       </section>
@@ -572,10 +612,10 @@ export function HomeCockpit({
       >
         {sessionState === 'count-in'
           ? `Count-in for ${practiceTarget?.name ?? 'your selected target'}.`
-          : hasPracticeTarget && recommendation
-          ? `${practiceTarget?.name} is armed at ${recommendation.suggestedSpeed.toFixed(
-              1,
-            )} times speed. Any mapped pad starts it.`
+          : hasPracticeTarget && targetRecommendation
+          ? `${practiceTarget?.name} is armed at ${(
+              homeSession?.launchSpeed ?? targetRecommendation.suggestedSpeed
+            ).toFixed(1)} times speed. Any mapped pad starts it.`
           : 'No practice target is armed. Choose a song, then hit any pad.'}
       </p>
     </section>

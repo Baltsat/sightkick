@@ -17,6 +17,7 @@ import type {
   PracticeDecision,
   SkillReview,
   SongGoal,
+  ZpdRankedCandidate,
 } from '../pedagogy/types';
 
 export type PracticeCandidateKind = 'song' | 'lesson';
@@ -213,5 +214,6 @@ export interface NextPracticeResult {
     | 'none-available';
   recommendation?: RankedPracticeCandidate;
   ranking: RankedPracticeCandidate[];
+  pedagogyRanking?: readonly ZpdRankedCandidate[];
   deadlinePacing?: DeadlinePacingSummary;
 }
