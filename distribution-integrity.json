@@ -2,9 +2,9 @@
   "schemaVersion": 2,
   "application": {
     "productName": "Drumroll",
-    "releaseVersion": "1.2.0-kb.9",
+    "releaseVersion": "1.2.0-kb.10",
     "shortVersion": "1.2.0",
-    "buildVersion": "1.2.9"
+    "buildVersion": "1.2.10"
   },
   "lessonLibrary": {
     "lessonCount": 170,
