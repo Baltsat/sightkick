@@ -174,6 +174,31 @@ describe('SongListView — loading the library', () => {
     );
   });
 
+  it('opens the shell profile control as a full insights view and starts its current target', async () => {
+    const view = mountSongListView();
+
+    view.loadSongs([
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Pulse and posture',
+        starsToUnlock: 0,
+      }),
+    ]);
+    view.emit('load-goals', { goals: [] });
+    fireEvent.click(screen.getByTestId('open-profile-button'));
+
+    expect(await screen.findByTestId('profile-view')).toBeInTheDocument();
+    expect(screen.getByTestId('profile-insights-hero')).toBeInTheDocument();
+    expect(document.querySelector('.ant-drawer')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('profile-target-action'));
+
+    expect(await screen.findByTestId('song-view-stub')).toHaveAttribute(
+      'data-song-id',
+      'lesson-1',
+    );
+  });
+
   it('keeps the selected target armed while a remembered kit reconnects', async () => {
     const view = mountSongListView({
       settings: {
@@ -378,9 +403,7 @@ describe('SongListView — loading the library', () => {
         0,
       ),
     );
-    expect(screen.getByTestId('home-recent-songs')).toHaveTextContent(
-      'Your first scored pass will appear here.',
-    );
+    expect(screen.queryByTestId('home-recent-songs')).not.toBeInTheDocument();
     expect(screen.queryByTestId('home-lane-evidence')).not.toBeInTheDocument();
     expect(screen.getByTestId('home-session-manifest')).toHaveTextContent(
       'Mid and Floor Tom Signals',
@@ -444,7 +467,7 @@ describe('SongListView — loading the library', () => {
     expect(screen.queryByTestId('home-lane-evidence')).not.toBeInTheDocument();
   });
 
-  it('shows only the newest completed pass on the quiet Home shelf', async () => {
+  it('keeps completed-run history off the quiet Home cockpit', async () => {
     const view = mountSongListView();
     const run = (
       completedAt: string,
@@ -494,15 +517,35 @@ describe('SongListView — loading the library', () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByTestId('home-recent-songs')).toHaveTextContent(
-        'Name song-b',
-      ),
-    );
-
-    expect(screen.getByTestId('home-recent-songs')).toHaveTextContent(
-      '82% · perform',
+      expect(screen.queryByTestId('home-recent-songs')).not.toBeInTheDocument(),
     );
     expect(screen.queryByTestId(/home-recent-song-/)).not.toBeInTheDocument();
+  });
+
+  it('launches the composed songs-intent target from a pad hit', async () => {
+    const view = mountSongListView();
+
+    view.loadSongs([
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Pulse and posture',
+        starsToUnlock: 0,
+      }),
+      makeListSong('song-a', { liked: true }),
+    ]);
+    fireEvent.click(screen.getByTestId('home-intent-songs'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-session-manifest')).toHaveTextContent(
+        'Name song-a',
+      ),
+    );
+    fireEvent.click(screen.getByTestId('kit-hotspot-kick'));
+
+    expect(await screen.findByTestId('song-view-stub')).toHaveAttribute(
+      'data-song-id',
+      'song-a',
+    );
   });
 
   it('starts the recommendation from one deliberate Home kick and unmounts the background cockpit', async () => {

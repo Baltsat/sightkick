@@ -209,7 +209,11 @@ export function composeHomeSession(
         })
       : undefined;
   const plannedLaunch = byCandidateId(input.ranking, plan?.launch.candidate_id);
-  const launch = plannedLaunch ?? fallbackLaunch(input);
+  const intentLaunch =
+    input.intent === 'songs' && plannedLaunch?.candidate.kind !== 'song'
+      ? undefined
+      : plannedLaunch;
+  const launch = intentLaunch ?? fallbackLaunch(input);
 
   if (!launch) {
     return undefined;
@@ -239,7 +243,7 @@ export function composeHomeSession(
     launch,
     launchSpeed: plan?.launch.speed ?? launch.suggestedSpeed,
     reason: launchDecision?.explanation ?? waveStop?.reason ?? launch.reason,
-    source: plannedLaunch
+    source: intentLaunch
       ? 'pedagogy-v2'
       : waveStop
       ? 'practice-wave'

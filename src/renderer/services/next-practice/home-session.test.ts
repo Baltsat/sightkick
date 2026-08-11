@@ -197,4 +197,38 @@ describe('composeHomeSession', () => {
       payoff: { title: song.candidate.title },
     });
   });
+
+  it('keeps a songs-intent launch musical when no song has an atomic receipt', () => {
+    const lesson = ranked('lesson:focus', 'lesson', 'Saved timing evidence.');
+    const song = ranked('song:apply', 'song', 'A liked song is available.');
+    const wave: PracticeWaveResult = {
+      strategy: 'skill-linked',
+      stops: [
+        {
+          role: 'focus',
+          recommendation: lesson,
+          reason: lesson.reason,
+          linkedSkills: ['timing'],
+        },
+        {
+          role: 'apply',
+          recommendation: song,
+          reason: song.reason,
+          linkedSkills: ['timing'],
+        },
+      ],
+      focusSkills: ['timing'],
+    };
+    const session = composeHomeSession({
+      intent: 'songs',
+      ranking: [lesson, song],
+      pedagogyRanking: [zpd(lesson)],
+      practiceWave: wave,
+    });
+
+    expect(session).toMatchObject({
+      source: 'practice-wave',
+      launch: { candidate: { id: song.candidate.id } },
+    });
+  });
 });

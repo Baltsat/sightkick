@@ -70,13 +70,22 @@ import { SaveGoalInput, SetGoalModal, useGoals } from '../../components/Goals';
 import { AppShell, ArenaView } from '../../components/AppShell';
 import { HomeCockpit } from '../../components/HomeCockpit';
 import { KitCommandPrompt } from '../../components/KitCommandPrompt';
+import { buildDrumLearningProfile } from '../../services/learning-profile';
 import {
   buildPracticeWave,
+  OneKickHomeSession,
   PracticeCandidate,
   PracticeHistoryEntry,
   PracticeWaveResult,
+  RankedPracticeCandidate,
   recommendNextPractice,
 } from '../../services/next-practice';
+import {
+  CURRICULUM_ITEM_MANIFESTS,
+  dueReviews,
+  replayAtomicSkillState,
+  SongGoal,
+} from '../../services/pedagogy';
 import { PracticeOutletContext } from '../practice-context';
 import {
   filterLibraryCandidates,
@@ -93,10 +102,6 @@ import {
 import { resolveLibraryControls } from './library-controls';
 import { isPlayableEvidence } from '../../../library-sources/playability';
 
-// Lazy-loaded: recharts (the Profile's mastery graph) is a meaningfully
-// sized dependency the library header/song list never otherwise needs, so
-// it ships in its own chunk that only loads the first time a player opens
-// the Profile drawer, not on every app launch.
 const ProfileView = lazy(() => import('../../components/Profile'));
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard', 'expert'];
 
@@ -216,12 +221,7 @@ export function SongListView() {
   // live state without a separate context provider).
   const gamification = useGamification(songList);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
-  // One goals instance, shared by the Profile drawer and the per-song "Set
-  // a goal" menu entry below — mirrors `gamification` above: mounted once
-  // here so both surfaces stay in sync off the same IPC round trips rather
-  // than each keeping its own, possibly-stale copy.
   const goals = useGoals();
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSetGoalOpen, setIsSetGoalOpen] = useState(false);
   const [goalModalSongId, setGoalModalSongId] = useState<string | undefined>(
     undefined,
@@ -401,6 +401,38 @@ export function SongListView() {
       ),
     [gamification.runsBySong],
   );
+  const activeGoalRecord = goals.primaryGoal ?? goals.goals[0];
+  const activeGoal = useMemo<SongGoal | undefined>(
+    () =>
+      activeGoalRecord
+        ? {
+            song_id: activeGoalRecord.songId,
+            preferred: true,
+            goal_kind: 'full_song',
+          }
+        : undefined,
+    [activeGoalRecord],
+  );
+  const atomicStateReplay = useMemo(
+    () =>
+      replayAtomicSkillState(
+        practiceHistory.flatMap(
+          ({ summary }) => summary.atomicSkillEvidence ?? [],
+        ),
+        { manifests: CURRICULUM_ITEM_MANIFESTS },
+      ),
+    [practiceHistory],
+  );
+  const atomicStates = atomicStateReplay.states;
+  const atomicReviews = useMemo(
+    () => dueReviews(atomicStates, new Date(recommendationNowMs).toISOString()),
+    [atomicStates, recommendationNowMs],
+  );
+  const learningProfile = useMemo(
+    () =>
+      buildDrumLearningProfile(practiceHistory.map(({ summary }) => summary)),
+    [practiceHistory],
+  );
   const persistedCoachEvidence = useMemo(
     () => practiceHistory.flatMap(({ summary }) => summary.coachEvidence ?? []),
     [practiceHistory],
@@ -413,10 +445,23 @@ export function SongListView() {
         coachEvidence: persistedCoachEvidence,
         weakLanes: gamification.laneAccuracy,
         nowMs: recommendationNowMs,
+        goalDate: activeGoalRecord?.targetDate,
+        learningProfile,
+        pedagogy: {
+          atomicStates,
+          itemManifests: CURRICULUM_ITEM_MANIFESTS,
+          ...(activeGoal ? { activeGoal } : {}),
+          dueReviews: atomicReviews,
+        },
         limit: 12,
       }),
     [
+      activeGoal,
+      activeGoalRecord?.targetDate,
+      atomicReviews,
+      atomicStates,
       gamification.laneAccuracy,
+      learningProfile,
       practiceCandidates,
       practiceHistory,
       persistedCoachEvidence,
@@ -704,6 +749,52 @@ export function SongListView() {
       setDifficulty,
     ],
   );
+  const launchPractice = useCallback(
+    (recommendation: RankedPracticeCandidate, practiceSpeed: number) => {
+      const waveIndex = practiceWave.stops.findIndex(
+        ({ recommendation: waveRecommendation }) =>
+          waveRecommendation.candidate.id === recommendation.candidate.id,
+      );
+      const wave =
+        waveIndex === -1
+          ? buildPracticeWave({
+              ranking: [recommendation],
+              history: practiceHistory,
+            })
+          : practiceWave;
+
+      setActivePracticeWave({
+        result: wave,
+        index: Math.max(0, waveIndex),
+      });
+
+      if (recommendation.candidate.difficulty !== difficulty) {
+        setDifficulty(recommendation.candidate.difficulty);
+      }
+
+      const params = new URLSearchParams({
+        gameMode: 'practice',
+        autoStart: '1',
+        practiceSpeed: practiceSpeed.toFixed(1),
+      });
+
+      navigate(`/${recommendation.candidate.id}?${params.toString()}`);
+    },
+    [difficulty, navigate, practiceHistory, practiceWave, setDifficulty],
+  );
+  const startComposedSession = useCallback(
+    (session: OneKickHomeSession) =>
+      launchPractice(session.launch, session.launchSpeed),
+    [launchPractice],
+  );
+  const startTargetedPractice = useCallback(() => {
+    if (nextPractice.recommendation) {
+      launchPractice(
+        nextPractice.recommendation,
+        nextPractice.recommendation.suggestedSpeed,
+      );
+    }
+  }, [launchPractice, nextPractice.recommendation]);
 
   useEffect(() => {
     const lessonId = searchParams.get('coachLesson');
@@ -856,7 +947,7 @@ export function SongListView() {
         }
         onOpenProfile={() => {
           gamification.loadAchievements();
-          setIsProfileOpen(true);
+          setView('insights');
         }}
       >
         {!songOpen && view === 'home' && (
@@ -867,14 +958,19 @@ export function SongListView() {
             lessonProgress={lessonProgress}
             gamification={gamification}
             recommendation={nextPractice.recommendation}
+            practiceRanking={nextPractice.ranking}
+            pedagogyRanking={nextPractice.pedagogyRanking}
             practiceWave={practiceWave}
+            activeGoal={activeGoal}
+            atomicStates={atomicStates}
             onStartRecommended={() => startRecommendedPractice()}
+            onStartSession={startComposedSession}
             onOpenSongs={() => setView('songs')}
             onOpenJourney={() => setView('journey')}
             onOpenCoach={openHomeCoach}
             onOpenProfile={() => {
               gamification.loadAchievements();
-              setIsProfileOpen(true);
+              setView('insights');
             }}
           />
         )}
@@ -887,16 +983,50 @@ export function SongListView() {
             lessonProgress={lessonProgress}
             gamification={gamification}
             recommendation={nextPractice.recommendation}
+            practiceRanking={nextPractice.ranking}
+            pedagogyRanking={nextPractice.pedagogyRanking}
             practiceWave={practiceWave}
+            activeGoal={activeGoal}
+            atomicStates={atomicStates}
             onStartRecommended={() => startRecommendedPractice()}
+            onStartSession={startComposedSession}
             onOpenSongs={() => setView('songs')}
             onOpenJourney={() => setView('journey')}
             onOpenCoach={openHomeCoach}
             onOpenProfile={() => {
               gamification.loadAchievements();
-              setIsProfileOpen(true);
+              setView('insights');
             }}
           />
+        )}
+
+        {!songOpen && view === 'insights' && (
+          <Suspense
+            fallback={
+              <div className="flex min-h-64 items-center justify-center">
+                <Spin size="large" />
+              </div>
+            }
+          >
+            <ProfileView
+              songList={librarySongs}
+              goals={goals.goals}
+              isGoalsLoaded={goals.isLoaded}
+              onSaveGoal={goals.saveGoal}
+              onSetPrimaryGoal={goals.setPrimaryGoal}
+              gamification={gamification}
+              insights={{
+                recommendation: nextPractice.recommendation,
+                atomicStates,
+                dueReviews: atomicReviews,
+                deadlinePacing: nextPractice.deadlinePacing,
+                rejectedAtomicEvidenceCount:
+                  atomicStateReplay.rejected_events.length,
+                latestRun: gamification.latestRun?.summary,
+              }}
+              onStartTargetedPractice={startTargetedPractice}
+            />
+          </Suspense>
         )}
 
         {!songOpen && view === 'journey' && (
@@ -1284,31 +1414,6 @@ export function SongListView() {
           laneAccuracy={gamification.laneAccuracy ?? []}
           achievements={gamification.achievements}
         />
-      </Drawer>
-
-      <Drawer
-        title="Your profile"
-        open={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
-        size={480}
-        destroyOnHidden
-      >
-        <Suspense
-          fallback={
-            <div className="flex min-h-64 items-center justify-center">
-              <Spin size="large" />
-            </div>
-          }
-        >
-          <ProfileView
-            songList={librarySongs}
-            goals={goals.goals}
-            isGoalsLoaded={goals.isLoaded}
-            onSaveGoal={goals.saveGoal}
-            onSetPrimaryGoal={goals.setPrimaryGoal}
-            gamification={gamification}
-          />
-        </Suspense>
       </Drawer>
 
       <SetGoalModal

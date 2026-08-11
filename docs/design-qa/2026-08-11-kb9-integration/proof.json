@@ -1,0 +1,42 @@
+{
+  "source": "current production Electron build",
+  "viewport": {
+    "width": 1224,
+    "height": 768
+  },
+  "fixture": {
+    "base": ".userdata/final-qa/config.json",
+    "addedSongsIntentCandidate": {
+      "id": "song:kb9-songs-mode-proof",
+      "name": "Songs Intent – Composed Launch",
+      "source": "copy of the local Lesson 01.01 chart and audio with lesson metadata removed"
+    }
+  },
+  "insights": {
+    "profileRoute": true,
+    "heroVisible": true,
+    "drawerPresent": false,
+    "outerScroll": {
+      "document": false,
+      "body": false
+    },
+    "profileOwnScroll": true,
+    "activeView": "Insights"
+  },
+  "songsModePadLaunch": {
+    "prepared": {
+      "intent": "songs",
+      "target": "Songs Intent – Composed Launch",
+      "targetMeta": "Drumroll QA · 0.7× · Apply the session in the highest-ranked unused song; no stronger preference or skill link is available.",
+      "kickLabel": "Kick. Start Songs Intent – Composed Launch."
+    },
+    "launched": {
+      "practiceMode": "practice",
+      "speed": "0.7",
+      "title": "Songs Intent – Composed Launch",
+      "phase": "ready"
+    }
+  },
+  "consoleErrors": [],
+  "pageErrors": []
+}

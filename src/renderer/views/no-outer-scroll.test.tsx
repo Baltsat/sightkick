@@ -28,10 +28,10 @@ const routes = [
     },
   },
   {
-    name: 'Profile',
+    name: 'Insights',
     open: () => {
       fireEvent.click(screen.getByTestId('open-profile-button'));
-      expect(screen.getByText('Your profile')).toBeInTheDocument();
+      expect(screen.getByText('Insights')).toBeInTheDocument();
     },
   },
 ] as const;
