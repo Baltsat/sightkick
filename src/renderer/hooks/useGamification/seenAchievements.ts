@@ -10,7 +10,7 @@ import { AchievementId } from '../../services/achievements';
  * a toast.
  */
 
-const SEEN_KEY = 'gamification.seenAchievements';
+const SEEN_KEY = 'gamification.seenAchievements.v2';
 
 export function loadSeenAchievements(): Set<AchievementId> {
   try {

@@ -115,8 +115,32 @@ describe('intent-aware session composer', () => {
     });
 
     expect(plan?.blocks.at(-1)).toMatchObject({
-      role: 'apply',
+      role: 'celebrate',
       candidate_id: 'song:favourite',
+    });
+  });
+
+  it('uses the active goal song for the final payoff when a learning block launches first', () => {
+    const plan = composePracticeSession({
+      request: {
+        ...request('exercise'),
+        active_goal: {
+          song_id: 'song:goal',
+          preferred: true,
+          goal_kind: 'full_song',
+        },
+      },
+      ranking: [
+        ranked('lesson:focus', 'lesson'),
+        ranked('song:other', 'song'),
+        ranked('song:goal', 'song'),
+      ],
+    });
+
+    expect(plan?.launch.candidate_id).toBe('lesson:focus');
+    expect(plan?.blocks.at(-1)).toMatchObject({
+      role: 'celebrate',
+      candidate_id: 'song:goal',
     });
   });
 

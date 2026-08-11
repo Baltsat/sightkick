@@ -23,8 +23,11 @@ import {
 } from '../../services/mastery';
 import {
   composeHomeSession,
+  DeadlinePacingSummary,
   HomeSessionIntent,
+  HomeSessionSize,
   OneKickHomeSession,
+  PracticeCandidate,
   PracticeWaveResult,
   RankedPracticeCandidate,
 } from '../../services/next-practice';
@@ -54,6 +57,9 @@ interface HomeCockpitProps {
   pedagogyRanking?: readonly ZpdRankedCandidate[];
   practiceWave?: PracticeWaveResult;
   activeGoal?: SongGoal;
+  goalPayoffCandidate?: PracticeCandidate;
+  goalTargetDate?: string;
+  deadlinePacing?: DeadlinePacingSummary;
   atomicStates?: readonly AtomicSkillState[];
   sessionEnergy?: SessionEnergy;
   recentEarlyExits?: number;
@@ -155,6 +161,9 @@ export function HomeCockpit({
   pedagogyRanking,
   practiceWave,
   activeGoal,
+  goalPayoffCandidate,
+  goalTargetDate,
+  deadlinePacing,
   atomicStates,
   sessionEnergy,
   recentEarlyExits,
@@ -171,6 +180,7 @@ export function HomeCockpit({
   );
   const [sessionIntent, setSessionIntent] =
     useState<HomeSessionIntent>('learning');
+  const [sessionSize, setSessionSize] = useState<HomeSessionSize>('full');
   const clearPulseRef = useRef<number | undefined>(undefined);
   const clearPointerStrikeRef = useRef<number | undefined>(undefined);
   const homeRanking = useMemo(() => {
@@ -200,19 +210,27 @@ export function HomeCockpit({
         pedagogyRanking,
         practiceWave,
         activeGoal,
+        goalPayoffCandidate,
+        goalTargetDate,
+        deadlinePacing,
         atomicStates,
+        size: sessionSize,
         energy: sessionEnergy,
         recentEarlyExits,
       }),
     [
       activeGoal,
       atomicStates,
+      deadlinePacing,
+      goalPayoffCandidate,
+      goalTargetDate,
       homeRanking,
       pedagogyRanking,
       practiceWave,
       recentEarlyExits,
       sessionEnergy,
       sessionIntent,
+      sessionSize,
     ],
   );
   const targetRecommendation = homeSession?.launch ?? recommendation;
@@ -444,9 +462,11 @@ export function HomeCockpit({
           data-testid="home-session-manifest"
           data-state={sessionState}
           data-intent={sessionIntent}
+          data-size={sessionSize}
         >
           <p className="kit-home__eyebrow">
-            <FontAwesomeIcon icon={faDrum} aria-hidden="true" /> Current room
+            <FontAwesomeIcon icon={faDrum} aria-hidden="true" /> Session
+            contract
           </p>
           <div
             className="kit-home__intent"
@@ -478,11 +498,41 @@ export function HomeCockpit({
               Songs
             </button>
           </div>
+          <div
+            className="kit-home__intent"
+            role="group"
+            aria-label="Session size"
+          >
+            <button
+              type="button"
+              data-testid="home-session-size-short"
+              data-active={sessionSize === 'short'}
+              aria-pressed={sessionSize === 'short'}
+              onClick={() => {
+                setSessionSize('short');
+                setSessionState('armed');
+              }}
+            >
+              Short
+            </button>
+            <button
+              type="button"
+              data-testid="home-session-size-full"
+              data-active={sessionSize === 'full'}
+              aria-pressed={sessionSize === 'full'}
+              onClick={() => {
+                setSessionSize('full');
+                setSessionState('armed');
+              }}
+            >
+              Full
+            </button>
+          </div>
           <p className="kit-home__session-state">
             {sessionState === 'count-in'
               ? 'Count-in'
               : hasPracticeTarget
-              ? 'Ready at the kit'
+              ? `${sessionSize} set armed`
               : 'Choose a target'}
           </p>
           <h1 id="home-cockpit-title">
@@ -500,6 +550,12 @@ export function HomeCockpit({
                 }`
               : 'Choose one practice target. Your next hit begins it.'}
           </p>
+          {homeSession?.runway && (
+            <p className="kit-home__runway" data-testid="home-goal-runway">
+              <strong>{homeSession.runway.title}</strong>
+              <span>{homeSession.runway.detail}</span>
+            </p>
+          )}
           <p
             className="kit-home__readiness"
             data-testid="home-input-readiness"
@@ -577,24 +633,40 @@ export function HomeCockpit({
         </p>
       </section>
 
-      <section className="kit-home__wave" aria-label="Practice wave">
-        <article className="kit-home__wave-cell" data-testid="home-why-now">
-          <p>Why this now</p>
-          <strong>{practiceTarget?.name ?? 'Choose a target'}</strong>
+      <section
+        className="kit-home__wave"
+        aria-label="Focus, build, payoff session contract"
+        data-testid="home-session-contract"
+      >
+        <article
+          className="kit-home__wave-cell"
+          data-testid="home-session-focus"
+        >
+          <p>Focus</p>
+          <strong>{homeSession?.focus.title ?? 'Choose a target'}</strong>
           <span>
-            {homeSession?.reason ?? 'No playable practice target is armed yet.'}
+            {homeSession?.focus.detail ??
+              'Start with one counted phrase after a playable target is selected.'}
           </span>
         </article>
-        <article className="kit-home__wave-cell" data-testid="home-next-unlock">
-          <p>Next unlock</p>
-          <strong>{homeSession?.next.title ?? 'No next move yet'}</strong>
+        <article
+          className="kit-home__wave-cell"
+          data-testid="home-session-build"
+        >
+          <p>Build</p>
+          <strong>
+            {homeSession?.build.title ?? 'Build the first clean pass'}
+          </strong>
           <span>
-            {homeSession?.next.detail ??
-              'A next step appears after a playable target is selected.'}
+            {homeSession?.build.detail ??
+              'Two clean passes make the next musical payoff useful.'}
           </span>
         </article>
-        <article className="kit-home__wave-cell" data-testid="home-payoff">
-          <p>Musical payoff</p>
+        <article
+          className="kit-home__wave-cell"
+          data-testid="home-session-payoff"
+        >
+          <p>Payoff</p>
           <strong>{homeSession?.payoff.title ?? 'Choose a song'}</strong>
           <span>
             {homeSession?.payoff.detail ??

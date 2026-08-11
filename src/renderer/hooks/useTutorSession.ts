@@ -146,7 +146,7 @@ export function messageForTutorCommand(
       }: ${triggerEvidence(command)}${
         settings.livesEnabled
           ? ` ${command.livesRemaining} lives remain.`
-          : ' Recovery is based on the phrase, not a life penalty.'
+          : ' Recovery now focuses on the next phrase.'
       }`,
       tone: 'warning',
     };

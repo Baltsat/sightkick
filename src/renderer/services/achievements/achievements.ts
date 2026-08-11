@@ -1,22 +1,9 @@
 import { Song } from '../../../types';
-import { GameMode } from '../../types';
 import { ALL_DIFFICULTIES } from '../../../constants';
+import { GameMode } from '../../types';
 import { KIT_ELEMENTS } from '../../constants';
 import { LaneAccuracy } from '../practice-stats';
 import { calculateAccuracy, getStarRating } from '../../scoring';
-
-/**
- * Pure achievement derivation. No storage of its own — every badge is
- * computed fresh from data the app already persists elsewhere
- * (`practiceRuns`, `songs[].scoreData`, the daily-streak rollup), per the
- * "no new heavy storage" brief. The caller (`useGamification`) is
- * responsible for gathering that data and keeping a lightweight
- * "already shown" cache for the unlock toast — this module only answers
- * "is this badge unlocked right now".
- *
- * The small lesson-accuracy reducer below intentionally stays import-free
- * from hooks/useLessons so achievement derivation remains a pure service.
- */
 
 export type AchievementId =
   | 'first-blood'
@@ -32,85 +19,109 @@ export type AchievementId =
 export interface AchievementDef {
   id: AchievementId;
   title: string;
-  /** Shown once unlocked. */
   description: string;
-  /** Shown while locked, as a hint toward earning it. */
   hint: string;
+  evidenceEvent: string;
+  proofRank: number;
+  quietArchive?: boolean;
 }
 
 export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'first-blood',
-    title: 'First Blood',
-    description: 'Completed your first practice run.',
-    hint: 'Finish any run to unlock.',
+    title: 'Retained skill',
+    description: 'A delayed skill check held after the first pass.',
+    hint: 'Save a retained skill check after its first acquisition.',
+    evidenceEvent: 'saved retention evidence',
+    proofRank: 1,
   },
   {
     id: 'perfect-10',
-    title: 'Perfect 10',
-    description: 'Landed 10 runs at 95%+ accuracy.',
-    hint: 'Play runs at 95%+ accuracy — any song, any mode.',
-  },
-  {
-    id: 'week-one',
-    title: 'Week One',
-    description: 'Kept a 7-day practice streak alive.',
-    hint: 'Practice every day for a week.',
-  },
-  {
-    id: 'century',
-    title: 'Century',
-    description: 'Earned 100 stars across your library.',
-    hint: 'Earn stars by scoring runs in Perform mode.',
-  },
-  {
-    id: 'full-kit',
-    title: 'Full Kit',
-    description: 'Hit 80%+ accuracy on every drum in one run.',
-    hint: 'Land 80%+ on kick, snare, hi-hat, toms, ride and crash in a single run.',
-  },
-  {
-    id: 'season-finale',
-    title: 'Season Finale',
-    description: 'Cleared every lesson in a Drumroll Method unit.',
-    hint: 'Clear every lesson in one Method unit at 90%+ accuracy.',
-  },
-  {
-    id: 'night-owl',
-    title: 'Night Owl',
-    description: 'Practiced after 11pm.',
-    hint: 'Finish a run after 11pm.',
+    title: 'Timing settled',
+    description: 'Timing bias improved across comparable saved runs.',
+    hint: 'Repeat the same song, pace, and setup to compare timing.',
+    evidenceEvent: 'comparable timing-bias improvement',
+    proofRank: 2,
   },
   {
     id: 'early-bird',
-    title: 'Early Bird',
-    description: 'Practiced before 8am.',
-    hint: 'Finish a run before 8am.',
+    title: 'Clean recovery',
+    description: 'A targeted recovery loop ended cleanly.',
+    hint: 'Finish a saved Tutor recovery on its focused bar.',
+    evidenceEvent: 'saved clean recovery',
+    proofRank: 3,
+  },
+  {
+    id: 'night-owl',
+    title: 'Goal-song safety pass',
+    description: 'A qualifying pass was saved on the active goal song.',
+    hint: 'Save a complete, qualifying pass on your current goal song.',
+    evidenceEvent: 'qualifying saved goal-song pass',
+    proofRank: 4,
   },
   {
     id: 'speed-demon',
-    title: 'Speed Demon',
-    description: '3-starred an Expert chart at full speed.',
-    hint: 'Score 3+ stars on Expert in Perform mode (always full speed).',
+    title: 'Song personal best',
+    description: 'A later comparable song pass exceeded your saved best.',
+    hint: 'Beat a saved result on the same song, pace, and difficulty.',
+    evidenceEvent: 'comparable saved song personal best',
+    proofRank: 5,
+  },
+  {
+    id: 'full-kit',
+    title: 'Full-kit balance',
+    description: 'Every drum lane held 80% or better in one saved run.',
+    hint: 'Keep kick, snare, cymbals, and toms above 80% together.',
+    evidenceEvent: 'all-lane accuracy in one saved run',
+    proofRank: 6,
+  },
+  {
+    id: 'season-finale',
+    title: 'Method unit complete',
+    description: 'Every lesson in one Method unit met the clear evidence gate.',
+    hint: 'Clear each lesson in one Method unit at 90%+ accuracy.',
+    evidenceEvent: 'lesson-unit completion evidence',
+    proofRank: 7,
+  },
+  {
+    id: 'week-one',
+    title: 'Practice rhythm',
+    description: 'Seven consecutive qualifying practice days are saved.',
+    hint: 'Keep a qualifying practice rhythm for seven days.',
+    evidenceEvent: 'seven-day saved practice streak',
+    proofRank: 8,
+  },
+  {
+    id: 'century',
+    title: '100 stars archived',
+    description: 'Your library has 100 earned performance stars.',
+    hint: 'Keep collecting verified performance stars.',
+    evidenceEvent: '100 library performance stars',
+    proofRank: 99,
+    quietArchive: true,
   },
 ];
 
-/** Minimal per-run shape achievement checks need. `localHour` (0-23) is
- * resolved by the caller from `RunSummary.completedAt` — kept out of this
- * module so it stays a pure function of plain numbers, never `Date`/TZ. */
 export interface AchievementRun {
   overallAccuracy: number;
   laneAccuracy: LaneAccuracy[];
-  localHour: number;
   mode?: GameMode;
+  songId?: string;
+  completedAt?: string;
+  difficulty?: string;
+  playbackSpeed?: number;
+  timingMeanMs?: number;
+  timingSampleCount?: number;
+  retainedSkillCount?: number;
+  cleanRecoveryCount?: number;
+  scoredAttempts?: number;
 }
 
 export interface AchievementsInput {
-  /** Every stored run across every song (see `load-all-practice-runs`). */
   runs: AchievementRun[];
   songList: Song[];
-  /** Longest streak ever reached, within retention. */
   longestStreak: number;
+  activeGoalSongId?: string;
 }
 
 export interface AchievementResult {
@@ -118,18 +129,15 @@ export interface AchievementResult {
   unlocked: boolean;
 }
 
-const PERFECT_RUN_ACCURACY = 0.95;
-const PERFECT_RUN_COUNT = 10;
 const CENTURY_STARS = 100;
 const WEEK_ONE_STREAK = 7;
-/** "Before 8am" per the brief - inclusive of the very early hours. */
-const EARLY_BIRD_BEFORE_HOUR = 8;
-/** "After 11pm" per the brief. */
-const NIGHT_OWL_AT_OR_AFTER_HOUR = 23;
-const SPEED_DEMON_MIN_STARS = 3;
+const MIN_TIMING_SAMPLES = 10;
+const MIN_TIMING_IMPROVEMENT_MS = 8;
+const MIN_PERSONAL_BEST_GAIN = 0.03;
+const GOAL_SAFETY_ACCURACY = 0.82;
+const GOAL_SAFETY_ATTEMPTS = 12;
 const LESSON_CLEAR_ACCURACY = 0.9;
 
-/** Best star rating (0-5) earned on a song across every played difficulty. */
 export function bestStarsForSong(song: Song): number {
   if (!song.scoreData) {
     return 0;
@@ -154,29 +162,95 @@ function bestAccuracyForSong(song: Song): number {
   }, 0);
 }
 
-/** Sum of each song's best star rating - the same "career total" the
- * library header's total-stars figure and the Century badge both use. */
 export function totalStarsAcrossLibrary(songList: Song[]): number {
   return songList.reduce((sum, song) => sum + bestStarsForSong(song), 0);
 }
 
-function hasFirstBlood(runs: AchievementRun[]): boolean {
-  return runs.length > 0;
+function comparableKey(run: AchievementRun): string | undefined {
+  if (!run.songId || !run.completedAt || !run.difficulty) {
+    return undefined;
+  }
+
+  return [
+    run.songId,
+    run.mode ?? 'unknown',
+    run.difficulty,
+    (run.playbackSpeed ?? 1).toFixed(3),
+  ].join(':');
 }
 
-function hasPerfect10(runs: AchievementRun[]): boolean {
-  return (
-    runs.filter((run) => run.overallAccuracy >= PERFECT_RUN_ACCURACY).length >=
-    PERFECT_RUN_COUNT
+function comparableGroups(runs: AchievementRun[]): AchievementRun[][] {
+  const groups = new Map<string, AchievementRun[]>();
+
+  for (const run of runs) {
+    const key = comparableKey(run);
+
+    if (key) {
+      groups.set(key, [...(groups.get(key) ?? []), run]);
+    }
+  }
+
+  return [...groups.values()].map((group) =>
+    [...group].sort((left, right) =>
+      left.completedAt!.localeCompare(right.completedAt!),
+    ),
   );
 }
 
-function hasWeekOne(longestStreak: number): boolean {
-  return longestStreak >= WEEK_ONE_STREAK;
+function hasRetainedSkill(runs: AchievementRun[]): boolean {
+  return runs.some((run) => (run.retainedSkillCount ?? 0) > 0);
 }
 
-function hasCentury(songList: Song[]): boolean {
-  return totalStarsAcrossLibrary(songList) >= CENTURY_STARS;
+function hasTimingSettled(runs: AchievementRun[]): boolean {
+  return comparableGroups(runs).some((group) =>
+    group.some((run, index) => {
+      const previous = group[index - 1];
+
+      return (
+        previous !== undefined &&
+        (run.timingSampleCount ?? 0) >= MIN_TIMING_SAMPLES &&
+        (previous.timingSampleCount ?? 0) >= MIN_TIMING_SAMPLES &&
+        Number.isFinite(previous.timingMeanMs) &&
+        Number.isFinite(run.timingMeanMs) &&
+        Math.abs(previous.timingMeanMs!) - Math.abs(run.timingMeanMs!) >=
+          MIN_TIMING_IMPROVEMENT_MS
+      );
+    }),
+  );
+}
+
+function hasCleanRecovery(runs: AchievementRun[]): boolean {
+  return runs.some((run) => (run.cleanRecoveryCount ?? 0) > 0);
+}
+
+function hasGoalSafetyPass(
+  runs: AchievementRun[],
+  activeGoalSongId: string | undefined,
+): boolean {
+  return Boolean(
+    activeGoalSongId &&
+      runs.some(
+        (run) =>
+          run.songId === activeGoalSongId &&
+          (run.scoredAttempts ?? 0) >= GOAL_SAFETY_ATTEMPTS &&
+          run.overallAccuracy >= GOAL_SAFETY_ACCURACY,
+      ),
+  );
+}
+
+function hasSongPersonalBest(runs: AchievementRun[]): boolean {
+  return comparableGroups(runs).some((group) =>
+    group.some((run, index) => {
+      const earlier = group.slice(0, index);
+
+      return (
+        earlier.length > 0 &&
+        run.overallAccuracy >=
+          Math.max(...earlier.map(({ overallAccuracy }) => overallAccuracy)) +
+            MIN_PERSONAL_BEST_GAIN
+      );
+    }),
+  );
 }
 
 function hasFullKit(runs: AchievementRun[]): boolean {
@@ -189,7 +263,7 @@ function hasFullKit(runs: AchievementRun[]): boolean {
   );
 }
 
-function hasSeasonFinale(songList: Song[]): boolean {
+function hasMethodUnit(songList: Song[]): boolean {
   const byUnit = new Map<string, Song[]>();
 
   for (const song of songList) {
@@ -197,10 +271,10 @@ function hasSeasonFinale(songList: Song[]): boolean {
       continue;
     }
 
-    const unitSongs = byUnit.get(song.lesson.unit) ?? [];
-
-    unitSongs.push(song);
-    byUnit.set(song.lesson.unit, unitSongs);
+    byUnit.set(song.lesson.unit, [
+      ...(byUnit.get(song.lesson.unit) ?? []),
+      song,
+    ]);
   }
 
   return [...byUnit.values()].some(
@@ -212,39 +286,21 @@ function hasSeasonFinale(songList: Song[]): boolean {
   );
 }
 
-function hasNightOwl(runs: AchievementRun[]): boolean {
-  return runs.some((run) => run.localHour >= NIGHT_OWL_AT_OR_AFTER_HOUR);
-}
-
-function hasEarlyBird(runs: AchievementRun[]): boolean {
-  return runs.some((run) => run.localHour < EARLY_BIRD_BEFORE_HOUR);
-}
-
-function hasSpeedDemon(songList: Song[]): boolean {
-  // Perform mode locks playback at 1x (see modes.ts MODE_POLICIES.perform),
-  // so any scored Expert run is "at 1x" by construction - no separate
-  // speed check needed.
-  return songList.some((song) => {
-    const data = song.scoreData?.expert;
-
-    return data !== undefined && getStarRating(data) >= SPEED_DEMON_MIN_STARS;
-  });
-}
-
 export function computeAchievements(
   input: AchievementsInput,
 ): AchievementResult[] {
-  const { runs, songList, longestStreak } = input;
+  const { runs, songList, longestStreak, activeGoalSongId } = input;
+  const unlockedById: Record<AchievementId, boolean> = {
+    'first-blood': hasRetainedSkill(runs),
+    'perfect-10': hasTimingSettled(runs),
+    'early-bird': hasCleanRecovery(runs),
+    'night-owl': hasGoalSafetyPass(runs, activeGoalSongId),
+    'speed-demon': hasSongPersonalBest(runs),
+    'full-kit': hasFullKit(runs),
+    'season-finale': hasMethodUnit(songList),
+    'week-one': longestStreak >= WEEK_ONE_STREAK,
+    century: totalStarsAcrossLibrary(songList) >= CENTURY_STARS,
+  };
 
-  return [
-    { id: 'first-blood', unlocked: hasFirstBlood(runs) },
-    { id: 'perfect-10', unlocked: hasPerfect10(runs) },
-    { id: 'week-one', unlocked: hasWeekOne(longestStreak) },
-    { id: 'century', unlocked: hasCentury(songList) },
-    { id: 'full-kit', unlocked: hasFullKit(runs) },
-    { id: 'season-finale', unlocked: hasSeasonFinale(songList) },
-    { id: 'night-owl', unlocked: hasNightOwl(runs) },
-    { id: 'early-bird', unlocked: hasEarlyBird(runs) },
-    { id: 'speed-demon', unlocked: hasSpeedDemon(songList) },
-  ];
+  return ACHIEVEMENTS.map(({ id }) => ({ id, unlocked: unlockedById[id] }));
 }

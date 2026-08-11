@@ -339,7 +339,7 @@ describe('Tutor HUD evidence messages', () => {
         ...DEFAULT_TUTOR_SETTINGS,
         livesEnabled: false,
       })?.detail,
-    ).not.toContain('lives remain');
+    ).not.toMatch(/life/i);
     expect(
       messageForTutorCommand(rewind, DEFAULT_TUTOR_SETTINGS)?.detail,
     ).toContain('Checkpoint bar 3 gives 1 lead-in bar before failed bars 4–5');

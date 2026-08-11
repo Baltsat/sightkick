@@ -294,14 +294,24 @@ describe('HomeCockpit kit home', () => {
       </InputProvider>,
     );
 
-    expect(screen.getByTestId('home-why-now')).toHaveTextContent(
-      '2 saved Coach findings route directly to this lesson.',
+    expect(screen.getByTestId('home-session-contract')).toHaveTextContent(
+      'Focus',
     );
-    expect(screen.getByTestId('home-next-unlock')).toHaveTextContent(
+    expect(screen.getByTestId('home-session-focus')).toHaveTextContent(
+      'Kick independence',
+    );
+    expect(screen.getByTestId('home-session-build')).toHaveTextContent(
+      'Build the phrase',
+    );
+    expect(screen.getByTestId('home-session-payoff')).toHaveTextContent(
       'Practice song',
     );
-    expect(screen.getByTestId('home-payoff')).toHaveTextContent(
-      'Practice song',
+
+    fireEvent.click(screen.getByTestId('home-session-size-short'));
+
+    expect(screen.getByTestId('home-session-manifest')).toHaveAttribute(
+      'data-size',
+      'short',
     );
 
     fireEvent.click(screen.getByTestId('home-intent-songs'));
@@ -317,6 +327,7 @@ describe('HomeCockpit kit home', () => {
     expect(onStartSession).toHaveBeenCalledWith(
       expect.objectContaining({
         intent: 'songs',
+        size: 'short',
         launch: expect.objectContaining({
           candidate: expect.objectContaining({ id: song.id }),
         }),

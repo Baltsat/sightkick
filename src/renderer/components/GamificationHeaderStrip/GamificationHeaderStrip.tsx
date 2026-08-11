@@ -51,6 +51,13 @@ export function GamificationHeaderStrip({
     );
   }
 
+  const practiceStreakLabel =
+    streak.current > 0
+      ? `Practice streak · ${streak.current} days`
+      : streak.longest > 0
+      ? 'New set, same progress'
+      : 'Practice streak';
+
   return (
     <div
       className={cn(
@@ -77,9 +84,15 @@ export function GamificationHeaderStrip({
             className="text-sm font-semibold tabular-nums text-text"
             data-testid="today-xp-label"
           >
-            {todayXp} / {goalXp} XP today
+            Today’s set · {todayXp} / {goalXp} XP
           </span>
           <div className="flex items-center gap-3">
+            <span
+              className="text-xs text-text-faint"
+              data-testid="practice-streak-label"
+            >
+              {practiceStreakLabel}
+            </span>
             <WeekDots activity={weekActivity} />
             <div
               className="flex items-center gap-1 text-xs text-text-faint"

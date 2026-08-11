@@ -32,6 +32,9 @@ describe('StatsPanel', () => {
     expect(screen.getByTestId('stat-current-streak')).toHaveTextContent('3');
     expect(screen.getByTestId('stat-longest-streak')).toHaveTextContent('5');
     expect(screen.getByTestId('stat-total-stars')).toHaveTextContent('12');
+    expect(screen.getByTestId('today-set-definition')).toHaveTextContent(
+      'qualifying saved practice days',
+    );
     expect(screen.getByTestId('weekly-xp-chart')).toBeInTheDocument();
     expect(screen.getByTestId('achievement-grid-loading')).toBeInTheDocument();
     expect(screen.getByTestId('lane-accuracy-empty')).toBeInTheDocument();
@@ -54,9 +57,27 @@ describe('StatsPanel', () => {
       'data-unlocked',
       'true',
     );
+    expect(screen.getByTestId('achievement-archive')).toBeInTheDocument();
     expect(screen.getByTestId('achievement-century')).toHaveAttribute(
       'data-unlocked',
       'false',
+    );
+  });
+
+  it('keeps a lapsed streak separate from the new daily set', () => {
+    render(
+      <StatsPanel
+        streak={{ current: 0, longest: 4 }}
+        weeklyXp={weeklyXp}
+        goalXp={50}
+        totalStars={0}
+        laneAccuracy={[]}
+        achievements={undefined}
+      />,
+    );
+
+    expect(screen.getByTestId('streak-reentry')).toHaveTextContent(
+      'New set, same progress',
     );
   });
 

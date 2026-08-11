@@ -91,6 +91,10 @@
   background: color-mix(in srgb, var(--surface-studio) 54%, transparent);
 }
 
+.kit-home__intent + .kit-home__intent {
+  margin-top: 0.35rem;
+}
+
 .kit-home__intent button {
   min-width: 4.4rem;
   padding: 0.32rem 0.52rem;
@@ -136,6 +140,22 @@
   color: color-mix(in srgb, var(--surface-raised) 76%, transparent);
   font-size: clamp(0.78rem, 1vw, 0.94rem);
   line-height: 1.45;
+}
+
+.kit-home__runway {
+  display: grid;
+  gap: 0.12rem;
+  margin: 0.55rem 0 0;
+  color: color-mix(in srgb, var(--surface-raised) 82%, transparent);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.kit-home__runway strong {
+  color: var(--signal-ember);
+  font-weight: 760;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
 }
 
 .kit-home__readiness {

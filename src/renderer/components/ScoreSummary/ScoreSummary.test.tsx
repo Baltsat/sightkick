@@ -268,6 +268,64 @@ describe('ScoreSummary', () => {
     expect(modal.getByTestId('practice-stats-empty')).toBeInTheDocument();
   });
 
+  it('places comparable musical change ahead of statistics and chooses one next action', () => {
+    const previous = {
+      ...multiLaneRunFixture(),
+      laneAccuracy: [
+        { element: 'kick' as const, hits: 6, misses: 4, accuracy: 0.6 },
+      ],
+    };
+    const summary = {
+      ...previous,
+      laneAccuracy: [
+        { element: 'kick' as const, hits: 8, misses: 2, accuracy: 0.8 },
+      ],
+    };
+    const { modal } = renderSummary({
+      practiceSummary: summary,
+      previousPracticeSummary: previous,
+    });
+
+    expect(modal.getByTestId('musical-receipt')).toHaveTextContent(
+      'Kick rose 20 points',
+    );
+    expect(modal.getByTestId('musical-receipt-action')).toHaveTextContent(
+      'Continue current plan',
+    );
+    expect(modal.getByTestId('score-next')).toHaveTextContent(
+      'Continue current plan',
+    );
+  });
+
+  it('makes a saved loop target the primary action without claiming improvement', () => {
+    const summary = {
+      ...multiLaneRunFixture(),
+      coachEvidence: [
+        {
+          id: 'bar-4',
+          kind: 'timing',
+          severity: 'medium' as const,
+          skillTag: 'timing',
+          sampleCount: 12,
+          barStart: 4,
+          barEnd: 4,
+        },
+      ],
+    };
+    const { modal } = renderSummary({ practiceSummary: summary });
+
+    expect(modal.getByTestId('musical-receipt')).toHaveAttribute(
+      'data-changed',
+      'false',
+    );
+    expect(modal.getByTestId('score-retry').className).toContain(
+      'ant-btn-primary',
+    );
+    expect(modal.getByTestId('score-retry')).toHaveTextContent(
+      'Replay this loop',
+    );
+  });
+
   describe('gamification', () => {
     function gamificationFixture(
       overrides: Partial<UseGamificationResult> = {},
@@ -329,10 +387,10 @@ describe('ScoreSummary', () => {
 
       expect(modal.getByTestId('run-xp-earned')).toHaveTextContent('+42 XP');
       expect(modal.getByTestId('run-streak-status')).toHaveTextContent(
-        '3-day streak',
+        '3-day practice streak',
       );
       expect(modal.getByTestId('run-goal-status')).toHaveTextContent(
-        "10 XP to today's goal",
+        "10 XP left in today's set",
       );
     });
 
@@ -344,14 +402,39 @@ describe('ScoreSummary', () => {
       });
 
       expect(modal.getByTestId('run-goal-status')).toHaveTextContent(
-        "Today's goal reached!",
+        "Today's set reached",
       );
+      expect(modal.getByTestId('gamification-summary').className).not.toContain(
+        'sk-goal-celebrate',
+      );
+    });
+
+    it('animates a completed daily set only when saved musical evidence changed', () => {
+      const previous = {
+        ...multiLaneRunFixture(),
+        laneAccuracy: [
+          { element: 'kick' as const, hits: 6, misses: 4, accuracy: 0.6 },
+        ],
+      };
+      const summary = {
+        ...previous,
+        laneAccuracy: [
+          { element: 'kick' as const, hits: 8, misses: 2, accuracy: 0.8 },
+        ],
+      };
+      const { modal } = renderSummary({
+        gamification: gamificationFixture({ todayXp: 60, goalXp: 50 }),
+        runResult: runResultFixture({ goalCrossed: true }),
+        practiceSummary: summary,
+        previousPracticeSummary: previous,
+      });
+
       expect(modal.getByTestId('gamification-summary').className).toContain(
         'sk-goal-celebrate',
       );
     });
 
-    it('shows a "start a streak" message when there is no active streak', () => {
+    it('keeps a lapsed practice streak separate from the new daily set', () => {
       const { modal } = renderSummary({
         scoreData: { hitNotes: 70, totalNotes: 100, falseHits: 5 },
         gamification: gamificationFixture({
@@ -361,7 +444,7 @@ describe('ScoreSummary', () => {
       });
 
       expect(modal.getByTestId('run-streak-status')).toHaveTextContent(
-        'Start a streak',
+        'New set, same progress',
       );
     });
 
@@ -371,14 +454,15 @@ describe('ScoreSummary', () => {
         gamification: gamificationFixture(),
         runResult: runResultFixture({
           nudge: {
-            achievementId: 'perfect-10',
-            message: '2 runs like this and Perfect 10 unlocks',
+            achievementId: 'week-one',
+            message:
+              '1 qualifying practice day in a row unlocks Practice rhythm',
           },
         }),
       });
 
       expect(modal.getByTestId('run-nudge')).toHaveTextContent(
-        '2 runs like this and Perfect 10 unlocks',
+        '1 qualifying practice day in a row unlocks Practice rhythm',
       );
     });
 
@@ -403,6 +487,8 @@ describe('ScoreSummary', () => {
               title: 'First Blood',
               description: 'Completed your first practice run.',
               hint: 'Finish any run to unlock.',
+              evidenceEvent: 'saved test evidence',
+              proofRank: 1,
             },
           ],
         }),

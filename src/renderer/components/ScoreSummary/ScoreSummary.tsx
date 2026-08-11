@@ -22,6 +22,7 @@ import { AchievementToastQueue } from '../AchievementToastQueue';
 import type { LessonProgressionDecision } from '../../services/lesson-progression';
 import { KitCommandPrompt } from '../KitCommandPrompt';
 import { LearningEvidenceReceipt } from '../LearningEvidenceReceipt';
+import { musicalReceipt } from './musicalReceipt';
 
 interface Props {
   isOpen: boolean;
@@ -36,6 +37,7 @@ interface Props {
   difficulty: Difficulty;
   scoreData?: ScoreData;
   practiceSummary?: RunSummary;
+  previousPracticeSummary?: RunSummary;
   /** Live streak/XP-vs-goal state, shared with the library header (see
    * SongListView's <Outlet context>). Only used to phrase "N XP to
    * today's goal" — everything specific to *this* run comes from
@@ -131,6 +133,7 @@ export function ScoreSummary({
   difficulty,
   scoreData,
   practiceSummary,
+  previousPracticeSummary,
   gamification,
   runResult,
   lessonProgression,
@@ -161,6 +164,11 @@ export function ScoreSummary({
     : 0;
   const streakCurrent =
     gamification?.streak.current ?? runResult?.streakCurrent ?? 0;
+  const receipt = useMemo(
+    () => musicalReceipt(practiceSummary, previousPracticeSummary),
+    [practiceSummary, previousPracticeSummary],
+  );
+  const primaryIsReplay = receipt?.action === 'replay';
   // A player may explicitly continue after an honest failure/no-evidence
   // warning, but never while the main-process write is still unresolved:
   // leaving then would tear down the only acknowledgement listener.
@@ -249,12 +257,13 @@ export function ScoreSummary({
         <Button
           data-testid="score-retry"
           className="grow"
+          type={primaryIsReplay ? 'primary' : 'default'}
           disabled={continuationBlocked}
           onClick={() => onRetry()}
           icon={<FontAwesomeIcon icon={faRepeat} />}
           size="large"
         >
-          Play again
+          {primaryIsReplay ? 'Replay this loop' : 'Play again'}
         </Button>
         {practiceSummary && onCoach && (
           <Button
@@ -270,12 +279,12 @@ export function ScoreSummary({
         <Button
           data-testid="score-next"
           className="grow"
-          type="primary"
+          type={primaryIsReplay ? 'default' : 'primary'}
           disabled={continuationBlocked}
           onClick={() => onNextSong()}
           size="large"
         >
-          {nextLabel}
+          {receipt?.action === 'continue' ? receipt.actionLabel : nextLabel}
         </Button>
       </div>
     </div>
@@ -297,6 +306,32 @@ export function ScoreSummary({
       zIndex={MODAL_ABOVE_POPOVER_Z_INDEX}
     >
       <div className="flex flex-col items-center gap-6 py-2">
+        {receipt && (
+          <section
+            className="w-full rounded-2xl border border-accent-soft-border bg-accent-soft-bg p-4 text-left"
+            data-testid="musical-receipt"
+            data-changed={receipt.changed}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-text">
+              Musical receipt
+            </p>
+            <h3 className="mt-1 font-display text-2xl font-semibold tracking-[-0.035em] text-text">
+              {receipt.headline}
+            </h3>
+            <p
+              className="mt-1 text-sm leading-relaxed text-text-muted"
+              data-testid="musical-receipt-meaning"
+            >
+              {receipt.meaning}
+            </p>
+            <p
+              className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-accent-text"
+              data-testid="musical-receipt-action"
+            >
+              Next: {receipt.actionLabel}
+            </p>
+          </section>
+        )}
         {scoreData ? (
           // Star rating, accuracy headline and the hit/missed/false-hit grid
           // are all derived from `scoreData` — Perform-only (see
@@ -391,7 +426,7 @@ export function ScoreSummary({
           <div
             className={cn(
               'flex w-full flex-col gap-2 rounded-xl border border-accent-soft-border bg-accent-soft-bg p-3',
-              runResult.goalCrossed && 'sk-goal-celebrate',
+              runResult.goalCrossed && receipt?.changed && 'sk-goal-celebrate',
             )}
             data-testid="gamification-summary"
           >
@@ -410,8 +445,8 @@ export function ScoreSummary({
                   }}
                 />
                 {streakCurrent > 0
-                  ? `${streakCurrent}-day streak`
-                  : 'Start a streak tomorrow'}
+                  ? `${streakCurrent}-day practice streak`
+                  : 'New set, same progress'}
               </div>
               <div
                 className="font-display text-lg font-semibold text-accent-text tabular-nums"
@@ -425,8 +460,8 @@ export function ScoreSummary({
               data-testid="run-goal-status"
             >
               {xpToGoal === 0
-                ? "Today's goal reached!"
-                : `${xpToGoal} XP to today's goal`}
+                ? "Today's set reached"
+                : `${xpToGoal} XP left in today's set`}
             </div>
             {runResult.nudge && (
               <div className="text-xs text-accent-text" data-testid="run-nudge">

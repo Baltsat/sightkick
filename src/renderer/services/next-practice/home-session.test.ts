@@ -148,9 +148,12 @@ describe('composeHomeSession', () => {
 
     expect(learning).toMatchObject({
       source: 'pedagogy-v2',
+      size: 'short',
       launch: { candidate: { id: lesson.candidate.id } },
       reason: lesson.decisionReceipt?.explanation,
-      next: { title: lesson.candidate.title },
+      focus: { title: lesson.candidate.title },
+      build: { title: lesson.candidate.title },
+      payoff: { title: favourite.candidate.title },
     });
     expect(songs).toMatchObject({
       source: 'pedagogy-v2',
@@ -190,9 +193,11 @@ describe('composeHomeSession', () => {
     expect(session).toMatchObject({
       source: 'practice-wave',
       reason: '2 saved Coach findings route directly to this lesson.',
-      next: {
-        title: song.candidate.title,
-        detail: 'Apply the focused skill in a liked song.',
+      focus: {
+        title: lesson.candidate.title,
+      },
+      build: {
+        title: 'Build the phrase',
       },
       payoff: { title: song.candidate.title },
     });
@@ -230,5 +235,50 @@ describe('composeHomeSession', () => {
       source: 'practice-wave',
       launch: { candidate: { id: song.candidate.id } },
     });
+  });
+
+  it('shows a target-date runway without inventing a weekly pace when evidence is thin', () => {
+    const lesson = ranked('lesson:focus', 'lesson', 'Saved Coach evidence.');
+    const song = ranked('song:apply', 'song', 'A liked song is available.');
+    const session = composeHomeSession({
+      intent: 'learning',
+      ranking: [lesson, song],
+      pedagogyRanking: [zpd(lesson), zpd(song)],
+      activeGoal: {
+        song_id: song.candidate.id,
+        preferred: true,
+        goal_kind: 'full_song',
+      },
+      goalTargetDate: '2026-09-10',
+    });
+
+    expect(session?.runway).toMatchObject({
+      title: 'September 10 runway',
+      detail: 'Building evidence for a weekly pace.',
+    });
+  });
+
+  it('keeps the primary goal song as payoff when it is outside the ranked shortlist', () => {
+    const lesson = ranked('lesson:focus', 'lesson', 'Saved Coach evidence.');
+    const otherSong = ranked('song:other', 'song', 'A different liked song.');
+    const goalSong = ranked('song:goal', 'song', 'The chosen goal song.');
+    const session = composeHomeSession({
+      intent: 'learning',
+      ranking: [lesson, otherSong],
+      activeGoal: {
+        song_id: goalSong.candidate.id,
+        preferred: true,
+        goal_kind: 'full_song',
+      },
+      goalPayoffCandidate: goalSong.candidate,
+    });
+
+    expect(session?.payoff).toMatchObject({
+      candidateId: 'song:goal',
+      title: 'song:goal',
+    });
+    expect(session?.payoff.detail).toContain(
+      'Apply the session in your goal song.',
+    );
   });
 });

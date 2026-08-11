@@ -104,20 +104,44 @@ function isErrorReply(reply: object): reply is { error: string } {
   return 'error' in reply;
 }
 
-function toAchievementRun(run: RunSummary): AchievementRun {
+function cleanRecoveryCount(run: RunSummary): number {
+  return [
+    ...Object.values(run.learningEvidence?.bars ?? {}),
+    ...Object.values(run.learningEvidence?.skills ?? {}),
+  ].reduce((count, evidence) => count + (evidence.recoveryCleanCount ?? 0), 0);
+}
+
+function toAchievementRun(run: RunSummary, songId?: string): AchievementRun {
   return {
     overallAccuracy: run.overallAccuracy,
     laneAccuracy: run.laneAccuracy,
-    // completedAt is a UTC ISO instant; reading it with the LOCAL Date
-    // getters here (not getUTCHours) reports the hour in this machine's
-    // *current* timezone. For a single-user desktop app that's the right
-    // answer in the overwhelming common case (the machine that finished
-    // the run is the one asking "was that late at night?"); a run
-    // recorded while traveling across timezones could read a few hours
-    // off, an accepted simplification.
-    localHour: new Date(run.completedAt).getHours(),
     mode: run.mode,
+    songId,
+    completedAt: run.completedAt,
+    difficulty: run.difficulty,
+    playbackSpeed: run.playbackSpeed,
+    timingMeanMs: run.timingBias.meanMs,
+    timingSampleCount: run.timingBias.sampleCount,
+    retainedSkillCount:
+      run.atomicSkillEvidence?.filter(
+        ({ evidence_kind }) => evidence_kind === 'retention',
+      ).length ?? 0,
+    cleanRecoveryCount: cleanRecoveryCount(run),
+    scoredAttempts: run.totalHits + run.totalMisses,
   };
+}
+
+function achievementRunsFor(
+  runs: RunSummary[],
+  runsBySong: Record<string, RunSummary[]> | undefined,
+): AchievementRun[] {
+  if (!runsBySong) {
+    return runs.map((run) => toAchievementRun(run));
+  }
+
+  return Object.entries(runsBySong).flatMap(([songId, summaries]) =>
+    summaries.map((summary) => toAchievementRun(summary, songId)),
+  );
 }
 
 /**
@@ -129,7 +153,10 @@ function toAchievementRun(run: RunSummary): AchievementRun {
  * `useSongList`'s `update-song` listener keeps multiple mounted consumers
  * consistent without a shared context provider.
  */
-export function useGamification(songList: Song[]): UseGamificationResult {
+export function useGamification(
+  songList: Song[],
+  activeGoalSongId?: string,
+): UseGamificationResult {
   const [days, setDays] = useState<PracticeDays>({});
   const [isLoaded, setIsLoaded] = useState(false);
   const [runsCache, setRunsCache] = useState<RunSummary[]>();
@@ -230,18 +257,19 @@ export function useGamification(songList: Song[]): UseGamificationResult {
       return undefined;
     }
 
-    const achievementRuns = runsCache.map(toAchievementRun);
+    const achievementRuns = achievementRunsFor(runsCache, runsBySongCache);
     const results = computeAchievements({
       runs: achievementRuns,
       songList,
       longestStreak: streak.longest,
+      activeGoalSongId,
     });
 
     return results.map((result) => ({
       ...ACHIEVEMENTS.find((def) => def.id === result.id)!,
       unlocked: result.unlocked,
     }));
-  }, [runsCache, songList, streak.longest]);
+  }, [activeGoalSongId, runsBySongCache, runsCache, songList, streak.longest]);
   const laneAccuracy = useMemo<LaneAccuracy[] | undefined>(() => {
     if (!runsCache) {
       return undefined;
@@ -319,21 +347,23 @@ export function useGamification(songList: Song[]): UseGamificationResult {
           recordRunsOffRef.current = undefined;
 
           const runs = isErrorReply(runsReply) ? [] : runsReply.runs;
+          const runsBySong = isErrorReply(runsReply)
+            ? undefined
+            : runsReply.runsBySong;
           const archiveBySong = isErrorReply(runsReply)
             ? undefined
             : runsReply.archiveBySong || {};
 
           setRunsCache(runs);
-          setRunsBySongCache(
-            isErrorReply(runsReply) ? undefined : runsReply.runsBySong,
-          );
+          setRunsBySongCache(runsBySong);
           setArchiveBySongCache(archiveBySong);
 
-          const achievementRuns = runs.map(toAchievementRun);
+          const achievementRuns = achievementRunsFor(runs, runsBySong);
           const results = computeAchievements({
             runs: achievementRuns,
             songList,
             longestStreak,
+            activeGoalSongId,
           });
           const seen = loadSeenAchievements();
           const unlockedIds = results
@@ -341,7 +371,9 @@ export function useGamification(songList: Song[]): UseGamificationResult {
             .map((result) => result.id);
           const newlyUnlocked = unlockedIds
             .filter((id) => !seen.has(id))
-            .map((id) => ACHIEVEMENTS.find((def) => def.id === id)!);
+            .map((id) => ACHIEVEMENTS.find((def) => def.id === id)!)
+            .filter((achievement) => !achievement.quietArchive)
+            .sort((left, right) => left.proofRank - right.proofRank);
 
           saveSeenAchievements(new Set([...seen, ...unlockedIds]));
 
@@ -369,7 +401,7 @@ export function useGamification(songList: Song[]): UseGamificationResult {
         minutes: input.minutes,
       });
     },
-    [songList],
+    [activeGoalSongId, songList],
   );
 
   return {

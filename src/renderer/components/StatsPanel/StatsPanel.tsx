@@ -58,14 +58,14 @@ export function StatsPanel({
       <div className="flex gap-2">
         <StatTile
           testId="stat-current-streak"
-          label="Day streak"
+          label="Practice streak"
           value={streak.current}
           icon={faFire}
           iconColor="var(--color-orange)"
         />
         <StatTile
           testId="stat-longest-streak"
-          label="Best streak"
+          label="Longest practice streak"
           value={streak.longest}
           icon={faFire}
           iconColor="var(--color-text-faint)"
@@ -79,10 +79,27 @@ export function StatsPanel({
         />
       </div>
 
+      {streak.current === 0 && streak.longest > 0 && (
+        <p
+          className="rounded-xl border border-border-soft bg-fill px-4 py-3 text-sm leading-relaxed text-text-muted"
+          data-testid="streak-reentry"
+        >
+          New set, same progress. Your saved practice, stars, and goal path stay
+          with you.
+        </p>
+      )}
+
       <section className="flex flex-col gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint">
-          This week&apos;s XP
+          Today&apos;s set · daily XP
         </h3>
+        <p
+          className="text-sm leading-relaxed text-text-muted"
+          data-testid="today-set-definition"
+        >
+          This is today&apos;s effort target. A practice streak counts
+          consecutive qualifying saved practice days.
+        </p>
         <WeeklyXpChart points={weeklyXp} goalXp={goalXp} />
       </section>
 

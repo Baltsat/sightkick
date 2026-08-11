@@ -305,7 +305,7 @@ describe('achievements', () => {
     expect(
       result.current.achievements!.find((a) => a.id === 'first-blood')
         ?.unlocked,
-    ).toBe(true);
+    ).toBe(false);
     expect(
       result.current.achievements!.find((a) => a.id === 'century')?.unlocked,
     ).toBe(false);
@@ -374,8 +374,26 @@ describe('recordRun', () => {
       });
     });
 
+    const retainedRun = fakeRun({
+      atomicSkillEvidence: [
+        {
+          run_id: 'run:retained',
+          chart_revision: 'chart:1',
+          manifest_revision: 'manifest:1',
+          skill_id: 'pulse.quarter',
+          item_id: 'lesson:1',
+          context_signature: '4/4',
+          evidence_kind: 'retention',
+          quality: 0.9,
+          weight: 1,
+          playback_speed: 0.8,
+          completed_at: '2026-08-08T14:00:00.000Z',
+        },
+      ],
+    });
+
     act(() => {
-      ipc.emit('load-all-practice-runs', { runs: [fakeRun()] });
+      ipc.emit('load-all-practice-runs', { runs: [retainedRun] });
     });
 
     expect(onResult).toHaveBeenCalledTimes(1);
@@ -405,7 +423,7 @@ describe('recordRun', () => {
     });
 
     act(() => {
-      ipc.emit('load-all-practice-runs', { runs: [fakeRun(), fakeRun()] });
+      ipc.emit('load-all-practice-runs', { runs: [retainedRun, fakeRun()] });
     });
 
     expect(onResult.mock.calls[0][0]).toMatchObject({ goalCrossed: false });
@@ -440,8 +458,26 @@ describe('recordRun', () => {
       });
     });
 
+    const retainedRun = fakeRun({
+      atomicSkillEvidence: [
+        {
+          run_id: 'run:retained',
+          chart_revision: 'chart:1',
+          manifest_revision: 'manifest:1',
+          skill_id: 'pulse.quarter',
+          item_id: 'lesson:1',
+          context_signature: '4/4',
+          evidence_kind: 'retention',
+          quality: 0.9,
+          weight: 1,
+          playback_speed: 0.8,
+          completed_at: '2026-08-08T14:00:00.000Z',
+        },
+      ],
+    });
+
     act(() => {
-      ipc.emit('load-all-practice-runs', { runs: [fakeRun()] });
+      ipc.emit('load-all-practice-runs', { runs: [retainedRun] });
     });
 
     const firstUnlocked = onResult.mock.calls[0][0].newlyUnlocked.map(
@@ -473,7 +509,7 @@ describe('recordRun', () => {
     });
 
     act(() => {
-      ipc.emit('load-all-practice-runs', { runs: [fakeRun(), fakeRun()] });
+      ipc.emit('load-all-practice-runs', { runs: [retainedRun, fakeRun()] });
     });
 
     const secondUnlocked = onResult.mock.calls[0][0].newlyUnlocked.map(
@@ -483,7 +519,7 @@ describe('recordRun', () => {
     expect(secondUnlocked).not.toContain('first-blood');
   });
 
-  it('includes a nudge toward the closest locked achievement', () => {
+  it('keeps the supporting nudge tied to qualifying practice rhythm', () => {
     const { result } = renderHook(() => useGamification([]));
 
     act(() => {
@@ -513,13 +549,9 @@ describe('recordRun', () => {
     });
 
     act(() => {
-      const runs = Array.from({ length: 9 }, () =>
-        fakeRun({ overallAccuracy: 0.97 }),
-      );
-
-      ipc.emit('load-all-practice-runs', { runs });
+      ipc.emit('load-all-practice-runs', { runs: [fakeRun()] });
     });
 
-    expect(onResult.mock.calls[0][0].nudge?.achievementId).toBe('perfect-10');
+    expect(onResult.mock.calls[0][0].nudge?.achievementId).toBe('week-one');
   });
 });

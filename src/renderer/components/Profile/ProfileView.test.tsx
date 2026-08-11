@@ -174,6 +174,36 @@ describe('ProfileView', () => {
     expect(screen.getByTestId('xp-skill-line')).toBeInTheDocument();
   });
 
+  it('shows the September 10 runway without inventing a weekly pace before retained evidence exists', () => {
+    render(
+      <ProfileView
+        songList={[song()]}
+        goals={[goal({ targetDate: '2026-09-10' })]}
+        isGoalsLoaded
+        onSaveGoal={() => {}}
+        onSetPrimaryGoal={() => {}}
+        gamification={gamification()}
+        insights={{
+          deadlinePacing: {
+            goalDate: '2026-09-10',
+            weeksRemaining: 4,
+            targets: [],
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('profile-deadline-targets')).toHaveTextContent(
+      'Goal runway',
+    );
+    expect(screen.getByTestId('profile-deadline-targets')).toHaveTextContent(
+      'Target date: 2026-09-10',
+    );
+    expect(screen.getByTestId('profile-deadline-targets')).toHaveTextContent(
+      'Building evidence for a weekly pace',
+    );
+  });
+
   it('shows a goal switcher when more than one goal exists', () => {
     render(
       <ProfileView

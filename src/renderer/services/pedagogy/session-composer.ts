@@ -171,10 +171,10 @@ function composeShort(
       'Use the shortest evidence-backed dose for the current frontier.',
     ),
     block(
-      'apply',
+      'celebrate',
       musical,
       musical.candidate.kind === 'song'
-        ? 'Finish with a musical application, even in a short session.'
+        ? 'Finish with the selected song section, even in a short session.'
         : 'No playable song is available, so finish with the closest musical phrase.',
     ),
   ];
@@ -263,8 +263,11 @@ export function composePracticeSession(
   }
 
   const explicit = byItem(input.ranking, input.request.explicit_song_id);
+  const goal_song = byItem(input.ranking, input.request.active_goal?.song_id);
   const application =
-    explicit ?? applicationFor(input.ranking, primary.candidate.item_id);
+    explicit ??
+    (goal_song?.candidate.kind === 'song' ? goal_song : undefined) ??
+    applicationFor(input.ranking, primary.candidate.item_id);
   const energy =
     input.request.recent_early_exits >= 2 && input.request.energy !== 'short'
       ? 'short'

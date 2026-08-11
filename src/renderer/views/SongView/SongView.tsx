@@ -205,6 +205,21 @@ export function SongView() {
   >([]);
   const [gamificationResult, setGamificationResult] =
     useState<RecordRunResult>();
+  const previousPracticeSummary = useMemo(
+    () =>
+      practiceSummary
+        ? fullRuns
+            ?.map(({ summary }) => summary)
+            .filter(
+              ({ completedAt }) => completedAt < practiceSummary.completedAt,
+            )
+            .sort((left, right) =>
+              left.completedAt.localeCompare(right.completedAt),
+            )
+            .at(-1)
+        : undefined,
+    [fullRuns, practiceSummary],
+  );
   const [lessonProgressionResult, setLessonProgressionResult] =
     useState<LessonProgressionDecision>();
   const [notationLayout, setNotationLayout] = usePersisted<SheetMusicLayout>(
@@ -2092,7 +2107,7 @@ export function SongView() {
       <div className="flex items-center justify-between gap-3">
         <SettingLabel
           label="Challenge lives"
-          tooltip="Optional game pressure. Leave this off for relaxed practice with clean-repetition progress."
+          tooltip="Optional challenge score only. It never changes practice credit, XP, streaks, stars, goals, or achievements."
         />
         <Switch
           size="small"
@@ -2266,6 +2281,7 @@ export function SongView() {
         difficulty={difficulty}
         scoreData={scoreData}
         practiceSummary={practiceSummary}
+        previousPracticeSummary={previousPracticeSummary}
         gamification={gamification}
         runResult={gamificationResult}
         lessonProgression={lessonProgressionResult}

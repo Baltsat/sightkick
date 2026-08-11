@@ -43,8 +43,8 @@ export function StreakFlame({
       role="img"
       aria-label={
         isActive
-          ? `${streakDays}-day streak. ${todayXp} of ${goalXp} XP toward today's goal.`
-          : `No active streak. ${todayXp} of ${goalXp} XP toward today's goal.`
+          ? `${streakDays}-day practice streak. Today's set: ${todayXp} of ${goalXp} XP.`
+          : `No active practice streak. Today's set: ${todayXp} of ${goalXp} XP.`
       }
     >
       <svg

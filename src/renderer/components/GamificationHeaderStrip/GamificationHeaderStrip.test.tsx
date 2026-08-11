@@ -34,7 +34,10 @@ describe('GamificationHeaderStrip', () => {
     );
     expect(screen.getByTestId('streak-count')).toHaveTextContent('0');
     expect(screen.getByTestId('today-xp-label')).toHaveTextContent(
-      '0 / 50 XP today',
+      'Today’s set · 0 / 50 XP',
+    );
+    expect(screen.getByTestId('practice-streak-label')).toHaveTextContent(
+      'Practice streak',
     );
 
     for (let i = 0; i < 7; i += 1) {
@@ -61,6 +64,9 @@ describe('GamificationHeaderStrip', () => {
       'true',
     );
     expect(screen.getByTestId('streak-count')).toHaveTextContent('4');
+    expect(screen.getByTestId('practice-streak-label')).toHaveTextContent(
+      'Practice streak · 4 days',
+    );
     expect(screen.getByTestId('week-dot-1')).toHaveAttribute(
       'data-practiced',
       'true',
@@ -83,7 +89,7 @@ describe('GamificationHeaderStrip', () => {
       'true',
     );
     expect(screen.getByTestId('today-xp-label')).toHaveTextContent(
-      '60 / 50 XP today',
+      'Today’s set · 60 / 50 XP',
     );
   });
 

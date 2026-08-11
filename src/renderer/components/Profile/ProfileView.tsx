@@ -284,7 +284,11 @@ function DeadlineTargets({
       data-testid="profile-deadline-targets"
     >
       <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
-        Weekly target
+        Goal runway
+      </p>
+      <p className="mt-2 text-sm leading-relaxed text-text-muted">
+        Target date: {targetDate}. Weekly pace is based only on retained
+        practice evidence.
       </p>
       {pacing?.targets.length ? (
         <div className="mt-3 divide-y divide-border-soft">
@@ -307,8 +311,8 @@ function DeadlineTargets({
         </div>
       ) : (
         <p className="mt-2 text-sm leading-relaxed text-text-muted">
-          The date is saved, but there is not enough retained run evidence for a
-          weekly target yet.
+          Building evidence for a weekly pace. The date is saved, but there is
+          not enough retained run evidence for a weekly target yet.
         </p>
       )}
     </section>

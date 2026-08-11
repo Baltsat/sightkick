@@ -42,8 +42,12 @@ export function GoalPopover({
           data-testid="goal-popover-menu"
         >
           <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-[0.12em] text-text-faint">
-            Daily goal
+            Today’s set · daily XP
           </div>
+          <p className="px-2 pb-2 text-xs leading-relaxed text-text-muted">
+            This changes today’s effort target. Practice streaks come from
+            qualifying saved practice days.
+          </p>
           {GOAL_OPTIONS.map((option) => (
             <button
               key={option}
@@ -73,7 +77,7 @@ export function GoalPopover({
       <button
         type="button"
         data-testid="goal-popover-trigger"
-        aria-label="Change daily XP goal"
+        aria-label="Change today’s set XP target"
         onClick={(event) => event.stopPropagation()}
         className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs text-text-faint hover:bg-fill hover:text-text-body"
       >

@@ -219,9 +219,10 @@ export function SongListView() {
   // (SongView renders inside this component's Outlet - see App.tsx's
   // nested route - so one instance is enough for both surfaces to share
   // live state without a separate context provider).
-  const gamification = useGamification(songList);
-  const [isStatsOpen, setIsStatsOpen] = useState(false);
   const goals = useGoals();
+  const activeGoalRecord = goals.primaryGoal ?? goals.goals[0];
+  const gamification = useGamification(songList, activeGoalRecord?.songId);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isSetGoalOpen, setIsSetGoalOpen] = useState(false);
   const [goalModalSongId, setGoalModalSongId] = useState<string | undefined>(
     undefined,
@@ -401,7 +402,6 @@ export function SongListView() {
       ),
     [gamification.runsBySong],
   );
-  const activeGoalRecord = goals.primaryGoal ?? goals.goals[0];
   const activeGoal = useMemo<SongGoal | undefined>(
     () =>
       activeGoalRecord
@@ -412,6 +412,16 @@ export function SongListView() {
           }
         : undefined,
     [activeGoalRecord],
+  );
+  const activeGoalPayoffCandidate = useMemo(
+    () =>
+      activeGoal
+        ? practiceCandidates.find(
+            (candidate) =>
+              candidate.id === activeGoal.song_id && candidate.kind === 'song',
+          )
+        : undefined,
+    [activeGoal, practiceCandidates],
   );
   const atomicStateReplay = useMemo(
     () =>
@@ -962,6 +972,9 @@ export function SongListView() {
             pedagogyRanking={nextPractice.pedagogyRanking}
             practiceWave={practiceWave}
             activeGoal={activeGoal}
+            goalPayoffCandidate={activeGoalPayoffCandidate}
+            goalTargetDate={activeGoalRecord?.targetDate}
+            deadlinePacing={nextPractice.deadlinePacing}
             atomicStates={atomicStates}
             onStartRecommended={() => startRecommendedPractice()}
             onStartSession={startComposedSession}
@@ -987,6 +1000,9 @@ export function SongListView() {
             pedagogyRanking={nextPractice.pedagogyRanking}
             practiceWave={practiceWave}
             activeGoal={activeGoal}
+            goalPayoffCandidate={activeGoalPayoffCandidate}
+            goalTargetDate={activeGoalRecord?.targetDate}
+            deadlinePacing={nextPractice.deadlinePacing}
             atomicStates={atomicStates}
             onStartRecommended={() => startRecommendedPractice()}
             onStartSession={startComposedSession}

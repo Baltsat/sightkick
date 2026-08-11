@@ -9,6 +9,8 @@ function badge(id: string, title: string): AchievementDef {
     title,
     description: `${title}!`,
     hint: 'hint',
+    evidenceEvent: 'saved test evidence',
+    proofRank: 1,
   };
 }
 

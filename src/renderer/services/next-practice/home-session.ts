@@ -8,21 +8,32 @@ import type {
   ZpdRankedCandidate,
 } from '../pedagogy/types';
 import type { PracticeWaveResult } from './practice-wave';
-import type { RankedPracticeCandidate } from './types';
+import type {
+  DeadlinePacingSummary,
+  PracticeCandidate,
+  RankedPracticeCandidate,
+} from './types';
 
 export type HomeSessionIntent = 'learning' | 'songs';
+
+export type HomeSessionSize = 'short' | 'full';
 
 export interface HomeSessionReceipt {
   title: string;
   detail: string;
+  candidateId?: string;
 }
 
 export interface ComposeHomeSessionInput {
   intent: HomeSessionIntent;
+  size?: HomeSessionSize;
   ranking: readonly RankedPracticeCandidate[];
   pedagogyRanking?: readonly ZpdRankedCandidate[];
   practiceWave?: PracticeWaveResult;
   activeGoal?: SongGoal;
+  goalPayoffCandidate?: PracticeCandidate;
+  goalTargetDate?: string;
+  deadlinePacing?: DeadlinePacingSummary;
   atomicStates?: readonly AtomicSkillState[];
   energy?: SessionEnergy;
   recentEarlyExits?: number;
@@ -31,12 +42,15 @@ export interface ComposeHomeSessionInput {
 
 export interface OneKickHomeSession {
   intent: HomeSessionIntent;
+  size: HomeSessionSize;
   launch: RankedPracticeCandidate;
   launchSpeed: number;
   reason: string;
   source: 'pedagogy-v2' | 'practice-wave' | 'ranking';
-  next: HomeSessionReceipt;
+  focus: HomeSessionReceipt;
+  build: HomeSessionReceipt;
   payoff: HomeSessionReceipt;
+  runway?: HomeSessionReceipt;
   plan?: SessionPlan;
   goalPath?: UnlockPath;
 }
@@ -93,75 +107,115 @@ function fallbackLaunch({
   );
 }
 
-function nextReceipt({
-  plan,
+function receiptForBlock({
+  block,
   ranking,
-  goalPath,
-  practiceWave,
-  launchId,
+  fallback,
+  empty,
 }: {
-  plan: SessionPlan | undefined;
+  block: SessionPlan['blocks'][number] | undefined;
   ranking: readonly RankedPracticeCandidate[];
-  goalPath: UnlockPath | undefined;
-  practiceWave: PracticeWaveResult | undefined;
-  launchId: string;
+  fallback?: RankedPracticeCandidate;
+  empty: HomeSessionReceipt;
 }): HomeSessionReceipt {
-  const goalNext = goalPath?.next_items[0];
+  const candidate = byCandidateId(ranking, block?.candidate_id) ?? fallback;
 
-  if (goalNext) {
-    const candidate = byCandidateId(ranking, goalNext.item_id);
-
-    return {
-      title: candidate?.candidate.title ?? 'Next unlock',
-      detail: goalNext.reason,
-    };
-  }
-
-  const nextBlock = plan?.blocks.find(
-    ({ candidate_id }) => candidate_id !== plan.launch.candidate_id,
-  );
-  const candidate = byCandidateId(ranking, nextBlock?.candidate_id);
-
-  if (nextBlock && candidate) {
-    return {
-      title: candidate.candidate.title,
-      detail: nextBlock.why,
-    };
-  }
-
-  const launchIndex = practiceWave?.stops.findIndex(
-    ({ recommendation }) => recommendation.candidate.id === launchId,
-  );
-  const waveNext =
-    launchIndex !== undefined && launchIndex >= 0
-      ? practiceWave?.stops[launchIndex + 1]
-      : practiceWave?.stops.find(
-          ({ recommendation }) => recommendation.candidate.id !== launchId,
-        );
-
-  if (waveNext) {
-    return {
-      title: waveNext.recommendation.candidate.title,
-      detail: waveNext.reason,
-    };
+  if (!candidate) {
+    return empty;
   }
 
   return {
-    title: 'No next move yet',
-    detail:
-      'A playable plan appears when the library has another eligible item.',
+    title: candidate.candidate.title,
+    detail: block?.why ?? candidate.reason,
+    candidateId: candidate.candidate.id,
   };
+}
+
+function focusReceipt({
+  plan,
+  ranking,
+  launch,
+}: {
+  plan: SessionPlan | undefined;
+  ranking: readonly RankedPracticeCandidate[];
+  launch: RankedPracticeCandidate;
+}): HomeSessionReceipt {
+  return receiptForBlock({
+    block: plan?.blocks[0],
+    ranking,
+    fallback: launch,
+    empty: {
+      title: 'Choose a target',
+      detail:
+        'A counted first phrase appears after a playable target is selected.',
+    },
+  });
+}
+
+function buildReceipt({
+  plan,
+  ranking,
+  practiceWave,
+  launch,
+}: {
+  plan: SessionPlan | undefined;
+  ranking: readonly RankedPracticeCandidate[];
+  practiceWave: PracticeWaveResult | undefined;
+  launch: RankedPracticeCandidate;
+}): HomeSessionReceipt {
+  const buildBlock = plan?.blocks.find(({ role }) =>
+    ['acquire', 'retain', 'transfer'].includes(role),
+  );
+  const waveBuild = practiceWave?.stops.find(
+    ({ recommendation }) => recommendation.candidate.id !== launch.candidate.id,
+  );
+
+  return receiptForBlock({
+    block: buildBlock,
+    ranking,
+    fallback: waveBuild?.recommendation ?? launch,
+    empty: {
+      title: 'Build the first clean pass',
+      detail: 'Two clean passes make the next musical payoff useful.',
+    },
+  });
 }
 
 function payoffReceipt({
   plan,
   ranking,
   practiceWave,
+  goalPath,
+  goalPayoffCandidate,
 }: {
   plan: SessionPlan | undefined;
   ranking: readonly RankedPracticeCandidate[];
   practiceWave: PracticeWaveResult | undefined;
+  goalPath: UnlockPath | undefined;
+  goalPayoffCandidate: PracticeCandidate | undefined;
 }): HomeSessionReceipt {
+  const probe = goalPath?.next_song_probe;
+  const goalSong = byCandidateId(ranking, probe?.song_id);
+
+  if (probe && goalSong) {
+    return {
+      title: goalSong.candidate.title,
+      detail: `Play bars ${probe.start_bar}–${
+        probe.end_bar
+      } at ${probe.speed.toFixed(1)}×.`,
+      candidateId: goalSong.candidate.id,
+    };
+  }
+
+  if (goalPayoffCandidate?.kind === 'song' && goalPayoffCandidate.available) {
+    return {
+      title: goalPayoffCandidate.title,
+      detail:
+        'Apply the session in your goal song. A safe section probe will appear when chart evidence supports one.',
+      candidateId: goalPayoffCandidate.id,
+    };
+  }
+
   const payoffBlock =
     plan?.blocks.find(({ role }) => role === 'celebrate') ??
     plan?.blocks.at(-1);
@@ -171,6 +225,7 @@ function payoffReceipt({
     return {
       title: planned.candidate.title,
       detail: payoffBlock.why,
+      candidateId: planned.candidate.id,
     };
   }
 
@@ -182,13 +237,95 @@ function payoffReceipt({
     return {
       title: waveSong.recommendation.candidate.title,
       detail: waveSong.reason,
+      candidateId: waveSong.recommendation.candidate.id,
     };
   }
 
   return {
     title: 'No musical payoff yet',
-    detail: 'No playable song is currently ranked for this session.',
+    detail: 'No playable favourite-song section is currently ranked.',
   };
+}
+
+function distinctBuild(
+  build: HomeSessionReceipt,
+  payoff: HomeSessionReceipt,
+): HomeSessionReceipt {
+  if (
+    (build.candidateId && build.candidateId === payoff.candidateId) ||
+    build.title === payoff.title
+  ) {
+    return {
+      candidateId: build.candidateId,
+      title: 'Build the phrase',
+      detail: 'Keep the work to two clean passes before the song payoff.',
+    };
+  }
+
+  return build;
+}
+
+function formatGoalDate(goalTargetDate: string): string {
+  const date = new Date(`${goalTargetDate}T12:00:00`);
+
+  if (!Number.isFinite(date.getTime())) {
+    return goalTargetDate;
+  }
+
+  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+}
+
+function runwayReceipt({
+  goalTargetDate,
+  deadlinePacing,
+  goalPath,
+  ranking,
+}: {
+  goalTargetDate: string | undefined;
+  deadlinePacing: DeadlinePacingSummary | undefined;
+  goalPath: UnlockPath | undefined;
+  ranking: readonly RankedPracticeCandidate[];
+}): HomeSessionReceipt | undefined {
+  if (!goalTargetDate) {
+    return undefined;
+  }
+
+  const probe = goalPath?.next_song_probe;
+  const goalSong = byCandidateId(
+    ranking,
+    probe?.song_id ?? goalPath?.goal.song_id,
+  );
+  const nextTarget = deadlinePacing?.targets[0];
+  const pace = nextTarget
+    ? ` ${nextTarget.label} ${Math.round(
+        nextTarget.weeklyTarget,
+      )}/100 this week.`
+    : '';
+
+  return {
+    title: `${formatGoalDate(goalTargetDate)} runway`,
+    detail:
+      probe && goalSong
+        ? `Toward ${goalSong.candidate.title} · next proof: bars ${
+            probe.start_bar
+          }–${probe.end_bar} at ${probe.speed.toFixed(1)}×.${pace}`
+        : 'Building evidence for a weekly pace.',
+    ...(goalSong ? { candidateId: goalSong.candidate.id } : {}),
+  };
+}
+
+function sizeFor(input: ComposeHomeSessionInput): HomeSessionSize {
+  return input.size ?? (input.energy === 'short' ? 'short' : 'full');
+}
+
+function energyFor(input: ComposeHomeSessionInput): SessionEnergy {
+  const size = sizeFor(input);
+
+  if (size === 'short') {
+    return 'short';
+  }
+
+  return input.energy === 'deep' ? 'deep' : 'standard';
 }
 
 export function composeHomeSession(
@@ -200,7 +337,7 @@ export function composeHomeSession(
       ? composePracticeSession({
           request: {
             intent: input.intent === 'songs' ? 'song' : 'exercise',
-            energy: input.energy ?? 'standard',
+            energy: energyFor(input),
             ...(input.activeGoal ? { active_goal: input.activeGoal } : {}),
             recent_early_exits: input.recentEarlyExits ?? 0,
             now: input.now ?? new Date().toISOString(),
@@ -237,9 +374,17 @@ export function composeHomeSession(
           states: input.atomicStates,
         })
       : undefined;
+  const payoff = payoffReceipt({
+    plan,
+    ranking: input.ranking,
+    practiceWave: input.practiceWave,
+    goalPath,
+    goalPayoffCandidate: input.goalPayoffCandidate,
+  });
 
   return {
     intent: input.intent,
+    size: sizeFor(input),
     launch,
     launchSpeed: plan?.launch.speed ?? launch.suggestedSpeed,
     reason: launchDecision?.explanation ?? waveStop?.reason ?? launch.reason,
@@ -248,18 +393,27 @@ export function composeHomeSession(
       : waveStop
       ? 'practice-wave'
       : 'ranking',
-    next: nextReceipt({
-      plan,
-      ranking: input.ranking,
-      goalPath,
-      practiceWave: input.practiceWave,
-      launchId: launch.candidate.id,
-    }),
-    payoff: payoffReceipt({
-      plan,
-      ranking: input.ranking,
-      practiceWave: input.practiceWave,
-    }),
+    focus: focusReceipt({ plan, ranking: input.ranking, launch }),
+    build: distinctBuild(
+      buildReceipt({
+        plan,
+        ranking: input.ranking,
+        practiceWave: input.practiceWave,
+        launch,
+      }),
+      payoff,
+    ),
+    payoff,
+    ...(input.goalTargetDate
+      ? {
+          runway: runwayReceipt({
+            goalTargetDate: input.goalTargetDate,
+            deadlinePacing: input.deadlinePacing,
+            goalPath,
+            ranking: input.ranking,
+          }),
+        }
+      : {}),
     ...(plan ? { plan } : {}),
     ...(goalPath ? { goalPath } : {}),
   };
