@@ -1,6 +1,8 @@
 # Drumroll requirement and proof ledger
 
-Last reconciled: 2026-08-11, kb.8 published and live; kb.9 source integrated at `8544ff5` with package publication still pending
+Last reconciled: 2026-08-11, kb.9 published and live; kb.10 engagement
+mechanics P0 and P1 integrated at `455e898` with package publication still
+pending
 
 This is the release contract for the Drumroll redesign. It maps the active
 session into sequential epochs and requires evidence, not implementation
@@ -148,10 +150,9 @@ learner studies support that claim.
 
 ## Epoch 10 — kb.9 practice, evidence, and playable-song truth
 
-`passed` in this epoch means direct proof from the current integrated source
-tree at `8544ff5`, its named regression tests, or the captured kb.9 dossier. It
-does not claim that a kb.9 DMG has been signed, notarized, published, or
-checksum-replayed.
+`passed` in this epoch means direct proof from the integrated source tree at
+`8544ff5`, its named regression tests, or the captured kb.9 dossier. The kb.9
+release is separately recorded below as published and live.
 
 | ID     | Requirement                                                                                                                                                                       | State   | Evidence / remaining gate                                                                                                                                                                                                                                                                                                                                                                                         |
 | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -162,6 +163,26 @@ checksum-replayed.
 | E10.05 | Enforce the five-gate playable-song contract and state the Drums result honestly.                                                                                                 | partial | `2026-08-11-kb9-songs/status.md` binds identity, lawful local audio hash, approved chart provenance, drum scan, and headless load. Three of 13 rows are playable with certificates; eight exact rows lack lawful local audio and remain blocked; two rows are identity-incomplete. Dropping lawful local audio unlocks the auto-chart route for the eight blocked identities, subject to its scan and load gates. |
 | E10.06 | Use the premium snare icon and motion that is bound to musical events rather than decorative idle looping.                                                                        | passed  | `5abdfc4` adds both; `2026-08-11-kb9-dossier/current/app-icon-finder-context.png` and `app-icon-scale-matrix.png` cover the icon, while the dossier’s playing, hit, and reduced-motion captures prove event-bound motion.                                                                                                                                                                                         |
 | E10.07 | Retain a regression dossier for the current Home, Journey, Practice, Profile, icon, and compact layouts.                                                                          | passed  | `2026-08-11-kb9-dossier/README.md`, `proof.json`, and `before-after-board.png` retain 1224×768 and 1024×700 captures, motion states, fit checks, and zero recorded console/page errors.                                                                                                                                                                                                                           |
+
+## Epoch 11 — kb.10 engagement mechanics and musical return loop
+
+`passed` in this epoch means the integrated source at `455e898`, its regression
+coverage, and the captured current Electron/Storybook dossier. It does not claim
+that a kb.10 package has been signed, notarized, published, or checksum-replayed.
+
+| ID     | Requirement                                                                                                                                                      | State  | Evidence / remaining gate                                                                                                                                                                                                                                                                                                                   |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E11.01 | Compose one evidence-backed session as Focus → Build → Payoff, with the kit Home remaining the direct physical start.                                            | passed | `a6e69ea` implements the session contract and `455e898` integrates the P1 routes. `docs/design-qa/2026-08-11-kb10-mechanics/home-full-1224x768.png`, `home-short-1224x768.png`, and `home-short-1024x700.png` capture the armed Home without outer-page overflow.                                                                           |
+| E11.02 | Make the September 10 song path, musical receipts, streak/XP separation, and achievement order describe saved musical evidence rather than attendance or volume. | passed | `a6e69ea` adds the runway, receipt, separated practice-streak/today's-set treatment, and proof-ranked achievements. The dossier's `profile-runway-*`, `profile-story-runway-*`, `score-musical-receipt-*`, `score-supporting-proof-*`, and `achievement-proof-order-*` captures retain the rendered evidence.                               |
+| E11.03 | Offer evidence-backed Review, Build, and Apply cards, plus a weekly rhythm that keeps planned rests visible but unscored.                                        | passed | `455e898` adds evidence cards and weekly rhythm. `p1-home-evidence-cards-1224x768.png`, `p1-home-evidence-cards-1024x700.png`, `p1-profile-weekly-rhythm-1224x768.png`, and `p1-profile-weekly-rhythm-1024x700.png` capture the routes; `proof.json` records no outer-page overflow or page/console errors for the captured Electron paths. |
+| E11.04 | Turn prerequisite proof into a bounded song-section audition, a local weekly musical recap, and peripheral phrase-tier feedback without punitive loss language.  | passed | `455e898` adds the audition, recap, phrase return, and phrase tier. The dossier captures `p1-section-audition-*`, `p1-audition-ready-*`, `p1-weekly-musical-recap-*`, `p1-phrase-return-*`, and `p1-phrase-tier-*` at 1224×768 and 1024×700.                                                                                                |
+| E11.05 | Keep engagement rewards dependent on saved practice evidence and preserve the existing non-punitive practice contract.                                           | passed | `a6e69ea` makes musical proof the reward order; `455e898` carries that contract through cards, audition, recap, and phrase feedback. `docs/engagement-mechanics-v1.md` remains the selected scope and evidence model, not a claim of long-term retention or learning efficacy.                                                              |
+
+**Next recorded line — not built:** opt-in menu-bar practice presence, one
+scheduled respectful macOS notification, and a manual private performance
+postcard remain P2 items from `docs/engagement-mechanics-v1.md`. No native
+presence, notification permission/scheduling, or export surface is claimed by
+kb.10.
 
 ## kb.5 corrective acceptance matrix — every active-session remark
 
@@ -253,20 +274,27 @@ its `app.asar` SHA-256 is
 
 ## Current release verdict
 
-Drumroll `1.2.0-kb.8` is published and live from exact commit `1ec1a4f`, tag
-`v1.2.0-kb.8`. Its Apple Silicon DMG SHA-256 is
-`5f50c38afcd22fd00c9cd89014e03dca7ebdd486f5b2c4b2cea8b3c4949c8244`; the
-site serves kb.8 and the published package is Developer ID signed, Apple
-notarized, stapled, and Gatekeeper-verified.
+Drumroll `1.2.0-kb.9` is published and live from exact commit `8544ff5`, tag
+`v1.2.0-kb.9`. Its Apple Silicon DMG SHA-256 is
+`2f47539ec27b874312440baccf65fea6049556d4e0624e544db676b5a898fa91`; the
+site serves kb.9 and the release is live. kb.9 adds the kit-as-home composer
+and intent switch, performance chrome, pedagogy engine v2, Insights, a
+five-gate song contract, premium snare icon, event-bound motion, and the
+regression dossier. Its three certified playable Drums rows are Loyal, Made To
+Love, and What I Like About You; eight rows await exact lawful local audio and
+two cannot enter the resolver until source identity is completed.
 
-kb.9 is integrated at `8544ff5`. It adds the kit-as-home composer and intent
-switch, performance chrome, pedagogy engine v2, Insights, a five-gate song
-contract, premium snare icon, event-bound motion, and the regression dossier.
-Its three certified playable Drums rows are Loyal, Made To Love, and What I
-Like About You; eight rows await exact lawful local audio and two cannot enter
-the resolver until source identity is completed. kb.9 package build,
-notarization, publication, and remote-download checksum proof are still
-pending, so source integration is not described here as a released artifact.
+kb.10 is integrated at `455e898` after P0 commit `a6e69ea`. It adds the
+Focus → Build → Payoff session contract, September 10 runway, musical receipts,
+streak/XP separation, proof-ranked achievements, evidence cards, unscored
+weekly rests, section auditions, weekly recap, and phrase-tier feedback. Its
+current proof is the integrated source and
+`docs/design-qa/2026-08-11-kb10-mechanics/`; a kb.10 package build,
+notarization, publication, and remote-download checksum receipt remain pending.
+
+**Next recorded line — not built:** opt-in menu-bar practice presence, one
+scheduled respectful macOS notification, and a manual private performance
+postcard remain P2 work.
 
 Three outside proof limits remain and are not inferred from software tests: a
 real Yamaha cable-cycle and complete physical playing session, longitudinal
