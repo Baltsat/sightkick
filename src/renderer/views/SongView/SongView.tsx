@@ -58,7 +58,11 @@ import { useRemediationSession } from '../../hooks/useRemediationSession';
 import { ScoreSummary } from '../../components/ScoreSummary';
 import { CountIn } from '../../components/CountIn';
 import { StreakMeter, useStreakEngine } from '../../components/StreakMeter';
-import { NotationLocationReadout } from '../../components/ContinuousNotation';
+import {
+  LoopEscapeRunwayModel,
+  loopEscapePhase,
+  NotationLocationReadout,
+} from '../../components/ContinuousNotation';
 import { InputMapping, ScoreData } from '../../../types';
 import {
   computeRunsTrend,
@@ -1282,6 +1286,121 @@ export function SongView() {
     },
     hitToleranceSeconds,
   });
+  const loopEscape = useMemo<LoopEscapeRunwayModel | undefined>(() => {
+    if (gameMode !== 'practice' || notationLayout !== 'flow') {
+      return undefined;
+    }
+
+    const remediationTask = remediationSession.activeTask;
+
+    if (remediationTask) {
+      const lastAttempt = remediationTask.attempts.at(-1);
+
+      return {
+        barStart: remediationTask.barStart,
+        barEnd: remediationTask.barEnd,
+        qualityProgress: remediationTask.consecutiveCleanPasses,
+        requiredCleanPasses: REQUIRED_CONSECUTIVE_CLEAN_PASSES,
+        currentSpeed: playbackSpeed,
+        targetSpeed: remediationTask.playbackSpeed,
+        retainedQuality:
+          Boolean(lastAttempt) &&
+          !lastAttempt!.qualifiesAsCleanPass &&
+          lastAttempt!.consecutiveCleanPassesAfter > 0,
+      };
+    }
+
+    if (remediationSession.queue?.status === 'completed') {
+      const finalTask = remediationSession.queue.tasks.at(-1);
+
+      if (finalTask) {
+        return {
+          barStart: finalTask.barStart,
+          barEnd: finalTask.barEnd,
+          qualityProgress: REQUIRED_CONSECUTIVE_CLEAN_PASSES,
+          requiredCleanPasses: REQUIRED_CONSECUTIVE_CLEAN_PASSES,
+          currentSpeed: playbackSpeed,
+          targetSpeed: playbackSpeed,
+          phase: 'release',
+        };
+      }
+    }
+
+    const recovery = tutorSession.state.recovery;
+
+    if (recovery) {
+      const lastAttempt = tutorSession.state.recoveryAttempts.at(-1);
+
+      return {
+        barStart: recovery.region.startMeasure + 1,
+        barEnd: recovery.region.endMeasure + 1,
+        qualityProgress: recovery.qualityProgress,
+        requiredCleanPasses:
+          tutorSession.state.settings.requiredCleanRepetitions,
+        currentSpeed: tutorSession.state.currentSpeed,
+        targetSpeed: tutorSession.state.targetSpeed,
+        retainedQuality:
+          lastAttempt?.result === 'retry' && recovery.qualityProgress > 0,
+      };
+    }
+
+    const outcome = tutorSession.state.lastRecoveryOutcome;
+
+    if (outcome?.status === 'mastered') {
+      return {
+        barStart: outcome.startMeasure + 1,
+        barEnd: outcome.endMeasure + 1,
+        qualityProgress: outcome.qualityProgress,
+        requiredCleanPasses:
+          tutorSession.state.settings.requiredCleanRepetitions,
+        currentSpeed: outcome.resumeSpeed,
+        targetSpeed: tutorSession.state.targetSpeed,
+        phase: 'release',
+      };
+    }
+
+    return undefined;
+  }, [
+    gameMode,
+    notationLayout,
+    playbackSpeed,
+    remediationSession.activeTask,
+    remediationSession.queue,
+    tutorSession.state,
+  ]);
+  const recoveryCaption = useMemo(() => {
+    if (!loopEscape) {
+      return undefined;
+    }
+
+    if (loopEscapePhase(loopEscape) === 'release') {
+      return {
+        title: 'Loop released',
+        detail: `Two verified passes earned this exit at ${loopEscape.currentSpeed.toFixed(
+          1,
+        )}×.`,
+      };
+    }
+
+    if (loopEscape.retainedQuality) {
+      return {
+        title: 'Near-clean quality retained',
+        detail: `${loopEscape.qualityProgress.toFixed(1)} of ${
+          loopEscape.requiredCleanPasses
+        } passes remains banked.`,
+      };
+    }
+
+    return {
+      title:
+        loopEscape.qualityProgress >= 1
+          ? 'First anchor acquired'
+          : 'Coach loop armed',
+      detail: `${loopEscape.qualityProgress.toFixed(1)} of ${
+        loopEscape.requiredCleanPasses
+      } verified passes at ${loopEscape.currentSpeed.toFixed(1)}×.`,
+    };
+  }, [loopEscape]);
   const drumGestureSurface = useMemo<DrumGestureSurface>(() => {
     if (isScoreModalOpen) {
       return 'result';
@@ -1989,6 +2108,7 @@ export function SongView() {
     <Layout
       className="drumroll-practice-shell h-full pointer-events-auto"
       data-session-phase={practicePresentationPhase}
+      data-loop-escape={loopEscape ? 'active' : undefined}
     >
       <ScoreSummary
         isOpen={isScoreModalOpen}
@@ -2380,6 +2500,7 @@ export function SongView() {
               timeStore={timeStore}
               chart={chart}
               delaySeconds={delaySeconds}
+              loopEscape={loopEscape}
               enableColors={notationColorsEnabled}
               showReference={showReference}
               vexflowContainerRef={vexflowContainerRef}
@@ -2405,6 +2526,7 @@ export function SongView() {
           <TutorHud
             state={tutorSession.state}
             message={tutorHudMessage}
+            recoveryCaption={recoveryCaption}
             displayState={tutorDisplayState}
             controlPrompt={kitControlPrompt}
             controlPromptCompact={practicePresentationPhase === 'playing'}

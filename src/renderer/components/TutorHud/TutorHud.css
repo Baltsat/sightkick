@@ -118,6 +118,57 @@
   --tutor-signal: #5ed39a;
 }
 
+.drumroll-tutor-hud--caption {
+  display: flex;
+  min-height: 0;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-ink);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.drumroll-tutor-hud--caption::after {
+  display: none;
+}
+
+.drumroll-tutor-hud__caption-kicker {
+  color: #4b3d95;
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.drumroll-tutor-hud--caption > strong {
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: clamp(0.94rem, 1.25vw, 1.12rem);
+  font-weight: 680;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.drumroll-tutor-hud--caption > span:last-child {
+  max-width: min(48rem, 58vw);
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: clamp(0.7rem, 0.92vw, 0.8rem);
+  font-weight: 560;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .drumroll-tutor-hud[data-tone='recovery']::after {
   animation: drumroll-tutor-scan 1.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
@@ -356,6 +407,18 @@
 
   .drumroll-tutor-hud__copy > strong {
     white-space: normal;
+  }
+
+  .drumroll-tutor-hud--caption {
+    align-items: center;
+    flex-wrap: wrap;
+    row-gap: 0.35rem;
+  }
+
+  .drumroll-tutor-hud--caption > span:last-child {
+    width: 100%;
+    max-width: none;
+    text-align: center;
   }
 }
 

@@ -12,6 +12,9 @@ import {
   flowPlayheadOffset,
   flowScrollStep,
   horizontalScrollParent,
+  LoopEscapeRunway,
+  loopEscapeEnergy,
+  loopEscapePhase,
   NotationLocationReadout,
 } from './ContinuousNotation';
 
@@ -205,6 +208,63 @@ describe('Flow meter and current location', () => {
     expect(screen.getByTestId('notation-location')).toHaveAttribute(
       'data-location-key',
       '1:0',
+    );
+  });
+});
+
+describe('Loop Escape runway', () => {
+  it('holds near-clean quality while placing the first clean pass at lock', () => {
+    expect(
+      loopEscapeEnergy({ qualityProgress: 0.5, requiredCleanPasses: 2 }),
+    ).toBeCloseTo(0.45);
+    expect(
+      loopEscapeEnergy({ qualityProgress: 1, requiredCleanPasses: 2 }),
+    ).toBeCloseTo(0.72);
+    expect(
+      loopEscapeEnergy({ qualityProgress: 2, requiredCleanPasses: 2 }),
+    ).toBe(1);
+    expect(
+      loopEscapePhase({ qualityProgress: 0.5, requiredCleanPasses: 2 }),
+    ).toBe('control');
+    expect(
+      loopEscapePhase({ qualityProgress: 1, requiredCleanPasses: 2 }),
+    ).toBe('lock');
+    expect(
+      loopEscapePhase({ qualityProgress: 2, requiredCleanPasses: 2 }),
+    ).toBe('release');
+  });
+
+  it('renders retained quality and the real speed ladder above its phrase', () => {
+    render(
+      createElement(LoopEscapeRunway, {
+        renderData: [
+          measureData(0, 400, 100, 400),
+          measureData(400, 800, 500, 400),
+        ],
+        model: {
+          barStart: 1,
+          barEnd: 2,
+          qualityProgress: 1,
+          requiredCleanPasses: 2,
+          currentSpeed: 0.7,
+          targetSpeed: 0.9,
+          retainedQuality: true,
+        },
+      }),
+    );
+
+    expect(screen.getByTestId('loop-escape-runway')).toHaveAttribute(
+      'data-phase',
+      'lock',
+    );
+    expect(screen.getByTestId('loop-escape-runway')).toHaveAttribute(
+      'data-retained-quality',
+      'true',
+    );
+    expect(screen.getByText('Quality retained')).toBeInTheDocument();
+    expect(screen.getByText('0.7× → 0.9×')).toBeInTheDocument();
+    expect(screen.getByTestId('loop-escape-runway')).toHaveAccessibleName(
+      'Loop escape, bars 1 through 2: lock; 1.0 of 2 clean passes, 0.7× → 0.9×; near-clean quality retained',
     );
   });
 });

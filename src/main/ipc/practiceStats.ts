@@ -113,6 +113,18 @@ function compactRecord(record: HitRecord): StoredHitRecord {
     element: record.element,
     verdict: record.verdict,
     ...(record.velocity === undefined ? {} : { velocity: record.velocity }),
+    ...(record.expectedTick === undefined
+      ? {}
+      : { expectedTick: record.expectedTick }),
+    ...(record.actualTick === undefined
+      ? {}
+      : { actualTick: record.actualTick }),
+    ...(record.expectedElement === undefined
+      ? {}
+      : { expectedElement: record.expectedElement }),
+    ...(record.actualElement === undefined
+      ? {}
+      : { actualElement: record.actualElement }),
   };
 }
 
@@ -122,6 +134,14 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isOptionalFiniteNumber(value: unknown): boolean {
+  return value === undefined || isFiniteNumber(value);
+}
+
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || typeof value === 'string';
 }
 
 function isStoredHitRecord(value: unknown): value is StoredHitRecord {
@@ -136,7 +156,11 @@ function isStoredHitRecord(value: unknown): value is StoredHitRecord {
     (value.verdict === 'hit' ||
       value.verdict === 'miss' ||
       value.verdict === 'wrong') &&
-    (value.velocity === undefined || isFiniteNumber(value.velocity))
+    isOptionalFiniteNumber(value.velocity) &&
+    isOptionalFiniteNumber(value.expectedTick) &&
+    isOptionalFiniteNumber(value.actualTick) &&
+    isOptionalString(value.expectedElement) &&
+    isOptionalString(value.actualElement)
   );
 }
 

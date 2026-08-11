@@ -21,7 +21,12 @@ import { faRepeat, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { IconButton } from '../IconButton';
 import { getScrollParent } from '../../services/engine/helpers';
 import { autoScrollSpeed } from './helpers';
-import { ContinuousNotationCamera, FlowMeter } from '../ContinuousNotation';
+import {
+  ContinuousNotationCamera,
+  FlowMeter,
+  LoopEscapeRunway,
+  LoopEscapeRunwayModel,
+} from '../ContinuousNotation';
 
 export interface SheetMusicProps {
   engine: Engine | undefined;
@@ -42,6 +47,7 @@ export interface SheetMusicProps {
   timeStore?: TimeStore;
   chart?: ParsedChart | null;
   delaySeconds?: number;
+  loopEscape?: LoopEscapeRunwayModel;
 }
 
 export function SheetMusic({
@@ -63,6 +69,7 @@ export function SheetMusic({
   timeStore,
   chart,
   delaySeconds = 0,
+  loopEscape,
 }: SheetMusicProps) {
   const cursorRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -347,32 +354,40 @@ export function SheetMusic({
           <span className="drumroll-flow-fixed-playhead__beat" />
         </div>
       )}
-      {gameMode === 'practice' && isLooping && practiceRange && (
-        <div className="fixed top-35 ml-10 bg-bg rounded-md z-100 px-4 py-3 flex items-center gap-2">
-          <div className="text-accent bg-accent-soft-bg p-2 border border-accent-soft-border rounded-md w-10 h-10 flex items-center justify-center">
-            <FontAwesomeIcon icon={faRepeat} />
-          </div>
-          <div>
-            <div className="text-[16px] font-semibold">Looping Section</div>
-            <div className="text-xs text-text-muted">
-              Measure{' '}
-              {practiceRange.start === practiceRange.end
-                ? practiceRange.start + 1
-                : `${practiceRange.start + 1} - ${practiceRange.end + 1}`}
+      {gameMode === 'practice' &&
+        isLooping &&
+        practiceRange &&
+        !(isFlow && loopEscape) && (
+          <div className="fixed top-35 ml-10 bg-bg rounded-md z-100 px-4 py-3 flex items-center gap-2">
+            <div className="text-accent bg-accent-soft-bg p-2 border border-accent-soft-border rounded-md w-10 h-10 flex items-center justify-center">
+              <FontAwesomeIcon icon={faRepeat} />
             </div>
+            <div>
+              <div className="text-[16px] font-semibold">Looping Section</div>
+              <div className="text-xs text-text-muted">
+                Measure{' '}
+                {practiceRange.start === practiceRange.end
+                  ? practiceRange.start + 1
+                  : `${practiceRange.start + 1} - ${practiceRange.end + 1}`}
+              </div>
+            </div>
+            <IconButton
+              icon={faXmark}
+              data-testid="clear-loop"
+              onClick={() => onPracticeRangeChange?.(undefined)}
+            />
           </div>
-          <IconButton
-            icon={faXmark}
-            data-testid="clear-loop"
-            onClick={() => onPracticeRangeChange?.(undefined)}
-          />
-        </div>
-      )}
+        )}
       <div
         ref={flowStageRef}
         className={cn(
           'flex flex-col items-center min-w-max',
-          isFlow ? 'drumroll-flow-stage' : 'bg-paper rounded-[11px] p-10',
+          isFlow
+            ? cn(
+                'drumroll-flow-stage',
+                loopEscape && 'drumroll-flow-stage--loop-escape',
+              )
+            : 'bg-paper rounded-[11px] p-10',
         )}
       >
         {!isFlow && (
@@ -388,6 +403,9 @@ export function SheetMusic({
         )}
         <div ref={scoreRef} className="min-w-max relative z-0">
           {isFlow && <FlowMeter renderData={renderData} />}
+          {isFlow && loopEscape && (
+            <LoopEscapeRunway renderData={renderData} model={loopEscape} />
+          )}
           <div
             ref={vexflowContainerRef}
             className={cn(

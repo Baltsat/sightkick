@@ -32,6 +32,10 @@ interface TutorHudProps {
     cleanRepetitions: number;
     requiredCleanRepetitions: number;
   };
+  recoveryCaption?: {
+    title: string;
+    detail: string;
+  };
 }
 
 function labelForPhase(phase: TutorState['phase']) {
@@ -55,9 +59,28 @@ export function TutorHud({
   timingWindowMs,
   timingWindowReason,
   remediation,
+  recoveryCaption,
 }: TutorHudProps) {
   const titleId = useId();
   const detailId = useId();
+
+  if (recoveryCaption) {
+    return (
+      <aside
+        className="drumroll-tutor-hud drumroll-tutor-hud--caption"
+        data-testid="tutor-recovery-caption"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-labelledby={titleId}
+        aria-describedby={detailId}
+      >
+        <span className="drumroll-tutor-hud__caption-kicker">Coach</span>
+        <strong id={titleId}>{recoveryCaption.title}</strong>
+        <span id={detailId}>{recoveryCaption.detail}</span>
+      </aside>
+    );
+  }
 
   if (
     state.phase === 'off' &&

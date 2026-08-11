@@ -202,6 +202,152 @@ export function flowMeterBars(renderData: RenderData[]): FlowMeterBar[] {
   });
 }
 
+export type LoopEscapePhase = 'control' | 'lock' | 'release';
+
+export interface LoopEscapeRunwayModel {
+  barStart: number;
+  barEnd: number;
+  qualityProgress: number;
+  requiredCleanPasses: number;
+  currentSpeed: number;
+  targetSpeed: number;
+  retainedQuality?: boolean;
+  phase?: LoopEscapePhase;
+}
+
+export function loopEscapePhase({
+  qualityProgress,
+  requiredCleanPasses,
+  phase,
+}: Pick<
+  LoopEscapeRunwayModel,
+  'qualityProgress' | 'requiredCleanPasses' | 'phase'
+>): LoopEscapePhase {
+  if (phase) {
+    return phase;
+  }
+
+  if (qualityProgress >= requiredCleanPasses) {
+    return 'release';
+  }
+
+  return qualityProgress >= 1 ? 'lock' : 'control';
+}
+
+export function loopEscapeEnergy({
+  qualityProgress,
+  requiredCleanPasses,
+}: Pick<
+  LoopEscapeRunwayModel,
+  'qualityProgress' | 'requiredCleanPasses'
+>): number {
+  if (requiredCleanPasses <= 0) {
+    return 1;
+  }
+
+  if (qualityProgress <= 0) {
+    return 0.18;
+  }
+
+  if (qualityProgress < 1) {
+    return 0.18 + qualityProgress * 0.54;
+  }
+
+  return Math.min(
+    1,
+    0.72 +
+      ((qualityProgress - 1) * 0.28) / Math.max(1, requiredCleanPasses - 1),
+  );
+}
+
+export function LoopEscapeRunway({
+  renderData,
+  model,
+}: {
+  renderData: RenderData[];
+  model: LoopEscapeRunwayModel;
+}) {
+  const start = renderData[model.barStart - 1];
+  const end = renderData[model.barEnd - 1];
+
+  if (!start || !end) {
+    return null;
+  }
+
+  const left = start.stave.getX();
+  const width = Math.max(
+    1,
+    end.stave.getX() + end.stave.getWidth() - start.stave.getX(),
+  );
+  const energy = loopEscapeEnergy(model);
+  const phase = loopEscapePhase(model);
+  const speed = `${model.currentSpeed.toFixed(
+    1,
+  )}× → ${model.targetSpeed.toFixed(1)}×`;
+  const label = `Loop escape, bars ${model.barStart} through ${
+    model.barEnd
+  }: ${phase}; ${model.qualityProgress.toFixed(1)} of ${
+    model.requiredCleanPasses
+  } clean passes, ${speed}${
+    model.retainedQuality ? '; near-clean quality retained' : ''
+  }`;
+
+  return (
+    <section
+      className="drumroll-loop-escape"
+      data-testid="loop-escape-runway"
+      data-phase={phase}
+      data-retained-quality={model.retainedQuality || undefined}
+      style={{ left, width }}
+      aria-label={label}
+    >
+      <svg
+        className="drumroll-loop-escape__ribbon"
+        viewBox="0 0 1000 64"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient id="loop-escape-energy" x1="0" x2="1">
+            <stop offset="0" stopColor="#63d5ff" />
+            <stop offset="0.54" stopColor="#8a74ff" />
+            <stop offset="1" stopColor="#d48cff" />
+          </linearGradient>
+        </defs>
+        <path
+          className="drumroll-loop-escape__trace"
+          d="M0 37 C58 20 97 52 154 35 S253 18 311 34 S407 52 468 31 S563 16 621 34 S716 51 775 30 S896 16 1000 32"
+          pathLength="100"
+        />
+        <path
+          className="drumroll-loop-escape__energy"
+          d="M0 37 C58 20 97 52 154 35 S253 18 311 34 S407 52 468 31 S563 16 621 34 S716 51 775 30 S896 16 1000 32"
+          pathLength="100"
+          style={{ strokeDasharray: `${energy * 100} 100` }}
+        />
+      </svg>
+      <span className="drumroll-loop-escape__anchor drumroll-loop-escape__anchor--control">
+        <span data-acquired={energy > 0} />
+        <b>Control</b>
+      </span>
+      <span className="drumroll-loop-escape__anchor drumroll-loop-escape__anchor--lock">
+        <span data-acquired={energy >= 0.5} />
+        <b>Lock</b>
+      </span>
+      <span className="drumroll-loop-escape__release">Release</span>
+      <span className="drumroll-loop-escape__telemetry">
+        <b>
+          {model.qualityProgress.toFixed(1)} / {model.requiredCleanPasses}
+        </b>
+        <span>{speed}</span>
+      </span>
+      {model.retainedQuality && (
+        <span className="drumroll-loop-escape__retained">Quality retained</span>
+      )}
+    </section>
+  );
+}
+
 export function FlowMeter({ renderData }: { renderData: RenderData[] }) {
   const bars = flowMeterBars(renderData);
 

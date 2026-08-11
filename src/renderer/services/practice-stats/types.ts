@@ -7,7 +7,7 @@ import type {
   TutorSettings,
 } from '../tutor/types';
 
-export const PRACTICE_RUN_SCHEMA_VERSION = 2;
+export const PRACTICE_RUN_SCHEMA_VERSION = 3;
 
 /**
  * An incomplete, local-only capture of a practice attempt. It is deliberately
@@ -27,7 +27,7 @@ export const MAX_PRACTICE_ATTEMPT_CHECKPOINTS_PER_SONG = 3;
  */
 export const MAX_PRACTICE_ATTEMPT_RECORDS = 20_000;
 
-export const SCORING_POLICY_VERSION = 'judge-resolved-v2';
+export const SCORING_POLICY_VERSION = 'judge-evidence-v3';
 
 /**
  * A drum-kit lane a hit record can be attributed to. Deliberately narrower
@@ -57,11 +57,23 @@ export interface HitRecord {
   element: KitElement;
   verdict: HitVerdict;
   velocity?: number;
+  expectedTick?: number;
+  actualTick?: number;
+  expectedElement?: KitElement;
+  actualElement?: KitElement;
 }
 
 export type StoredHitRecord = Pick<
   HitRecord,
-  'tick' | 'deltaMs' | 'element' | 'verdict' | 'velocity'
+  | 'tick'
+  | 'deltaMs'
+  | 'element'
+  | 'verdict'
+  | 'velocity'
+  | 'expectedTick'
+  | 'actualTick'
+  | 'expectedElement'
+  | 'actualElement'
 >;
 
 export interface LaneAccuracy {
@@ -154,6 +166,7 @@ export interface PersistedCoachFindingEvidence {
   expectedElement?: KitElement;
   /** Present only when the exact finding has an authored supported route. */
   remediationLessonId?: string;
+  resolved?: boolean;
 }
 
 /**
@@ -210,7 +223,7 @@ export interface RunSummary {
   learningEvidence?: RunLearningEvidence;
   /** Deterministic Coach/remediation evidence captured at run completion. */
   coachEvidence?: PersistedCoachFindingEvidence[];
-  /** Actual symmetric scoring window used for this run, in milliseconds. */
+  /** Source symmetric scoring window used for this run, in milliseconds. */
   timingWindowMs?: number;
   /** Authored lesson skills stamped for longitudinal atomic-skill evidence. */
   authoredSkills?: string[];

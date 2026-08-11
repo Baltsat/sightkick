@@ -100,6 +100,7 @@ meta:
       cannot skip authored prerequisites.
     next: id of the next exercise in the recommended play order, or null for the last exercise.
   skills_legend:
+    timing: maintains a consistent pulse against the authored grid
     kick-independence: kick drum plays independently of / alongside the hands
     hihat-timekeeping: hi-hat or ride carries a steady timekeeping pulse
     eighth-notes: uses 8th-note step resolution in at least one bar
@@ -195,6 +196,7 @@ units:
             cue: Keep both hands the same height and let the stick rebound on its own.
             skills:
               - sixteenth-notes
+              - timing
             time_signature:
               - 4
               - 4
@@ -216,6 +218,7 @@ units:
             cue: Two even taps per hand -- listen for the second tap matching the first.
             skills:
               - sixteenth-notes
+              - timing
             time_signature:
               - 4
               - 4
@@ -237,6 +240,7 @@ units:
             cue: Rest your heel down and let the beater bounce back off the head.
             skills:
               - sixteenth-notes
+              - timing
             time_signature:
               - 4
               - 4

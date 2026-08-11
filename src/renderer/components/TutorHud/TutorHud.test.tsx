@@ -206,4 +206,29 @@ describe('TutorHud', () => {
     );
     expect(screen.queryByTestId('tutor-lives')).not.toBeInTheDocument();
   });
+
+  it('reduces Flow recovery to a thin coach caption when Loop Escape is active', () => {
+    render(
+      <TutorHud
+        state={createTutorState({ enabled: false })}
+        message={{
+          title: 'Unused recovery card',
+          detail: 'The runway owns this state.',
+          tone: 'recovery',
+        }}
+        recoveryCaption={{
+          title: 'Near-clean quality retained',
+          detail: '1.0 of 2 passes remains banked.',
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('tutor-recovery-caption')).toHaveAccessibleName(
+      'Near-clean quality retained',
+    );
+    expect(
+      screen.getByTestId('tutor-recovery-caption'),
+    ).toHaveAccessibleDescription('1.0 of 2 passes remains banked.');
+    expect(screen.queryByTestId('tutor-speed')).not.toBeInTheDocument();
+  });
 });

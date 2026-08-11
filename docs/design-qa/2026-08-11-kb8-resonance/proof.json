@@ -1,0 +1,53 @@
+{
+  "retained": {
+    "viewport": {
+      "width": 1225,
+      "height": 768
+    },
+    "scroll": {
+      "width": 1225,
+      "height": 768
+    },
+    "phase": "lock",
+    "retained": "true"
+  },
+  "anchor": {
+    "viewport": {
+      "width": 1225,
+      "height": 768
+    },
+    "scroll": {
+      "width": 1225,
+      "height": 768
+    },
+    "phase": "lock",
+    "retained": null
+  },
+  "release": {
+    "viewport": {
+      "width": 1225,
+      "height": 768
+    },
+    "scroll": {
+      "width": 1225,
+      "height": 768
+    },
+    "phase": "release",
+    "retained": null
+  },
+  "viewport": {
+    "viewport": {
+      "width": 1024,
+      "height": 700
+    },
+    "scroll": {
+      "width": 1024,
+      "height": 700
+    },
+    "phase": "lock",
+    "retained": null
+  },
+  "reducedMotion": {
+    "transitionDuration": "0s"
+  }
+}

@@ -25,6 +25,12 @@
   pointer-events: none;
 }
 
+.drumroll-practice-shell[data-loop-escape] .drumroll-notation-stage {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+
 .drumroll-practice-shell[data-session-phase='paused'] .drumroll-notation-stage {
   opacity: 0.68;
   filter: blur(1.2px) saturate(0.82);

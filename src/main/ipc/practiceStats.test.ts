@@ -198,6 +198,77 @@ describe('savePracticeRun', () => {
     ]);
   });
 
+  it('round-trips compact judge attribution with the source scoring window', () => {
+    storeHolder.current = makeStore({});
+
+    const summary: RunSummary = {
+      ...fakeSummary(),
+      timingWindowMs: 105,
+    };
+    const record: HitRecord = {
+      ...fakeRecord(480),
+      deltaMs: 0,
+      verdict: 'wrong',
+      expectedTick: 480,
+      actualTick: 492,
+      expectedElement: 'kick',
+      actualElement: 'snare',
+    };
+
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary,
+      records: [record],
+    });
+
+    expect(storeHolder.current.get('practiceRunDetails.song-1')).toEqual([
+      {
+        summary,
+        records: [
+          {
+            tick: 480,
+            deltaMs: 0,
+            element: 'snare',
+            verdict: 'wrong',
+            velocity: 92,
+            expectedTick: 480,
+            actualTick: 492,
+            expectedElement: 'kick',
+            actualElement: 'snare',
+          },
+        ],
+      },
+    ]);
+
+    const event = makeEvent();
+
+    loadPracticeRuns(event as never, 'song-1');
+
+    expect(lastReply(event, 'load-practice-runs')!.args[0]).toEqual({
+      songId: 'song-1',
+      runs: [summary],
+      fullRuns: [
+        {
+          summary,
+          records: [
+            {
+              tick: 480,
+              deltaMs: 0,
+              element: 'snare',
+              verdict: 'wrong',
+              velocity: 92,
+              expectedTick: 480,
+              actualTick: 492,
+              expectedElement: 'kick',
+              actualElement: 'snare',
+            },
+          ],
+        },
+      ],
+      archive: emptyArchive(),
+    });
+  });
+
   it('commits summary, archive, and detail evidence in one consistent snapshot', () => {
     const existing = Array.from(
       { length: MAX_STORED_RUNS_PER_SONG },
@@ -627,6 +698,34 @@ describe('loadPracticeRuns', () => {
     });
   });
 
+  it('loads legacy detailed records without adding judge attribution fields', () => {
+    const summary = fakeSummary(0.75);
+    const legacyRecord = {
+      tick: 480,
+      deltaMs: 0,
+      element: 'snare',
+      verdict: 'wrong' as const,
+    };
+
+    storeHolder.current = makeStore({
+      practiceRuns: { 'song-1': [summary] },
+      practiceRunDetails: {
+        'song-1': [{ summary, records: [legacyRecord] }],
+      },
+    });
+
+    const event = makeEvent();
+
+    loadPracticeRuns(event as never, 'song-1');
+
+    expect(lastReply(event, 'load-practice-runs')!.args[0]).toEqual({
+      songId: 'song-1',
+      runs: [summary],
+      fullRuns: [{ summary, records: [legacyRecord] }],
+      archive: emptyArchive(),
+    });
+  });
+
   it('replies with an empty list for a song with no stored runs', () => {
     storeHolder.current = makeStore({});
 
@@ -675,6 +774,52 @@ describe('loadPracticeRuns', () => {
 });
 
 describe('practice attempt checkpoints', () => {
+  it('loads legacy compact records without adding future judge fields', () => {
+    const legacyRecord = {
+      tick: 480,
+      deltaMs: 0,
+      element: 'snare',
+      verdict: 'wrong' as const,
+    };
+
+    storeHolder.current = makeStore({
+      practiceAttemptCheckpoints: {
+        'song-1': [
+          {
+            schemaVersion: 1,
+            state: 'in-progress',
+            songId: 'song-1',
+            sessionId: 'legacy-attempt',
+            startedAt: '2026-08-09T23:59:00.000Z',
+            updatedAt: '2026-08-10T00:00:00.000Z',
+            chartRevision: 'chart-revision-1',
+            mode: 'practice',
+            difficulty: 'expert',
+            playbackSpeed: 0.8,
+            positionTick: 960,
+            records: [legacyRecord],
+          },
+        ],
+      },
+    });
+
+    const event = makeEvent();
+
+    loadPracticeAttemptCheckpoints(event as never, 'song-1');
+
+    expect(
+      lastReply(event, 'load-practice-attempt-checkpoints')!.args[0],
+    ).toEqual({
+      songId: 'song-1',
+      checkpoints: [
+        expect.objectContaining({
+          sessionId: 'legacy-attempt',
+          records: [legacyRecord],
+        }),
+      ],
+    });
+  });
+
   it('upserts an in-progress attempt without manufacturing a completed run', () => {
     storeHolder.current = makeStore({});
 
