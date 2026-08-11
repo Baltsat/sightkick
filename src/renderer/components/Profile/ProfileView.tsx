@@ -19,6 +19,7 @@ import { XpSkillLine } from './XpSkillLine';
 import { SkillBars } from './SkillBars';
 import { useMastery } from './useMastery';
 import { useRetiredLessons } from './useRetiredLessons';
+import { AtomicSkillRadar } from './AtomicSkillRadar';
 
 export interface ProfileViewProps {
   songList: Song[];
@@ -228,6 +229,8 @@ export function ProfileView({
       )}
 
       <PracticeHistory progress={gamification.longitudinalProgress} />
+
+      <AtomicSkillRadar runs={mastery.allRuns} />
 
       <section className="flex flex-col gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint">

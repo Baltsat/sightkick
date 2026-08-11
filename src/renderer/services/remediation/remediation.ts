@@ -2,6 +2,8 @@ import type { CoachFinding } from '../coach';
 import {
   DEFAULT_MINIMUM_RESOLVED_NOTES,
   DEFAULT_REMEDIATION_SPEED,
+  REMEDIATION_NEAR_MISS_ACCURACY,
+  REMEDIATION_QUALITY_ACCURACY,
   REQUIRED_CONSECUTIVE_CLEAN_PASSES,
   REMEDIATION_QUEUE_VERSION,
   CreateRemediationQueueInput,
@@ -200,31 +202,68 @@ function isValidPassInput(input: RecordRemediationPassInput): boolean {
   );
 }
 
+function assessRemediationPass(
+  minimumResolvedNotes: number,
+  input: Pick<
+    RecordRemediationPassInput,
+    'resolvedNotes' | 'misses' | 'wrongHits'
+  >,
+) {
+  const isErrorFree = input.misses === 0 && input.wrongHits === 0;
+  const hasSufficientCoverage = input.resolvedNotes >= minimumResolvedNotes;
+  const denominator = Math.max(1, input.resolvedNotes + input.wrongHits);
+  const accuracy =
+    minimumResolvedNotes === 0 &&
+    input.resolvedNotes === 0 &&
+    input.wrongHits === 0
+      ? 1
+      : Math.max(0, (input.resolvedNotes - input.misses) / denominator);
+  const allowedMisses = minimumResolvedNotes >= 6 ? 1 : 0;
+  const allowedWrongHits = minimumResolvedNotes >= 8 ? 1 : 0;
+  const qualifiesAsCleanPass =
+    hasSufficientCoverage &&
+    accuracy >= REMEDIATION_QUALITY_ACCURACY &&
+    input.misses <= allowedMisses &&
+    input.wrongHits <= allowedWrongHits;
+  const nearMiss =
+    hasSufficientCoverage &&
+    accuracy >= REMEDIATION_NEAR_MISS_ACCURACY &&
+    input.wrongHits <= Math.max(1, allowedWrongHits);
+
+  return {
+    isErrorFree,
+    hasSufficientCoverage,
+    qualifiesAsCleanPass,
+    nearMiss,
+  };
+}
+
 function makeAttempt(
   task: RemediationTask,
   input: RecordRemediationPassInput,
 ): RemediationAttempt {
-  const isErrorFree = input.misses === 0 && input.wrongHits === 0;
-  const hasSufficientCoverage =
-    input.resolvedNotes >= task.minimumResolvedNotes;
-  const qualifiesAsCleanPass = isErrorFree && hasSufficientCoverage;
+  const { isErrorFree, hasSufficientCoverage, qualifiesAsCleanPass, nearMiss } =
+    assessRemediationPass(task.minimumResolvedNotes, input);
+  const progressAfter = qualifiesAsCleanPass
+    ? task.consecutiveCleanPasses + 1
+    : nearMiss
+    ? task.consecutiveCleanPasses
+    : Math.max(0, task.consecutiveCleanPasses - 1);
 
   return {
     ...input,
     isErrorFree,
     hasSufficientCoverage,
     qualifiesAsCleanPass,
-    consecutiveCleanPassesAfter: qualifiesAsCleanPass
-      ? task.consecutiveCleanPasses + 1
-      : 0,
+    consecutiveCleanPassesAfter: progressAfter,
   };
 }
 
 /**
- * Records exactly one completed loop. A weak/partial loop is intentionally
- * retained as evidence, resets the clean streak, and cannot accidentally
- * advance the player. Completing a task advances the queue; completing the
- * final task keeps the original source identity intact for the review return.
+ * Records exactly one completed loop. A useful near miss is retained as
+ * evidence instead of erasing the preceding pass; a clearly unplayable pass
+ * steps progress down by one. Completing the final task keeps the original
+ * source identity intact for the review return.
  */
 export function recordRemediationPass(
   queue: RemediationQueue,
@@ -335,12 +374,19 @@ function isAttempt(
   }
 
   const isErrorFree = value.misses === 0 && value.wrongHits === 0;
-  const hasSufficientCoverage = value.resolvedNotes >= minimumResolvedNotes;
+  const assessment = assessRemediationPass(minimumResolvedNotes, {
+    resolvedNotes: value.resolvedNotes,
+    misses: value.misses,
+    wrongHits: value.wrongHits,
+  });
 
   return (
     value.isErrorFree === isErrorFree &&
-    value.hasSufficientCoverage === hasSufficientCoverage &&
-    value.qualifiesAsCleanPass === (isErrorFree && hasSufficientCoverage)
+    value.hasSufficientCoverage === assessment.hasSufficientCoverage &&
+    (value.qualifiesAsCleanPass === assessment.qualifiesAsCleanPass ||
+      // Legacy v1 attempts used a stricter zero-error gate. Preserve them as
+      // honest failures while all newly recorded passes use the adaptive gate.
+      (!value.isErrorFree && !value.qualifiesAsCleanPass))
   );
 }
 
@@ -400,12 +446,26 @@ function isTask(value: unknown): value is RemediationTask {
   let expectedCleanPasses = 0;
 
   for (const attempt of value.attempts) {
+    const assessment = assessRemediationPass(minimumResolvedNotes, attempt);
+
     expectedCleanPasses = attempt.qualifiesAsCleanPass
       ? expectedCleanPasses + 1
-      : 0;
+      : assessment.nearMiss
+      ? expectedCleanPasses
+      : Math.max(0, expectedCleanPasses - 1);
 
     if (attempt.consecutiveCleanPassesAfter !== expectedCleanPasses) {
-      return false;
+      // v1 queues created before retained progress reset a near miss to zero.
+      // Accept that honest old state; every newly recorded attempt uses the
+      // non-erasing progression above.
+      if (
+        !attempt.qualifiesAsCleanPass &&
+        attempt.consecutiveCleanPassesAfter === 0
+      ) {
+        expectedCleanPasses = 0;
+      } else {
+        return false;
+      }
     }
   }
 

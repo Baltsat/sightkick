@@ -62,8 +62,10 @@ import { AppShell, ArenaView } from '../../components/AppShell';
 import { HomeCockpit } from '../../components/HomeCockpit';
 import { KitCommandPrompt } from '../../components/KitCommandPrompt';
 import {
+  buildPracticeWave,
   PracticeCandidate,
   PracticeHistoryEntry,
+  PracticeWaveResult,
   recommendNextPractice,
 } from '../../services/next-practice';
 import { PracticeOutletContext } from '../practice-context';
@@ -344,13 +346,20 @@ export function SongListView() {
           difficulty: targetDifficulty,
           available: true,
           liked: song.liked,
+          skills: [
+            ...new Set(
+              (gamification.runsBySong?.[song.id] ?? []).flatMap((run) =>
+                (run.coachEvidence ?? []).map((finding) => finding.skillTag),
+              ),
+            ),
+          ],
           targetSpeed: 1,
           availableDifficulties: song.drumDifficulties,
           chartTotalNotes: song.scoreData?.[targetDifficulty]?.totalNotes,
         },
       ];
     });
-  }, [difficulty, lessonProgress.entries, songList]);
+  }, [difficulty, gamification.runsBySong, lessonProgress.entries, songList]);
   const practiceHistory = useMemo<PracticeHistoryEntry[]>(
     () =>
       Object.entries(gamification.runsBySong ?? {}).flatMap(
@@ -371,7 +380,7 @@ export function SongListView() {
         coachEvidence: persistedCoachEvidence,
         weakLanes: gamification.laneAccuracy,
         nowMs: recommendationNowMs,
-        limit: 5,
+        limit: 12,
       }),
     [
       gamification.laneAccuracy,
@@ -381,6 +390,18 @@ export function SongListView() {
       recommendationNowMs,
     ],
   );
+  const practiceWave = useMemo(
+    () =>
+      buildPracticeWave({
+        ranking: nextPractice.ranking,
+        history: practiceHistory,
+      }),
+    [nextPractice.ranking, practiceHistory],
+  );
+  const [activePracticeWave, setActivePracticeWave] = useState<{
+    result: PracticeWaveResult;
+    index: number;
+  }>();
   const rescanLibrary = useCallback(() => {
     window.electron.ipcRenderer.sendMessage('rescan-songs', false);
   }, []);
@@ -518,26 +539,64 @@ export function SongListView() {
     // just to repeat that choice. Lessons therefore always enter their own
     // chart directly in Practice; SongView remains responsible for its
     // deliberate ready cue and count-in, so this does not start audio early.
-    navigate(`/${entry.song.id}?gameMode=practice`);
+    const authoredStartSpeed =
+      entry.lesson.bpmStart && entry.lesson.bpmTarget
+        ? entry.lesson.bpmStart / entry.lesson.bpmTarget
+        : 0.8;
+    const practiceSpeed = Math.min(1, Math.max(0.7, authoredStartSpeed));
+    const params = new URLSearchParams({
+      gameMode: 'practice',
+      practiceSpeed: practiceSpeed.toFixed(1),
+    });
+
+    navigate(`/${entry.song.id}?${params.toString()}`);
   };
   const startRecommendedPractice = useCallback(
     (completedRun?: PracticeHistoryEntry) => {
-      const result = recommendNextPractice({
-        candidates: practiceCandidates,
-        history: appendCompletedRun(practiceHistory, completedRun),
-        coachEvidence: [
-          ...persistedCoachEvidence,
-          ...(completedRun?.summary.coachEvidence ?? []),
-        ],
-        nowMs: Date.now(),
-        limit: 5,
-      });
-      const recommendation = result.recommendation;
+      const history = appendCompletedRun(practiceHistory, completedRun);
+      const activeCurrentId =
+        activePracticeWave?.result.stops[activePracticeWave.index]
+          ?.recommendation.candidate.id;
+      const activeNextStop =
+        completedRun &&
+        activePracticeWave &&
+        activeCurrentId === completedRun.candidateId
+          ? activePracticeWave.result.stops[activePracticeWave.index + 1]
+          : undefined;
+      let wave = activePracticeWave?.result;
+      let waveIndex = activePracticeWave?.index ?? 0;
+
+      if (activeNextStop) {
+        waveIndex += 1;
+      } else {
+        const result = recommendNextPractice({
+          candidates: practiceCandidates,
+          history,
+          coachEvidence: [
+            ...persistedCoachEvidence,
+            ...(completedRun?.summary.coachEvidence ?? []),
+          ],
+          nowMs: Date.now(),
+          limit: 12,
+        });
+
+        wave = buildPracticeWave({ ranking: result.ranking, history });
+        waveIndex = 0;
+      }
+
+      const recommendation =
+        activeNextStop?.recommendation ??
+        wave?.stops[waveIndex]?.recommendation;
 
       if (!recommendation) {
+        setActivePracticeWave(undefined);
         setView('songs');
 
         return;
+      }
+
+      if (wave) {
+        setActivePracticeWave({ result: wave, index: waveIndex });
       }
 
       if (recommendation.candidate.difficulty !== difficulty) {
@@ -553,6 +612,7 @@ export function SongListView() {
       navigate(`/${recommendation.candidate.id}?${params.toString()}`);
     },
     [
+      activePracticeWave,
       difficulty,
       navigate,
       persistedCoachEvidence,
@@ -583,7 +643,17 @@ export function SongListView() {
       setDifficulty(targetDifficulty);
     }
 
-    navigate(`/${entry.song.id}?gameMode=practice`, { replace: true });
+    const authoredStartSpeed =
+      entry.lesson.bpmStart && entry.lesson.bpmTarget
+        ? entry.lesson.bpmStart / entry.lesson.bpmTarget
+        : 0.8;
+    const practiceSpeed = Math.min(1, Math.max(0.7, authoredStartSpeed));
+    const params = new URLSearchParams({
+      gameMode: 'practice',
+      practiceSpeed: practiceSpeed.toFixed(1),
+    });
+
+    navigate(`/${entry.song.id}?${params.toString()}`, { replace: true });
   }, [difficulty, lessonProgress, navigate, searchParams, setDifficulty]);
 
   const libraryInputHandlers: InputControlHandlers = isSortOpen
@@ -714,6 +784,7 @@ export function SongListView() {
             lessonProgress={lessonProgress}
             gamification={gamification}
             recommendation={nextPractice.recommendation}
+            practiceWave={practiceWave}
             onStartRecommended={() => startRecommendedPractice()}
             onOpenSongs={() => setView('songs')}
             onOpenJourney={() => setView('journey')}
@@ -733,6 +804,7 @@ export function SongListView() {
             lessonProgress={lessonProgress}
             gamification={gamification}
             recommendation={nextPractice.recommendation}
+            practiceWave={practiceWave}
             onStartRecommended={() => startRecommendedPractice()}
             onOpenSongs={() => setView('songs')}
             onOpenJourney={() => setView('journey')}
@@ -1172,7 +1244,9 @@ export function SongListView() {
           context={
             {
               gamification,
-              recommendation: nextPractice.recommendation,
+              recommendation:
+                activePracticeWave?.result.stops[activePracticeWave.index]
+                  ?.recommendation ?? nextPractice.recommendation,
               continuePractice: startRecommendedPractice,
             } satisfies PracticeOutletContext
           }

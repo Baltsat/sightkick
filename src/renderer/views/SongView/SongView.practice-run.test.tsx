@@ -87,7 +87,7 @@ async function runToEnd(view: ReturnType<typeof setupSongView>) {
   // chunk's scheduled end - so this has to step both the timers *and* the
   // fake clock together, the same way completeCountIn() does for the
   // count-in scheduler elsewhere in this test suite.
-  for (let i = 0; i < 30; i += 1) {
+  for (let i = 0; i < 60; i += 1) {
     view.audio.currentTime += 1.5;
 
     await act(async () => {
@@ -642,7 +642,7 @@ describe('practice mode analytics', () => {
       expect(view.updateSongPayloads()).toHaveLength(0);
       expect(recordRun).not.toHaveBeenCalled();
       expect(screen.getByTestId('lesson-progression-result')).toHaveTextContent(
-        'Target-speed pass complete',
+        'Learning pass complete',
       );
 
       await act(async () => {
@@ -692,7 +692,7 @@ describe('practice mode analytics', () => {
     }
   }, 30000);
 
-  it('does not unlock a lesson when a run starts slowly and only finishes at target speed', async () => {
+  it('does not unlock a lesson when a run starts below the learning tempo and only finishes at target speed', async () => {
     vi.useFakeTimers();
 
     const recordRun = vi.fn();
@@ -728,7 +728,7 @@ describe('practice mode analytics', () => {
         }),
       );
 
-      for (let index = 0; index < 3; index += 1) {
+      for (let index = 0; index < 4; index += 1) {
         await view.pressKey('ArrowDown');
       }
 
@@ -739,7 +739,7 @@ describe('practice mode analytics', () => {
       });
       await view.pressKey('KeyJ');
 
-      for (let index = 0; index < 3; index += 1) {
+      for (let index = 0; index < 4; index += 1) {
         await view.pressKey('ArrowUp');
       }
 
@@ -751,7 +751,7 @@ describe('practice mode analytics', () => {
       await runToEnd(view);
 
       expect(screen.getByTestId('lesson-progression-result')).toHaveTextContent(
-        'play one complete run at 1.0×',
+        'Complete the lesson at 0.7× or faster',
       );
 
       await act(async () => {
@@ -817,7 +817,7 @@ describe('practice mode analytics', () => {
       await runToEnd(view);
 
       expect(screen.getByTestId('lesson-progression-result')).toHaveTextContent(
-        'restart at the beginning',
+        'Start from bar 1',
       );
 
       await act(async () => {

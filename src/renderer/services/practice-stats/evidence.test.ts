@@ -82,6 +82,8 @@ describe('decideRunEvidence', () => {
         cleanMaximumMisses: 0,
         cleanMaximumWrongHits: 0,
         requiredCleanRepetitions: 2,
+        recoveryProgressRetention: 0.5,
+        strongRecoveryAccuracy: 0.97,
         minimumSpeed: 0.5,
         speedStep: 0.1,
         maximumFailedRecoveryAttempts: 6,

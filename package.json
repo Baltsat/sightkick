@@ -1,7 +1,7 @@
 {
   "name": "sight-kick",
   "description": "An adaptive drum tutor and performance game for MIDI kits",
-  "version": "1.2.0-kb.6",
+  "version": "1.2.0-kb.7",
   "keywords": [
     "clonehero",
     "drums",
@@ -156,7 +156,7 @@
   "build": {
     "productName": "Drumroll",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
-    "buildVersion": "1.2.6",
+    "buildVersion": "1.2.7",
     "appId": "org.sk.SightKick",
     "asar": true,
     "asarUnpack": "**\\*.{node,dll}",
@@ -175,12 +175,15 @@
       },
       "type": "distribution",
       "bundleShortVersion": "1.2.0",
-      "bundleVersion": "1.2.6",
+      "bundleVersion": "1.2.7",
       "minimumSystemVersion": "12.0",
       "identity": "Konstantin Baltsat (3BGK34ZGS6)",
       "binaries": [
         "Contents/Resources/ffmpeg-runtime/bin/ffmpeg",
         "Contents/Resources/ffmpeg-runtime/bin/ffprobe"
+      ],
+      "signIgnore": [
+        "Contents/Resources/lesson-library/"
       ],
       "forceCodeSigning": true,
       "hardenedRuntime": true,

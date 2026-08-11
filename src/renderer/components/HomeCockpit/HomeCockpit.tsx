@@ -33,7 +33,10 @@ import {
   RECENT_LANE_TREND_WINDOW_DAYS,
   RECENT_READINESS_WINDOW_DAYS,
 } from '../../services/mastery';
-import { RankedPracticeCandidate } from '../../services/next-practice';
+import {
+  PracticeWaveResult,
+  RankedPracticeCandidate,
+} from '../../services/next-practice';
 import { KitElement, RunSummary } from '../../services/practice-stats';
 import { playKitPreview } from '../../services/kit-preview-audio';
 import homeKitStudio from '../../assets/daybreak/home-kit-studio.png';
@@ -49,6 +52,7 @@ interface HomeCockpitProps {
   lessonProgress: LessonProgress;
   gamification: UseGamificationResult;
   recommendation?: RankedPracticeCandidate;
+  practiceWave?: PracticeWaveResult;
   onStartRecommended: () => void;
   onOpenSongs: () => void;
   onOpenJourney: () => void;
@@ -261,6 +265,7 @@ export function HomeCockpit({
   lessonProgress,
   gamification,
   recommendation,
+  practiceWave,
   onStartRecommended,
   onOpenSongs,
   onOpenJourney,
@@ -755,20 +760,36 @@ export function HomeCockpit({
 
       <div className="home-cockpit__below">
         <article className="home-cockpit__next">
-          <div>
-            <p className="home-cockpit__label">Current lesson</p>
-            <h2>
-              {nextLesson
-                ? `Lesson · ${nextLesson.lesson.title}`
-                : 'Your first lesson is ready'}
-            </h2>
-            <p className="home-cockpit__lesson-meta">
-              {nextLesson
-                ? `${nextLesson.lesson.unit} · ${
-                    nextLesson.lesson.bpmStart ?? '—'
-                  } → ${nextLesson.lesson.bpmTarget ?? '—'} BPM`
-                : 'Open Journey to load the Drumroll Method into your library.'}
-            </p>
+          <div className="home-cockpit__wave-copy">
+            <p className="home-cockpit__label">Your Practice Wave</p>
+            {practiceWave && practiceWave.stops.length > 0 ? (
+              <ol className="home-cockpit__wave-list">
+                {practiceWave.stops.map((stop) => (
+                  <li key={`${stop.role}:${stop.recommendation.candidate.id}`}>
+                    <span>{stop.role}</span>
+                    <strong>{stop.recommendation.candidate.title}</strong>
+                    <small>
+                      {stop.recommendation.suggestedSpeed.toFixed(1)}×
+                    </small>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <>
+                <h2>
+                  {nextLesson
+                    ? `Lesson · ${nextLesson.lesson.title}`
+                    : 'Your first lesson is ready'}
+                </h2>
+                <p className="home-cockpit__lesson-meta">
+                  {nextLesson
+                    ? `${nextLesson.lesson.unit} · ${
+                        nextLesson.lesson.bpmStart ?? '—'
+                      } → ${nextLesson.lesson.bpmTarget ?? '—'} BPM`
+                    : 'Open Journey to load the Drumroll Method into your library.'}
+                </p>
+              </>
+            )}
           </div>
           <Button
             type="text"

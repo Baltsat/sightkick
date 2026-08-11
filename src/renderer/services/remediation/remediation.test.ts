@@ -115,7 +115,7 @@ describe('remediation queue', () => {
     ).toEqual(queue);
   });
 
-  it('requires coverage and two consecutive zero-error passes, retaining every failed attempt', () => {
+  it('accepts a developing one-miss pass and reaches a finite terminal state', () => {
     const queue = createQueue();
 
     expect(queue).not.toBeNull();
@@ -153,19 +153,20 @@ describe('remediation queue', () => {
       wrongHits: 0,
     });
 
-    expect(getActiveRemediationTask(secondClean)).toBeNull();
-    expect(secondClean).toMatchObject({
+    expect(getActiveRemediationTask(firstClean)).toBeNull();
+    expect(firstClean).toMatchObject({
       status: 'completed',
       activeTaskIndex: 1,
       source,
-      completedAt: '2026-08-10T09:35:00.000Z',
+      completedAt: '2026-08-10T09:34:00.000Z',
     });
-    expect(secondClean.tasks[0]).toMatchObject({
+    expect(secondClean).toEqual(firstClean);
+    expect(firstClean.tasks[0]).toMatchObject({
       status: 'completed',
       consecutiveCleanPasses: REQUIRED_CONSECUTIVE_CLEAN_PASSES,
-      completedAt: '2026-08-10T09:35:00.000Z',
+      completedAt: '2026-08-10T09:34:00.000Z',
     });
-    expect(secondClean.tasks[0].attempts).toEqual([
+    expect(firstClean.tasks[0].attempts).toEqual([
       expect.objectContaining({
         resolvedNotes: 5,
         isErrorFree: true,
@@ -176,10 +177,6 @@ describe('remediation queue', () => {
       expect.objectContaining({
         misses: 1,
         isErrorFree: false,
-        qualifiesAsCleanPass: false,
-        consecutiveCleanPassesAfter: 0,
-      }),
-      expect.objectContaining({
         qualifiesAsCleanPass: true,
         consecutiveCleanPassesAfter: 1,
       }),
@@ -188,7 +185,7 @@ describe('remediation queue', () => {
         consecutiveCleanPassesAfter: 2,
       }),
     ]);
-    expect(isRemediationComplete(secondClean)).toBe(true);
+    expect(isRemediationComplete(firstClean)).toBe(true);
   });
 
   it('advances through multiple phrases only after each phrase is mastered', () => {

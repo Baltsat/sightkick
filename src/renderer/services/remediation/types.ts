@@ -6,8 +6,13 @@ import type { CoachFinding, CoachSeverity, CoachSkillTag } from '../coach';
  */
 export const REMEDIATION_QUEUE_VERSION = 1 as const;
 
-/** Every task needs two back-to-back, error-free passes before it can clear. */
+/** Every task needs two good-enough learning passes before it can clear. */
 export const REQUIRED_CONSECUTIVE_CLEAN_PASSES = 2;
+
+/** Coach loops teach a pattern; they are not a zero-error audition. */
+export const REMEDIATION_QUALITY_ACCURACY = 0.82;
+
+export const REMEDIATION_NEAR_MISS_ACCURACY = 0.68;
 
 /**
  * A conservative fallback when the chart caller has not supplied the exact
@@ -46,13 +51,13 @@ export interface RemediationAttempt {
   resolvedNotes: number;
   misses: number;
   wrongHits: number;
-  /** Zero miss and zero wrong hits. */
+  /** Diagnostic fact, not the completion gate. */
   isErrorFree: boolean;
   /** Enough chart heads in this task's authored range were actually resolved. Zero is valid for an authored silent range. */
   hasSufficientCoverage: boolean;
-  /** Both predicates above were true for this attempt. */
+  /** Coverage and the forgiving learning-quality gate were met. */
   qualifiesAsCleanPass: boolean;
-  /** The streak immediately after recording this attempt. */
+  /** Retained whole-pass progress immediately after this attempt. */
   consecutiveCleanPassesAfter: number;
 }
 
@@ -65,6 +70,7 @@ export interface RemediationTask {
   /** Persisted so a reopened task resumes at the same authored tempo. */
   playbackSpeed: number;
   status: RemediationTaskStatus;
+  /** Legacy field name; represents retained good-pass progress. */
   consecutiveCleanPasses: number;
   attempts: readonly RemediationAttempt[];
   completedAt?: string;

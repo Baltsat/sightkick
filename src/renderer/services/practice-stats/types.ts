@@ -210,6 +210,10 @@ export interface RunSummary {
   learningEvidence?: RunLearningEvidence;
   /** Deterministic Coach/remediation evidence captured at run completion. */
   coachEvidence?: PersistedCoachFindingEvidence[];
+  /** Actual symmetric scoring window used for this run, in milliseconds. */
+  timingWindowMs?: number;
+  /** Authored lesson skills stamped for longitudinal atomic-skill evidence. */
+  authoredSkills?: string[];
 }
 
 export interface RunTrendPoint {

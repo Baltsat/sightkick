@@ -421,3 +421,239 @@ button,
     display: none;
   }
 }
+
+/* Borderless in-play streak VFX. The title is the reward; the smaller count
+   follows as proof. No pill, panel, or field wash competes with notation. */
+@keyframes sk-streak-title-first {
+  from {
+    transform: translateY(0.35rem) scale(0.92);
+    filter: blur(6px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+    opacity: 1;
+  }
+}
+
+@keyframes sk-streak-proof-follow {
+  from {
+    transform: translateY(0.25rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes sk-streak-hit-proof {
+  0% {
+    transform: scale(0.96);
+    filter: brightness(1.7);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes sk-streak-energy-strike {
+  0% {
+    transform: translate(-50%, -50%) scaleX(0.12) scaleY(0.6);
+    opacity: 0;
+  }
+  35% {
+    transform: translate(-50%, -50%) scaleX(1.12) scaleY(1.06);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-50%, -50%) scaleX(0.8) scaleY(0.8);
+    opacity: 0.28;
+  }
+}
+
+.sk-streak-meter {
+  position: relative;
+  display: grid;
+  min-width: clamp(13rem, 24vw, 21rem);
+  min-height: 4.4rem;
+  place-items: center;
+  align-content: center;
+  padding: 0.15rem 2.2rem;
+  border: 0 !important;
+  color: var(--sk-streak-ink);
+  background: transparent !important;
+  box-shadow: none !important;
+  isolation: isolate;
+}
+
+.sk-streak-meter::before,
+.sk-streak-meter::after,
+.sk-streak-energy {
+  position: absolute;
+  z-index: -1;
+  content: '';
+  pointer-events: none;
+}
+
+.sk-streak-meter::before {
+  top: 52%;
+  left: 50%;
+  width: calc(7rem + var(--sk-streak-glow-size));
+  height: 0.12rem;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--sk-streak-ink),
+    transparent
+  );
+  filter: blur(1px);
+  opacity: 0.34;
+}
+
+.sk-streak-meter::after {
+  top: 50%;
+  left: 50%;
+  width: calc(4.5rem + var(--sk-streak-glow-size));
+  aspect-ratio: 2.4;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, var(--sk-streak-glow), transparent 70%);
+  filter: blur(8px);
+  opacity: 0.52;
+}
+
+.sk-streak-energy {
+  top: 50%;
+  left: 50%;
+  width: calc(8rem + var(--sk-streak-glow-size));
+  height: calc(2.6rem + var(--sk-streak-glow-size));
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: conic-gradient(
+    from 88deg,
+    transparent 0 20%,
+    var(--sk-streak-glow) 32%,
+    transparent 45% 62%,
+    color-mix(in srgb, var(--sk-streak-ink) 52%, transparent) 73%,
+    transparent 86%
+  );
+  filter: blur(8px);
+  opacity: 0.28;
+}
+
+.sk-streak-title {
+  max-width: 16ch;
+  color: var(--sk-streak-ink);
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2.25vw, 2rem);
+  font-weight: 720;
+  line-height: 0.9;
+  letter-spacing: -0.035em;
+  text-align: center;
+  text-shadow:
+    0 2px 8px rgb(17 23 34 / 18%),
+    0 0 var(--sk-streak-glow-size) var(--sk-streak-glow);
+}
+
+.sk-streak-proof,
+.sk-streak-best {
+  color: color-mix(in srgb, var(--sk-streak-ink) 76%, var(--color-ink));
+  font-family: var(--font-ui);
+  font-size: 0.65rem;
+  font-weight: 760;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sk-streak-proof {
+  margin-top: 0.35rem;
+  animation: sk-streak-hit-proof 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sk-streak-proof b {
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.sk-streak-best {
+  margin-top: 0.22rem;
+  color: var(--color-text-faint);
+  font-size: 0.55rem;
+}
+
+.sk-streak-meter.sk-streak-pulse,
+.sk-streak-meter[data-tier].sk-streak-pulse {
+  animation: none;
+}
+
+.sk-streak-meter.sk-streak-tier-up .sk-streak-title {
+  animation: sk-streak-title-first 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sk-streak-meter.sk-streak-tier-up .sk-streak-proof {
+  animation: sk-streak-proof-follow 360ms 120ms cubic-bezier(0.16, 1, 0.3, 1)
+    both;
+}
+
+.sk-streak-meter.sk-streak-tier-up .sk-streak-energy {
+  animation: sk-streak-energy-strike 780ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sk-streak-meter[data-tier='-1'] {
+  --sk-streak-ink: var(--color-ink-soft);
+}
+
+.sk-streak-meter[data-tier='-1']::after,
+.sk-streak-meter[data-tier='-1'] .sk-streak-energy {
+  display: none;
+}
+
+/* The notation surface is warm and light, so late tiers stay dark enough to
+   read while their surrounding energy becomes brighter and more chromatic. */
+.sk-streak-meter[data-tier='5'] {
+  --sk-streak-ink: #a83a2e;
+}
+
+.sk-streak-meter[data-tier='6'] {
+  --sk-streak-ink: #972f4b;
+}
+
+.sk-streak-meter[data-tier='7'] {
+  --sk-streak-ink: #782d62;
+}
+
+.sk-streak-meter[data-tier='8'] {
+  --sk-streak-ink: #572b70;
+}
+
+.sk-streak-meter[data-tier='9'] {
+  --sk-streak-ink: #302154;
+}
+
+.sk-streak-meter[data-tier='7'] .sk-streak-energy,
+.sk-streak-meter[data-tier='8'] .sk-streak-energy,
+.sk-streak-meter[data-tier='9'] .sk-streak-energy {
+  filter: blur(6px) saturate(1.4);
+  opacity: 0.82;
+}
+
+.sk-streak-meter[data-tier='9']::before {
+  height: 0.22rem;
+  box-shadow:
+    0 -0.5rem 1.2rem #63d5ff,
+    0 0.5rem 1.2rem #ff4ca2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-streak-meter.sk-streak-tier-up .sk-streak-title,
+  .sk-streak-meter.sk-streak-tier-up .sk-streak-proof,
+  .sk-streak-meter.sk-streak-tier-up .sk-streak-energy,
+  .sk-streak-proof {
+    animation: none;
+  }
+}

@@ -211,7 +211,7 @@ describe('safe hands-free run intent', () => {
       );
 
       expect(
-        within(screen.getByTestId('tutor-hud')).getByText('Star run ready'),
+        within(screen.getByTestId('tutor-hud')).getByText('Lesson ready'),
       ).toBeInTheDocument();
 
       await view.pressKey('KeyK');

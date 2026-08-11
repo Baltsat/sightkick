@@ -92,10 +92,8 @@ import { usePracticeAttemptCheckpoint } from '../../hooks/usePracticeAttemptChec
 import { useDrumGestures } from '../../hooks/useDrumGestures';
 import { DrumGestureAction, DrumGestureSurface } from '../../services/gestures';
 import { CountInPolicy } from '../../services/engine';
-import {
-  HIT_TOLERANCE_SECONDS,
-  PRACTICE_HIT_TOLERANCE_SECONDS,
-} from '../../services/engine/constants';
+import { HIT_TOLERANCE_SECONDS } from '../../services/engine/constants';
+import { deriveAdaptiveTimingWindow } from '../../services/adaptive-practice';
 import {
   buildTutorChartPlan,
   GUIDED_PRACTICE_TUTOR_SETTINGS,
@@ -257,10 +255,6 @@ export function SongView() {
       : 1;
   }, [gameMode, searchParams]);
   const policy = useMemo(() => resolveModePolicy(gameMode), [gameMode]);
-  const hitToleranceSeconds =
-    gameMode === 'practice'
-      ? PRACTICE_HIT_TOLERANCE_SECONDS
-      : HIT_TOLERANCE_SECONDS;
   // usePracticeSession (below) owns playbackSpeed, but it needs `engine`
   // from useEngine (below that), and useEngine's onEnded (right here) needs
   // the speed to stamp onto the saved run summary. Mirror the ref-sync
@@ -310,9 +304,20 @@ export function SongView() {
   const lessonTraversalRef = useRef<LessonTraversalEvidence>({
     ...EMPTY_LESSON_TRAVERSAL,
   });
-  const expectedInitialLessonSeekRef = useRef(false);
   const navigate = useNavigate();
   const { fileData, format, songData, trackData } = useSongLoader(id);
+  const adaptiveTiming = useMemo(
+    () =>
+      deriveAdaptiveTimingWindow({
+        kind: songData?.lesson ? 'lesson' : 'song',
+        runs: songRuns,
+      }),
+    [songData?.lesson, songRuns],
+  );
+  const hitToleranceSeconds =
+    gameMode === 'practice'
+      ? adaptiveTiming.timingWindowMs / 1000
+      : HIT_TOLERANCE_SECONDS;
   const currentChartRevision = useMemo(
     () =>
       chartContentRevision({
@@ -561,6 +566,10 @@ export function SongView() {
         },
         ...(tutorEvidence ? { tutor: tutorEvidence } : {}),
         ...(learningEvidence ? { learningEvidence } : {}),
+        timingWindowMs: Math.round(hitToleranceSeconds * 1000),
+        ...(songData?.lesson?.skills
+          ? { authoredSkills: [...songData.lesson.skills] }
+          : {}),
       };
       const coachEvidence =
         chart && parsedMidi
@@ -709,7 +718,6 @@ export function SongView() {
       guidedReadyRef.current = false;
       tutorEvidenceRef.current = undefined;
       lessonTraversalRef.current = { ...EMPTY_LESSON_TRAVERSAL };
-      expectedInitialLessonSeekRef.current = false;
     },
   });
   const readAttemptCheckpointSeed = useCallback(() => {
@@ -832,11 +840,6 @@ export function SongView() {
       uninterrupted: true,
       minimumPlaybackSpeed: playbackSpeedRef.current,
     };
-    // Engine/Transport announces the legitimate start itself through the
-    // same onSeekStart channel used by scrubs and recovery rewinds. Consume
-    // exactly that first notification; every later transport restart makes
-    // this run ineligible for lesson progression.
-    expectedInitialLessonSeekRef.current = true;
   }, []);
   const playRun = useCallback(
     (countInPolicy: CountInPolicy = 'inherit') => {
@@ -1414,13 +1417,13 @@ export function SongView() {
       const coverageDetail =
         lastAttempt && !lastAttempt.hasSufficientCoverage
           ? 'Finish every authored note in the loop.'
-          : lastAttempt && !lastAttempt.isErrorFree
-          ? 'A miss or wrong pad reset the clean-rep streak.'
-          : 'Play the whole phrase with zero misses and zero wrong pads.';
+          : lastAttempt && !lastAttempt.qualifiesAsCleanPass
+          ? 'That attempt was kept as evidence; settle the pattern and try once more.'
+          : 'A good-enough pass can include one developing hit; useful progress is retained.';
 
       return {
         title: `Coach loop · ${bars}`,
-        detail: `${remediationTask.consecutiveCleanPasses}/${REQUIRED_CONSECUTIVE_CLEAN_PASSES} clean reps. ${coverageDetail}`,
+        detail: `${remediationTask.consecutiveCleanPasses}/${REQUIRED_CONSECUTIVE_CLEAN_PASSES} pattern passes. ${coverageDetail}`,
         tone:
           remediationTask.consecutiveCleanPasses > 0
             ? ('success' as const)
@@ -1443,19 +1446,16 @@ export function SongView() {
 
       const lessonDetail = songData?.lesson
         ? playbackSpeed < 0.999
-          ? `Kick once to start. This ${playbackSpeed.toFixed(
+          ? `Kick once to start. A complete ${playbackSpeed.toFixed(
               1,
-            )}× run builds control and saves coaching evidence; a complete 1.0× pass earns lesson stars.`
-          : 'Kick once to start. Finish this 1.0× run from the beginning without seeking to earn lesson stars.'
+            )}× pass at 82%+ unlocks the next learning step; 1.0× and 90%+ remains the mastery goal.`
+          : 'Kick once to start. Finish from the beginning at 82%+; Tutor rewinds are allowed and full-tempo mastery stays visible.'
         : countIn
         ? 'Kick once to start the count-in.'
         : 'Kick once to start.';
 
       return {
-        title:
-          songData?.lesson && playbackSpeed >= 0.999
-            ? 'Star run ready'
-            : 'Ready when you are',
+        title: songData?.lesson ? 'Lesson ready' : 'Ready when you are',
         detail: lessonDetail,
         tone: 'steady' as const,
       };
@@ -1645,28 +1645,6 @@ export function SongView() {
   }, [playbackSpeed]);
 
   useEffect(() => {
-    if (!engine) {
-      return undefined;
-    }
-
-    return engine.onSeekStart(() => {
-      const traversal = lessonTraversalRef.current;
-
-      if (!traversal.uninterrupted) {
-        return;
-      }
-
-      if (expectedInitialLessonSeekRef.current) {
-        expectedInitialLessonSeekRef.current = false;
-
-        return;
-      }
-
-      traversal.uninterrupted = false;
-    });
-  }, [engine]);
-
-  useEffect(() => {
     durationRef.current = duration;
   }, [duration]);
 
@@ -1853,7 +1831,7 @@ export function SongView() {
       <div className="flex items-center justify-between gap-3">
         <SettingLabel
           label="Smart rewind"
-          tooltip="Return to a musical checkpoint, shape the tempo, and continue after clean repetitions."
+          tooltip="Return to a musical checkpoint, shape the tempo, and continue after confident repetitions."
         />
         <Switch
           size="small"
@@ -2073,8 +2051,10 @@ export function SongView() {
                   }`}
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-text-muted">
-              Two consecutive zero-error passes clear each phrase. The original
-              full-song review remains linked to session{' '}
+              Two consecutive good-enough passes clear each phrase: full
+              coverage, at least 82% accuracy, and only a small phrase-length
+              allowance. Near-misses keep your progress. The original full-song
+              review remains linked to session{' '}
               {remediationSession.queue.source.sessionId}.
             </p>
             <Progress
@@ -2200,6 +2180,11 @@ export function SongView() {
               return;
             }
 
+            // Only a deliberate timeline scrub invalidates complete lesson
+            // coverage. Tutor rewinds, kit pause/resume, and inactivity
+            // checkpoints are teaching/navigation mechanics and remain valid
+            // evidence when the learner ultimately reaches every note.
+            lessonTraversalRef.current.uninterrupted = false;
             seekSeconds((value / 100) * duration);
           }}
         />
@@ -2423,6 +2408,8 @@ export function SongView() {
             displayState={tutorDisplayState}
             controlPrompt={kitControlPrompt}
             controlPromptCompact={practicePresentationPhase === 'playing'}
+            timingWindowMs={adaptiveTiming.timingWindowMs}
+            timingWindowReason={adaptiveTiming.reason}
             remediation={
               remediationSession.activeTask && remediationProgress
                 ? {

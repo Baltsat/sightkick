@@ -296,7 +296,7 @@ describe('SongListView — loading the library', () => {
       }),
     ]);
 
-    expect(screen.getByText('Pulse and posture')).toBeInTheDocument();
+    expect(screen.getAllByText('Pulse and posture')).not.toHaveLength(0);
     fireEvent.click(screen.getByTestId('home-start-practice'));
 
     const opened = await screen.findByTestId('song-view-stub');
@@ -397,7 +397,9 @@ describe('SongListView — loading the library', () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByText('Mid and Floor Tom Signals')).toBeInTheDocument(),
+      expect(screen.getAllByText('Mid and Floor Tom Signals')).not.toHaveLength(
+        0,
+      ),
     );
     expect(screen.getByTestId('home-recent-songs')).toHaveTextContent(
       'Your last three completed songs will appear here.',
@@ -2106,7 +2108,10 @@ describe('SongListView — Lessons surface', () => {
     const opened = await screen.findByTestId('song-view-stub');
 
     expect(opened).toHaveAttribute('data-song-id', 'lesson-1');
-    expect(opened).toHaveAttribute('data-search', '?gameMode=practice');
+    expect(opened).toHaveAttribute(
+      'data-search',
+      '?gameMode=practice&practiceSpeed=0.8',
+    );
     expect(
       screen.queryByTestId('game-mode-selector-modal'),
     ).not.toBeInTheDocument();
@@ -2150,7 +2155,10 @@ describe('SongListView — Lessons surface', () => {
     const opened = await screen.findByTestId('song-view-stub');
 
     expect(opened).toHaveAttribute('data-song-id', 'lesson-1');
-    expect(opened).toHaveAttribute('data-search', '?gameMode=practice');
+    expect(opened).toHaveAttribute(
+      'data-search',
+      '?gameMode=practice&practiceSpeed=0.8',
+    );
   });
 
   it('launches a Journey lesson from fresh DTX lane mappings when control mappings are empty', async () => {
@@ -2212,7 +2220,10 @@ describe('SongListView — Lessons surface', () => {
     const opened = await screen.findByTestId('song-view-stub');
 
     expect(opened).toHaveAttribute('data-song-id', 'lesson-1');
-    expect(opened).toHaveAttribute('data-search', '?gameMode=practice');
+    expect(opened).toHaveAttribute(
+      'data-search',
+      '?gameMode=practice&practiceSpeed=0.8',
+    );
   });
 });
 

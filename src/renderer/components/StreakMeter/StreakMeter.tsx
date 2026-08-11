@@ -54,44 +54,30 @@ export function StreakMeter({
       )}
       data-testid="streak-meter"
     >
-      {/* `relative` anchor sized by the pill alone - the announce flash
-          below is `absolute inset-0`, so it grows outward from (and
-          settles back into) the pill's own footprint instead of stacking
-          a second block underneath it. That keeps the whole overlay's
-          layout height pinned to the small pill regardless of whether a
-          flash is playing, which is what keeps it clear of the sheet
-          music below (see SongView's mount point) even at the exact
-          instant a stage-up fires. */}
       <div className="relative">
         <div
-          key={`sk-streak-pill-${shatterSeq}`}
+          key={`sk-streak-vfx-${announceSeq}-${shatterSeq}`}
           className={cn(
-            'sk-streak-meter flex items-center gap-2 rounded-full border border-border px-4 py-1.5',
+            'sk-streak-meter',
             animated && 'sk-streak-pulse',
             animated && shatterSeq > 0 && 'sk-streak-shatter',
+            animated && announceSeq > 0 && 'sk-streak-tier-up',
           )}
           data-tier={tier}
           data-testid="streak-meter-pill"
         >
-          <span
-            className="font-display text-2xl font-bold leading-none tabular-nums"
-            data-testid="streak-count"
-          >
-            {streak.count}
-          </span>
+          <span className="sk-streak-energy" aria-hidden="true" />
           {streak.stage && (
-            <span
-              className="font-ui text-xs font-semibold uppercase leading-none tracking-[0.08em]"
-              data-testid="streak-stage-name"
-            >
+            <strong className="sk-streak-title" data-testid="streak-stage-name">
               {streak.stage.name}
-            </span>
+            </strong>
           )}
+          <span key={streak.count} className="sk-streak-proof">
+            Streak · <b data-testid="streak-count">{streak.count}</b>
+            {' · hits'}
+          </span>
           {streak.best > streak.count && (
-            <span
-              className="font-ui text-[10px] font-medium leading-none text-text-faint"
-              data-testid="streak-best"
-            >
+            <span className="sk-streak-best" data-testid="streak-best">
               best {streak.best}
             </span>
           )}
@@ -108,20 +94,18 @@ export function StreakMeter({
           )}
         </div>
         {announceStage && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div
-              key={`sk-streak-announce-${announceSeq}`}
-              className={cn(
-                'sk-streak-announce-text',
-                animated && 'sk-streak-announce',
-              )}
-              data-tier={announceStage.tier}
-              data-testid="streak-announce"
-              aria-live="polite"
-            >
-              {announceStage.name}
-            </div>
-          </div>
+          <span
+            key={`sk-streak-announce-${announceSeq}`}
+            className={cn(
+              'sk-streak-announce-text sr-only',
+              animated && 'sk-streak-announce',
+            )}
+            data-tier={announceStage.tier}
+            data-testid="streak-announce"
+            aria-live="polite"
+          >
+            {announceStage.name}
+          </span>
         )}
       </div>
     </div>

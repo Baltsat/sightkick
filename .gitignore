@@ -47,3 +47,14 @@ npm-debug.log.*
 # Storybook build output
 storybook-static
 .remarque/
+
+# local working noise (kb.7 hygiene)
+/tmp/
+/scratchpad/
+/release/kb*/
+/release/installed-backups/
+/index.js
+/.claude/
+/.codex/
+/.entire/
+/.*.cjs

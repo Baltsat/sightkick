@@ -44,6 +44,8 @@ export interface UseMasteryResult {
    * across the whole library — independent of any goal, so it's populated
    * even before a goal exists. Feeds the Profile's skill-bars section. */
   last30DaysLaneAccuracy: LaneAccuracy[];
+  /** All persisted runs, used by the interpretable atomic-skill profile. */
+  allRuns: RunSummary[];
 }
 
 interface RunsReply {
@@ -181,6 +183,7 @@ export function useMastery(
       needleLine: undefined,
       dominantLaneProgress: undefined,
       last30DaysLaneAccuracy,
+      allRuns,
     };
   }
 
@@ -221,5 +224,6 @@ export function useMastery(
       thirtyDaysAgo + THIRTY_DAYS_MS,
     ),
     last30DaysLaneAccuracy,
+    allRuns,
   };
 }

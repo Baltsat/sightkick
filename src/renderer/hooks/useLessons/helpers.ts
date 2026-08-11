@@ -100,7 +100,7 @@ export function bestAccuracyForSong(song: Song): number {
   }, 0);
 }
 
-/** A clear is one saved complete 1.0x pass at 90%+ scored accuracy. */
+/** A clear is one saved complete learning pass at the adaptive clear gate. */
 export function isLessonCleared(song: Song): boolean {
   return (
     isLessonSong(song) && bestAccuracyForSong(song) >= LESSON_CLEAR_ACCURACY
@@ -112,7 +112,7 @@ export interface LessonEntry {
   lesson: SongLessonInfo;
   /** Best star rating earned on this lesson, any difficulty. */
   bestStars: number;
-  /** True only after a saved target-speed pass met the authored 90% gate. */
+  /** True after a saved full learning pass met the adaptive clear gate. */
   cleared: boolean;
   unlocked: boolean;
   /** 0 when unlocked, otherwise prior lesson clears still needed. */
@@ -133,7 +133,7 @@ export interface LessonProgress {
   unlockedCount: number;
   /** Total stars earned across every lesson song, any difficulty. */
   totalStars: number;
-  /** Count of lessons cleared at the authored target-speed/accuracy gate. */
+  /** Count of lessons cleared at the adaptive learning gate. */
   clearedCount: number;
   /** Furthest unlocked lesson that has not yet been cleared. */
   continueEntry?: LessonEntry;
@@ -208,7 +208,7 @@ function uniqueLessonSongs(
  * Computes the Lessons unlock chain from the full song library.
  *
  * Unlock rule: the legacy `sk_stars_to_unlock` number is the authored chain
- * position (0, 1, 2, ...). One honest 90% target-speed clear contributes one
+ * position (0, 1, 2, ...). One honest complete learning clear contributes one
  * curriculum credit, so a high star rating can never skip several lessons.
  * The first lesson remains available because its authored threshold is 0.
  */

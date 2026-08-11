@@ -359,17 +359,21 @@ export function ScoreSummary({
           >
             <div className="text-sm font-semibold text-text">
               {lessonProgression.qualifies
-                ? 'Target-speed pass complete'
-                : 'Practice saved for coaching'}
+                ? 'Learning pass complete'
+                : 'One more learning pass'}
             </div>
             <div className="mt-1 text-xs leading-5 text-text-muted">
               {lessonProgression.qualifies
-                ? 'Your stars are applied after this run is safely saved.'
+                ? `Complete coverage and 82%+ accuracy saved. The next Method step can unlock${
+                    lessonProgression.atTargetSpeed
+                      ? '; full-tempo mastery also earned.'
+                      : ', while full-tempo mastery stays as your next goal.'
+                  }`
                 : !lessonProgression.fullCoverage
-                ? 'To earn lesson stars, restart at the beginning and finish without scrubbing, looping, or recovery rewinds.'
-                : !lessonProgression.atTargetSpeed
-                ? 'Keep this evidence, then play one complete run at 1.0× to earn lesson stars.'
-                : 'Reach at least 90% scored accuracy on the complete 1.0× run to clear this lesson.'}
+                ? 'Start from bar 1 and reach the end. Tutor rewinds are allowed and remain part of the learning evidence.'
+                : !lessonProgression.meetsLearningTempo
+                ? 'Complete the lesson at 0.7× or faster. Slower exploration still saves as Practice evidence.'
+                : 'Reach at least 82% scored accuracy on the complete pass. Full mastery remains 90%+ at 1.0×.'}
             </div>
           </div>
         )}

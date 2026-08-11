@@ -5,6 +5,7 @@ import {
   detectTutorTrigger,
   isCleanRecovery,
   isRepeatableBarFailure,
+  recoveryQualityScore,
   summarizeTutorWindow,
 } from './detector';
 import {
@@ -27,6 +28,14 @@ function normalizeFailedRecoveryAttemptLimit(value: number): number {
   return Number.isFinite(value)
     ? Math.max(1, Math.trunc(value))
     : DEFAULT_TUTOR_SETTINGS.maximumFailedRecoveryAttempts;
+}
+
+function normalizeUnitInterval(value: number, fallback: number): number {
+  return Number.isFinite(value) ? clamp(value, 0, 1) : fallback;
+}
+
+function normalizePositiveCount(value: number, fallback: number): number {
+  return Number.isFinite(value) ? Math.max(1, Math.trunc(value)) : fallback;
 }
 
 function nextId(state: TutorState, prefix: string): string {
@@ -69,6 +78,18 @@ export function createTutorState(
   const mergedSettings = { ...DEFAULT_TUTOR_SETTINGS, ...settings };
   const resolvedSettings = {
     ...mergedSettings,
+    recoveryProgressRetention: normalizeUnitInterval(
+      mergedSettings.recoveryProgressRetention,
+      DEFAULT_TUTOR_SETTINGS.recoveryProgressRetention,
+    ),
+    strongRecoveryAccuracy: normalizeUnitInterval(
+      mergedSettings.strongRecoveryAccuracy,
+      DEFAULT_TUTOR_SETTINGS.strongRecoveryAccuracy,
+    ),
+    requiredCleanRepetitions: normalizePositiveCount(
+      mergedSettings.requiredCleanRepetitions,
+      DEFAULT_TUTOR_SETTINGS.requiredCleanRepetitions,
+    ),
     maximumFailedRecoveryAttempts: normalizeFailedRecoveryAttemptLimit(
       mergedSettings.maximumFailedRecoveryAttempts,
     ),
@@ -232,6 +253,8 @@ function beginRecovery(
     region,
     repetition: 1,
     cleanRepetitions: 0,
+    qualityProgress: 0,
+    bestQuality: 0,
   };
   const intervention = {
     id: nextId(
@@ -291,6 +314,7 @@ function finishRecoveryAttempt(
     recovery.region.endMeasure,
   );
   const clean = isCleanRecovery(stats, state.settings);
+  const qualityScore = recoveryQualityScore(stats, state.settings);
   const priorFailedAttempts = state.recoveryAttempts.filter(
     (attempt) =>
       attempt.recoveryId === recovery.id &&
@@ -310,6 +334,7 @@ function finishRecoveryAttempt(
     repetition: recovery.repetition,
     speed: state.currentSpeed,
     result: clean ? 'clean' : shouldDefer ? 'deferred' : 'retry',
+    qualityScore,
     ...(shouldDefer
       ? { deferralReason: 'maximum-failed-attempts' as const }
       : {}),
@@ -317,7 +342,19 @@ function finishRecoveryAttempt(
     judgements,
   };
   const attempts = [...state.recoveryAttempts, attempt];
-  const cleanRepetitions = clean ? recovery.cleanRepetitions + 1 : 0;
+  const maximumProgressLoss = 1 - state.settings.recoveryProgressRetention;
+  const qualityProgress = clean
+    ? Math.min(
+        state.settings.requiredCleanRepetitions,
+        recovery.qualityProgress + 1,
+      )
+    : Math.max(
+        0,
+        recovery.qualityProgress -
+          Math.min(maximumProgressLoss, 1 - qualityScore),
+      );
+  const cleanRepetitions = Math.floor(qualityProgress);
+  const bestQuality = Math.max(recovery.bestQuality, qualityScore);
   let nextSpeed = state.currentSpeed;
 
   if (!clean) {
@@ -328,28 +365,33 @@ function finishRecoveryAttempt(
         state.targetSpeed,
       ),
     );
-  } else if (
-    cleanRepetitions >= state.settings.requiredCleanRepetitions &&
-    state.currentSpeed < state.targetSpeed
-  ) {
-    nextSpeed = speedToTenth(
-      Math.min(
-        state.targetSpeed,
-        state.currentSpeed + state.settings.speedStep,
-      ),
-    );
   }
 
   const hasEarnedRelease =
-    clean &&
-    cleanRepetitions >= state.settings.requiredCleanRepetitions &&
-    state.currentSpeed >= state.targetSpeed;
+    clean && qualityProgress >= state.settings.requiredCleanRepetitions;
 
   if (hasEarnedRelease || shouldDefer) {
+    const canPromoteTempo =
+      hasEarnedRelease &&
+      qualityScore >= state.settings.strongRecoveryAccuracy &&
+      stats.wrong === 0;
+    const resumeSpeed = speedToTenth(
+      shouldDefer
+        ? nextSpeed
+        : canPromoteTempo
+        ? Math.min(
+            state.targetSpeed,
+            state.currentSpeed + state.settings.speedStep,
+          )
+        : state.currentSpeed,
+    );
     const nextState: TutorState = {
       ...state,
       phase: 'observing',
-      currentSpeed: state.targetSpeed,
+      // The adapted tempo carries into the rest of the song. A hard phrase
+      // must not snap the player back to 1.0x at the next bar; strong evidence
+      // earns one bounded step instead.
+      currentSpeed: resumeSpeed,
       // Reaching the bounded safety release is a checkpoint transition, not
       // an invitation to continue displaying an impossible 0/3 game state.
       // Refill the checkpoint lives while preserving the deferred recovery
@@ -364,6 +406,9 @@ function finishRecoveryAttempt(
         startMeasure: recovery.region.startMeasure,
         endMeasure: recovery.region.endMeasure,
         cleanRepetitions,
+        qualityProgress,
+        bestQuality,
+        resumeSpeed,
       },
       recoveryAttempts: attempts,
       nextSequence: state.nextSequence + 1,
@@ -381,7 +426,7 @@ function finishRecoveryAttempt(
         {
           type: 'resume-main',
           recoveryId: recovery.id,
-          speed: state.targetSpeed,
+          speed: resumeSpeed,
           reason: shouldDefer ? 'maximum-failed-attempts' : 'clean-repetitions',
           ...(shouldDefer
             ? {
@@ -401,11 +446,9 @@ function finishRecoveryAttempt(
   const nextRecovery: TutorRecovery = {
     ...recovery,
     repetition: recovery.repetition + 1,
-    cleanRepetitions:
-      cleanRepetitions >= state.settings.requiredCleanRepetitions &&
-      nextSpeed > state.currentSpeed
-        ? 0
-        : cleanRepetitions,
+    cleanRepetitions,
+    qualityProgress,
+    bestQuality,
   };
   const nextState: TutorState = {
     ...state,

@@ -6,6 +6,7 @@ import { Measure, ParsedChart, RenderData } from '../../../chart-parser/types';
 import { TimeStore } from '../../services/time-store';
 import {
   flowBeatCount,
+  flowFixedPlayheadGeometry,
   flowLocationForTick,
   flowMeterBars,
   flowPlayheadOffset,
@@ -74,6 +75,34 @@ describe('ContinuousNotation camera viewport', () => {
     expect(flowPlayheadOffset(1000)).toBe(220);
     expect(flowPlayheadOffset(1600)).toBe(272);
   });
+
+  it.each([
+    { surfaceLeft: -40, horizontalScrollDelta: 0, scale: 1 },
+    { surfaceLeft: -265.5, horizontalScrollDelta: 0, scale: 1.15 },
+    { surfaceLeft: -900, horizontalScrollDelta: 14, scale: 1.3 },
+  ])(
+    'keeps the fixed playhead anchored from a zoomed surface at $surfaceLeft',
+    ({ surfaceLeft, horizontalScrollDelta, scale }) => {
+      const geometry = flowFixedPlayheadGeometry({
+        viewportLeft: 0,
+        surfaceLeft,
+        surfaceTop: 169,
+        horizontalScrollDelta,
+        anchor: 272,
+        scoreTop: 219,
+        scoreBottom: 518,
+        beatY: 320,
+        visualScale: scale,
+        verticalScale: scale,
+      });
+      const projectedSurfaceLeft = surfaceLeft - horizontalScrollDelta;
+
+      expect(projectedSurfaceLeft + geometry.left * scale).toBeCloseTo(272);
+      expect(169 + geometry.top * scale).toBeCloseTo(219);
+      expect(geometry.height * scale).toBeCloseTo(299);
+      expect(219 + geometry.beatOffset * scale).toBeCloseTo(320);
+    },
+  );
 
   it('settles a paused seek all the way to the labelled bar', () => {
     let scrollLeft = 0;

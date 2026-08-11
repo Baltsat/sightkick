@@ -7,7 +7,7 @@ import {
   faPause,
   faRotateLeft,
 } from '@fortawesome/free-solid-svg-icons';
-import { useId } from 'react';
+import { CSSProperties, useId } from 'react';
 import { TutorHudMessage } from '../../hooks/useTutorSession';
 import { TutorState } from '../../services/tutor';
 import { KitCommandPrompt, KitCommandPromptModel } from '../KitCommandPrompt';
@@ -24,6 +24,8 @@ interface TutorHudProps {
     | 'remediation';
   controlPrompt?: KitCommandPromptModel;
   controlPromptCompact?: boolean;
+  timingWindowMs?: number;
+  timingWindowReason?: string;
   remediation?: {
     currentTask: number;
     totalTasks: number;
@@ -50,6 +52,8 @@ export function TutorHud({
   displayState,
   controlPrompt,
   controlPromptCompact = false,
+  timingWindowMs,
+  timingWindowReason,
   remediation,
 }: TutorHudProps) {
   const titleId = useId();
@@ -83,6 +87,13 @@ export function TutorHud({
       ? 'Coach remediation'
       : labelForPhase(state.phase);
   const speedLabel = `${state.currentSpeed.toFixed(1)}×`;
+  const qualityProgress =
+    recovery?.qualityProgress ?? completedRecovery?.qualityProgress;
+  const bestQuality = recovery?.bestQuality ?? completedRecovery?.bestQuality;
+  const progressRatio =
+    qualityProgress === undefined
+      ? 0
+      : Math.min(1, qualityProgress / state.settings.requiredCleanRepetitions);
 
   return (
     <aside
@@ -112,9 +123,26 @@ export function TutorHud({
         />
       </div>
       <div className="drumroll-tutor-hud__copy">
-        <span className="drumroll-tutor-hud__eyebrow">{phaseLabel}</span>
+        <span className="drumroll-tutor-hud__phase">{phaseLabel}</span>
         <strong id={titleId}>{message.title}</strong>
         <span id={detailId}>{message.detail}</span>
+        {!remediation && qualityProgress !== undefined && (
+          <div
+            className="drumroll-tutor-hud__runway"
+            style={
+              {
+                '--runway-progress': `${progressRatio * 100}%`,
+              } as CSSProperties
+            }
+            role="progressbar"
+            aria-label="Retained pattern progress"
+            aria-valuemin={0}
+            aria-valuemax={state.settings.requiredCleanRepetitions}
+            aria-valuenow={Number(qualityProgress.toFixed(2))}
+          >
+            <span aria-hidden="true" />
+          </div>
+        )}
         {controlPrompt && (
           <KitCommandPrompt
             model={controlPrompt}
@@ -130,6 +158,15 @@ export function TutorHud({
             {speedLabel}
           </dd>
         </div>
+        {timingWindowMs !== undefined && (
+          <div
+            className="drumroll-tutor-hud__metric"
+            title={timingWindowReason}
+          >
+            <dt>Timing window</dt>
+            <dd data-testid="tutor-timing-window">±{timingWindowMs} ms</dd>
+          </div>
+        )}
         {remediation && (
           <div className="drumroll-tutor-hud__metric">
             <dt>Phrase</dt>
@@ -140,7 +177,7 @@ export function TutorHud({
         )}
         {remediation && (
           <div className="drumroll-tutor-hud__metric">
-            <dt>Clean reps</dt>
+            <dt>Pattern</dt>
             <dd data-testid="remediation-repetition">
               {remediation.cleanRepetitions} /{' '}
               {remediation.requiredCleanRepetitions}
@@ -150,15 +187,17 @@ export function TutorHud({
         {!remediation && (recovery || completedRecovery) && (
           <div className="drumroll-tutor-hud__metric">
             <dt>
-              {completedRecovery?.status === 'mastered'
-                ? 'Mastered'
-                : 'Clean reps'}
+              {completedRecovery?.status === 'mastered' ? 'Ready' : 'Pattern'}
             </dt>
             <dd data-testid="tutor-repetition">
-              {recovery?.cleanRepetitions ??
-                completedRecovery?.cleanRepetitions}{' '}
-              / {state.settings.requiredCleanRepetitions}
+              {(qualityProgress ?? 0).toFixed(1)} /{' '}
+              {state.settings.requiredCleanRepetitions}
             </dd>
+            {bestQuality !== undefined && (
+              <span className="drumroll-tutor-hud__quality">
+                Best {Math.round(bestQuality * 100)}%
+              </span>
+            )}
           </div>
         )}
         {!remediation && state.settings.livesEnabled && (

@@ -301,3 +301,33 @@ export function isCleanRecovery(
     stats.wrong <= settings.cleanMaximumWrongHits
   );
 }
+
+/**
+ * A continuous, explainable phrase-quality signal for the recovery runway.
+ * Accuracy owns most of the score; authored coverage prevents a partial loop
+ * from looking successful, and timing stability contributes without turning
+ * every developing hit into a binary failure.
+ */
+export function recoveryQualityScore(
+  stats: TutorWindowStats,
+  settings: TutorSettings,
+): number {
+  const coverage = Math.min(
+    1,
+    stats.resolved / Math.max(1, settings.cleanMinimumResolvedEvents),
+  );
+  const timing =
+    stats.timingSampleCount < Math.max(2, settings.minimumTimingSamples / 2)
+      ? 1
+      : Math.max(
+          0,
+          1 -
+            stats.timingSpreadMs /
+              Math.max(1, settings.timingSpreadThresholdMs * 1.5),
+        );
+
+  return Math.min(
+    1,
+    Math.max(0, stats.accuracy * 0.8 + coverage * 0.15 + timing * 0.05),
+  );
+}

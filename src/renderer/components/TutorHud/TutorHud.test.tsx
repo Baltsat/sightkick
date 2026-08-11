@@ -43,7 +43,7 @@ describe('TutorHud', () => {
     expect(screen.getByTestId('tutor-lives')).toHaveTextContent('2/ 3');
   });
 
-  it('makes recovery phase and clean-pass progress explicit', () => {
+  it('makes recovery phase and retained pattern progress explicit', () => {
     const state = createTutorState();
 
     render(
@@ -81,6 +81,8 @@ describe('TutorHud', () => {
             },
             repetition: 1,
             cleanRepetitions: 1,
+            qualityProgress: 1,
+            bestQuality: 0.92,
           },
         }}
         message={{
@@ -92,7 +94,7 @@ describe('TutorHud', () => {
     );
 
     expect(screen.getByText('Focused recovery')).toBeInTheDocument();
-    expect(screen.getByTestId('tutor-repetition')).toHaveTextContent('1 / 2');
+    expect(screen.getByTestId('tutor-repetition')).toHaveTextContent('1.0 / 2');
   });
 
   it('keeps a mastered loop terminal state visible after the song resumes', () => {
@@ -106,6 +108,9 @@ describe('TutorHud', () => {
             startMeasure: 2,
             endMeasure: 4,
             cleanRepetitions: 2,
+            qualityProgress: 2,
+            bestQuality: 0.97,
+            resumeSpeed: 0.9,
           },
         }}
         message={{
@@ -116,8 +121,8 @@ describe('TutorHud', () => {
       />,
     );
 
-    expect(screen.getByText('Mastered')).toBeInTheDocument();
-    expect(screen.getByTestId('tutor-repetition')).toHaveTextContent('2 / 2');
+    expect(screen.getByText('Ready')).toBeInTheDocument();
+    expect(screen.getByTestId('tutor-repetition')).toHaveTextContent('2.0 / 2');
   });
 
   it('shows a truthful checkpoint refill after a bounded recovery deferral', () => {
@@ -132,6 +137,9 @@ describe('TutorHud', () => {
             startMeasure: 2,
             endMeasure: 4,
             cleanRepetitions: 0,
+            qualityProgress: 0.4,
+            bestQuality: 0.74,
+            resumeSpeed: 0.7,
           },
         }}
         message={{
@@ -185,7 +193,7 @@ describe('TutorHud', () => {
         }}
         message={{
           title: 'Coach loop · bars 17–20',
-          detail: '1/2 clean reps. Zero misses and zero wrong pads.',
+          detail: '1/2 quality passes. Keep the pattern moving.',
           tone: 'success',
         }}
       />,

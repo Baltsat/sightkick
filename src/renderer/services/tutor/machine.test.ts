@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { ResolvedJudgement } from '../engine';
 import { createTutorState, transitionTutor } from './machine';
-import { TutorChartPlan, TutorEvent, TutorState } from './types';
+import {
+  GUIDED_PRACTICE_TUTOR_SETTINGS,
+  TutorChartPlan,
+  TutorEvent,
+  TutorState,
+} from './types';
 
 const CHART: TutorChartPlan = {
   measures: Array.from({ length: 6 }, (_, index) => ({
@@ -331,10 +336,83 @@ describe('tutor machine', () => {
       startMeasure: region?.startMeasure,
       endMeasure: region?.endMeasure,
       cleanRepetitions: 2,
+      qualityProgress: 2,
+      bestQuality: 1,
+      resumeSpeed: 1,
     });
   });
 
-  it('slows after a failed recovery, then rebuilds clean speed in steps', () => {
+  it('keeps earned progress after a useful near miss', () => {
+    let { state } = beginFailedSession();
+    const region = state.recovery!.region;
+
+    state = addCleanRegion(state, region.startMeasure, region.endMeasure);
+    state = dispatch(state, {
+      type: 'measure-complete',
+      measureIndex: region.endMeasure,
+    }).state;
+
+    for (
+      let measure = region.startMeasure;
+      measure <= region.endMeasure;
+      measure += 1
+    ) {
+      state = addMeasure(
+        state,
+        measure,
+        measure === region.endMeasure
+          ? ['hit', 'hit', 'miss', 'miss']
+          : ['hit', 'hit', 'hit', 'hit'],
+      );
+    }
+
+    const nearMiss = dispatch(state, {
+      type: 'measure-complete',
+      measureIndex: region.endMeasure,
+    });
+
+    expect(nearMiss.state.phase).toBe('recovering');
+    expect(nearMiss.state.recovery?.qualityProgress).toBeGreaterThan(0.5);
+    expect(nearMiss.state.recovery?.qualityProgress).toBeLessThan(1);
+    expect(nearMiss.state.recovery?.bestQuality).toBe(1);
+  });
+
+  it('accepts developing guided-practice passes without demanding perfection', () => {
+    let { state } = beginFailedSession({
+      ...GUIDED_PRACTICE_TUTOR_SETTINGS,
+      minimumDistinctErrors: 3,
+    });
+    const region = state.recovery!.region;
+
+    for (let repetition = 0; repetition < 2; repetition += 1) {
+      for (
+        let measure = region.startMeasure;
+        measure <= region.endMeasure;
+        measure += 1
+      ) {
+        state = addMeasure(
+          state,
+          measure,
+          measure === region.endMeasure
+            ? ['hit', 'hit', 'hit', 'miss']
+            : ['hit', 'hit', 'hit', 'hit'],
+        );
+      }
+
+      state = dispatch(state, {
+        type: 'measure-complete',
+        measureIndex: region.endMeasure,
+      }).state;
+    }
+
+    expect(state.phase).toBe('observing');
+    expect(state.lastRecoveryOutcome).toMatchObject({
+      status: 'mastered',
+      qualityProgress: 2,
+    });
+  });
+
+  it('slows after a failed recovery and releases after two quality passes', () => {
     let { state } = beginFailedSession();
     const region = state.recovery?.region;
     const start = region?.startMeasure ?? 0;
@@ -366,26 +444,13 @@ describe('tutor machine', () => {
     }
 
     expect(state.currentSpeed).toBe(1);
-    expect(state.phase).toBe('recovering');
-    expect(state.recovery?.cleanRepetitions).toBe(0);
-
-    let lastCommands: string[] = [];
-
-    for (let repetition = 0; repetition < 2; repetition += 1) {
-      state = addCleanRegion(state, start, end);
-
-      const result = dispatch(state, {
-        type: 'measure-complete',
-        measureIndex: end,
-      });
-
-      state = result.state;
-      lastCommands = result.commands.map((command) => command.type);
-    }
-
     expect(state.phase).toBe('observing');
-    expect(lastCommands).toEqual(['resume-main']);
-    expect(state.recoveryAttempts).toHaveLength(5);
+    expect(state.lastRecoveryOutcome).toMatchObject({
+      status: 'mastered',
+      qualityProgress: 2,
+      resumeSpeed: 1,
+    });
+    expect(state.recoveryAttempts).toHaveLength(3);
   });
 
   it('defers at the configured failed-recovery limit and safely resumes', () => {
@@ -422,7 +487,7 @@ describe('tutor machine', () => {
 
     expect(deferred.state).toMatchObject({
       phase: 'observing',
-      currentSpeed: 1,
+      currentSpeed: 0.8,
       livesRemaining: 3,
       recovery: undefined,
       ignoreTriggersThroughMeasure: end,
@@ -449,7 +514,7 @@ describe('tutor machine', () => {
         reason: 'maximum-failed-attempts',
         failedAttempts: 2,
         maximumFailedAttempts: 2,
-        speed: 1,
+        speed: 0.8,
         resumeMeasure: 3,
         resumeTick: 300,
         attempt: expect.objectContaining({

@@ -28,6 +28,13 @@ export interface TutorSettings {
   cleanMaximumMisses: number;
   cleanMaximumWrongHits: number;
   requiredCleanRepetitions: number;
+  /**
+   * A near-miss no longer erases all learning progress. Failed repetitions
+   * retain this fraction of one earned quality repetition.
+   */
+  recoveryProgressRetention: number;
+  /** Accuracy that earns a small tempo promotion when leaving recovery. */
+  strongRecoveryAccuracy: number;
   minimumSpeed: number;
   speedStep: number;
   maximumFailedRecoveryAttempts: number;
@@ -55,6 +62,8 @@ export const DEFAULT_TUTOR_SETTINGS: TutorSettings = {
   cleanMaximumMisses: 0,
   cleanMaximumWrongHits: 0,
   requiredCleanRepetitions: 2,
+  recoveryProgressRetention: 0.5,
+  strongRecoveryAccuracy: 0.97,
   minimumSpeed: 0.5,
   speedStep: 0.1,
   maximumFailedRecoveryAttempts: 6,
@@ -68,8 +77,9 @@ export const DEFAULT_TUTOR_SETTINGS: TutorSettings = {
  * over. The original defaults are retained for deterministic service tests
  * and advanced callers; the product surface applies this learner-facing
  * profile so an isolated timing cluster cannot trap a developing player in
- * recovery. Two controlled repetitions still establish retention, while the
- * failed-attempt cap guarantees a terminal path back to the song.
+ * recovery. Two good-enough repetitions establish retention, a near miss
+ * keeps half of the earned progress, and the failed-attempt cap guarantees a
+ * terminal path back to the song at the adapted tempo.
  */
 export const GUIDED_PRACTICE_TUTOR_SETTINGS: Partial<TutorSettings> = {
   triggerAccuracy: 0.68,
@@ -81,15 +91,16 @@ export const GUIDED_PRACTICE_TUTOR_SETTINGS: Partial<TutorSettings> = {
   minimumTimingSamples: 8,
   minimumTimingOutliers: 3,
   timingSpreadThresholdMs: 90,
-  // Intervention is forgiving; mastery is explicit. The learner can keep
-  // moving after the safety limit, but a phrase is only labelled mastered
-  // after two truly error-free passes.
-  cleanMinimumAccuracy: 1,
+  // Guided Practice is a learning surface, not an audition. One miss in a
+  // normal eight-to-sixteen-note phrase can still be a useful repetition.
+  cleanMinimumAccuracy: 0.84,
   cleanMinimumResolvedEvents: 6,
-  cleanMaximumMisses: 0,
-  cleanMaximumWrongHits: 0,
+  cleanMaximumMisses: 2,
+  cleanMaximumWrongHits: 1,
   requiredCleanRepetitions: 2,
-  maximumFailedRecoveryAttempts: 2,
+  recoveryProgressRetention: 0.5,
+  strongRecoveryAccuracy: 0.94,
+  maximumFailedRecoveryAttempts: 3,
 };
 
 export interface TutorMeasureSpec {
@@ -165,6 +176,8 @@ export interface TutorRecoveryAttempt {
   repetition: number;
   speed: number;
   result: TutorRecoveryAttemptResult;
+  /** Continuous 0..1 phrase quality used by the adaptive release UI. */
+  qualityScore?: number;
   deferralReason?: TutorRecoveryDeferralReason;
   stats: TutorWindowStats;
   /** Immutable outcome timeline for this exact repetition. */
@@ -177,6 +190,10 @@ export interface TutorRecovery {
   region: TutorRecoveryRegion;
   repetition: number;
   cleanRepetitions: number;
+  /** Continuous retained progress toward `requiredCleanRepetitions`. */
+  qualityProgress: number;
+  /** Strongest observed phrase-quality score in this recovery. */
+  bestQuality: number;
 }
 
 export interface TutorRecoveryOutcome {
@@ -185,6 +202,9 @@ export interface TutorRecoveryOutcome {
   startMeasure: number;
   endMeasure: number;
   cleanRepetitions: number;
+  qualityProgress: number;
+  bestQuality: number;
+  resumeSpeed: number;
 }
 
 export interface TutorIntervention {

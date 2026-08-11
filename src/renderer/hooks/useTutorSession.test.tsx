@@ -315,6 +315,8 @@ describe('Tutor HUD evidence messages', () => {
     },
     repetition: 2,
     cleanRepetitions: 1,
+    qualityProgress: 1,
+    bestQuality: 0.9,
   };
 
   it('names the trigger counts, checkpoint, lead-in, and first-pass speed rationale', () => {

@@ -9,7 +9,7 @@ const completeTargetSpeedTraversal = {
 };
 
 describe('lesson progression', () => {
-  it('awards a star only for a full target-speed lesson Practice pass', () => {
+  it('clears a complete good-enough lesson Practice pass', () => {
     expect(
       decideLessonProgression({
         isLesson: true,
@@ -21,6 +21,7 @@ describe('lesson progression', () => {
       qualifies: true,
       fullCoverage: true,
       atTargetSpeed: true,
+      meetsLearningTempo: true,
       meetsAccuracyTarget: true,
       accuracy: 0.9,
       starsEarned: 4,
@@ -29,28 +30,16 @@ describe('lesson progression', () => {
 
   it.each([
     [
-      'slow pass',
+      'below learning tempo',
       true,
       'practice',
-      { ...completeTargetSpeedTraversal, minimumPlaybackSpeed: 0.7 },
-    ],
-    [
-      'mid-run slowdown',
-      true,
-      'practice',
-      { ...completeTargetSpeedTraversal, minimumPlaybackSpeed: 0.9 },
+      { ...completeTargetSpeedTraversal, minimumPlaybackSpeed: 0.6 },
     ],
     [
       'clicked-bar start',
       true,
       'practice',
       { ...completeTargetSpeedTraversal, startedAtBeginning: false },
-    ],
-    [
-      'scrubbed or recovered run',
-      true,
-      'practice',
-      { ...completeTargetSpeedTraversal, uninterrupted: false },
     ],
     ['ordinary song', false, 'practice', completeTargetSpeedTraversal],
     ['non-practice mode', true, 'perform', completeTargetSpeedTraversal],
@@ -68,7 +57,27 @@ describe('lesson progression', () => {
     },
   );
 
-  it('keeps a complete target-speed pass below 90 percent out of progression', () => {
+  it('allows Tutor recovery and an authored 0.7x start to advance learning', () => {
+    expect(
+      decideLessonProgression({
+        isLesson: true,
+        gameMode: 'practice',
+        traversal: {
+          ...completeTargetSpeedTraversal,
+          minimumPlaybackSpeed: 0.7,
+        },
+        score: { hitNotes: 9, totalNotes: 10, falseHits: 1 },
+      }),
+    ).toMatchObject({
+      qualifies: true,
+      fullCoverage: true,
+      atTargetSpeed: false,
+      meetsLearningTempo: true,
+      accuracy: 0.82,
+    });
+  });
+
+  it('keeps a complete pass below 82 percent out of progression', () => {
     expect(
       decideLessonProgression({
         isLesson: true,
@@ -80,6 +89,7 @@ describe('lesson progression', () => {
       qualifies: false,
       fullCoverage: true,
       atTargetSpeed: true,
+      meetsLearningTempo: true,
       meetsAccuracyTarget: false,
       accuracy: 0.8,
     });

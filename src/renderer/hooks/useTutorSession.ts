@@ -125,7 +125,7 @@ function triggerEvidence(
   )}.`;
 }
 
-function cleanPredicate(settings: TutorSettings): string {
+function qualityPredicate(settings: TutorSettings): string {
   return `${percent(settings.cleanMinimumAccuracy)} or better across ${
     settings.cleanMinimumResolvedEvents
   } resolved notes, no more than ${plural(
@@ -180,7 +180,7 @@ export function messageForTutorCommand(
   }
 
   if (command.type === 'repeat-recovery') {
-    const clean = command.attempt.result === 'clean';
+    const qualityPass = command.attempt.result === 'clean';
     const previousSpeed = percent(command.attempt.speed);
     const nextSpeed = percent(command.speed);
     const stats = command.attempt.stats;
@@ -190,22 +190,26 @@ export function messageForTutorCommand(
       stats.wrong,
       'wrong hit',
     )}`;
+    const retainedProgress = Math.min(
+      settings.requiredCleanRepetitions,
+      command.recovery.qualityProgress,
+    );
 
     return {
-      title: clean ? 'Clean pass saved' : 'Tempo adjusted',
-      detail: clean
-        ? `${plural(command.recovery.cleanRepetitions, 'clean pass')} toward ${
+      title: qualityPass ? 'Quality pass saved' : 'Tempo adjusted',
+      detail: qualityPass
+        ? `${retainedProgress.toFixed(1)} of ${
             settings.requiredCleanRepetitions
-          }; it met ${cleanPredicate(settings)}. ${
+          } pattern progress; this pass met ${qualityPredicate(settings)}. ${
             command.speed > command.attempt.speed
               ? `Raise from ${previousSpeed} to ${nextSpeed} for the next controlled step.`
-              : `Hold ${nextSpeed} until the configured clean-pass count is met.`
+              : `Hold ${nextSpeed}; one useful repetition remains.`
           }`
-        : `Recovery attempt ${
-            command.recovery.repetition
-          } missed the clean rule (${attemptEvidence}; success requires ${cleanPredicate(
+        : `This pass was close, not erased: ${retainedProgress.toFixed(1)} of ${
+            settings.requiredCleanRepetitions
+          } progress remains (${attemptEvidence}; a quality pass is ${qualityPredicate(
             settings,
-          )}). Lower from ${previousSpeed} to ${nextSpeed} so the next lead-in is playable.`,
+          )}). Lower from ${previousSpeed} to ${nextSpeed} for a playable next lead-in.`,
       tone: 'recovery',
     };
   }
@@ -219,7 +223,9 @@ export function messageForTutorCommand(
         title: 'Phrase saved for focus work',
         detail: `${failedAttempts} failed recovery ${
           failedAttempts === 1 ? 'attempt reached' : 'attempts reached'
-        } the configured ${maximumFailedAttempts}-attempt safety limit. Continuing without trapping you here.${
+        } the configured ${maximumFailedAttempts}-attempt safety limit. Continuing at ${percent(
+          command.speed,
+        )} without trapping you here.${
           settings.livesEnabled
             ? ` Checkpoint lives refilled to ${settings.startingLives}.`
             : ''
@@ -229,13 +235,14 @@ export function messageForTutorCommand(
     }
 
     return {
-      title: 'Phrase locked',
-      detail: `${plural(
-        settings.requiredCleanRepetitions,
-        'clean pass',
-      )} met the configured success rule (${cleanPredicate(
+      title: 'Pattern ready',
+      detail: `${
+        settings.requiredCleanRepetitions
+      } quality passes met the learning rule (${qualityPredicate(
         settings,
-      )}). Target tempo restored; continuing from the next musical bar.`,
+      )}). Continuing from the next musical bar at ${percent(
+        command.speed,
+      )}; tempo only rises one step after strong evidence.`,
       tone: 'success',
     };
   }

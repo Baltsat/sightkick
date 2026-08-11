@@ -37,6 +37,51 @@ export function flowPlayheadOffset(viewportWidth: number): number {
   return Math.min(272, Math.max(160, viewportWidth * 0.22));
 }
 
+export interface FlowFixedPlayheadGeometryInput {
+  viewportLeft: number;
+  /** Viewport-space origin of the playhead's actual zoomed parent. */
+  surfaceLeft: number;
+  surfaceTop: number;
+  /** Scroll applied later in the same frame moves the surface by this amount. */
+  horizontalScrollDelta: number;
+  anchor: number;
+  scoreTop: number;
+  scoreBottom: number;
+  beatY: number;
+  visualScale: number;
+  verticalScale: number;
+}
+
+/**
+ * Converts viewport-space camera landmarks into the local coordinate system
+ * of the zoomed notation wrapper. Chromium makes a fixed descendant of a
+ * zoomed ancestor move with that ancestor's scroll; without this conversion
+ * the "Now" line drifts toward the left edge as playback advances.
+ */
+export function flowFixedPlayheadGeometry({
+  viewportLeft,
+  surfaceLeft,
+  surfaceTop,
+  horizontalScrollDelta,
+  anchor,
+  scoreTop,
+  scoreBottom,
+  beatY,
+  visualScale,
+  verticalScale,
+}: FlowFixedPlayheadGeometryInput) {
+  const safeHorizontalScale = visualScale > 0 ? visualScale : 1;
+  const safeVerticalScale = verticalScale > 0 ? verticalScale : 1;
+  const projectedSurfaceLeft = surfaceLeft - horizontalScrollDelta;
+
+  return {
+    left: (viewportLeft + anchor - projectedSurfaceLeft) / safeHorizontalScale,
+    top: (scoreTop - surfaceTop) / safeVerticalScale,
+    height: Math.max(1, scoreBottom - scoreTop) / safeVerticalScale,
+    beatOffset: Math.max(0, beatY - scoreTop) / safeVerticalScale,
+  };
+}
+
 export interface FlowScrollStep {
   nextScrollLeft: number;
   continueSettling: boolean;
@@ -286,14 +331,16 @@ export function ContinuousNotationCamera({
       const viewport = horizontalScrollParent(notation);
       const stage = stageRef.current;
       const fixedPlayhead = fixedPlayheadRef.current;
+      const fixedSurface = fixedPlayhead?.parentElement;
 
-      if (!notation || !viewport || !stage || !fixedPlayhead) {
+      if (!notation || !viewport || !stage || !fixedPlayhead || !fixedSurface) {
         return;
       }
 
       const viewportRect = viewport.getBoundingClientRect();
       const stageRect = stage.getBoundingClientRect();
       const notationRect = notation.getBoundingClientRect();
+      const fixedSurfaceRect = fixedSurface.getBoundingClientRect();
       const anchor = flowPlayheadOffset(viewport.clientWidth);
       const scoreTop = Math.max(stageRect.top + 82, notationRect.top - 32);
       const scoreBottom = Math.min(
@@ -369,30 +416,49 @@ export function ContinuousNotationCamera({
         Math.max(0, scoreLeft + x * visualScale - anchor),
       );
       const delta = target - viewport.scrollLeft;
+      const shouldScroll =
+        viewport.scrollWidth > viewport.clientWidth && Math.abs(delta) > 0.5;
+      const scrollStep = shouldScroll
+        ? flowScrollStep(viewport.scrollLeft, target, reducedMotion)
+        : undefined;
+      const horizontalScrollDelta = scrollStep
+        ? scrollStep.nextScrollLeft - viewport.scrollLeft
+        : 0;
+      const fixedHorizontalScale =
+        fixedSurface.offsetWidth > 0
+          ? fixedSurfaceRect.width / fixedSurface.offsetWidth
+          : visualScale;
+      const fixedVerticalScale =
+        fixedSurface.offsetHeight > 0
+          ? fixedSurfaceRect.height / fixedSurface.offsetHeight
+          : verticalScale;
+      const fixedGeometry = flowFixedPlayheadGeometry({
+        viewportLeft: viewportRect.left,
+        surfaceLeft: fixedSurfaceRect.left,
+        surfaceTop: fixedSurfaceRect.top,
+        horizontalScrollDelta,
+        anchor,
+        scoreTop,
+        scoreBottom,
+        beatY,
+        visualScale: fixedHorizontalScale,
+        verticalScale: fixedVerticalScale,
+      });
 
       viewport.style.setProperty('--flow-playhead-px', `${anchor}px`);
-      fixedPlayhead.style.left = `${viewportRect.left + anchor}px`;
-      fixedPlayhead.style.top = `${scoreTop}px`;
-      fixedPlayhead.style.height = `${Math.max(1, scoreBottom - scoreTop)}px`;
+      fixedPlayhead.style.left = `${fixedGeometry.left}px`;
+      fixedPlayhead.style.top = `${fixedGeometry.top}px`;
+      fixedPlayhead.style.height = `${fixedGeometry.height}px`;
       fixedPlayhead.style.setProperty(
         '--flow-beat-y',
-        `${Math.max(0, beatY - scoreTop)}px`,
+        `${fixedGeometry.beatOffset}px`,
       );
       fixedPlayhead.style.display = '';
 
       // The interpolation makes a single existing engine frame feel fluid
       // without owning a second animation loop. Tiny changes are ignored to
       // avoid sub-pixel scroll churn on a parked playhead.
-      if (
-        viewport.scrollWidth > viewport.clientWidth &&
-        Math.abs(delta) > 0.5
-      ) {
-        const scrollStep = flowScrollStep(
-          viewport.scrollLeft,
-          target,
-          reducedMotion,
-        );
-
+      if (scrollStep) {
         viewport.scrollLeft = scrollStep.nextScrollLeft;
 
         // A paused seek or a Classic -> Flow switch emits only one time-store

@@ -1,8 +1,7 @@
 .home-cockpit,
 .coach-desk {
   height: 100%;
-  background:
-    radial-gradient(
+  background: radial-gradient(
       circle at 88% 10%,
       rgb(86 216 242 / 14%),
       transparent 26rem
@@ -50,8 +49,7 @@
 
 .home-cockpit__wash {
   pointer-events: none;
-  background:
-    linear-gradient(
+  background: linear-gradient(
       90deg,
       rgb(17 23 34 / 82%) 0%,
       rgb(17 23 34 / 54%) 28%,
@@ -640,6 +638,48 @@
   line-height: 1.35;
 }
 
+.home-cockpit__wave-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.home-cockpit__wave-list {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0;
+  margin: 0.34rem 0 0;
+  list-style: none;
+}
+
+.home-cockpit__wave-list li {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 3.7rem minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.38rem;
+  color: var(--color-ink-soft);
+  font-size: clamp(0.58rem, 0.68vw, 0.66rem);
+}
+
+.home-cockpit__wave-list span {
+  color: var(--color-magenta);
+  font-weight: 760;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.home-cockpit__wave-list strong {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-cockpit__wave-list small {
+  font-variant-numeric: tabular-nums;
+}
+
 .home-cockpit__next .ant-btn {
   flex: 0 0 auto;
   color: var(--color-magenta);
@@ -757,17 +797,12 @@
   overflow: hidden;
   border: 1px solid rgb(17 23 34 / 10%);
   border-radius: 1.75rem;
-  background:
-    radial-gradient(
+  background: radial-gradient(
       circle at 82% 36%,
       rgb(247 53 134 / 22%),
       transparent 13rem
     ),
-    radial-gradient(
-      circle at 71% 72%,
-      rgb(255 173 47 / 29%),
-      transparent 16rem
-    ),
+    radial-gradient(circle at 71% 72%, rgb(255 173 47 / 29%), transparent 16rem),
     var(--color-ink);
   box-shadow: 0 1.5rem 3.5rem rgb(17 23 34 / 16%);
 }
@@ -833,8 +868,12 @@
 
 .coach-desk__card--focus {
   border-color: rgb(247 53 134 / 26%);
-  background:
-    linear-gradient(145deg, rgb(247 53 134 / 11%), rgb(255 173 47 / 12%)), #fff;
+  background: linear-gradient(
+      145deg,
+      rgb(247 53 134 / 11%),
+      rgb(255 173 47 / 12%)
+    ),
+    #fff;
 }
 
 .coach-desk__card h2 {
