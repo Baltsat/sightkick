@@ -31,7 +31,6 @@ const LANE_DARK_VARIABLE: Record<KitColorLane, string> = {
   blue: '--color-blue-dark',
   green: '--color-green-dark',
 };
-
 let cachedRuns: readonly RunSummary[] | undefined;
 let loadingRuns = false;
 const runSubscribers = new Set<
@@ -94,10 +93,10 @@ export function kitColorPresentation(
     override === 'full-color'
       ? 0
       : override === 'faded'
-        ? 0.62
-        : override === 'near-black'
-          ? 1
-          : clamp((resolvedMaturity - 0.1) / 0.9);
+      ? 0.62
+      : override === 'near-black'
+      ? 1
+      : clamp((resolvedMaturity - 0.1) / 0.9);
 
   return {
     maturity: resolvedMaturity,

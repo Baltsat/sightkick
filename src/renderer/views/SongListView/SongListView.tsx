@@ -227,8 +227,8 @@ export function SongListView() {
     libraryMode === 'drums'
       ? yandexSources?.drums
       : libraryMode === 'favorites'
-        ? yandexSources?.favorites
-        : undefined;
+      ? yandexSources?.favorites
+      : undefined;
   const filteredLibraryCandidates = useMemo(
     () => filterLibraryCandidates(candidateSource?.tracks ?? [], nameFilter),
     [candidateSource?.tracks, nameFilter],
@@ -942,9 +942,9 @@ export function SongListView() {
                         isYandexMode
                           ? filteredLibraryCandidates.length
                           : libraryMode === 'online' &&
-                              onlineTotal !== undefined
-                            ? onlineTotal
-                            : filteredSongList.length
+                            onlineTotal !== undefined
+                          ? onlineTotal
+                          : filteredSongList.length
                       }
                       libraryMode={libraryMode}
                       onlineDownloadsAvailable={onlineDownloadsAvailable}
@@ -1018,10 +1018,10 @@ export function SongListView() {
                       {libraryControls.source === 'kit-lanes'
                         ? 'Kit navigation'
                         : libraryControls.source === 'mixed'
-                          ? 'Mixed navigation'
-                          : libraryControls.source === 'explicit'
-                            ? 'Mapped navigation'
-                            : 'Navigation unavailable'}
+                        ? 'Mixed navigation'
+                        : libraryControls.source === 'explicit'
+                        ? 'Mapped navigation'
+                        : 'Navigation unavailable'}
                     </span>
                     {(libraryControls.source === 'kit-lanes' ||
                       libraryControls.source === 'mixed') && (

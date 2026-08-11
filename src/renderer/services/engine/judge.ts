@@ -360,9 +360,8 @@ export class Judge {
     const actualElement = this.resolveElement(controlId);
     const expectedPrefixes = expected?.note.notes.map(keyPrefix) ?? [];
     const expectedPrefix = expected
-      ? (expectedPrefixes.find(
-          (prefix) => !this.isHit(expected.tick, prefix),
-        ) ?? expectedPrefixes[0])
+      ? expectedPrefixes.find((prefix) => !this.isHit(expected.tick, prefix)) ??
+        expectedPrefixes[0]
       : undefined;
     const record: FalseHitRecord = {
       tick,

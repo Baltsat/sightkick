@@ -74,7 +74,6 @@ describe('kit color maturity', () => {
       'red',
       kitColorPresentation(0, 'near-black'),
     );
-
     const cssVariables = properties as Record<string, string>;
 
     expect(cssVariables['--kit-color-vividness']).toBe('8.0%');

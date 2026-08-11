@@ -215,10 +215,10 @@ export function LessonNode({
     state === 'next-up'
       ? 'Next up'
       : state === 'done'
-        ? 'Cleared'
-        : state === 'available'
-          ? 'Ready'
-          : 'Locked';
+      ? 'Cleared'
+      : state === 'available'
+      ? 'Ready'
+      : 'Locked';
 
   return (
     <div

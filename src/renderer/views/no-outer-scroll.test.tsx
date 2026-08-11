@@ -8,7 +8,6 @@ const laptopViewports = [
   { width: 1225, height: 768 },
   { width: 1024, height: 700 },
 ] as const;
-
 const routes = [
   {
     name: 'Home',
@@ -36,7 +35,6 @@ const routes = [
     },
   },
 ] as const;
-
 const originalViewport = {
   width: window.innerWidth,
   height: window.innerHeight,
