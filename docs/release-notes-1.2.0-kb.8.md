@@ -51,16 +51,15 @@ with evidence intact. This is a build-in-flight note for source commit
   readiness cues, deadline pacing, wrong-pad attribution, every core route at
   1225×768 and 1024×700, and the forbidden “Support the project” copy.
 
-## Distribution — in flight
+## Distribution
 
 - Source commit: `1ec1a4f`
-- Release: <RELEASE-URL>
-- Apple Silicon DMG SHA-256: `<DMG-SHA256>`
+- Release: [GitHub v1.2.0-kb.8](https://github.com/Baltsat/sightkick/releases/tag/v1.2.0-kb.8)
+- Apple Silicon DMG SHA-256: `5f50c38afcd22fd00c9cd89014e03dca7ebdd486f5b2c4b2cea8b3c4949c8244`
 
-The kb.7 package remains the released, notarized, stapled, and publicly
-downloadable build. kb.8 must still complete build, signing, notarization,
-stapling, Gatekeeper, publication, and remote-checksum replay before those
-claims apply to it.
+The kb.8 package is published as a prerelease. Its Apple Silicon DMG is
+Developer ID signed, Apple notarized, stapled, Gatekeeper-verified, and
+published with a reproducible SHA-256 checksum.
 
 ## Evidence boundary
 
