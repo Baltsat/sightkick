@@ -61,14 +61,117 @@ const gamification = {
     'song-1': Array.from({ length: 12 }, (_, index) => run(index)),
   },
 } as unknown as UseGamificationResult;
+const recommendation = {
+  candidate: {
+    id: song.id,
+    title: song.name,
+    difficulty: 'easy',
+  },
+  suggestedSpeed: 0.8,
+  predictedSuccess: 0.78,
+} as never;
 
-describe('HomeCockpit kit color maturity', () => {
+describe('HomeCockpit kit home', () => {
   beforeEach(() => {
     installLocalStorage();
     installIpcMock();
   });
 
-  it('renders shared lane color variables and lets the player restore full colour', () => {
+  it('starts the same selected practice target from every visible pad', () => {
+    const onStartRecommended = vi.fn();
+
+    render(
+      <InputProvider>
+        <HomeCockpit
+          surface="home"
+          songList={[song]}
+          difficulty="easy"
+          lessonProgress={lessonProgress}
+          gamification={gamification}
+          recommendation={recommendation}
+          onStartRecommended={onStartRecommended}
+          onOpenSongs={vi.fn()}
+          onOpenJourney={vi.fn()}
+          onOpenCoach={vi.fn()}
+          onOpenProfile={vi.fn()}
+        />
+      </InputProvider>,
+    );
+
+    ['kick', 'snare', 'hihat', 'tom1', 'tom2', 'tom3', 'ride', 'crash'].forEach(
+      (element) => {
+        fireEvent.click(screen.getByTestId(`kit-hotspot-${element}`));
+      },
+    );
+
+    expect(onStartRecommended).toHaveBeenCalledTimes(8);
+    expect(screen.getByTestId('home-session-manifest')).toHaveAttribute(
+      'data-state',
+      'count-in',
+    );
+    expect(screen.getByTestId('home-session-manifest')).toHaveTextContent(
+      'Count-in',
+    );
+  });
+
+  it('starts the same selected practice target from every mapped physical pad', () => {
+    window.localStorage.setItem(
+      'settings.selectedDevice',
+      JSON.stringify({
+        id: 'keyboard',
+        name: 'Keyboard',
+        sourceId: 'keyboard',
+      }),
+    );
+    window.localStorage.setItem(
+      'settings.inputMappings',
+      JSON.stringify({
+        keyboard: {
+          kick: ['keyboard:KeyA'],
+          snare: ['keyboard:KeyB'],
+          hihat: ['keyboard:KeyC'],
+          tom1: ['keyboard:KeyD'],
+          tom2: ['keyboard:KeyE'],
+          tom3: ['keyboard:KeyF'],
+          ride: ['keyboard:KeyG'],
+          crash: ['keyboard:KeyH'],
+        },
+      }),
+    );
+
+    const onStartRecommended = vi.fn();
+
+    render(
+      <InputProvider>
+        <HomeCockpit
+          surface="home"
+          songList={[song]}
+          difficulty="easy"
+          lessonProgress={lessonProgress}
+          gamification={gamification}
+          recommendation={recommendation}
+          onStartRecommended={onStartRecommended}
+          onOpenSongs={vi.fn()}
+          onOpenJourney={vi.fn()}
+          onOpenCoach={vi.fn()}
+          onOpenProfile={vi.fn()}
+        />
+      </InputProvider>,
+    );
+
+    ['KeyA', 'KeyB', 'KeyC', 'KeyD', 'KeyE', 'KeyF', 'KeyG', 'KeyH'].forEach(
+      (code) => fireEvent.keyDown(window, { code }),
+    );
+
+    expect(onStartRecommended).toHaveBeenCalledTimes(8);
+    expect(screen.getByTestId('home-session-status')).toHaveTextContent(
+      'Count-in for Practice song',
+    );
+  });
+
+  it('keeps pads on the armed home when no target is selected', () => {
+    const onOpenSongs = vi.fn();
+
     render(
       <InputProvider>
         <HomeCockpit
@@ -78,7 +181,7 @@ describe('HomeCockpit kit color maturity', () => {
           lessonProgress={lessonProgress}
           gamification={gamification}
           onStartRecommended={vi.fn()}
-          onOpenSongs={vi.fn()}
+          onOpenSongs={onOpenSongs}
           onOpenJourney={vi.fn()}
           onOpenCoach={vi.fn()}
           onOpenProfile={vi.fn()}
@@ -86,19 +189,13 @@ describe('HomeCockpit kit color maturity', () => {
       </InputProvider>,
     );
 
-    const cockpit = screen.getByTestId('home-cockpit');
+    fireEvent.click(screen.getByTestId('kit-hotspot-snare'));
 
-    expect(cockpit.style.getPropertyValue('--kit-color-vividness')).not.toBe(
-      '100.0%',
-    );
+    expect(onOpenSongs).not.toHaveBeenCalled();
+    expect(screen.queryByText('Songs')).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByTestId('home-kit-color-override'), {
-      target: { value: 'full-color' },
-    });
+    fireEvent.click(screen.getByTestId('home-choose-song'));
 
-    expect(cockpit).toHaveAttribute('data-kit-color-mode', 'full-color');
-    expect(cockpit.style.getPropertyValue('--kit-color-vividness')).toBe(
-      '100.0%',
-    );
+    expect(onOpenSongs).toHaveBeenCalledTimes(1);
   });
 });

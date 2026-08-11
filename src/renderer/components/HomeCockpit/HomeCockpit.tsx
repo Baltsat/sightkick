@@ -1,31 +1,19 @@
-import {
-  CSSProperties,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Progress } from 'antd';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowRight,
   faBolt,
-  faBullseye,
   faDrum,
-  faGraduationCap,
   faMusic,
   faWandMagicSparkles,
 } from '@fortawesome/free-solid-svg-icons';
 import { Difficulty } from 'scan-chart';
 import { Song } from '../../../types';
-import { cn } from '../../cn';
 import { useInput } from '../../context/InputContext';
 import { inputBus } from '../../input';
 import { UseGamificationResult } from '../../hooks/useGamification';
 import { LessonProgress } from '../../hooks/useLessons';
-import { useDrumGestures } from '../../hooks/useDrumGestures';
-import { DrumGestureAction } from '../../services/gestures';
 import { calculateAccuracy } from '../../scoring';
 import {
   MIN_RECENT_LANE_SAMPLES,
@@ -39,13 +27,10 @@ import {
 } from '../../services/next-practice';
 import { KitElement, RunSummary } from '../../services/practice-stats';
 import { playKitPreview } from '../../services/kit-preview-audio';
-import {
-  useKitColorMaturity,
-  type KitColorOverride,
-} from '../../services/kit-color-maturity';
 import homeKitStudio from '../../assets/daybreak/home-kit-studio.png';
 import drumstickCursor from '../../assets/daybreak/drumstick-cursor-reversed.png';
 import './HomeCockpit.css';
+import './KitHome.css';
 
 export type CockpitSurface = 'home' | 'coach';
 
@@ -70,15 +55,12 @@ interface KitHotspot {
   position: string;
 }
 
-type CanonicalKitColorLane = 'orange' | 'red' | 'yellow' | 'blue' | 'green';
+interface RecentCompletedSong {
+  song: Song;
+  summary: RunSummary;
+}
 
-/**
- * The cockpit uses the same five notation lanes as the score: kick/orange,
- * snare/red, the first cymbal/tom lane/yellow, the second/blue, and the
- * third/green. Paired cymbal and tom voices deliberately share a color so
- * Home rehearses the exact visual vocabulary the player sees in practice.
- */
-const KIT_COLOR_LANE: Record<KitElement, CanonicalKitColorLane> = {
+const KIT_COLOR_LANE: Record<KitElement, string> = {
   kick: 'orange',
   snare: 'red',
   hihat: 'yellow',
@@ -98,25 +80,6 @@ const KIT_HOTSPOTS: KitHotspot[] = [
   { element: 'tom3', label: 'Floor tom', position: 'tom3' },
   { element: 'kick', label: 'Kick', position: 'kick' },
 ];
-const HOME_KIT_NAV_LABEL: Partial<Record<KitElement, string>> = {
-  snare: 'Songs',
-  tom1: 'Journey',
-  ride: 'Coach',
-  crash: 'Profile',
-};
-
-interface LaneSignalSummary {
-  compact: string;
-  secondary: string;
-  ariaDescription: string;
-}
-
-interface RecentCompletedSong {
-  song: Song;
-  summary: RunSummary;
-}
-
-const RECENT_SONG_ACCENT_LANES = ['hihat', 'snare', 'kick'] as const;
 
 function completedAtMs(summary: RunSummary) {
   const completedAt = Date.parse(summary.completedAt);
@@ -124,12 +87,6 @@ function completedAtMs(summary: RunSummary) {
   return Number.isFinite(completedAt) ? completedAt : Number.NEGATIVE_INFINITY;
 }
 
-/**
- * Home only names songs that have a real completed run. A song can have
- * several stored attempts, so reduce each song to its newest `completedAt`
- * before ranking the three rows across the library. This prevents the
- * cockpit from mistaking an imported or merely-liked track for recent work.
- */
 export function recentCompletedSongs(
   songList: Song[],
   runsBySong: Readonly<Record<string, RunSummary[]>> | undefined,
@@ -195,41 +152,6 @@ function trendSummary(trendPp: number | undefined) {
   };
 }
 
-function laneSummary(
-  lane: KitElement,
-  signals: RecentLaneSignal[] | undefined,
-): LaneSignalSummary {
-  const signal = signals?.find((candidate) => candidate.element === lane);
-
-  if (!signal) {
-    return {
-      compact: 'no recent data',
-      secondary: `${RECENT_READINESS_WINDOW_DAYS}-day window`,
-      ariaDescription: `No dated scored hits or misses in the last ${RECENT_READINESS_WINDOW_DAYS} days.`,
-    };
-  }
-
-  const accuracy = `${Math.round(signal.accuracy * 100)}%`;
-  const samples = `${signal.sampleCount} scored ${
-    signal.sampleCount === 1 ? 'hit or miss' : 'hits or misses'
-  } across ${signal.runCount} ${signal.runCount === 1 ? 'run' : 'runs'}`;
-  const trend = trendSummary(signal.trendPp);
-
-  if (signal.evidenceState === 'insufficient') {
-    return {
-      compact: `${accuracy} · ${signal.sampleCount}/${MIN_RECENT_LANE_SAMPLES}`,
-      secondary: 'low sample',
-      ariaDescription: `${accuracy} recent time-decayed hit accuracy from ${samples}; insufficient data until ${MIN_RECENT_LANE_SAMPLES} scored hits or misses. ${trend.detailed}`,
-    };
-  }
-
-  return {
-    compact: `${accuracy} · ${signal.sampleCount}`,
-    secondary: trend.compact,
-    ariaDescription: `${accuracy} recent time-decayed hit accuracy from ${samples}. ${trend.detailed}`,
-  };
-}
-
 function bestPlayableSong(
   songList: Song[],
   difficulty: Difficulty,
@@ -257,11 +179,6 @@ function weakestLane(signals: RecentLaneSignal[] | undefined) {
   return [...measured].sort((a, b) => a.accuracy - b.accuracy)[0];
 }
 
-/**
- * The central Home/Coach visual. The photograph is an authored product asset;
- * buttons layer only on real, mapped drums so all statistics and feedback map
- * to actual saved-kit lanes rather than decorative made-up values.
- */
 export function HomeCockpit({
   surface,
   songList,
@@ -273,24 +190,23 @@ export function HomeCockpit({
   onStartRecommended,
   onOpenSongs,
   onOpenJourney,
-  onOpenCoach,
-  onOpenProfile,
 }: HomeCockpitProps) {
   const { inputMapping, inputReadiness, selectedDevice } = useInput();
   const [activeLane, setActiveLane] = useState<KitElement>();
   const [pointerStrikeLane, setPointerStrikeLane] = useState<KitElement>();
+  const [sessionState, setSessionState] = useState<'armed' | 'count-in'>(
+    'armed',
+  );
   const clearPulseRef = useRef<number | undefined>(undefined);
   const clearPointerStrikeRef = useRef<number | undefined>(undefined);
+  const recommendedSong = songList.find(
+    (song) => song.id === recommendation?.candidate.id,
+  );
   const currentSong = useMemo(
     () =>
-      songList.find((song) => song.id === recommendation?.candidate.id) ??
+      recommendedSong ??
       bestPlayableSong(songList, difficulty, gamification.latestRun?.songId),
-    [
-      difficulty,
-      gamification.latestRun?.songId,
-      recommendation?.candidate,
-      songList,
-    ],
+    [difficulty, gamification.latestRun?.songId, recommendedSong, songList],
   );
   const nextLesson =
     lessonProgress.continueEntry ??
@@ -300,11 +216,8 @@ export function HomeCockpit({
     () => recentCompletedSongs(songList, gamification.runsBySong),
     [gamification.runsBySong, songList],
   );
-  const kitColorRuns = useMemo(
-    () => Object.values(gamification.runsBySong ?? {}).flat(),
-    [gamification.runsBySong],
-  );
-  const kitColors = useKitColorMaturity(kitColorRuns);
+  const practiceTarget = recommendation ? recommendedSong : undefined;
+  const hasPracticeTarget = Boolean(practiceTarget && recommendation);
   const elementByControlId = useMemo(() => {
     const map = new Map<string, KitElement>();
 
@@ -321,73 +234,48 @@ export function HomeCockpit({
     setActiveLane(element);
     clearPulseRef.current = window.setTimeout(() => {
       setActiveLane(undefined);
-    }, 530);
+    }, 120);
   }, []);
-  const handleStartRecommended = useCallback(() => {
-    if (inputReadiness !== 'connected') {
-      return;
-    }
-
-    pulseLane('kick');
-    onStartRecommended();
-  }, [inputReadiness, onStartRecommended, pulseLane]);
-  const handlePointerStrike = useCallback(
+  const startCurrentPractice = useCallback(
     (element: KitElement) => {
       pulseLane(element);
+      setSessionState('count-in');
+      onStartRecommended();
+    },
+    [onStartRecommended, pulseLane],
+  );
+  const handlePointerStrike = useCallback(
+    (element: KitElement) => {
       playKitPreview(element);
       window.clearTimeout(clearPointerStrikeRef.current);
       setPointerStrikeLane(element);
       clearPointerStrikeRef.current = window.setTimeout(() => {
         setPointerStrikeLane(undefined);
-      }, 420);
-    },
-    [pulseLane],
-  );
-  const handleHomeKitAction = useCallback(
-    (action: DrumGestureAction) => {
-      if (action === 'start') {
-        if (recommendation) {
-          handleStartRecommended();
-        } else {
-          onOpenSongs();
-        }
+      }, 120);
 
-        return;
-      }
-
-      if (action === 'open-songs') {
-        onOpenSongs();
-      } else if (action === 'open-journey') {
-        onOpenJourney();
-      } else if (action === 'open-coach') {
-        onOpenCoach();
-      } else if (action === 'open-profile') {
-        onOpenProfile();
+      if (hasPracticeTarget) {
+        startCurrentPractice(element);
+      } else {
+        pulseLane(element);
       }
     },
-    [
-      handleStartRecommended,
-      onOpenCoach,
-      onOpenJourney,
-      onOpenProfile,
-      onOpenSongs,
-      recommendation,
-    ],
+    [hasPracticeTarget, pulseLane, startCurrentPractice],
   );
-
-  useDrumGestures({
-    enabled: surface === 'home' && inputReadiness === 'connected',
-    surface: 'home',
-    mapping: inputMapping,
-    onAction: handleHomeKitAction,
-  });
 
   useEffect(() => {
+    if (surface !== 'home') {
+      return;
+    }
+
     const unsubscribe = inputBus.subscribe((event) => {
       const element = elementByControlId.get(event.controlId);
 
       if (element && event.value > 0) {
-        pulseLane(element);
+        if (hasPracticeTarget) {
+          startCurrentPractice(element);
+        } else {
+          pulseLane(element);
+        }
       }
     });
 
@@ -396,7 +284,13 @@ export function HomeCockpit({
       window.clearTimeout(clearPulseRef.current);
       window.clearTimeout(clearPointerStrikeRef.current);
     };
-  }, [elementByControlId, pulseLane]);
+  }, [
+    elementByControlId,
+    hasPracticeTarget,
+    pulseLane,
+    startCurrentPractice,
+    surface,
+  ]);
 
   const currentScore = currentSong?.scoreData?.[difficulty];
   const latestRunForSong =
@@ -409,36 +303,6 @@ export function HomeCockpit({
         ? Math.round(calculateAccuracy(currentScore) * 100)
         : undefined
       : Math.round(latestRunForSong.overallAccuracy * 100);
-  const currentAccuracyLabel =
-    currentAccuracy === undefined
-      ? 'no saved score yet'
-      : latestRunForSong
-      ? `${currentAccuracy}% latest run`
-      : `${currentAccuracy}% best at ${difficulty}`;
-  const inputStatus =
-    inputReadiness === 'connected'
-      ? `Connected · ${selectedDevice?.name ?? 'Input'}`
-      : inputReadiness === 'reconnecting'
-      ? `Reconnecting · ${
-          selectedDevice?.name ?? 'your kit'
-        } · Drumroll will resume automatically`
-      : 'Waiting for a MIDI drum kit';
-  const inputStateLabel =
-    inputReadiness === 'connected'
-      ? 'Connected'
-      : inputReadiness === 'reconnecting'
-      ? 'Reconnecting'
-      : 'Waiting for kit';
-  const inputStateDetail =
-    inputReadiness === 'connected'
-      ? selectedDevice?.name ?? 'Drum input ready'
-      : inputReadiness === 'reconnecting'
-      ? `${selectedDevice?.name ?? 'Remembered kit'} · automatic retry`
-      : 'Connect USB MIDI · auto-detect is on';
-  const rootStyle = {
-    '--drumstick-cursor': `url(${drumstickCursor}) 6 6`,
-    ...kitColors.properties,
-  } as CSSProperties;
 
   if (surface === 'coach') {
     return (
@@ -542,353 +406,178 @@ export function HomeCockpit({
 
   return (
     <section
-      className="home-cockpit"
-      style={rootStyle}
+      className="kit-home"
       data-testid="home-cockpit"
-      data-kit-color-mode={kitColors.override}
-      data-kit-color-maturity={kitColors.presentation.maturity.toFixed(3)}
+      data-session-state={sessionState}
       aria-labelledby="home-cockpit-title"
     >
-      <div className="home-cockpit__hero">
+      <section className="kit-home__studio" data-testid="home-kit-stage">
         <img
-          className="home-cockpit__studio"
+          className="kit-home__photo"
           src={homeKitStudio}
           alt="A pearl drum kit in a sunlit studio"
         />
-        <div className="home-cockpit__wash" aria-hidden="true" />
-
-        <div className="home-cockpit__intro">
-          <p className="daybreak-kicker">
-            <FontAwesomeIcon icon={faDrum} aria-hidden="true" /> Current room
-          </p>
-          <h1 id="home-cockpit-title">
-            {currentSong?.name ?? 'Choose your next song'}
-          </h1>
-        </div>
-
-        <div className="home-cockpit__launch">
-          <p
-            className="home-cockpit__input-readiness"
-            data-state={inputReadiness}
-            data-testid="home-input-readiness"
-            role="status"
-            aria-label={inputStatus}
-          >
-            <span aria-hidden="true" />
-            <span className="home-cockpit__input-readiness-copy">
-              <strong>{inputStateLabel}</strong>
-              <small>{inputStateDetail}</small>
-            </span>
-          </p>
-          <p className="home-cockpit__lede">
-            {currentSong && recommendation
-              ? `${
-                  currentSong.artist
-                } · ${recommendation.suggestedSpeed.toFixed(1)}× adaptive start`
-              : currentSong
-              ? `${currentSong.artist} · ${currentAccuracyLabel}`
-              : 'Choose a chart once; after that, your kit starts the session.'}
-          </p>
-          <div className="home-cockpit__actions">
-            {recommendation && (
-              <Button
-                size="large"
-                data-testid="home-start-practice"
-                className="home-cockpit__start-secondary"
-                icon={<FontAwesomeIcon icon={faBolt} />}
-                disabled={inputReadiness !== 'connected'}
-                onClick={handleStartRecommended}
-              >
-                Start practice
-              </Button>
-            )}
-            <Button
-              size="large"
-              data-testid="home-choose-song"
-              icon={<FontAwesomeIcon icon={faMusic} />}
-              onClick={onOpenSongs}
-            >
-              {currentSong ? 'Change song' : 'Choose song'}
-            </Button>
-          </div>
-          <label className="home-cockpit__color-control">
-            <span>Kit colour</span>
-            <select
-              data-testid="home-kit-color-override"
-              value={kitColors.override}
-              onChange={(event) =>
-                kitColors.setOverride(event.target.value as KitColorOverride)
-              }
-            >
-              <option value="auto">Auto</option>
-              <option value="full-color">Full colour</option>
-              <option value="faded">Faded</option>
-              <option value="near-black">Near-black</option>
-            </select>
-          </label>
-        </div>
-
-        <div className="home-cockpit__status" aria-label="Practice status">
-          <span>
-            <strong>{gamification.streak.current}</strong>
-            day streak
-          </span>
-          <span>
-            <strong>{lessonProgress.unlockedCount}</strong>
-            lessons open
-          </span>
-          <span>
-            <strong>
-              {recommendation
-                ? `${Math.round(recommendation.predictedSuccess * 100)}%`
-                : gamification.totalStars}
-            </strong>
-            {recommendation ? 'predicted success' : 'stars earned'}
-          </span>
-        </div>
-
-        <button
-          type="button"
-          className="home-cockpit__coach-link"
-          data-testid="home-open-coach"
-          onClick={onOpenCoach}
-        >
-          <FontAwesomeIcon icon={faWandMagicSparkles} aria-hidden="true" />
-          <span>
-            <small>AI Coach</small>
-            <strong>
-              {weakest
-                ? `Tune your ${
-                    KIT_HOTSPOTS.find(
-                      (item) => item.element === weakest.element,
-                    )?.label ?? weakest.element
-                  }`
-                : 'Open a focused run'}
-            </strong>
-          </span>
-          <FontAwesomeIcon icon={faArrowRight} aria-hidden="true" />
-        </button>
+        <div className="kit-home__wash" aria-hidden="true" />
 
         <div
-          className="home-cockpit__kit"
-          role="group"
-          aria-label="Interactive drum kit"
+          className="kit-home__manifest"
+          data-testid="home-session-manifest"
+          data-state={sessionState}
         >
+          <p className="kit-home__eyebrow">
+            <FontAwesomeIcon icon={faDrum} aria-hidden="true" /> Current room
+          </p>
+          <p className="kit-home__session-state">
+            {sessionState === 'count-in'
+              ? 'Count-in'
+              : hasPracticeTarget
+              ? 'Ready at the kit'
+              : 'Choose a target'}
+          </p>
+          <h1 id="home-cockpit-title">
+            {practiceTarget?.name ?? 'Choose a song'}
+          </h1>
+          <p className="kit-home__target-meta">
+            {practiceTarget && recommendation
+              ? `${
+                  practiceTarget.artist
+                } · ${recommendation.suggestedSpeed.toFixed(1)}× · ${
+                  nextLesson?.lesson.cue ?? 'one clean bar at a time'
+                }`
+              : 'Choose one practice target. Your next hit begins it.'}
+          </p>
+          <p
+            className="kit-home__readiness"
+            data-testid="home-input-readiness"
+            data-state={inputReadiness}
+          >
+            <span aria-hidden="true" />
+            {inputReadiness === 'connected'
+              ? `${selectedDevice?.name ?? 'MIDI kit'} mapped · ready`
+              : inputReadiness === 'reconnecting'
+              ? 'Kit reconnecting · your target stays armed'
+              : 'Mouse works now · connect MIDI when ready'}
+          </p>
+        </div>
+
+        <div className="kit-home__action-cue" aria-hidden="true">
+          <span>{sessionState === 'count-in' ? 'Count-in' : 'Armed'}</span>
+          <strong>
+            {hasPracticeTarget ? 'Hit any pad to begin' : 'Choose a song'}
+          </strong>
+        </div>
+
+        <div className="kit-home__pads" role="group" aria-label="Practice kit">
           {KIT_HOTSPOTS.map((hotspot) => {
             const isActive = activeLane === hotspot.element;
             const isPointerStrike = pointerStrikeLane === hotspot.element;
-            const signal = laneSummary(
-              hotspot.element,
-              gamification.recentLaneSignals,
-            );
+            const targetLabel =
+              practiceTarget?.name ?? 'the selected practice target';
 
             return (
               <button
                 key={hotspot.element}
                 type="button"
                 data-testid={`kit-hotspot-${hotspot.element}`}
-                className={cn(
-                  'home-kit-hotspot',
-                  `home-kit-hotspot--${hotspot.position}`,
-                  isActive && 'home-kit-hotspot--active',
-                )}
+                className={`kit-home__pad kit-home__pad--${hotspot.position}`}
+                data-active={isActive}
                 data-color-lane={KIT_COLOR_LANE[hotspot.element]}
-                aria-label={`${hotspot.label}: ${signal.ariaDescription} ${
-                  hotspot.element === 'kick'
-                    ? recommendation
-                      ? `Start ${
-                          recommendation.candidate.title
-                        } at ${recommendation.suggestedSpeed.toFixed(
-                          1,
-                        )} times speed.`
-                      : 'Choose a song.'
-                    : HOME_KIT_NAV_LABEL[hotspot.element]
-                    ? `Hit this pad on your physical kit to open ${
-                        HOME_KIT_NAV_LABEL[hotspot.element]
-                      }.`
-                    : `Pulse ${hotspot.label}.`
-                }`}
-                onClick={() => {
-                  handlePointerStrike(hotspot.element);
-
-                  if (hotspot.element === 'kick') {
-                    if (recommendation) {
-                      handleStartRecommended();
-                    } else {
-                      onOpenSongs();
-                    }
-                  }
-                }}
+                aria-label={
+                  hasPracticeTarget
+                    ? `${hotspot.label}. Start ${targetLabel}.`
+                    : `${hotspot.label}. No practice target armed.`
+                }
+                onClick={() => handlePointerStrike(hotspot.element)}
               >
-                <span className="home-kit-hotspot__ring" aria-hidden="true" />
+                <span className="kit-home__pad-head" aria-hidden="true" />
+                <span className="kit-home__pad-impact" aria-hidden="true" />
                 <img
-                  className="home-kit-hotspot__stick"
+                  className="kit-home__pad-stick"
                   data-active={isPointerStrike}
                   src={drumstickCursor}
                   alt=""
                   aria-hidden="true"
                 />
-                <span className="home-kit-hotspot__copy">
-                  <strong>
-                    {hotspot.element === 'kick'
-                      ? inputReadiness === 'connected'
-                        ? recommendation
-                          ? 'Kick to start'
-                          : 'Choose song'
-                        : 'Waiting'
-                      : hotspot.label}
-                  </strong>
-                  <small>
-                    {hotspot.element === 'kick'
-                      ? inputReadiness === 'reconnecting'
-                        ? 'auto-connect armed'
-                        : inputReadiness === 'waiting'
-                        ? 'connect MIDI'
-                        : currentSong && recommendation
-                        ? `${recommendation.suggestedSpeed.toFixed(1)}× · ready`
-                        : 'pick a chart'
-                      : HOME_KIT_NAV_LABEL[hotspot.element] ?? signal.compact}
-                  </small>
-                  {hotspot.element !== 'kick' && (
-                    <small className="home-kit-hotspot__evidence">
-                      {HOME_KIT_NAV_LABEL[hotspot.element]
-                        ? `${signal.compact} · ${signal.secondary}`
-                        : signal.secondary}
-                    </small>
-                  )}
-                </span>
               </button>
             );
           })}
         </div>
 
-        <p className="home-cockpit__live" data-testid="home-hit-feedback">
+        {!hasPracticeTarget && (
+          <button
+            type="button"
+            className="kit-home__choose-target"
+            data-testid="home-choose-song"
+            onClick={onOpenSongs}
+          >
+            <FontAwesomeIcon icon={faMusic} aria-hidden="true" />
+            Choose a song
+          </button>
+        )}
+
+        <p className="kit-home__hit-feedback" data-testid="home-hit-feedback">
           {activeLane
             ? `${KIT_HOTSPOTS.find((item) => item.element === activeLane)
                 ?.label} hit`
             : ''}
         </p>
-        <p
-          className="sr-only"
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          data-testid="home-session-status"
-        >
-          {inputReadiness !== 'connected'
-            ? inputStatus
-            : recommendation
-            ? `Practice recommendation ready: ${
-                recommendation.candidate.title
-              } at ${recommendation.suggestedSpeed.toFixed(1)} times speed.`
-            : 'No practice recommendation is ready. Choose a song to begin.'}
-        </p>
-      </div>
+      </section>
 
-      <div className="home-cockpit__below">
-        <article className="home-cockpit__next">
-          <div className="home-cockpit__wave-copy">
-            <p className="home-cockpit__label">Your Practice Wave</p>
-            {practiceWave && practiceWave.stops.length > 0 ? (
-              <ol className="home-cockpit__wave-list">
-                {practiceWave.stops.map((stop) => (
-                  <li key={`${stop.role}:${stop.recommendation.candidate.id}`}>
-                    <span>{stop.role}</span>
-                    <strong>{stop.recommendation.candidate.title}</strong>
-                    <small>
-                      {stop.recommendation.suggestedSpeed.toFixed(1)}×
-                    </small>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <>
-                <h2>
-                  {nextLesson
-                    ? `Lesson · ${nextLesson.lesson.title}`
-                    : 'Your first lesson is ready'}
-                </h2>
-                <p className="home-cockpit__lesson-meta">
-                  {nextLesson
-                    ? `${nextLesson.lesson.unit} · ${
-                        nextLesson.lesson.bpmStart ?? '—'
-                      } → ${nextLesson.lesson.bpmTarget ?? '—'} BPM`
-                    : 'Open Journey to load the Drumroll Method into your library.'}
-                </p>
-              </>
-            )}
-          </div>
-          <Button
-            type="text"
-            aria-label="Open your journey"
-            onClick={onOpenJourney}
-          >
-            <FontAwesomeIcon icon={faGraduationCap} />
-            <span>Journey</span>
-          </Button>
+      <section className="kit-home__wave" aria-label="Practice wave">
+        <article className="kit-home__wave-cell">
+          <p>Next lesson</p>
+          <strong>
+            {nextLesson?.lesson.title ?? 'Your first lesson is waiting'}
+          </strong>
+          <button type="button" onClick={onOpenJourney}>
+            Open journey{' '}
+            <FontAwesomeIcon icon={faArrowRight} aria-hidden="true" />
+          </button>
         </article>
         <article
-          className="home-cockpit__recent-songs"
+          className="kit-home__wave-cell"
           data-testid="home-recent-songs"
-          aria-labelledby="home-recent-songs-title"
         >
-          <div className="home-cockpit__recent-heading">
-            <p className="home-cockpit__label">Recent songs</p>
-            <h2 id="home-recent-songs-title">Last completed passes</h2>
-          </div>
-          {recentSongs.length > 0 ? (
-            <ol className="home-cockpit__recent-list">
-              {recentSongs.map(({ song, summary }, index) => {
-                const accent =
-                  RECENT_SONG_ACCENT_LANES[
-                    index % RECENT_SONG_ACCENT_LANES.length
-                  ];
-
-                return (
-                  <li
-                    key={song.id}
-                    className="home-cockpit__recent-song"
-                    data-testid={`home-recent-song-${song.id}`}
-                    data-lane={accent}
-                  >
-                    <span className="home-cockpit__recent-song-copy">
-                      <strong>{song.name}</strong>
-                      <small>{song.artist}</small>
-                    </span>
-                    <span className="home-cockpit__recent-song-score">
-                      {recentRunLabel(summary)}
-                    </span>
-                    <time dateTime={summary.completedAt} className="sr-only">
-                      {summary.completedAt}
-                    </time>
-                  </li>
-                );
-              })}
-            </ol>
+          <p>Last completed pass</p>
+          {recentSongs[0] ? (
+            <>
+              <strong>{recentSongs[0].song.name}</strong>
+              <span>{recentRunLabel(recentSongs[0].summary)}</span>
+            </>
           ) : (
-            <p className="home-cockpit__recent-empty">
-              Your last three completed songs will appear here.
-            </p>
+            <span>Your first scored pass will appear here.</span>
           )}
         </article>
-        <article className="home-cockpit__goal">
-          <p className="home-cockpit__label">
-            <FontAwesomeIcon icon={faBullseye} aria-hidden="true" /> Daily pulse
-          </p>
+        <article className="kit-home__wave-cell kit-home__wave-cell--goal">
+          <p>Today</p>
           <strong>
             {gamification.todayXp} / {gamification.goalXp} XP
           </strong>
-          <Progress
-            percent={Math.min(
-              100,
-              Math.round((gamification.todayXp / gamification.goalXp) * 100),
-            )}
-            showInfo={false}
-            strokeColor="var(--color-cyan)"
-            railColor="rgb(17 23 34 / 12%)"
-          />
+          <span>
+            {practiceWave?.stops[1]?.recommendation.candidate.title ??
+              `${Math.max(
+                0,
+                gamification.goalXp - gamification.todayXp,
+              )} XP to your goal`}
+          </span>
         </article>
-      </div>
+      </section>
+
+      <p
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        data-testid="home-session-status"
+      >
+        {sessionState === 'count-in'
+          ? `Count-in for ${practiceTarget?.name ?? 'your selected target'}.`
+          : hasPracticeTarget && recommendation
+          ? `${practiceTarget?.name} is armed at ${recommendation.suggestedSpeed.toFixed(
+              1,
+            )} times speed. Any mapped pad starts it.`
+          : 'No practice target is armed. Choose a song, then hit any pad.'}
+      </p>
     </section>
   );
 }

@@ -1,0 +1,286 @@
+{
+  "source": "production Electron build with final QA lesson fixture",
+  "wideViewport": {
+    "width": 1224,
+    "height": 768
+  },
+  "compactViewport": {
+    "width": 1024,
+    "height": 700
+  },
+  "proofs": [
+    {
+      "label": "01-ready-performance-chrome",
+      "phase": "ready",
+      "viewport": {
+        "width": 1224,
+        "height": 768
+      },
+      "outerScroll": {
+        "document": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "score": {
+        "opacity": "1",
+        "filter": "none",
+        "transform": "none",
+        "ancestorEffects": [],
+        "readyNotes": {
+          "activeFills": [
+            "rgb(255, 104, 79)"
+          ],
+          "inactiveFills": [
+            "rgb(82, 97, 114)"
+          ]
+        }
+      },
+      "localState": {
+        "readiness": true,
+        "countIn": false,
+        "tutor": false,
+        "railHeight": 52
+      },
+      "inspector": null
+    },
+    {
+      "label": "02-ready-inspector",
+      "phase": "ready",
+      "viewport": {
+        "width": 1224,
+        "height": 768
+      },
+      "outerScroll": {
+        "document": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "score": {
+        "opacity": "1",
+        "filter": "none",
+        "transform": "none",
+        "ancestorEffects": [],
+        "readyNotes": {
+          "activeFills": [
+            "rgb(255, 104, 79)"
+          ],
+          "inactiveFills": [
+            "rgb(82, 97, 114)"
+          ]
+        }
+      },
+      "localState": {
+        "readiness": true,
+        "countIn": false,
+        "tutor": false,
+        "railHeight": 52
+      },
+      "inspector": {
+        "className": "ant-popover drumroll-performance-inspector ant-popover-css-var css-xsuzon css-var-_r_0_ css-xsuzon css-var-_r_0_ ant-popover-placement-bottomRight",
+        "height": 688,
+        "maxHeight": "688px",
+        "overflow": "auto"
+      }
+    },
+    {
+      "label": "03-count-in",
+      "phase": "counting-in",
+      "viewport": {
+        "width": 1224,
+        "height": 768
+      },
+      "outerScroll": {
+        "document": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "score": {
+        "opacity": "1",
+        "filter": "none",
+        "transform": "none",
+        "ancestorEffects": [],
+        "readyNotes": null
+      },
+      "localState": {
+        "readiness": false,
+        "countIn": true,
+        "tutor": false,
+        "railHeight": 52
+      },
+      "inspector": null
+    },
+    {
+      "label": "04-playing",
+      "phase": "playing",
+      "viewport": {
+        "width": 1224,
+        "height": 768
+      },
+      "outerScroll": {
+        "document": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "score": {
+        "opacity": "1",
+        "filter": "none",
+        "transform": "none",
+        "ancestorEffects": [],
+        "readyNotes": null
+      },
+      "localState": {
+        "readiness": false,
+        "countIn": false,
+        "tutor": true,
+        "railHeight": 143
+      },
+      "inspector": null
+    },
+    {
+      "label": "05-paused",
+      "phase": "paused",
+      "viewport": {
+        "width": 1224,
+        "height": 768
+      },
+      "outerScroll": {
+        "document": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "score": {
+        "opacity": "1",
+        "filter": "none",
+        "transform": "none",
+        "ancestorEffects": [],
+        "readyNotes": null
+      },
+      "localState": {
+        "readiness": false,
+        "countIn": false,
+        "tutor": true,
+        "railHeight": 52
+      },
+      "inspector": null
+    },
+    {
+      "label": "06-recovery-inactivity",
+      "phase": "inactivity-paused",
+      "viewport": {
+        "width": 1224,
+        "height": 768
+      },
+      "outerScroll": {
+        "document": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1224,
+          "height": 768,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "score": {
+        "opacity": "1",
+        "filter": "none",
+        "transform": "none",
+        "ancestorEffects": [],
+        "readyNotes": null
+      },
+      "localState": {
+        "readiness": false,
+        "countIn": false,
+        "tutor": true,
+        "railHeight": 52
+      },
+      "inspector": null
+    },
+    {
+      "label": "07-recovery-1024x700",
+      "phase": "inactivity-paused",
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "outerScroll": {
+        "document": {
+          "width": 1024,
+          "height": 700,
+          "horizontal": false,
+          "vertical": false
+        },
+        "body": {
+          "width": 1024,
+          "height": 700,
+          "horizontal": false,
+          "vertical": false
+        }
+      },
+      "score": {
+        "opacity": "1",
+        "filter": "none",
+        "transform": "none",
+        "ancestorEffects": [],
+        "readyNotes": null
+      },
+      "localState": {
+        "readiness": false,
+        "countIn": false,
+        "tutor": true,
+        "railHeight": 52
+      },
+      "inspector": null
+    }
+  ],
+  "pageErrors": [],
+  "failedProofs": []
+}

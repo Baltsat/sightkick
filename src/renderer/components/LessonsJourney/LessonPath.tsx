@@ -52,6 +52,8 @@ export interface LessonPathProps {
   controlLegend: string;
   controlSource: 'explicit' | 'mixed' | 'kit-lanes' | 'unavailable';
   kitActions: Array<'up' | 'down' | 'left' | 'right' | 'confirm' | 'back'>;
+  controlsVisible: boolean;
+  onRevealControls: () => void;
   onPlay: (entry: LessonEntry) => void;
   onLockedClick: (entry: LessonEntry) => void;
 }
@@ -70,6 +72,8 @@ export function LessonPath({
   controlLegend,
   controlSource,
   kitActions,
+  controlsVisible,
+  onRevealControls,
   onPlay,
   onLockedClick,
 }: LessonPathProps) {
@@ -126,6 +130,7 @@ export function LessonPath({
       data-window-start={windowStart + 1}
       data-window-end={windowEnd}
       data-window-size={visibleEntries.length}
+      data-controls-visible={controlsVisible}
     >
       <svg
         viewBox="0 0 100 100"
@@ -137,7 +142,7 @@ export function LessonPath({
         <path
           d={d}
           fill="none"
-          stroke="rgba(17, 23, 34, 0.22)"
+          stroke="var(--line-soft)"
           strokeWidth={3}
           strokeLinecap="round"
           vectorEffect="non-scaling-stroke"
@@ -147,7 +152,7 @@ export function LessonPath({
             d={travelledD}
             fill="none"
             className="daybreak-lesson-path__track--completed"
-            stroke="#f73586"
+            stroke="var(--signal-green)"
             strokeOpacity={0.8}
             strokeWidth={3}
             strokeLinecap="round"
@@ -156,10 +161,22 @@ export function LessonPath({
         )}
       </svg>
 
+      <button
+        type="button"
+        className="daybreak-lesson-path__controls-toggle"
+        data-testid="journey-controls-toggle"
+        aria-expanded={controlsVisible}
+        onClick={onRevealControls}
+      >
+        Controls
+      </button>
+
       <div
         className="daybreak-lesson-path__kit-hint"
         data-testid="journey-kit-controls"
         data-control-source={controlSource}
+        data-visible={controlsVisible}
+        onFocusCapture={onRevealControls}
       >
         <span>
           {controlSource === 'kit-lanes'

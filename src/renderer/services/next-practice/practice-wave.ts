@@ -1,5 +1,9 @@
 import { PracticeHistoryEntry, RankedPracticeCandidate } from './types';
 
+export { composePracticeSession } from '../pedagogy/session-composer';
+
+export type { ComposeSessionInput } from '../pedagogy/session-composer';
+
 export type PracticeWaveRole = 'focus' | 'apply' | 'consolidate';
 
 export interface PracticeWaveStop {

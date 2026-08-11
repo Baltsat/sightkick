@@ -31,6 +31,8 @@ export interface SeasonCardProps {
   controlLegend: string;
   controlSource: 'explicit' | 'mixed' | 'kit-lanes' | 'unavailable';
   kitActions: Array<'up' | 'down' | 'left' | 'right' | 'confirm' | 'back'>;
+  controlsVisible: boolean;
+  onRevealControls: () => void;
   onPlay: (entry: LessonEntry) => void;
   onLockedClick: (entry: LessonEntry) => void;
 }
@@ -56,6 +58,8 @@ export function SeasonCard({
   controlLegend,
   controlSource,
   kitActions,
+  controlsVisible,
+  onRevealControls,
   onPlay,
   onLockedClick,
 }: SeasonCardProps) {
@@ -75,7 +79,7 @@ export function SeasonCard({
       data-expanded={isPathExpanded ? 'true' : 'false'}
       data-featured={isFeatured ? 'true' : 'false'}
       className={cn(
-        'daybreak-season-card motion-safe:transition-opacity motion-safe:duration-500',
+        'daybreak-season-card',
         isFeatured && 'daybreak-season-card--featured',
         state === 'locked' && 'opacity-85',
       )}
@@ -86,33 +90,30 @@ export function SeasonCard({
         aria-expanded={isPathExpanded}
         aria-controls={pathId}
         data-testid={`season-toggle-${group.unit}`}
-        className="daybreak-season-card__masthead flex items-center gap-3.5 text-left cursor-pointer"
+        className="daybreak-season-card__masthead"
       >
         <div
           data-testid={`season-ring-${group.unit}`}
           data-percent={donePercent}
-          className="daybreak-season-progress ml-3.5 shrink-0"
+          className="daybreak-season-progress"
         >
           <Progress
             type="circle"
             percent={donePercent}
             size={52}
             showInfo={false}
-            strokeColor="#f73586"
-            railColor="rgba(17, 23, 34, 0.1)"
+            strokeColor="var(--signal-ember)"
+            railColor="var(--line-soft)"
           />
         </div>
 
-        <div className="min-w-0 grow py-3.5">
-          <div
-            className="daybreak-season-state mb-0.5 flex text-[11px] font-semibold uppercase tracking-[0.16em]"
-            data-state={state}
-          >
+        <div className="daybreak-season-card__copy">
+          <div className="daybreak-season-state" data-state={state}>
             <span>Season {String(seasonNumber).padStart(2, '0')}</span>
             {state === 'locked' && (
               <FontAwesomeIcon
                 icon={faLock}
-                className="text-text-dim"
+                className="daybreak-season-state__icon"
                 aria-hidden="true"
               />
             )}
@@ -121,14 +122,14 @@ export function SeasonCard({
             )}
           </div>
           <h3
-            className="truncate font-display text-xl font-semibold leading-tight text-[#111722]"
+            className="daybreak-season-card__title"
             data-testid={`lesson-group-${group.unit}`}
             title={group.unit}
           >
             {group.unit}
           </h3>
           <div
-            className="mt-0.5 text-xs text-[#53606d]"
+            className="daybreak-season-card__evidence"
             data-testid={`season-stars-${group.unit}`}
           >
             {earned} / {possible}{' '}
@@ -141,7 +142,7 @@ export function SeasonCard({
           icon={faChevronDown}
           aria-hidden="true"
           className={cn(
-            'mr-3.5 shrink-0 text-[#53606d] motion-safe:transition-transform motion-safe:duration-200',
+            'daybreak-season-card__chevron',
             isPathExpanded && 'rotate-180',
           )}
         />
@@ -162,6 +163,8 @@ export function SeasonCard({
           controlLegend={controlLegend}
           controlSource={controlSource}
           kitActions={kitActions}
+          controlsVisible={controlsVisible}
+          onRevealControls={onRevealControls}
           onPlay={onPlay}
           onLockedClick={onLockedClick}
         />

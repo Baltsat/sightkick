@@ -10,9 +10,7 @@ describe('PracticeReadinessCue', () => {
       'data-phase',
       'idle',
     );
-    expect(
-      screen.getByText('Your score is getting ready.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Score preparing')).toBeInTheDocument();
     expect(
       screen.queryByLabelText('Hit the kick pad once to start the count-in'),
     ).not.toBeInTheDocument();
@@ -25,10 +23,19 @@ describe('PracticeReadinessCue', () => {
       'data-phase',
       'ready',
     );
-    expect(screen.getByText('One kick starts the groove.')).toBeInTheDocument();
+    expect(screen.getByText('Kick to count in')).toBeInTheDocument();
     expect(
       screen.getByLabelText('Hit the kick pad once to start the count-in'),
     ).toBeInTheDocument();
+  });
+
+  it('keeps an interrupted attempt in the same one-kick cue', () => {
+    render(<PracticeReadinessCue phase="ready" resumeMeasure={3} />);
+
+    expect(screen.getByTestId('practice-readiness-cue')).toHaveTextContent(
+      'Resume bar 4 · kick to count in',
+    );
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
   });
 
   it('leaves the notation unblocked while playing', () => {

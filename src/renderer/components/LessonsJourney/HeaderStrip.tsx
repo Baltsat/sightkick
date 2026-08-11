@@ -3,24 +3,16 @@ import { faPlay, faStar } from '@fortawesome/free-solid-svg-icons';
 import { Button } from 'antd';
 import {
   LESSON_METHOD_DISPLAY_NAME,
-  LessonEntry,
   LessonProgress,
   lockedHint,
 } from '../../hooks/useLessons';
-import { Stars } from '../Stars';
 import { currentSeasonInfo } from './journey';
 
 export interface HeaderStripProps {
   progress: LessonProgress;
-  onPlay: (entry: LessonEntry) => void;
+  onPlay: (entry: NonNullable<LessonProgress['continueEntry']>) => void;
 }
 
-/**
- * Persistent "where am I" strip: current season, node X of Y within it,
- * the existing chain-progress summary, and the Continue affordance (same
- * onPlay logic as before, just restyled). Sticky so it stays visible while
- * scrolling a long season path.
- */
 export function HeaderStrip({ progress, onPlay }: HeaderStripProps) {
   const {
     unlockedCount,
@@ -30,144 +22,85 @@ export function HeaderStrip({ progress, onPlay }: HeaderStripProps) {
     nextLockedEntry,
   } = progress;
   const info = currentSeasonInfo(progress);
-  /* The numbered tile already carries the curriculum coordinate. Prefer the
-   * authored exercise title so the useful words survive the minimum window. */
   const continueTitle =
     continueEntry?.lesson.title || continueEntry?.song.name || '';
-  const continueLesson = continueEntry?.lesson;
 
   return (
-    <div
-      className="daybreak-header-strip sticky top-0 z-10 flex flex-col gap-3 p-4"
-      data-testid="lessons-header-strip"
-    >
-      <div>
-        <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#9d3d2e]">
-          <span>{LESSON_METHOD_DISPLAY_NAME}</span>
+    <header className="journey-manifest" data-testid="lessons-header-strip">
+      <div className="journey-manifest__context">
+        <p className="journey-manifest__eyebrow">
+          {LESSON_METHOD_DISPLAY_NAME}
           {info && (
             <>
-              <span className="text-[#65717e]" aria-hidden="true">
-                ·
-              </span>
+              <span aria-hidden="true">·</span>
               <span data-testid="lesson-header-current-season">
-                {info.group.unit}
-              </span>
-              <span className="text-[#65717e]" aria-hidden="true">
-                ·
-              </span>
-              <span data-testid="lesson-header-node-position">
-                Node {info.positionInSeason} of {info.seasonSize}
+                Current season · {info.group.unit}
               </span>
             </>
           )}
-        </div>
-        <h2
-          className="font-display text-xl font-semibold leading-tight text-[#111722]"
+        </p>
+        <h2>{info?.group.unit ?? 'Your rehearsal route'}</h2>
+        {info && (
+          <p
+            className="journey-manifest__position"
+            data-testid="lesson-header-node-position"
+          >
+            Node {info.positionInSeason} of {info.seasonSize}
+          </p>
+        )}
+        <p
+          className="journey-manifest__progress"
           data-testid="lesson-progress-summary"
         >
           {unlockedCount} of {totalLessons} unlocked · {totalStars}{' '}
           <FontAwesomeIcon icon={faStar} aria-label="stars" /> earned
-        </h2>
+        </p>
       </div>
 
       {continueEntry ? (
         <section
-          className="daybreak-next-up flex min-w-0 items-center gap-3 rounded-2xl border p-2.5"
+          className="journey-manifest__next"
           data-testid="lesson-continue-card"
           aria-labelledby="lesson-continue-title"
         >
-          <div className="daybreak-next-up-number flex size-14 shrink-0 items-center justify-center rounded-xl font-display text-sm font-semibold">
-            {continueEntry.lesson.id}
-          </div>
-          <div className="min-w-0 grow">
-            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#b42b6c]">
-              Continue
-            </div>
-            <h3
-              id="lesson-continue-title"
-              className="truncate font-display text-lg font-semibold leading-tight text-[#111722]"
-              title={continueTitle}
-            >
+          <div>
+            <p>Next lesson</p>
+            <h3 id="lesson-continue-title" title={continueTitle}>
               {continueTitle}
             </h3>
-            <div className="mt-1 flex items-center gap-2 text-xs text-[#53606d]">
-              <Stars
-                rating={continueEntry.bestStars}
-                size="xs"
-                className="gap-1"
-              />
-              <span className="truncate">{continueEntry.lesson.unit}</span>
-            </div>
-            {continueLesson?.cue && (
-              <div
-                className="daybreak-lesson-plan mt-2 text-xs leading-relaxed text-[#3f4b58]"
-                data-testid="lesson-continue-plan"
-              >
-                <p className="m-0">
-                  <strong>Cue:</strong> {continueLesson.cue}
-                </p>
-                <p className="m-0">
-                  <strong>Tempo:</strong> {continueLesson.bpmStart ?? '—'} →{' '}
-                  {continueLesson.bpmTarget ?? '—'} BPM
-                  {continueLesson.prerequisiteIds?.length
-                    ? ` · prerequisite: ${continueLesson.prerequisiteIds.join(
-                        ', ',
-                      )}`
-                    : ' · no prerequisite'}
-                </p>
-                {continueLesson.doseRule && (
-                  <p className="m-0">
-                    <strong>Dose:</strong> {continueLesson.doseRule}
-                  </p>
-                )}
-                {continueLesson.masteryRule && (
-                  <p className="m-0">
-                    <strong>Coach target:</strong> {continueLesson.masteryRule}
-                  </p>
-                )}
-                <p
-                  className="m-0 text-[#65717e]"
-                  data-testid="lesson-assessment-boundary"
-                >
-                  {continueLesson.assessmentBoundary ??
-                    'MIDI assesses timing and pad choice; sticking/form cue is not assessed.'}
-                </p>
-              </div>
-            )}
+            <span>
+              {continueEntry.lesson.cue ??
+                `${continueEntry.lesson.unit} · settle the pulse before adding speed`}
+            </span>
           </div>
           <Button
             type="primary"
             size="large"
-            className="min-h-11 shrink-0"
-            icon={<FontAwesomeIcon icon={faPlay} />}
-            aria-label={`Play ${continueTitle}`}
+            aria-label={`Start ${continueTitle}`}
             onClick={() => onPlay(continueEntry)}
           >
-            Play
+            <FontAwesomeIcon icon={faPlay} aria-hidden="true" />
+            Start
           </Button>
         </section>
       ) : nextLockedEntry ? (
         <section
-          className="rounded-2xl border border-[#111722]/15 bg-white/75 p-3"
+          className="journey-manifest__next journey-manifest__next--complete"
           data-testid="lesson-all-mastered-card"
         >
-          <p className="text-sm text-[#53606d]">
-            You&apos;ve cleared every lesson you&apos;ve unlocked.{' '}
-            {lockedHint(nextLockedEntry)} to unlock “
-            {nextLockedEntry.lesson.title}.”
+          <p>
+            Your unlocked route is clear. {lockedHint(nextLockedEntry)} to open
+            “{nextLockedEntry.lesson.title}.”
           </p>
         </section>
       ) : (
         <section
-          className="rounded-2xl border border-[#111722]/15 bg-white/75 p-3"
+          className="journey-manifest__next journey-manifest__next--complete"
           data-testid="lesson-complete-card"
         >
-          <p className="text-sm text-[#53606d]">
-            You&apos;ve completed the whole {LESSON_METHOD_DISPLAY_NAME}{' '}
-            curriculum. Nice work!
-          </p>
+          <p>You’ve completed the {LESSON_METHOD_DISPLAY_NAME} route.</p>
         </section>
       )}
-    </div>
+    </header>
   );
 }

@@ -6,6 +6,7 @@ import type {
   TutorRecoveryAttempt,
   TutorSettings,
 } from '../tutor/types';
+import type { SkillEvidenceEvent } from '../pedagogy/types';
 
 export const PRACTICE_RUN_SCHEMA_VERSION = 3;
 
@@ -227,6 +228,7 @@ export interface RunSummary {
   timingWindowMs?: number;
   /** Authored lesson skills stamped for longitudinal atomic-skill evidence. */
   authoredSkills?: string[];
+  atomicSkillEvidence?: SkillEvidenceEvent[];
 }
 
 export interface RunTrendPoint {

@@ -20,6 +20,8 @@ interface Props {
   onExportPdf?: () => void;
   isExporting?: boolean;
   tutorControls?: ReactNode;
+  performanceControls?: ReactNode;
+  label?: string;
 }
 
 export const SettingsButton = memo(function Settings({
@@ -32,6 +34,8 @@ export const SettingsButton = memo(function Settings({
   onExportPdf,
   isExporting,
   tutorControls,
+  performanceControls,
+  label,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [inputConfigOpen, setInputConfigOpen] = useState(false);
@@ -58,9 +62,17 @@ export const SettingsButton = memo(function Settings({
         onOpenChange={popoverOpenChange(setIsOpen)}
         trigger="click"
         placement="bottomRight"
+        rootClassName={label ? 'drumroll-performance-inspector' : undefined}
+        destroyOnHidden={Boolean(label)}
         styles={popoverStyles}
         content={
-          <div className="min-w-90 flex flex-col gap-3">
+          <div
+            className={
+              label
+                ? 'drumroll-performance-inspector__body'
+                : 'min-w-90 flex flex-col gap-3'
+            }
+          >
             {page === 'song-list' ? (
               <SongListSettings
                 scanPercent={scanPercent}
@@ -72,10 +84,13 @@ export const SettingsButton = memo(function Settings({
                 onExportPdf={onExportPdf}
                 isExporting={isExporting}
                 gameMode={gameMode}
+                onSetupInput={openInput}
+                currentInputName={currentInputName}
                 masterVolumeControl={masterVolumeControl}
                 volumeSliders={volumeSliders}
                 clickControls={clickControls}
                 tutorControls={tutorControls}
+                performanceControls={performanceControls}
               />
             )}
             <Collapse
@@ -93,11 +108,13 @@ export const SettingsButton = memo(function Settings({
       >
         <Button
           icon={<FontAwesomeIcon icon={faCog} />}
-          size="large"
-          className="min-h-11 min-w-11"
-          aria-label="Open settings"
+          size={label ? 'middle' : 'large'}
+          className={label ? 'min-h-9 px-3' : 'min-h-11 min-w-11'}
+          aria-label={label ? `Open ${label.toLowerCase()}` : 'Open settings'}
           data-testid="settings-trigger"
-        />
+        >
+          {label}
+        </Button>
       </Popover>
     </>
   );

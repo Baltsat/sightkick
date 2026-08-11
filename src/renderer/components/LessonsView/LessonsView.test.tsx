@@ -311,11 +311,30 @@ describe('LessonsView — chain progress header', () => {
     const card = screen.getByTestId('lesson-continue-card');
 
     fireEvent.click(
-      within(card).getByRole('button', { name: 'Play Half Notes' }),
+      within(card).getByRole('button', { name: 'Start Half Notes' }),
     );
 
     expect(onPlay).toHaveBeenCalledTimes(1);
     expect(onPlay.mock.calls[0][0].lesson.id).toBe('02.02');
+  });
+
+  it('keeps one readable next-lesson manifest instead of a curriculum admin card', () => {
+    const progress = makeMixedProgress();
+
+    render(
+      <LessonsView progress={progress} onPlay={vi.fn()} onRescan={vi.fn()} />,
+      { wrapper },
+    );
+
+    const manifest = screen.getByTestId('lesson-continue-card');
+
+    expect(within(manifest).getByText('Half Notes')).toBeInTheDocument();
+    expect(
+      within(manifest).getByRole('button', { name: 'Start Half Notes' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('lesson-continue-plan'),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -462,7 +481,7 @@ describe('LessonsView — seasons', () => {
       'active',
     );
     expect(screen.getByTestId('journey-world-marker')).toHaveTextContent(
-      'World tour · stop 02ReadingCurrent stage',
+      'Season 02ReadingCurrent stage',
     );
     expect(
       screen.getByTestId('season-rail-state-Foundations'),
@@ -490,7 +509,7 @@ describe('LessonsView — seasons', () => {
       'locked',
     );
     expect(screen.getByTestId('journey-world-marker')).toHaveTextContent(
-      'World tour · stop 03GroovesVenue locked',
+      'Season 03GroovesVenue locked',
     );
   });
 
@@ -699,6 +718,23 @@ describe('LessonsView — path nodes', () => {
 
     hitMidiNote(74);
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps journey controls quiet until the player asks for them', () => {
+    const progress = makeMixedProgress();
+
+    render(
+      <LessonsView progress={progress} onPlay={vi.fn()} onRescan={vi.fn()} />,
+      { wrapper },
+    );
+
+    const controls = screen.getAllByTestId('journey-kit-controls')[0];
+
+    expect(controls).toHaveAttribute('data-visible', 'false');
+
+    fireEvent.click(screen.getAllByTestId('journey-controls-toggle')[0]);
+
+    expect(controls).toHaveAttribute('data-visible', 'true');
   });
 
   it('activates an unlocked node on Enter and Space, same as a click', () => {

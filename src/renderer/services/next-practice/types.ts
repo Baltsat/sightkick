@@ -11,6 +11,13 @@ import type {
   DrumSkillAxisId,
   SkillTrendDirection,
 } from '../learning-profile';
+import type {
+  AtomicSkillState,
+  ItemSkillManifest,
+  PracticeDecision,
+  SkillReview,
+  SongGoal,
+} from '../pedagogy/types';
 
 export type PracticeCandidateKind = 'song' | 'lesson';
 
@@ -65,6 +72,7 @@ export interface PracticeCandidate {
   mastered?: boolean;
   availableDifficulties?: readonly Difficulty[];
   chartTotalNotes?: number;
+  itemManifest?: ItemSkillManifest;
 }
 
 export interface PracticeHistoryEntry {
@@ -85,6 +93,12 @@ export interface NextPracticeInput {
   nowMs: number;
   goalDate?: string;
   learningProfile?: DrumLearningProfile;
+  pedagogy?: {
+    atomicStates: readonly AtomicSkillState[];
+    itemManifests?: readonly ItemSkillManifest[];
+    activeGoal?: SongGoal;
+    dueReviews?: readonly SkillReview[];
+  };
   limit?: number;
 }
 
@@ -100,7 +114,12 @@ export type RecommendationFactorKey =
   | 'curriculum-progress'
   | 'deadline-pacing'
   | 'same-song-fatigue'
-  | 'recent-mastery';
+  | 'recent-mastery'
+  | 'atomic-zpd'
+  | 'atomic-prerequisite'
+  | 'atomic-retention'
+  | 'atomic-transfer'
+  | 'atomic-evidence';
 
 export interface RecommendationFactor {
   key: RecommendationFactorKey;
@@ -183,10 +202,15 @@ export interface RankedPracticeCandidate {
   reason: string;
   factors: RecommendationFactor[];
   confidence: RecommendationConfidence;
+  decisionReceipt?: PracticeDecision;
 }
 
 export interface NextPracticeResult {
-  strategy: 'evidence-ranked' | 'deterministic-fallback' | 'none-available';
+  strategy:
+    | 'evidence-ranked'
+    | 'atomic-evidence-ranked'
+    | 'deterministic-fallback'
+    | 'none-available';
   recommendation?: RankedPracticeCandidate;
   ranking: RankedPracticeCandidate[];
   deadlinePacing?: DeadlinePacingSummary;

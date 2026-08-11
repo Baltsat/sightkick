@@ -900,4 +900,98 @@ describe('recommendNextPractice', () => {
 
     expect(result).toEqual({ strategy: 'none-available', ranking: [] });
   });
+
+  it('keeps direct Coach remediation ahead of graph-aware receipts', () => {
+    const result = recommend({
+      candidates: [
+        makeCandidate('atomic-generic', {
+          kind: 'lesson',
+          curriculumId: '01.01',
+          skills: ['timing'],
+        }),
+        makeCandidate('atomic-remediation', {
+          kind: 'lesson',
+          curriculumId: '01.02',
+          skills: ['timing'],
+        }),
+      ],
+      history: [history('atomic-generic', '2026-08-08T12:00:00.000Z')],
+      coachEvidence: [
+        {
+          id: 'saved-timing-route',
+          kind: 'timing-bias',
+          severity: 'high',
+          skillTag: 'timing',
+          sampleCount: 12,
+          remediationLessonId: '01.02',
+        },
+      ],
+      pedagogy: {
+        atomicStates: [
+          {
+            skill_id: 'pulse.quarter',
+            alpha: 20,
+            beta: 2,
+            effective_trials: 8,
+            best_supported_bpm: 80,
+            last_retention_at: '2026-08-08T12:00:00.000Z',
+            stage: 'retained',
+            evidence_boundary: 'midi',
+          },
+        ],
+      },
+    });
+
+    expect(result.strategy).toBe('atomic-evidence-ranked');
+    expect(result.recommendation?.candidate.id).toBe('atomic-remediation');
+    expect(result.recommendation?.directRemediation?.findingCount).toBe(1);
+    expect(result.recommendation?.decisionReceipt).toMatchObject({
+      policy_version: 'pedagogy-v2.0',
+    });
+  });
+
+  it('keeps deadline pacing ahead of ordinary graph-aware receipts', () => {
+    const result = recommend({
+      candidates: [
+        makeCandidate('atomic-generic', {
+          kind: 'lesson',
+          curriculumId: '01.01',
+          skills: ['timing'],
+        }),
+        makeCandidate('atomic-paced', {
+          kind: 'lesson',
+          curriculumId: '01.02',
+          skills: ['sixteenth-hihat'],
+        }),
+      ],
+      history: [history('atomic-generic', '2026-08-26T12:00:00.000Z')],
+      goalDate: PACING_GOAL_DATE,
+      learningProfile: learningProfile({ 'hand-control': 40 }),
+      nowMs: PACING_NOW,
+      pedagogy: {
+        atomicStates: [
+          {
+            skill_id: 'pulse.quarter',
+            alpha: 20,
+            beta: 2,
+            effective_trials: 8,
+            best_supported_bpm: 80,
+            last_retention_at: '2026-08-26T12:00:00.000Z',
+            stage: 'retained',
+            evidence_boundary: 'midi',
+          },
+        ],
+      },
+    });
+
+    expect(result.strategy).toBe('atomic-evidence-ranked');
+    expect(result.recommendation?.candidate.id).toBe('atomic-paced');
+    expect(result.recommendation?.deadlinePacing).toMatchObject({
+      axisId: 'hand-control',
+      behindBy: 20,
+    });
+    expect(result.recommendation?.decisionReceipt).toMatchObject({
+      policy_version: 'pedagogy-v2.0',
+    });
+  });
 });

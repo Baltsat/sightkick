@@ -952,6 +952,7 @@ describe('practice mode analytics', () => {
       });
 
       await view.loadSong();
+      view.openSettings();
       fireEvent.click(screen.getByTestId('ai-coach-button'));
 
       const summary = {
@@ -1004,7 +1005,10 @@ describe('practice mode analytics', () => {
       };
       const originalSource = startedQueue.source;
 
-      expect(screen.getByTestId('loop-toggle')).toBeChecked();
+      expect(screen.getByTestId('practice-mode-indicator')).toHaveAttribute(
+        'data-looping',
+        'true',
+      );
       expect(screen.getByTestId('loop-escape-runway')).toHaveAttribute(
         'data-phase',
         'control',
@@ -1078,7 +1082,9 @@ describe('practice mode analytics', () => {
         ],
       });
       expect(completedQueue.source).toEqual(originalSource);
-      expect(screen.getByTestId('loop-toggle')).not.toBeChecked();
+      expect(screen.getByTestId('practice-mode-indicator')).not.toHaveAttribute(
+        'data-looping',
+      );
       expect(screen.getByTestId('loop-escape-runway')).toHaveAttribute(
         'data-phase',
         'release',

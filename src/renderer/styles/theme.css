@@ -1,4 +1,14 @@
 @theme {
+  --surface-canvas: #f5f0e7;
+  --surface-raised: #fffdf8;
+  --ink-strong: #1b1814;
+  --ink-muted: #6f685e;
+  --line-soft: #ddd3c4;
+  --signal-ember: #d75a34;
+  --signal-wine: #932d4c;
+  --signal-green: #287a64;
+  --surface-studio: #24201b;
+
   --color-bg: #f8f5ef;
   --color-surface: #ffffff;
   --color-surface-raised: #eee8dc;
@@ -93,6 +103,16 @@
 }
 
 :root {
+  --surface-canvas: #f5f0e7;
+  --surface-raised: #fffdf8;
+  --ink-strong: #1b1814;
+  --ink-muted: #6f685e;
+  --line-soft: #ddd3c4;
+  --signal-ember: #d75a34;
+  --signal-wine: #932d4c;
+  --signal-green: #287a64;
+  --surface-studio: #24201b;
+
   --gradient-header: linear-gradient(180deg, #ffffff, #eee8dc);
   --gradient-header-reverse: linear-gradient(180deg, #eee8dc, #ffffff);
   --gradient-accent: linear-gradient(

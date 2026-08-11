@@ -14,6 +14,12 @@ import {
   RunSummary,
 } from '../practice-stats';
 import {
+  curriculumItemManifest,
+  dueReviews,
+  rankZpdFrontier,
+} from '../pedagogy';
+import type { ItemSkillManifest, PracticeDecision } from '../pedagogy/types';
+import {
   CandidateLaneDemand,
   DeadlinePacingSummary,
   NextPracticeInput,
@@ -1030,6 +1036,235 @@ function fallbackRank(
   });
 }
 
+function manifestForCandidate(
+  candidate: PracticeCandidate,
+  manifests: readonly ItemSkillManifest[],
+): ItemSkillManifest | undefined {
+  return (
+    candidate.itemManifest ??
+    manifests.find(
+      (manifest) =>
+        manifest.item_id === candidate.id ||
+        manifest.item_id === candidate.curriculumId,
+    ) ??
+    (candidate.curriculumId
+      ? curriculumItemManifest(candidate.curriculumId)
+      : undefined)
+  );
+}
+
+function atomicFactors(decision: PracticeDecision): RecommendationFactor[] {
+  return [
+    {
+      key: 'atomic-zpd',
+      label: 'Atomic ZPD fit',
+      value: round(decision.predicted_success, 4),
+      weight: 35,
+      contribution: round(decision.learning_value * 35),
+      detail: decision.explanation,
+    },
+    {
+      key: 'atomic-prerequisite',
+      label: 'Hard prerequisite confidence',
+      value: round(decision.prereq_fit, 4),
+      weight: 20,
+      contribution: round(decision.prereq_fit * 20),
+      detail: decision.independent_eligible
+        ? 'Hard prerequisites have retained evidence for independent work.'
+        : `Scaffolded because ${
+            decision.hard_prerequisites.join(', ') || 'the active prerequisite'
+          } is not yet retained.`,
+    },
+    {
+      key: 'atomic-retention',
+      label: 'Delayed retention value',
+      value: round(
+        decision.factors.find(({ key }) => key === 'due_retention')?.value ?? 0,
+        4,
+      ),
+      weight: 15,
+      contribution: round(
+        (decision.factors.find(({ key }) => key === 'due_retention')
+          ?.contribution ?? 0) * 100,
+      ),
+      detail: 'Only a due skill-specific delayed review receives this value.',
+    },
+    {
+      key: 'atomic-transfer',
+      label: 'Transfer value',
+      value: round(decision.transfer_fit, 4),
+      weight: 10,
+      contribution: round(decision.transfer_fit * 10),
+      detail:
+        'Context-specific retention stays distinct from transfer evidence.',
+    },
+    {
+      key: 'atomic-evidence',
+      label: 'Evidence confidence',
+      value: round(1 - decision.uncertainty, 4),
+      weight: 10,
+      contribution: round((1 - decision.uncertainty) * 10),
+      detail: `Atomic evidence confidence is ${Math.round(
+        (1 - decision.uncertainty) * 100,
+      )}%.`,
+    },
+  ];
+}
+
+function atomicRecommendation(
+  baseline: RankedPracticeCandidate,
+  decision: PracticeDecision,
+): RankedPracticeCandidate {
+  const confidence = 1 - decision.uncertainty;
+
+  return {
+    ...baseline,
+    score: round(decision.learning_value * 100),
+    predictedSuccess: round(decision.predicted_success, 3),
+    suggestedSpeed: decision.scaffold.speed,
+    reason:
+      baseline.directRemediation || baseline.deadlinePacing
+        ? baseline.reason
+        : decision.explanation,
+    factors: [...baseline.factors, ...atomicFactors(decision)],
+    confidence: {
+      value: round(confidence, 3),
+      level: confidence < 0.4 ? 'low' : confidence < 0.7 ? 'medium' : 'high',
+      evidenceRuns: Math.round(
+        decision.uncertainty === 1 ? 0 : (1 - decision.uncertainty) * 8,
+      ),
+      detail: `Atomic state, demand manifest ${decision.source_revision}, and scaffold receipt are available.`,
+    },
+    decisionReceipt: decision,
+  };
+}
+
+function recommendAtomicPractice(
+  input: NextPracticeInput,
+  eligible: readonly PracticeCandidate[],
+  limit: number,
+): NextPracticeResult | undefined {
+  const pedagogy = input.pedagogy;
+
+  if (!pedagogy) {
+    return undefined;
+  }
+
+  const manifests = pedagogy.itemManifests ?? [];
+  const atomic_candidates = eligible.flatMap((candidate) => {
+    const manifest = manifestForCandidate(candidate, manifests);
+
+    return manifest
+      ? [
+          {
+            item_id: candidate.id,
+            kind: candidate.kind,
+            title: candidate.title,
+            available: candidate.available,
+            liked: candidate.liked,
+            sequence: candidate.sequence,
+            manifest,
+            recent_attempts: input.history.filter(
+              (entry) => entry.candidateId === candidate.id,
+            ).length,
+          },
+        ]
+      : [];
+  });
+
+  if (atomic_candidates.length === 0) {
+    return undefined;
+  }
+
+  const normalizedHistory = input.history.map(({ candidateId, summary }) => ({
+    candidateId,
+    summary: sanitizeRunSummary(summary),
+  }));
+  const sortedHistory = normalizedHistory.sort(byHistoryTime);
+  const nowMs = normalizedNowMs(input.nowMs, sortedHistory);
+  const allRuns = sortedHistory.map(({ summary }) => summary);
+  const lanes = recentLaneEvidence(sortedHistory, nowMs, input.weakLanes);
+  const directRemediations = directRemediationEvidence(
+    input.coachEvidence ?? [],
+  );
+  const deadlinePacing = deriveDeadlinePacing({
+    goalDate: input.goalDate,
+    learningProfile: input.learningProfile,
+    nowMs,
+  });
+  const skills = skillEvidence([
+    ...(input.coachFindings ?? []),
+    ...persistedSkillEvidence(input.coachEvidence ?? []),
+  ]);
+  const playerCapability = estimatePlayerCapability(sortedHistory);
+  const globalRecentAccuracy = weightedRecentAccuracy(allRuns);
+  const baseline = eligible.map((candidate) =>
+    rankCandidate({
+      candidate,
+      history: sortedHistory,
+      sortedHistory,
+      allRuns,
+      nowMs,
+      playerCapability,
+      globalRecentAccuracy,
+      lanes,
+      skills,
+      directRemediations,
+      deadlinePacing,
+    }),
+  );
+  const goal_candidate = pedagogy.activeGoal
+    ? eligible.find(
+        (candidate) => candidate.id === pedagogy.activeGoal!.song_id,
+      )
+    : undefined;
+  const active_goal_manifest = goal_candidate
+    ? manifestForCandidate(goal_candidate, manifests)
+    : undefined;
+  const zpd = rankZpdFrontier({
+    candidates: atomic_candidates,
+    states: pedagogy.atomicStates,
+    now: new Date(nowMs).toISOString(),
+    ...(pedagogy.activeGoal ? { active_goal: pedagogy.activeGoal } : {}),
+    ...(active_goal_manifest ? { active_goal_manifest } : {}),
+    due_reviews:
+      pedagogy.dueReviews ??
+      dueReviews(pedagogy.atomicStates, new Date(nowMs).toISOString()),
+  });
+  const decision_by_candidate_id = new Map(
+    zpd.map(({ candidate, decision }) => [candidate.item_id, decision]),
+  );
+  const ranked = baseline.map((candidate) => {
+    const decision = decision_by_candidate_id.get(candidate.candidate.id);
+
+    return decision ? atomicRecommendation(candidate, decision) : candidate;
+  });
+  const ranking = [
+    ...ranked
+      .filter(({ directRemediation }) => directRemediation !== undefined)
+      .sort(directRemediationTieBreak),
+    ...ranked
+      .filter(
+        ({ directRemediation, deadlinePacing: candidatePacing }) =>
+          directRemediation === undefined && candidatePacing !== undefined,
+      )
+      .sort(deadlinePacingTieBreak),
+    ...ranked
+      .filter(
+        ({ directRemediation, deadlinePacing: candidatePacing }) =>
+          directRemediation === undefined && candidatePacing === undefined,
+      )
+      .sort(evidenceTieBreak),
+  ].slice(0, limit);
+
+  return {
+    strategy: 'atomic-evidence-ranked',
+    recommendation: ranking[0],
+    ranking,
+    ...(deadlinePacing ? { deadlinePacing } : {}),
+  };
+}
+
 function evidenceTieBreak(
   left: RankedPracticeCandidate,
   right: RankedPracticeCandidate,
@@ -1086,6 +1321,11 @@ export function recommendNextPractice(
   const limit = Number.isFinite(configuredLimit)
     ? Math.max(1, Math.trunc(configuredLimit))
     : eligible.length;
+  const atomic = recommendAtomicPractice(input, eligible, limit);
+
+  if (atomic) {
+    return atomic;
+  }
 
   if (input.history.length === 0) {
     const ranking = fallbackRank(eligible).slice(0, limit);

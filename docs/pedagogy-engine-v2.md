@@ -555,3 +555,17 @@ The shortest real proof loop is: pick one favourite song section → compute its
 14. Yousician. _Can my students start practice at different levels?_ Official support documentation. [support.yousician.com](https://support.yousician.com/hc/en-us/articles/204793951-Can-my-students-start-practice-at-different-levels).
 15. Duolingo. _What Is the Duolingo Teaching Method?_ Official explanation of personalized sequencing, challenge balance, and habit mechanics. [blog.duolingo.com](https://blog.duolingo.com/duolingo-teaching-method/).
 16. r/CloneHero. _How to get from expert to master._ Community practice report used only as field observation for speed-ladder behavior. [reddit.com](https://www.reddit.com/r/CloneHero/comments/1uyzy95/how_to_get_from_expert_to_master/).
+
+## implementation status — 2026-08-11
+
+core map items 1–7 are implemented as the `services/pedagogy` layer.
+
+- item 1: versioned atomic graph, evidence boundaries, prerequisite strengths, cycle validation, and a generated 170-exercise curriculum manifest.
+- item 2: curriculum manifests carry normalized atomic demand, tempo, context signature, assessment confidence, and source revision; the lesson generator writes `pedagogy-manifest.json` beside its packaged exercises.
+- item 3: completed runs can persist immutable atomic evidence; replay rejects superseded manifest evidence and normalizes timing quality against the judging window.
+- item 4: acquisition, delayed retention, and changed-context transfer stay distinct; skill-specific reviews use expanding intervals.
+- item 5: graph-aware ZPD scoring emits a deterministic decision receipt with hard-prerequisite eligibility, scaffold, inputs, and factors. Direct Coach remediation and deadline pacing retain priority.
+- item 6: the session composer precomputes one-kick plans for intent and dose, including a musical payoff for short sessions and explicit-song precedence.
+- item 7: favourite-song paths expose at most three blockers, matching near-ready exercises, a safe section probe when chart confidence permits it, and unrestricted free play.
+
+the named proof lives in `atomic skill graph and curriculum manifests`, `atomic skill-state replay`, `graph-aware ZPD frontier`, `intent-aware session composer`, `favourite-song goal paths`, `favourite-song prerequisite paths`, `practice-stats atomic evidence persistence`, and the atomic Coach/deadline cases in `recommendNextPractice`. UI, library ingestion, and main-process IPC remain intentionally unchanged for the next surface-integration wave.

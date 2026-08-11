@@ -19,6 +19,7 @@ import { useInputControls } from '../../hooks/useInputControls';
 import journeyStudio from '../../assets/daybreak/journey-studio.png';
 import { resolveJourneyControls } from './journey-controls';
 import '../LessonsJourney/daybreak-journey.css';
+import '../LessonsJourney/JourneyV2.css';
 
 export interface LessonsViewProps {
   progress: LessonProgress;
@@ -81,6 +82,7 @@ export function LessonsView({
   const [focusedLessonId, setFocusedLessonId] = useState<string | undefined>(
     preferredFocusedLessonId,
   );
+  const [journeyControlsVisible, setJourneyControlsVisible] = useState(false);
   const resolvedFocusedLessonId = focusableEntries.some(
     (entry) => entry.song.id === focusedLessonId,
   )
@@ -100,8 +102,13 @@ export function LessonsView({
     },
     [groups, progress.continueEntry?.song.id],
   );
+  const revealJourneyControls = useCallback(() => {
+    setJourneyControlsVisible(true);
+  }, []);
   const moveKitFocus = useCallback(
     (delta: number) => {
+      revealJourneyControls();
+
       if (focusableEntries.length === 0) {
         return;
       }
@@ -118,10 +125,12 @@ export function LessonsView({
         return focusableEntries[nextIndex].song.id;
       });
     },
-    [focusableEntries],
+    [focusableEntries, revealJourneyControls],
   );
   const moveSeason = useCallback(
     (delta: number) => {
+      revealJourneyControls();
+
       const navigableGroups = groups.filter((group) =>
         group.entries.some((entry) => entry.unlocked),
       );
@@ -139,9 +148,11 @@ export function LessonsView({
 
       selectSeason(navigableGroups[nextIndex].unit);
     },
-    [groups, selectSeason, visibleUnit],
+    [groups, revealJourneyControls, selectSeason, visibleUnit],
   );
   const confirmFocusedLesson = useCallback(() => {
+    revealJourneyControls();
+
     const focused = focusableEntries.find(
       (entry) => entry.song.id === resolvedFocusedLessonId,
     );
@@ -149,7 +160,12 @@ export function LessonsView({
     if (focused) {
       onPlay(focused);
     }
-  }, [focusableEntries, onPlay, resolvedFocusedLessonId]);
+  }, [
+    focusableEntries,
+    onPlay,
+    resolvedFocusedLessonId,
+    revealJourneyControls,
+  ]);
 
   // The lane-derived fallback exists only in this mounted Journey surface.
   // InputContext remains unchanged, so the same pads retain their musical
@@ -162,7 +178,10 @@ export function LessonsView({
       left: () => moveSeason(-1),
       right: () => moveSeason(1),
       confirm: confirmFocusedLesson,
-      back: onBack,
+      back: () => {
+        revealJourneyControls();
+        onBack?.();
+      },
     },
     true,
   );
@@ -228,10 +247,10 @@ export function LessonsView({
 
   return (
     <div
-      className="daybreak-journey-root h-full w-full overflow-hidden"
+      className="daybreak-journey-root journey-route overflow-hidden"
       data-testid="lessons-scroll-root"
     >
-      <div className="daybreak-journey-shell mx-auto flex h-full min-h-0 w-full flex-col gap-3 px-4 py-3 sm:px-5">
+      <div className="daybreak-journey-shell journey-route__shell">
         <HeaderStrip progress={progress} onPlay={onPlay} />
 
         <nav
@@ -255,8 +274,11 @@ export function LessonsView({
                 aria-label={`Season ${index + 1}: ${group.unit}`}
                 onClick={() => selectSeason(group.unit)}
               >
-                <span aria-hidden="true">
-                  {String(index + 1).padStart(2, '0')} ·{' '}
+                <span
+                  className="daybreak-season-tab__number"
+                  aria-hidden="true"
+                >
+                  {String(index + 1).padStart(2, '0')}
                 </span>
                 <span className="daybreak-season-tab__label">{group.unit}</span>
                 <span
@@ -277,31 +299,22 @@ export function LessonsView({
         </nav>
 
         <div
-          className="daybreak-journey-stage min-h-0 grow"
+          className="daybreak-journey-stage journey-route__stage grow"
           style={{
             backgroundImage: `url(${journeyStudio})`,
           }}
           data-testid="lesson-season-stage"
           data-selected-season-state={visibleState}
         >
-          <div
-            className="daybreak-journey-stage__atmosphere"
-            aria-hidden="true"
-          >
-            <span className="daybreak-journey-stage__beam daybreak-journey-stage__beam--amber" />
-            <span className="daybreak-journey-stage__beam daybreak-journey-stage__beam--magenta" />
-            <span className="daybreak-journey-stage__beam daybreak-journey-stage__beam--cyan" />
-          </div>
           {visibleGroup && (
             <div
-              className="daybreak-journey-stage__tour-marker"
+              className="journey-venue-plaque"
               data-state={visibleState}
               data-testid="journey-world-marker"
               aria-hidden="true"
             >
               <span>
-                World tour · stop{' '}
-                {String(visibleSeasonIndex + 1).padStart(2, '0')}
+                Season {String(visibleSeasonIndex + 1).padStart(2, '0')}
               </span>
               <strong>{visibleGroup.unit}</strong>
               <small>{visibleStateLabel}</small>
@@ -319,6 +332,8 @@ export function LessonsView({
               controlLegend={journeyControls.legend}
               controlSource={journeyControls.source}
               kitActions={journeyControls.kitActions}
+              controlsVisible={journeyControlsVisible}
+              onRevealControls={revealJourneyControls}
               onPlay={onPlay}
               onLockedClick={handleLockedClick}
             />

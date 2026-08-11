@@ -50,6 +50,15 @@ function labelForPhase(phase: TutorState['phase']) {
   return 'Adaptive tutor';
 }
 
+function isCompactDisplayState(displayState: TutorHudProps['displayState']) {
+  return (
+    displayState === 'inactivity-paused' ||
+    displayState === 'kit-paused' ||
+    displayState === 'kit-ready' ||
+    displayState === 'recovery-explain'
+  );
+}
+
 export function TutorHud({
   state,
   message,
@@ -91,6 +100,42 @@ export function TutorHud({
     return null;
   }
 
+  if (isCompactDisplayState(displayState)) {
+    return (
+      <aside
+        className="drumroll-tutor-hud drumroll-tutor-hud--compact"
+        data-tone={message.tone}
+        data-phase={state.phase}
+        data-display-state={displayState}
+        data-testid="tutor-hud"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-labelledby={titleId}
+        aria-describedby={detailId}
+      >
+        <div className="drumroll-tutor-hud__signal" aria-hidden="true">
+          <FontAwesomeIcon
+            icon={
+              displayState === 'inactivity-paused' ||
+              displayState === 'kit-paused'
+                ? faPause
+                : displayState === 'kit-ready'
+                ? faDrum
+                : faRotateLeft
+            }
+            fixedWidth
+          />
+        </div>
+        <div className="drumroll-tutor-hud__compact-copy">
+          <strong id={titleId}>{message.title}</strong>
+          <span id={detailId}>{message.detail}</span>
+        </div>
+        {controlPrompt && <KitCommandPrompt model={controlPrompt} compact />}
+      </aside>
+    );
+  }
+
   const recovery = state.recovery;
   const completedRecovery = recovery ? undefined : state.lastRecoveryOutcome;
   const checkpointLivesRefilled =
@@ -98,15 +143,7 @@ export function TutorHud({
     state.settings.livesEnabled &&
     state.livesRemaining === state.settings.startingLives;
   const phaseLabel =
-    displayState === 'inactivity-paused'
-      ? 'Paused — no hits'
-      : displayState === 'kit-ready'
-      ? 'Kit ready'
-      : displayState === 'kit-paused'
-      ? 'Paused at the kit'
-      : displayState === 'recovery-explain'
-      ? 'Recovery preview'
-      : displayState === 'remediation'
+    displayState === 'remediation'
       ? 'Coach remediation'
       : labelForPhase(state.phase);
   const speedLabel = `${state.currentSpeed.toFixed(1)}×`;
@@ -140,15 +177,7 @@ export function TutorHud({
     >
       <div className="drumroll-tutor-hud__signal" aria-hidden="true">
         <FontAwesomeIcon
-          icon={
-            displayState === 'inactivity-paused'
-              ? faPause
-              : displayState === 'kit-ready'
-              ? faDrum
-              : recovery || remediation
-              ? faRotateLeft
-              : faEarListen
-          }
+          icon={recovery || remediation ? faRotateLeft : faEarListen}
           fixedWidth
         />
       </div>

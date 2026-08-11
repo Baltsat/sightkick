@@ -193,7 +193,11 @@ describe('TutorHud', () => {
       'data-display-state',
       'inactivity-paused',
     );
-    expect(screen.getByText('Paused — no hits')).toBeInTheDocument();
+    expect(screen.getByTestId('tutor-hud')).toHaveClass(
+      'drumroll-tutor-hud--compact',
+    );
+    expect(screen.getByText('Paused — no hits detected')).toBeInTheDocument();
+    expect(screen.queryByTestId('tutor-speed')).not.toBeInTheDocument();
   });
 
   it('keeps finite Coach remediation visible even when adaptive tutor is off', () => {

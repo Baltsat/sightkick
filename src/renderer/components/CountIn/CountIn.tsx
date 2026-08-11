@@ -35,7 +35,7 @@ export function CountIn({
       style={style}
     >
       <div className="drumroll-count-in__surface">
-        <p>Listen. Play after {beatCount}.</p>
+        <p>Count in</p>
         <ol className="drumroll-count-in__beats" aria-hidden="true">
           {Array.from({ length: beatCount }, (_, index) => {
             const beat = index + 1;

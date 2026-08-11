@@ -9,7 +9,7 @@ describe('CountIn', () => {
     const overlay = screen.getByTestId('count-in');
 
     expect(overlay).toHaveAccessibleName('Count in 2 of 4');
-    expect(screen.getByText('Listen. Play after 4.')).toBeInTheDocument();
+    expect(screen.getByText('Count in')).toBeInTheDocument();
     expect(
       [...overlay.querySelectorAll('.drumroll-count-in__beat')].map((beat) =>
         beat.getAttribute('data-state'),
@@ -24,7 +24,7 @@ describe('CountIn', () => {
     expect(screen.getByTestId('count-in')).toHaveAccessibleName(
       'Count in 2 of 2',
     );
-    expect(screen.getByText('Listen. Play after 2.')).toBeInTheDocument();
+    expect(screen.getByText('Count in')).toBeInTheDocument();
     expect(
       screen
         .getByTestId('count-in')

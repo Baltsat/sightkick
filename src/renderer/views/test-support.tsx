@@ -306,6 +306,19 @@ export function setupSongView({
     },
 
     clickTestId(testId: string) {
+      if (
+        !screen.queryByTestId(testId) &&
+        [
+          'loop-toggle',
+          'notation-flow-toggle',
+          'notation-classic-toggle',
+          'ai-coach-button',
+          'practice-stats-button',
+        ].includes(testId)
+      ) {
+        fireEvent.click(screen.getByTestId('settings-trigger'));
+      }
+
       fireEvent.click(screen.getByTestId(testId));
     },
 

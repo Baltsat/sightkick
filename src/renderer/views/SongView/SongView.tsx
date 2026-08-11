@@ -2,13 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   App,
   Button,
-  Divider,
   Drawer,
   InputNumber,
   Layout,
   Progress,
   Select,
-  Spin,
   Switch,
 } from 'antd';
 import { Content } from 'antd/es/layout/layout';
@@ -1792,21 +1790,31 @@ export function SongView() {
       pause();
       pendingDifficultySwitchRef.current = {
         time: timeStore.get(),
-        range: practiceRange,
+        range: undefined,
         renderData,
       };
+      clearSelection();
+      onPracticeRangeChange(undefined);
       // App-global, same setter the library header tabs use - the choice
       // sticks, and it's also what keys scoreData on song end (below), so
       // a mid-run switch can never misattribute the run's score.
       setDifficulty(next);
     },
-    [difficulty, pause, timeStore, practiceRange, renderData, setDifficulty],
+    [
+      clearSelection,
+      difficulty,
+      onPracticeRangeChange,
+      pause,
+      timeStore,
+      renderData,
+      setDifficulty,
+    ],
   );
 
   useEffect(() => {
     const pending = pendingDifficultySwitchRef.current;
 
-    if (!pending || !engine) {
+    if (!pending || !engine || pending.renderData === renderData) {
       return;
     }
 
@@ -1933,6 +1941,122 @@ export function SongView() {
     }
   }, [setEngineMasterVolume, masterVolume, isReady]);
 
+  const performanceControls = (
+    <section className="flex flex-col gap-3" aria-label="Performance controls">
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-accent-text">
+        Performance controls
+      </div>
+      {policy.speedControl && (
+        <div className="flex items-center justify-between gap-3">
+          <SettingLabel
+            label="Speed"
+            tooltip="Set a musical tempo without changing the chart."
+          />
+          <InputNumber
+            mode="spinner"
+            size="small"
+            aria-label="Playback speed"
+            min={0.3}
+            max={2}
+            step={0.1}
+            value={playbackSpeed}
+            onChange={(newValue) => {
+              if (newValue === null) {
+                return;
+              }
+
+              setPlaybackSpeed(newValue);
+            }}
+            styles={{
+              input: {
+                width: '5ch',
+              },
+            }}
+          />
+        </div>
+      )}
+      {policy.looping && (
+        <div className="flex items-center justify-between gap-3">
+          <SettingLabel
+            label="Loop section"
+            tooltip="Repeat the selected bars until you clear the phrase."
+          />
+          <Switch
+            size="small"
+            data-testid="loop-toggle"
+            aria-label="Loop section"
+            checked={isLooping}
+            onChange={(checked) => {
+              setIsLooping(checked);
+              clearSelection();
+            }}
+          />
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-3">
+        <SettingLabel
+          label="Score view"
+          tooltip="Choose the continuous Flow score or the full classic page."
+        />
+        <div className="flex gap-1" role="group" aria-label="Notation view">
+          <Button
+            type={notationLayout === 'flow' ? 'primary' : 'default'}
+            size="small"
+            data-testid="notation-flow-toggle"
+            aria-pressed={notationLayout === 'flow'}
+            onClick={() => setNotationLayout('flow')}
+          >
+            Flow
+          </Button>
+          <Button
+            type={notationLayout === 'classic' ? 'primary' : 'default'}
+            size="small"
+            data-testid="notation-classic-toggle"
+            aria-pressed={notationLayout === 'classic'}
+            onClick={() => setNotationLayout('classic')}
+          >
+            Classic
+          </Button>
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <SettingLabel
+          label="Difficulty"
+          tooltip="Choose the chart difficulty for this run."
+        />
+        <Select
+          size="small"
+          className="capitalize shrink-0"
+          popupMatchSelectWidth={false}
+          value={difficulty}
+          data-testid="song-difficulty-select"
+          aria-label="Difficulty"
+          disabled={availableDifficulties.length <= 1}
+          onChange={(value) => handleDifficultyChange(value as Difficulty)}
+          options={availableDifficulties.map((d) => ({
+            value: d,
+            label: d,
+          }))}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Button
+          icon={<FontAwesomeIcon icon={faWandMagicSparkles} />}
+          data-testid="ai-coach-button"
+          onClick={onOpenCoach}
+        >
+          Coach
+        </Button>
+        <Button
+          icon={<FontAwesomeIcon icon={faChartLine} />}
+          data-testid="practice-stats-button"
+          onClick={onOpenStats}
+        >
+          Stats
+        </Button>
+      </div>
+    </section>
+  );
   const tutorControls = (
     <section className="flex flex-col gap-3" aria-label="Adaptive tutor">
       <div className="text-xs font-semibold uppercase tracking-[0.12em] text-accent-text">
@@ -2112,6 +2236,11 @@ export function SongView() {
     : practicePresentationPhase === 'ready'
     ? 'ready'
     : 'playing';
+  const showTutorHud =
+    gameMode === 'practice' &&
+    !isLoading &&
+    practicePresentationPhase !== 'ready' &&
+    practicePresentationPhase !== 'counting-in';
 
   return (
     <Layout
@@ -2214,7 +2343,7 @@ export function SongView() {
           onTrainSkill={onTrainSkill}
         />
       </Drawer>
-      <header className="drumroll-practice-toolbar flex min-h-20 items-center gap-4 px-5 py-3">
+      <header className="drumroll-practice-toolbar flex h-12 min-h-12 items-center gap-3 px-4 py-1">
         <Button
           icon={<FontAwesomeIcon icon={faArrowLeft} />}
           data-testid="back-button"
@@ -2224,8 +2353,8 @@ export function SongView() {
             pause();
             navigate('/');
           }}
-          size="large"
-          className="min-h-11 min-w-11 shrink-0"
+          size="middle"
+          className="min-h-9 min-w-9 shrink-0"
         />
 
         <Button
@@ -2252,51 +2381,23 @@ export function SongView() {
             playRun();
           }}
           shape="circle"
-          size="large"
-          style={{ width: 52, height: 52 }}
+          size="middle"
           className="shrink-0"
         />
 
-        <div className="drumroll-practice-toolbar__identity min-w-0 max-w-72">
-          <div className="mb-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-accent-text">
-            {gameMode === 'practice' ? 'Practice mode' : 'Perform mode'}
-          </div>
+        <div className="drumroll-practice-toolbar__identity min-w-0">
           <h1
-            className="truncate font-display text-xl font-semibold leading-tight text-text-body"
+            className="truncate font-display text-base font-semibold leading-tight text-text-body"
             title={songData?.name}
           >
             {songData?.name}
           </h1>
-          <div className="flex items-center gap-1 truncate text-sm text-text-faint">
-            <span className="truncate" title={songData?.artist}>
-              {songData?.artist}
-            </span>
-            <span aria-hidden="true">·</span>
-            <Select
-              size="small"
-              className="capitalize shrink-0"
-              popupMatchSelectWidth={false}
-              value={difficulty}
-              data-testid="song-difficulty-select"
-              aria-label="Difficulty"
-              disabled={availableDifficulties.length <= 1}
-              onChange={(value) => handleDifficultyChange(value as Difficulty)}
-              options={availableDifficulties.map((d) => ({
-                value: d,
-                label: d,
-              }))}
-            />
-            <span
-              className="drumroll-practice-input-readiness shrink-0"
-              data-state={practiceInputStatus.state}
-              data-testid="practice-input-readiness"
-              aria-label={practiceInputStatus.accessibleLabel}
-              title={practiceInputStatus.accessibleLabel}
-            >
-              <span aria-hidden="true" />
-              {practiceInputStatus.shortLabel}
-            </span>
-          </div>
+          <p
+            className="m-0 truncate text-xs leading-tight text-text-faint"
+            title={songData?.artist}
+          >
+            {songData?.artist}
+          </p>
         </div>
 
         <Playback
@@ -2318,85 +2419,41 @@ export function SongView() {
           }}
         />
         <div
-          className="drumroll-practice-toolbar__view-switch flex shrink-0 items-center gap-1 p-1"
-          role="group"
-          aria-label="Notation view"
+          className="drumroll-practice-toolbar__session-state shrink-0"
+          data-testid="practice-mode-indicator"
+          data-notation-layout={notationLayout}
+          data-looping={isLooping || undefined}
+          data-speed={
+            policy.speedControl ? playbackSpeed.toFixed(1) : undefined
+          }
+          aria-label={`${
+            gameMode === 'practice' ? 'Practice' : 'Perform'
+          } ${notationLayout} ${difficulty}${
+            policy.speedControl ? ` at ${playbackSpeed.toFixed(1)} times` : ''
+          }${isLooping ? ', loop active' : ''}; ${
+            practiceInputStatus.accessibleLabel
+          }`}
         >
-          <Button
-            type={notationLayout === 'flow' ? 'primary' : 'text'}
-            size="small"
-            data-testid="notation-flow-toggle"
-            aria-pressed={notationLayout === 'flow'}
-            onClick={() => setNotationLayout('flow')}
+          <span>{gameMode === 'practice' ? 'Practice' : 'Perform'}</span>
+          <span>{notationLayout}</span>
+          <span>{difficulty}</span>
+          {policy.speedControl && <span>{playbackSpeed.toFixed(1)}×</span>}
+          {isLooping && <span>Loop</span>}
+          <span
+            className="drumroll-practice-input-readiness"
+            data-state={practiceInputStatus.state}
+            data-testid="practice-input-readiness"
+            aria-label={practiceInputStatus.accessibleLabel}
+            title={practiceInputStatus.accessibleLabel}
           >
-            Flow
-          </Button>
-          <Button
-            type={notationLayout === 'classic' ? 'primary' : 'text'}
-            size="small"
-            data-testid="notation-classic-toggle"
-            aria-pressed={notationLayout === 'classic'}
-            onClick={() => setNotationLayout('classic')}
-          >
-            Classic
-          </Button>
+            <span aria-hidden="true" />
+            {practiceInputStatus.shortLabel}
+          </span>
         </div>
-        {(policy.speedControl || policy.looping) && (
-          <div className="drumroll-practice-toolbar__controls flex shrink-0 items-center gap-2 px-3 py-2">
-            {policy.speedControl && (
-              <div className="flex gap-2 items-center">
-                <div className="drumroll-practice-toolbar__control-label text-text-faint">
-                  Speed:
-                </div>
-
-                <InputNumber
-                  mode="spinner"
-                  size="medium"
-                  aria-label="Playback speed"
-                  min={0.3}
-                  max={2}
-                  step={0.1}
-                  value={playbackSpeed}
-                  onChange={(newValue) => {
-                    if (newValue === null) {
-                      return;
-                    }
-
-                    setPlaybackSpeed(newValue);
-                  }}
-                  styles={{
-                    input: {
-                      width: '5ch',
-                    },
-                  }}
-                />
-              </div>
-            )}
-
-            {policy.speedControl && policy.looping && <Divider vertical />}
-
-            {policy.looping && (
-              <div className="flex gap-2 items-center">
-                <div className="drumroll-practice-toolbar__control-label text-text-faint">
-                  Loop:
-                </div>
-
-                <Switch
-                  size="medium"
-                  data-testid="loop-toggle"
-                  aria-label="Loop section"
-                  checked={isLooping}
-                  onChange={(checked) => {
-                    setIsLooping(checked);
-                    clearSelection();
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        )}
         <SettingsButton
           page="song-view"
+          label="Inspector"
+          performanceControls={performanceControls}
           volumeSliders={volumeSliders}
           gameMode={gameMode}
           tutorControls={tutorControls}
@@ -2420,22 +2477,6 @@ export function SongView() {
           }
           onExportPdf={onExportPdf}
           isExporting={isExporting}
-        />
-        <Button
-          icon={<FontAwesomeIcon icon={faWandMagicSparkles} />}
-          data-testid="ai-coach-button"
-          aria-label="AI practice coach"
-          onClick={onOpenCoach}
-          size="large"
-          className="drumroll-practice-toolbar__secondary-action shrink-0"
-        />
-        <Button
-          icon={<FontAwesomeIcon icon={faChartLine} />}
-          data-testid="practice-stats-button"
-          aria-label="Practice stats"
-          onClick={onOpenStats}
-          size="large"
-          className="drumroll-practice-toolbar__secondary-action shrink-0"
         />
       </header>
 
@@ -2532,9 +2573,16 @@ export function SongView() {
           )}
         </Content>
         {gameMode === 'practice' && (
-          <PracticeReadinessCue phase={practiceReadinessPhase} />
+          <PracticeReadinessCue
+            phase={practiceReadinessPhase}
+            resumeMeasure={
+              practicePresentationPhase === 'ready'
+                ? interruptedResumeMeasure
+                : undefined
+            }
+          />
         )}
-        {gameMode === 'practice' && (
+        {showTutorHud && (
           <TutorHud
             state={tutorSession.state}
             message={tutorHudMessage}
@@ -2566,11 +2614,6 @@ export function SongView() {
               model={kitControlPrompt}
               compact={practicePresentationPhase === 'playing'}
             />
-          </div>
-        )}
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-bg/80 z-10 backdrop-blur-xs">
-            <Spin size="large" />
           </div>
         )}
         <CountIn

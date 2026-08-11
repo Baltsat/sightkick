@@ -132,8 +132,8 @@ describe('opening a song', () => {
     ).toHaveTextContent(/Bar 1 \/ \d+ · Beat 1/);
     expect(flowHud).toHaveAttribute('data-mode', 'perform');
     expect(
-      screen.getByRole('group', { name: 'Notation view' }),
-    ).toBeInTheDocument();
+      screen.queryByRole('group', { name: 'Notation view' }),
+    ).not.toBeInTheDocument();
     expect(within(flowHud).getByText('Master of Puppets')).toBeInTheDocument();
     expect(within(flowHud).getByText('Metallica')).toBeInTheDocument();
     expect(within(flowHud).getByText('Perform flow')).toBeInTheDocument();
@@ -142,6 +142,7 @@ describe('opening a song', () => {
         name: 'Master of Puppets',
       }),
     ).not.toBeInTheDocument();
+    view.openSettings();
     expect(screen.getByTestId('notation-flow-toggle')).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -710,6 +711,7 @@ describe('keyboard transport shortcuts', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.openSettings();
 
     const speed = () =>
       (screen.getByRole('spinbutton') as HTMLInputElement).value;
@@ -742,6 +744,7 @@ describe('keyboard transport shortcuts', () => {
     });
 
     await view.loadSong();
+    view.openSettings();
     await view.pressKey('ArrowDown');
     await view.pressKey('ArrowDown');
     await view.pressKey('ArrowDown');
@@ -787,6 +790,7 @@ describe('keyboard transport shortcuts', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.openSettings();
 
     const spinbutton = screen.getByRole('spinbutton');
 
@@ -844,15 +848,21 @@ describe('practice mode', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.openSettings();
 
-    expect(screen.getByText('Speed:')).toBeInTheDocument();
-    expect(screen.getByText('Loop:')).toBeInTheDocument();
+    expect(
+      screen.getByRole('spinbutton', { name: 'Playback speed' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('switch', { name: 'Loop section' }),
+    ).toBeInTheDocument();
   });
 
   it('shows no speed or loop controls when performing', async () => {
     const view = setupSongView();
 
     await view.loadSong();
+    view.openSettings();
 
     expect(screen.queryByText('Speed:')).toBeNull();
     expect(screen.queryByText('Loop:')).toBeNull();
@@ -941,6 +951,7 @@ describe('practice mode', () => {
     });
 
     await view.loadSong();
+    view.openSettings();
 
     const speed = () =>
       (screen.getByRole('spinbutton') as HTMLInputElement).value;
@@ -1371,6 +1382,7 @@ describe('the score summary', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.openSettings();
     fireEvent.click(screen.getByTestId('ai-coach-button'));
 
     expect(view.ipc.sent).toContainEqual({
@@ -1410,8 +1422,14 @@ describe('the score summary', () => {
     fireEvent.click(screen.getByTestId('coach-practice-bars'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('loop-toggle')).toBeChecked();
-      expect(screen.getByRole('spinbutton')).toHaveValue('0.7');
+      expect(screen.getByTestId('practice-mode-indicator')).toHaveAttribute(
+        'data-looping',
+        'true',
+      );
+      expect(screen.getByTestId('practice-mode-indicator')).toHaveAttribute(
+        'data-speed',
+        '0.7',
+      );
       expect(view.measureHighlights()[0]).toHaveAttribute(
         'data-selected',
         'true',
@@ -1467,9 +1485,13 @@ describe('the reference legend', () => {
   });
 
   it('docks the color key above the adaptive Tutor instead of behind it', async () => {
-    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      settings: { countIn: false },
+    });
 
     await view.loadSong();
+    view.clickPlay();
 
     expect(
       document.querySelector('.drumroll-reference--above-tutor'),
@@ -1513,8 +1535,16 @@ const MULTI_DIFFICULTY_CHART = `[Song]
 }
 `;
 
+function getDifficultySelect() {
+  if (!screen.queryByRole('combobox', { name: 'Difficulty' })) {
+    fireEvent.click(screen.getByTestId('settings-trigger'));
+  }
+
+  return screen.getByRole('combobox', { name: 'Difficulty' });
+}
+
 function openDifficultySelect() {
-  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Difficulty' }));
+  fireEvent.mouseDown(getDifficultySelect());
 }
 
 function pickDifficulty(value: string) {
@@ -1545,7 +1575,7 @@ describe('in-practice difficulty switching', () => {
 
     await view.loadSong(makeSong({ drumDifficulties: ['expert'] }));
 
-    expect(screen.getByRole('combobox', { name: 'Difficulty' })).toBeDisabled();
+    expect(getDifficultySelect()).toBeDisabled();
   });
 
   it('reloads the parsed chart at the new difficulty', async () => {

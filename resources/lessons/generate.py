@@ -47,6 +47,8 @@ with warnings.catch_warnings():
 
 try:
     import yaml
+
+    from pedagogy_manifest import write_json_manifest
 except ImportError:  # pragma: no cover
     sys.exit(
         "PyYAML is required. Set up the pinned local venv first:\n"
@@ -766,6 +768,8 @@ def main() -> int:
         sys.exit("ffmpeg not found on PATH -- required to encode song.ogg/drums.ogg")
 
     curriculum = load_curriculum(args.curriculum)
+    if not args.dry_run:
+        write_json_manifest(args.curriculum, args.out_dir / "pedagogy-manifest.json")
     only = set(args.only.split(",")) if args.only else None
     all_exercises = list(iter_exercises(curriculum))
     prerequisite_ids_by_exercise: dict[str, list[str]] = {}

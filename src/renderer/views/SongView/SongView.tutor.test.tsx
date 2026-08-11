@@ -51,7 +51,17 @@ async function strikeCommand(
 }
 
 describe('adaptive tutor surfaces', () => {
-  it('shows the listening tutor, hands-free ready command, and controls only in Practice', async () => {
+  it('keeps a loading practice score unblurred behind its compact preparation cue', () => {
+    setupSongView({ route: '/song-1?gameMode=practice' });
+
+    expect(screen.getByTestId('practice-readiness-cue')).toHaveAttribute(
+      'data-phase',
+      'idle',
+    );
+    expect(document.querySelector('.backdrop-blur-xs')).not.toBeInTheDocument();
+  });
+
+  it('keeps Ready to one score-adjacent kick cue and moves controls into the inspector', async () => {
     const practice = setupSongView({
       route: '/song-1?gameMode=practice',
       keyboard: {
@@ -64,22 +74,24 @@ describe('adaptive tutor surfaces', () => {
 
     await practice.loadSong();
 
-    const hud = screen.getByTestId('tutor-hud');
-
-    expect(within(hud).getByText('Ready when you are')).toBeInTheDocument();
-    expect(hud).toHaveAccessibleDescription(/kick once/i);
-    expect(within(hud).getByTestId('kit-command-prompt')).toHaveAccessibleName(
-      'Kick to start the count-in: Kick',
+    expect(screen.queryByTestId('tutor-hud')).not.toBeInTheDocument();
+    expect(screen.getByTestId('practice-readiness-cue')).toHaveTextContent(
+      'Kick to count in',
     );
-    expect(within(hud).queryByTestId('tutor-lives')).not.toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Hit the kick pad once to start the count-in'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('spinbutton', { name: 'Playback speed' }),
+    ).not.toBeInTheDocument();
+
+    practice.openSettings();
     expect(
       screen.getByRole('spinbutton', { name: 'Playback speed' }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('switch', { name: 'Loop section' }),
     ).toBeInTheDocument();
-
-    practice.openSettings();
     expect(screen.getByRole('switch', { name: 'Tutor listens' })).toBeChecked();
     expect(screen.getByRole('switch', { name: 'Smart rewind' })).toBeChecked();
     expect(
@@ -87,6 +99,9 @@ describe('adaptive tutor surfaces', () => {
     ).not.toBeChecked();
     expect(screen.getByRole('switch', { name: 'Auto-continue' })).toBeChecked();
     expect(screen.getByRole('switch', { name: 'Kit controls' })).toBeChecked();
+    expect(screen.getByTestId('setup-input')).toHaveTextContent(
+      'Configure Keyboard',
+    );
 
     practice.unmount();
 
@@ -168,13 +183,12 @@ describe('safe hands-free run intent', () => {
         });
       });
 
-      const hud = screen.getByTestId('tutor-hud');
+      const cue = screen.getByTestId('practice-readiness-cue');
 
-      expect(within(hud).getByText('Interrupted attempt saved')).toBeVisible();
-      expect(within(hud).getByText(/1 scored outcome/)).toBeVisible();
+      expect(cue).toHaveTextContent('Resume bar 2 · kick to count in');
       expect(
-        within(hud).getByTestId('kit-command-prompt'),
-      ).toHaveAccessibleName('Resume saved bar 2: Kick');
+        screen.getByLabelText('Hit the kick pad once to start the count-in'),
+      ).toBeInTheDocument();
 
       await view.pressKey('KeyK');
 
@@ -210,9 +224,9 @@ describe('safe hands-free run intent', () => {
         }),
       );
 
-      expect(
-        within(screen.getByTestId('tutor-hud')).getByText('Lesson ready'),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId('practice-readiness-cue')).toHaveTextContent(
+        'Kick to count in',
+      );
 
       await view.pressKey('KeyK');
 
@@ -256,6 +270,7 @@ describe('safe hands-free run intent', () => {
         'Pause',
       ),
     );
+    view.openSettings();
     expect((screen.getByRole('spinbutton') as HTMLInputElement).value).toBe(
       '0.7',
     );
@@ -349,10 +364,8 @@ describe('safe hands-free run intent', () => {
 
       expect(screen.queryByTestId('count-in')).not.toBeInTheDocument();
       expect(
-        within(screen.getByTestId('tutor-hud')).getByTestId(
-          'kit-command-prompt',
-        ),
-      ).toHaveAccessibleName('Kick to start the count-in: Kick');
+        screen.getByLabelText('Hit the kick pad once to start the count-in'),
+      ).toBeInTheDocument();
 
       vi.advanceTimersByTime(1000);
       await view.pressKey('KeyK');
