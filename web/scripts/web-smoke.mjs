@@ -12,7 +12,7 @@ const systemChrome =
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const expectedLessonCount = 170;
 const expectedPublicRelease =
-  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.6/Drumroll-1.2.0-kb.6-arm64.dmg';
+  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.7/Drumroll-1.2.0-kb.7-arm64.dmg';
 
 mkdirSync(shotDir, { recursive: true });
 
@@ -41,6 +41,7 @@ async function waitForImages(targetPage, selector) {
               } else {
                 reject(new Error(`Image failed to load: ${image.currentSrc}`));
               }
+
               return;
             }
 
@@ -48,9 +49,7 @@ async function waitForImages(targetPage, selector) {
             image.addEventListener(
               'error',
               () =>
-                reject(
-                  new Error(`Image failed to load: ${image.currentSrc}`),
-                ),
+                reject(new Error(`Image failed to load: ${image.currentSrc}`)),
               { once: true },
             );
           }),
