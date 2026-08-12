@@ -12,7 +12,7 @@ import { cn } from '../../cn';
 import appIcon from '../../../../assets/icon.png';
 import './AppShell.css';
 
-export type ArenaView = 'home' | 'songs' | 'journey' | 'coach' | 'insights';
+export type ArenaView = 'home' | 'wave' | 'songs' | 'journey' | 'insights';
 
 interface AppShellProps {
   view: ArenaView;
@@ -30,6 +30,12 @@ const NAV_ITEMS: Array<{
   testId: string;
 }> = [
   { id: 'home', label: 'Home', icon: faHouse, testId: 'view-home' },
+  {
+    id: 'wave',
+    label: 'My Wave',
+    icon: faWandMagicSparkles,
+    testId: 'view-wave',
+  },
   { id: 'songs', label: 'Songs', icon: faMusic, testId: 'view-songs' },
   {
     id: 'journey',
@@ -39,19 +45,13 @@ const NAV_ITEMS: Array<{
     // visible label has deliberately moved from "Lessons" to "Journey".
     testId: 'view-lessons',
   },
-  {
-    id: 'coach',
-    label: 'Coach',
-    icon: faWandMagicSparkles,
-    testId: 'view-coach',
-  },
 ];
 const VIEW_LABELS: Record<ArenaView, string> = {
-  home: 'Practice',
+  home: 'Home',
+  wave: 'My Wave',
   songs: 'Songs',
   journey: 'Journey',
-  coach: 'Coach',
-  insights: 'Insights',
+  insights: 'Profile',
 };
 
 /**

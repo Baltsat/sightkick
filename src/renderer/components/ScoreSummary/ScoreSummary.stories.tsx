@@ -108,6 +108,24 @@ export const MusicalReceipt: Story = {
   },
 };
 
+export const ContinueMyWave: Story = {
+  args: {
+    scoreData: { hitNotes: 8, totalNotes: 10, falseHits: 0 },
+    nextLabel: 'Continue My Wave',
+    continuationLabelLocked: true,
+  },
+};
+
+export const NoMusicalInput: Story = {
+  args: {
+    scoreData: { hitNotes: 0, totalNotes: 10, falseHits: 0 },
+    noMusicalInput: true,
+    persistenceState: 'no-evidence',
+    nextLabel: 'Continue My Wave',
+    continuationLabelLocked: true,
+  },
+};
+
 export const SectionAudition: Story = {
   args: {
     scoreData: undefined,

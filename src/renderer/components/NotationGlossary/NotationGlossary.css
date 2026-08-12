@@ -1,0 +1,90 @@
+.drumroll-notation-glossary {
+  position: fixed;
+  z-index: 70;
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 12px;
+  width: min(340px, calc(100vw - 32px));
+  padding: 13px;
+  border: 1px solid
+    color-mix(in srgb, var(--color-accent-bright) 46%, var(--color-paper));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-paper) 94%, var(--color-ink));
+  box-shadow: 0 16px 42px rgb(35 21 12 / 28%);
+  color: var(--color-ink);
+  pointer-events: none;
+}
+
+.drumroll-notation-glossary svg {
+  align-self: center;
+  width: 74px;
+  height: 54px;
+  overflow: visible;
+  fill: none;
+  stroke: var(--color-ink);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3.5;
+}
+
+.drumroll-notation-glossary svg text {
+  fill: var(--color-ink);
+  stroke: none;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.drumroll-notation-glyph__staff,
+.drumroll-notation-glyph__soft {
+  opacity: 0.42;
+}
+
+.drumroll-notation-glyph__lane {
+  fill: var(--color-accent-bright);
+  stroke: var(--color-accent-bright);
+}
+
+.drumroll-notation-glyph__dot {
+  fill: var(--color-ink);
+}
+
+.drumroll-notation-glossary__eyebrow {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--color-accent-deep);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.drumroll-notation-glossary strong {
+  display: block;
+  font-size: 15px;
+}
+
+.drumroll-notation-glossary p {
+  margin: 4px 0 0;
+  color: color-mix(in srgb, var(--color-ink) 76%, var(--color-paper));
+  font-size: 12px;
+  line-height: 1.42;
+}
+
+.drumroll-sheet-music__notation [data-notation-kind],
+.drumroll-sheet-music__notation [data-notation-kinds] {
+  cursor: help;
+  pointer-events: auto;
+}
+
+@media (max-width: 560px) {
+  .drumroll-notation-glossary {
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .drumroll-notation-glossary svg {
+    width: 58px;
+    height: 48px;
+  }
+}

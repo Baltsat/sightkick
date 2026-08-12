@@ -87,6 +87,14 @@
   background: linear-gradient(135deg, rgb(250 254 255 / 98%), #f1eadc 96%);
 }
 
+.drumroll-tutor-hud__input-telemetry {
+  margin-top: 0.2rem;
+  color: color-mix(in srgb, var(--color-cyan) 74%, var(--color-text-muted));
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
 .drumroll-tutor-hud[data-display-state='kit-ready'] {
   --tutor-signal: var(--color-green);
 }

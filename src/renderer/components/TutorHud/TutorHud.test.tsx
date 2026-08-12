@@ -186,6 +186,12 @@ describe('TutorHud', () => {
           detail: 'Rewound to bar 8. Hit any pad to count in and resume.',
           tone: 'warning',
         }}
+        midiTelemetry={{
+          rawMessageCount: 3,
+          lastMidiTimestamp: 1_786_060_800_000,
+          selectedPortEpoch: 2,
+          lastMappedLane: 'snare',
+        }}
       />,
     );
 
@@ -197,6 +203,9 @@ describe('TutorHud', () => {
       'drumroll-tutor-hud--compact',
     );
     expect(screen.getByText('Paused — no hits detected')).toBeInTheDocument();
+    expect(screen.getByTestId('tutor-midi-telemetry')).toHaveTextContent(
+      /MIDI 3 · last .+ · E2 · snare/,
+    );
     expect(screen.queryByTestId('tutor-speed')).not.toBeInTheDocument();
   });
 

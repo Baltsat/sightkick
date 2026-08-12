@@ -136,6 +136,7 @@ export interface SongViewOptions {
   settings?: Record<string, unknown>;
   keyboard?: KeyboardSeed;
   onContinuePractice?: (completedRun?: PracticeHistoryEntry) => void;
+  recommendationReason?: string;
 }
 
 export interface SongViewHarness {
@@ -193,6 +194,7 @@ export function setupSongView({
   settings,
   keyboard,
   onContinuePractice,
+  recommendationReason,
 }: SongViewOptions = {}): SongViewHarness {
   shimSvgBBox();
   installLocalStorage();
@@ -222,10 +224,11 @@ export function setupSongView({
     return (
       <Outlet
         context={
-          onContinuePractice
+          onContinuePractice || recommendationReason
             ? {
                 gamification: undefined,
-                continuePractice: onContinuePractice,
+                recommendationReason,
+                continuePractice: onContinuePractice ?? (() => {}),
               }
             : undefined
         }

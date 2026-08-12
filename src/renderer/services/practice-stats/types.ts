@@ -37,6 +37,13 @@ export const SCORING_POLICY_VERSION = 'judge-evidence-v3';
  */
 export type KitElement = keyof InputMapping;
 
+export interface MidiInputTelemetry {
+  rawMessageCount: number;
+  lastMidiTimestamp?: number;
+  selectedPortEpoch: number;
+  lastMappedLane?: KitElement;
+}
+
 /** Outcome of a single scored input against the chart. */
 export type HitVerdict = 'hit' | 'miss' | 'wrong';
 
@@ -282,6 +289,7 @@ export interface PracticeAttemptCheckpoint {
   positionTick: number;
   /** Compact scored evidence observed so far, never a synthesized result. */
   records: StoredHitRecord[];
+  midiTelemetry?: MidiInputTelemetry;
 }
 
 export type PracticeAttemptCheckpointBySong = Record<

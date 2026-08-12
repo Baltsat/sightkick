@@ -10,5 +10,6 @@ import { RankedPracticeCandidate } from '../services/next-practice';
 export interface PracticeOutletContext {
   gamification: UseGamificationResult;
   recommendation?: RankedPracticeCandidate;
+  recommendationReason?: string;
   continuePractice: (completedRun?: PracticeHistoryEntry) => void;
 }

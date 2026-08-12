@@ -21,10 +21,17 @@ const routes = [
     },
   },
   {
-    name: 'Coach',
+    name: 'My Wave',
     open: () => {
-      fireEvent.click(screen.getByTestId('view-coach'));
-      expect(screen.getByTestId('coach-desk')).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('view-wave'));
+      expect(screen.getByTestId('my-wave')).toBeInTheDocument();
+    },
+  },
+  {
+    name: 'Journey',
+    open: () => {
+      fireEvent.click(screen.getByTestId('view-lessons'));
+      expect(screen.getByText('No lessons found')).toBeInTheDocument();
     },
   },
   {

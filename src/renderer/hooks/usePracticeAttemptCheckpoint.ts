@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { Difficulty } from 'scan-chart';
-import type { HitRecord } from '../services/practice-stats';
+import type { HitRecord, MidiInputTelemetry } from '../services/practice-stats';
 import type { GameMode } from '../types';
 
 /** A short interval limits loss to a few seconds without churning the store on every MIDI hit. */
@@ -16,6 +16,7 @@ export interface PracticeAttemptCheckpointSeed {
   playbackSpeed: number;
   /** Returns the current authored chart tick at persistence time. */
   positionTick: () => number;
+  midiTelemetry?: () => MidiInputTelemetry | undefined;
 }
 
 export interface PracticeAttemptEvidenceSource {
@@ -91,6 +92,8 @@ export function createPracticeAttemptCheckpointController(
       return false;
     }
 
+    const midiTelemetry = seed.midiTelemetry?.();
+
     send('save-practice-attempt-checkpoint', {
       checkpoint: {
         songId: seed.songId,
@@ -103,6 +106,7 @@ export function createPracticeAttemptCheckpointController(
         playbackSpeed: seed.playbackSpeed,
         positionTick: seed.positionTick(),
         records: options.evidence.getAttemptRecords(),
+        ...(midiTelemetry ? { midiTelemetry } : {}),
       },
     });
 

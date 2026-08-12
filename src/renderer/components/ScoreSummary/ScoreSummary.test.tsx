@@ -50,6 +50,24 @@ describe('ScoreSummary', () => {
     expect(modal.getByText('5 false hits')).toBeInTheDocument();
   });
 
+  it('labels a MIDI-silent miss-only run as missing musical input', () => {
+    const { modal } = renderSummary({
+      noMusicalInput: true,
+      persistenceState: 'no-evidence',
+      scoreData: { hitNotes: 0, totalNotes: 16, falseHits: 0 },
+      practiceSummary: multiLaneRunFixture(),
+    });
+
+    expect(modal.getByTestId('score-no-musical-input')).toHaveTextContent(
+      'Nothing from the kit reached the app',
+    );
+    expect(modal.getByTestId('score-persistence-status')).toHaveTextContent(
+      'No musical input reached Drumroll',
+    );
+    expect(modal.queryByText('0% accuracy')).not.toBeInTheDocument();
+    expect(modal.queryByTestId('practice-stats')).not.toBeInTheDocument();
+  });
+
   it('celebrates a flawless Perform run with Perfect and five stars', () => {
     const { modal, modalEl } = renderSummary({
       scoreData: { hitNotes: 100, totalNotes: 100, falseHits: 0 },
@@ -367,6 +385,31 @@ describe('ScoreSummary', () => {
     );
     expect(modal.getByTestId('score-next')).toHaveTextContent(
       'Continue current plan',
+    );
+  });
+
+  it('keeps explicit My Wave continuation visible over a generic receipt', () => {
+    const previous = {
+      ...multiLaneRunFixture(),
+      laneAccuracy: [
+        { element: 'kick' as const, hits: 6, misses: 4, accuracy: 0.6 },
+      ],
+    };
+    const summary = {
+      ...previous,
+      laneAccuracy: [
+        { element: 'kick' as const, hits: 8, misses: 2, accuracy: 0.8 },
+      ],
+    };
+    const { modal } = renderSummary({
+      practiceSummary: summary,
+      previousPracticeSummary: previous,
+      nextLabel: 'Continue My Wave',
+      continuationLabelLocked: true,
+    });
+
+    expect(modal.getByTestId('score-next')).toHaveTextContent(
+      'Continue My Wave',
     );
   });
 

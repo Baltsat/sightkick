@@ -330,6 +330,37 @@ describe('renderMusic', () => {
     expect(accented.querySelectorAll('.vf-accent')).toHaveLength(1);
   });
 
+  it('marks notation glyphs for the delayed score glossary', () => {
+    const div = container();
+
+    render(
+      ref(div),
+      song([
+        measure([
+          note({
+            notes: ['c/5'],
+            duration: '32',
+            dots: 1,
+            accents: ['c/5'],
+          }),
+        ]),
+      ]),
+      true,
+      true,
+    );
+
+    expect(div.querySelector('[data-notation-kinds~="dot"]')).not.toBeNull();
+    expect(
+      div.querySelector('[data-notation-kinds~="triple-beam"]'),
+    ).not.toBeNull();
+    expect(
+      div.querySelector('[data-notation-kind="colored-head"]'),
+    ).not.toBeNull();
+    expect(
+      div.querySelector('.vf-accent[data-notation-kind="accent"]'),
+    ).not.toBeNull();
+  });
+
   it('puts the accent of a lone note above the staff', () => {
     const div = container();
     const data = render(

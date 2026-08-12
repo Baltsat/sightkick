@@ -36,6 +36,12 @@ function setup() {
       difficulty: 'expert',
       playbackSpeed: 0.8,
       positionTick: () => positionTick,
+      midiTelemetry: () => ({
+        rawMessageCount: 2,
+        lastMidiTimestamp: 1_786_060_800_000,
+        selectedPortEpoch: 4,
+        lastMappedLane: 'snare',
+      }),
     }),
     evidence: {
       getAttemptRecords: () => records.map((record) => ({ ...record })),
@@ -72,6 +78,12 @@ describe('createPracticeAttemptCheckpointController', () => {
         sessionId: 'attempt-1',
         positionTick: 960,
         records,
+        midiTelemetry: {
+          rawMessageCount: 2,
+          lastMidiTimestamp: 1_786_060_800_000,
+          selectedPortEpoch: 4,
+          lastMappedLane: 'snare',
+        },
       }),
     });
 

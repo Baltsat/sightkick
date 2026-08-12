@@ -850,7 +850,7 @@ describe('practice mode analytics', () => {
       await runToEnd(view);
 
       expect(screen.getByTestId('score-next')).toHaveTextContent(
-        'Continue current plan',
+        'Continue My Wave',
       );
       expect(screen.getByTestId('score-next')).toBeDisabled();
       expect(

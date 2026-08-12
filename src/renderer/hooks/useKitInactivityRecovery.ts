@@ -15,6 +15,7 @@ export interface InactivityCheckpoint {
   checkpointMeasure: number;
   checkpointTick: number;
   abandonedExpectedHeads: number;
+  pauseEpoch?: number;
 }
 
 export type KitInactivityState = { phase: 'listening' } | InactivityCheckpoint;
@@ -117,6 +118,7 @@ export function useKitInactivityRecovery({
   const isPlayingRef = useRef(isPlaying);
   const lastActivitySecondsRef = useRef(0);
   const lastActivityTickRef = useRef(0);
+  const parkedEpochRef = useRef(0);
   const administrativeSeekRef = useRef(false);
   const mappedControls = useMemo(
     () => new Set(Object.values(mapping).flatMap((ids) => ids ?? [])),
@@ -279,7 +281,11 @@ export function useKitInactivityRecovery({
         return;
       }
 
-      const parked = { ...checkpoint, abandonedExpectedHeads };
+      const parked = {
+        ...checkpoint,
+        abandonedExpectedHeads,
+        pauseEpoch: ++parkedEpochRef.current,
+      };
 
       stateRef.current = parked;
       setStateSnapshot({ enabled, state: parked });

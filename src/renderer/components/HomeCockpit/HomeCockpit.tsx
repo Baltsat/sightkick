@@ -7,27 +7,10 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Button, Progress } from 'antd';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faArrowRight,
-  faBolt,
-  faMusic,
-  faWandMagicSparkles,
-} from '@fortawesome/free-solid-svg-icons';
-import { Difficulty } from 'scan-chart';
 import { Song } from '../../../types';
 import { useInput } from '../../context/InputContext';
 import { inputBus } from '../../input';
 import { UseGamificationResult } from '../../hooks/useGamification';
-import { LessonProgress } from '../../hooks/useLessons';
-import { calculateAccuracy } from '../../scoring';
-import {
-  MIN_RECENT_LANE_SAMPLES,
-  RecentLaneSignal,
-  RECENT_LANE_TREND_WINDOW_DAYS,
-  RECENT_READINESS_WINDOW_DAYS,
-} from '../../services/mastery';
 import {
   composeHomeSession,
   DeadlinePacingSummary,
@@ -55,16 +38,10 @@ import { playKitPreview } from '../../services/kit-preview-audio';
 import homeKitStudio from '../../assets/daybreak/home-kit-studio.png';
 import drumstickCursor from '../../assets/daybreak/drumstick-cursor-reversed.png';
 import { fitKitZone, HOME_KIT_ZONE_MAP } from './kit-zone-map';
-import './HomeCockpit.css';
 import './KitHome.css';
 
-export type CockpitSurface = 'home' | 'coach';
-
 interface HomeCockpitProps {
-  surface: CockpitSurface;
   songList: Song[];
-  difficulty: Difficulty;
-  lessonProgress: LessonProgress;
   gamification: UseGamificationResult;
   recommendation?: RankedPracticeCandidate;
   practiceRanking?: readonly RankedPracticeCandidate[];
@@ -82,8 +59,6 @@ interface HomeCockpitProps {
   onStartSession?: (session: OneKickHomeSession) => void;
   onStartPracticeCard?: (option: PracticeCardOption) => void;
   onOpenSongs: () => void;
-  onOpenJourney: () => void;
-  onOpenCoach: () => void;
   onOpenProfile: () => void;
 }
 
@@ -113,63 +88,8 @@ const KIT_HOTSPOTS: KitHotspot[] = [
   { element: 'kick', label: 'Kick' },
 ];
 
-function trendSummary(trendPp: number | undefined) {
-  if (trendPp === undefined) {
-    return {
-      compact: `trend needs 2 × ${MIN_RECENT_LANE_SAMPLES}`,
-      detailed: `Raw trend needs ${MIN_RECENT_LANE_SAMPLES} scored hits or misses in each ${RECENT_LANE_TREND_WINDOW_DAYS}-day half.`,
-    };
-  }
-
-  const rounded = Math.round(Math.abs(trendPp));
-
-  if (rounded === 0) {
-    return {
-      compact: 'steady',
-      detailed: `Raw trend is steady versus the preceding ${RECENT_LANE_TREND_WINDOW_DAYS} days.`,
-    };
-  }
-
-  return {
-    compact: `${trendPp > 0 ? '↑' : '↓'} ${rounded} pp`,
-    detailed: `Raw trend is ${
-      trendPp > 0 ? 'up' : 'down'
-    } ${rounded} percentage points versus the preceding ${RECENT_LANE_TREND_WINDOW_DAYS} days.`,
-  };
-}
-
-function bestPlayableSong(
-  songList: Song[],
-  difficulty: Difficulty,
-  preferredSongId?: string,
-) {
-  const regularSongs = songList.filter((song) => !song.lesson);
-
-  return (
-    regularSongs.find((song) => song.id === preferredSongId) ??
-    regularSongs.find((song) => song.scoreData?.[difficulty]) ??
-    regularSongs[0] ??
-    songList.find((song) => !song.lesson)
-  );
-}
-
-function weakestLane(signals: RecentLaneSignal[] | undefined) {
-  const measured = signals?.filter(
-    (signal) => signal.evidenceState === 'measured',
-  );
-
-  if (!measured || measured.length === 0) {
-    return undefined;
-  }
-
-  return [...measured].sort((a, b) => a.accuracy - b.accuracy)[0];
-}
-
 export function HomeCockpit({
-  surface,
   songList,
-  difficulty,
-  lessonProgress,
   gamification,
   recommendation,
   practiceRanking,
@@ -187,7 +107,7 @@ export function HomeCockpit({
   onStartSession,
   onStartPracticeCard,
   onOpenSongs,
-  onOpenJourney,
+  onOpenProfile,
 }: HomeCockpitProps) {
   const { inputMapping, inputReadiness, selectedDevice } = useInput();
   const [activeLane, setActiveLane] = useState<KitElement>();
@@ -278,16 +198,6 @@ export function HomeCockpit({
   const recommendedSong = songList.find(
     (song) => song.id === targetRecommendation?.candidate.id,
   );
-  const currentSong = useMemo(
-    () =>
-      recommendedSong ??
-      bestPlayableSong(songList, difficulty, gamification.latestRun?.songId),
-    [difficulty, gamification.latestRun?.songId, recommendedSong, songList],
-  );
-  const nextLesson =
-    lessonProgress.continueEntry ??
-    lessonProgress.entries.find((entry) => entry.unlocked);
-  const weakest = weakestLane(gamification.recentLaneSignals);
   const practiceTarget = targetRecommendation ? recommendedSong : undefined;
   const hasPracticeTarget = Boolean(practiceTarget && targetRecommendation);
   const kitColorRuns = useMemo(
@@ -388,10 +298,6 @@ export function HomeCockpit({
   );
 
   useEffect(() => {
-    if (surface !== 'home') {
-      return;
-    }
-
     const unsubscribe = inputBus.subscribe((event) => {
       const element = elementByControlId.get(event.controlId);
 
@@ -409,129 +315,11 @@ export function HomeCockpit({
       window.clearTimeout(clearPulseRef.current);
       window.clearTimeout(clearPointerStrikeRef.current);
     };
-  }, [
-    elementByControlId,
-    hasPracticeTarget,
-    pulseLane,
-    startCurrentPractice,
-    surface,
-  ]);
-
-  const currentScore = currentSong?.scoreData?.[difficulty];
-  const latestRunForSong =
-    gamification.latestRun && currentSong?.id === gamification.latestRun.songId
-      ? gamification.latestRun.summary
-      : undefined;
-  const currentAccuracy =
-    latestRunForSong === undefined
-      ? currentScore
-        ? Math.round(calculateAccuracy(currentScore) * 100)
-        : undefined
-      : Math.round(latestRunForSong.overallAccuracy * 100);
+  }, [elementByControlId, hasPracticeTarget, pulseLane, startCurrentPractice]);
   const rootStyle = {
     '--drumstick-cursor': `url(${drumstickCursor}) 6 6`,
     ...kitColors.properties,
   } as CSSProperties;
-
-  if (surface === 'coach') {
-    return (
-      <section
-        className="coach-desk"
-        data-testid="coach-desk"
-        aria-labelledby="coach-desk-title"
-      >
-        <div className="coach-desk__spotlight">
-          <div>
-            <p className="daybreak-kicker">
-              <FontAwesomeIcon icon={faWandMagicSparkles} aria-hidden="true" />{' '}
-              Coach briefing
-            </p>
-            <h1 id="coach-desk-title">Your next useful reps.</h1>
-            <p>
-              This view uses your saved practice. Play another run to make its
-              advice more personal.
-            </p>
-          </div>
-          <div className="coach-desk__halo" aria-hidden="true">
-            <FontAwesomeIcon icon={faBolt} />
-          </div>
-        </div>
-
-        <div className="coach-desk__grid">
-          <article className="coach-desk__card coach-desk__card--focus">
-            <p className="coach-desk__label">Focus area</p>
-            {weakest ? (
-              <>
-                <h2>
-                  {KIT_HOTSPOTS.find((item) => item.element === weakest.element)
-                    ?.label ?? weakest.element}
-                </h2>
-                <strong>{Math.round(weakest.accuracy * 100)}%</strong>
-                <p>
-                  {weakest.sampleCount} scored hits or misses across{' '}
-                  {weakest.runCount} {weakest.runCount === 1 ? 'run' : 'runs'}{' '}
-                  in the current {RECENT_READINESS_WINDOW_DAYS}-day,
-                  time-decayed window. {trendSummary(weakest.trendPp).detailed}
-                </p>
-              </>
-            ) : (
-              <>
-                <h2>Calibrate your kit</h2>
-                <p>
-                  Finish one scored song and the coach will identify the lane
-                  that needs the most care.
-                </p>
-              </>
-            )}
-            <Button type="primary" onClick={onOpenJourney}>
-              {nextLesson
-                ? `Train · ${nextLesson.lesson.title}`
-                : 'Open journey'}
-              <FontAwesomeIcon icon={faArrowRight} />
-            </Button>
-          </article>
-
-          <article className="coach-desk__card">
-            <p className="coach-desk__label">Today</p>
-            <h2>{gamification.todayXp} XP</h2>
-            <Progress
-              percent={Math.min(
-                100,
-                Math.round((gamification.todayXp / gamification.goalXp) * 100),
-              )}
-              showInfo={false}
-              strokeColor="var(--color-magenta)"
-              railColor="rgb(17 23 34 / 10%)"
-            />
-            <p>
-              {gamification.goalXp - gamification.todayXp > 0
-                ? `${
-                    gamification.goalXp - gamification.todayXp
-                  } XP to your daily goal.`
-                : 'Daily goal reached. Keep the streak musical.'}
-            </p>
-          </article>
-
-          <article className="coach-desk__card">
-            <p className="coach-desk__label">Current song</p>
-            <h2>{currentSong?.name ?? 'Choose a song'}</h2>
-            <p>
-              {currentSong
-                ? `${currentSong.artist} · ${
-                    currentAccuracy === undefined
-                      ? 'no saved score yet'
-                      : `${currentAccuracy}% best`
-                  }`
-                : 'Your song library is ready when you are.'}
-            </p>
-            <Button onClick={onOpenSongs}>
-              <FontAwesomeIcon icon={faMusic} /> Browse songs
-            </Button>
-          </article>
-        </div>
-      </section>
-    );
-  }
 
   return (
     <section
@@ -565,6 +353,31 @@ export function HomeCockpit({
             {hasPracticeTarget ? 'Start practice' : 'Choose a song'}
           </button>
         </div>
+
+        <section
+          className="kit-home__profile-snapshot"
+          data-testid="home-profile-snapshot"
+          aria-label="Your practice profile"
+        >
+          <p>Your practice</p>
+          <strong>
+            {gamification.streak.current === 0
+              ? 'No active streak'
+              : `${gamification.streak.current}-day streak`}
+          </strong>
+          <span>
+            {gamification.todayXp >= gamification.goalXp
+              ? `Set complete · ${gamification.todayXp.toLocaleString('en-US')} XP`
+              : `Today · ${gamification.todayXp.toLocaleString('en-US')} / ${gamification.goalXp.toLocaleString('en-US')} XP`}
+          </span>
+          <button
+            type="button"
+            data-testid="home-open-profile"
+            onClick={onOpenProfile}
+          >
+            View profile
+          </button>
+        </section>
 
         <section
           className="kit-home__session-summary"
@@ -618,8 +431,8 @@ export function HomeCockpit({
           {inputReadiness === 'connected'
             ? `${selectedDevice?.name ?? 'MIDI kit'} mapped · ready`
             : inputReadiness === 'reconnecting'
-            ? 'Kit reconnecting · your target stays armed'
-            : 'Mouse works now · connect MIDI when ready'}
+              ? 'Kit reconnecting · your target stays armed'
+              : 'Mouse works now · connect MIDI when ready'}
         </p>
 
         <div className="kit-home__pads" role="group" aria-label="Practice kit">
@@ -671,8 +484,9 @@ export function HomeCockpit({
           data-testid="home-hit-feedback"
         >
           {activeLane
-            ? `${KIT_HOTSPOTS.find((item) => item.element === activeLane)
-                ?.label} hit`
+            ? `${
+                KIT_HOTSPOTS.find((item) => item.element === activeLane)?.label
+              } hit`
             : ''}
         </p>
       </section>
@@ -687,10 +501,10 @@ export function HomeCockpit({
         {sessionState === 'count-in'
           ? `Count-in for ${practiceTarget?.name ?? 'your selected target'}.`
           : hasPracticeTarget && targetRecommendation
-          ? `${practiceTarget?.name} is armed at ${(
-              homeSession?.launchSpeed ?? targetRecommendation.suggestedSpeed
-            ).toFixed(1)} times speed. Any mapped pad starts it.`
-          : 'Choose a song to arm a practice target. Any mapped drum then starts it.'}
+            ? `${practiceTarget?.name} is armed at ${(
+                homeSession?.launchSpeed ?? targetRecommendation.suggestedSpeed
+              ).toFixed(1)} times speed. Any mapped pad starts it.`
+            : 'Choose a song to arm a practice target. Any mapped drum then starts it.'}
       </p>
     </section>
   );

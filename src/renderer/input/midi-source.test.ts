@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MidiDevice, MidiMessageType } from '../../types';
 import { installIpcMock, IpcMock } from '../hooks/test-support';
 import { MIDI_DEVICE_LIST_TIMEOUT_MS, MidiSource } from './midi-source';
-import { InputEvent } from './types';
+import { InputEvent, RawMidiInputEvent } from './types';
 
 describe('MidiSource', () => {
   let ipc: IpcMock;
@@ -50,6 +50,31 @@ describe('MidiSource', () => {
     });
 
     expect(events).toEqual([]);
+  });
+
+  it('observes every raw MIDI message before filtering scored input', () => {
+    const raw: RawMidiInputEvent[] = [];
+
+    new MidiSource().start(
+      () => {},
+      (event) => raw.push(event),
+    );
+
+    ipc.emit('listen-midi', {
+      type: MidiMessageType.NoteOff,
+      note: 38,
+      velocity: 0,
+    });
+
+    expect(raw).toEqual([
+      expect.objectContaining({
+        controlId: 'midi:38',
+        type: MidiMessageType.NoteOff,
+        note: 38,
+        velocity: 0,
+        receivedAt: expect.any(Number),
+      }),
+    ]);
   });
 
   it('requests and maps the device list into namespaced devices', async () => {

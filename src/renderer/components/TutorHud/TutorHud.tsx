@@ -10,6 +10,7 @@ import {
 import { CSSProperties, useId } from 'react';
 import { TutorHudMessage } from '../../hooks/useTutorSession';
 import { TutorState } from '../../services/tutor';
+import type { MidiInputTelemetry } from '../../services/practice-stats';
 import { KitCommandPrompt, KitCommandPromptModel } from '../KitCommandPrompt';
 import './TutorHud.css';
 
@@ -24,6 +25,7 @@ interface TutorHudProps {
     | 'remediation';
   controlPrompt?: KitCommandPromptModel;
   controlPromptCompact?: boolean;
+  midiTelemetry?: MidiInputTelemetry;
   timingWindowMs?: number;
   timingWindowReason?: string;
   remediation?: {
@@ -65,6 +67,7 @@ export function TutorHud({
   displayState,
   controlPrompt,
   controlPromptCompact = false,
+  midiTelemetry,
   timingWindowMs,
   timingWindowReason,
   remediation,
@@ -72,6 +75,13 @@ export function TutorHud({
 }: TutorHudProps) {
   const titleId = useId();
   const detailId = useId();
+  const lastMidiTime = midiTelemetry?.lastMidiTimestamp
+    ? new Date(midiTelemetry.lastMidiTimestamp).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    : 'none';
 
   if (recoveryCaption) {
     return (
@@ -130,6 +140,21 @@ export function TutorHud({
         <div className="drumroll-tutor-hud__compact-copy">
           <strong id={titleId}>{message.title}</strong>
           <span id={detailId}>{message.detail}</span>
+          {midiTelemetry && (
+            <span
+              className="drumroll-tutor-hud__input-telemetry"
+              data-testid="tutor-midi-telemetry"
+              title={`MIDI ${
+                midiTelemetry.rawMessageCount
+              }; last message: ${lastMidiTime}; selected port epoch ${
+                midiTelemetry.selectedPortEpoch
+              }; last mapped lane: ${midiTelemetry.lastMappedLane ?? 'none'}`}
+            >
+              MIDI {midiTelemetry.rawMessageCount} · last {lastMidiTime} · E
+              {midiTelemetry.selectedPortEpoch} ·{' '}
+              {midiTelemetry.lastMappedLane ?? 'unmapped'}
+            </span>
+          )}
         </div>
         {controlPrompt && <KitCommandPrompt model={controlPrompt} compact />}
       </aside>

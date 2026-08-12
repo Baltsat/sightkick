@@ -34,6 +34,7 @@ interface Props {
   onRetry: () => void;
   onNextSong: () => void;
   nextLabel?: string;
+  continuationLabelLocked?: boolean;
   autoContinueEnabled?: boolean;
   autoContinueSeconds?: number;
   persistenceState?: 'saving' | 'saved' | 'failed' | 'no-evidence';
@@ -42,6 +43,7 @@ interface Props {
   difficulty: Difficulty;
   scoreData?: ScoreData;
   practiceSummary?: RunSummary;
+  noMusicalInput?: boolean;
   previousPracticeSummary?: RunSummary;
   /** Live streak/XP-vs-goal state, shared with the library header (see
    * SongListView's <Outlet context>). Only used to phrase "N XP to
@@ -130,6 +132,7 @@ export function ScoreSummary({
   onRetry,
   onNextSong,
   nextLabel = 'Back to library',
+  continuationLabelLocked = false,
   autoContinueEnabled = false,
   autoContinueSeconds = 8,
   persistenceState,
@@ -138,6 +141,7 @@ export function ScoreSummary({
   difficulty,
   scoreData,
   practiceSummary,
+  noMusicalInput = false,
   previousPracticeSummary,
   gamification,
   runResult,
@@ -170,8 +174,11 @@ export function ScoreSummary({
   const streakCurrent =
     gamification?.streak.current ?? runResult?.streakCurrent ?? 0;
   const receipt = useMemo(
-    () => musicalReceipt(practiceSummary, previousPracticeSummary),
-    [practiceSummary, previousPracticeSummary],
+    () =>
+      noMusicalInput
+        ? undefined
+        : musicalReceipt(practiceSummary, previousPracticeSummary),
+    [noMusicalInput, practiceSummary, previousPracticeSummary],
   );
   const [postcardOpen, setPostcardOpen] = useState(false);
   const [postcardExporting, setPostcardExporting] = useState(false);
@@ -182,7 +189,10 @@ export function ScoreSummary({
   // leaving then would tear down the only acknowledgement listener.
   const continuationBlocked = persistenceState === 'saving';
   const canExportPostcard = Boolean(
-    songData && practiceSummary && persistenceState === 'saved',
+    songData &&
+      practiceSummary &&
+      persistenceState === 'saved' &&
+      !noMusicalInput,
   );
   const exportPostcard = (fields: PerformancePostcardField[]) => {
     if (!songData || !practiceSummary) {
@@ -217,7 +227,7 @@ export function ScoreSummary({
   const header = (
     <>
       <div className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
-        Run complete
+        {noMusicalInput ? 'No musical input received' : 'Run complete'}
       </div>
       <div>
         <h2 className="text-balance font-display text-3xl font-semibold leading-tight text-text-body">
@@ -258,17 +268,21 @@ export function ScoreSummary({
           role="status"
           data-testid="score-persistence-status"
         >
-          No scored notes were captured. Choose what to play next when you are
-          ready.
+          {noMusicalInput
+            ? 'No musical input reached Drumroll. The misses came from playback, not a played attempt. Check the kit connection or mapping, then play again.'
+            : 'No scored notes were captured. Choose what to play next when you are ready.'}
         </div>
       )}
-      {isOpen && autoContinueEnabled && !continuationBlocked && (
-        <AutoContinueCountdown
-          label={nextLabel}
-          seconds={autoContinueSeconds}
-          onComplete={onNextSong}
-        />
-      )}
+      {isOpen &&
+        autoContinueEnabled &&
+        !noMusicalInput &&
+        !continuationBlocked && (
+          <AutoContinueCountdown
+            label={nextLabel}
+            seconds={autoContinueSeconds}
+            onComplete={onNextSong}
+          />
+        )}
       {isOpen && handsFreeControlsEnabled && !continuationBlocked && (
         <section
           className="grid gap-1 rounded-2xl bg-fill/70 px-3 py-2"
@@ -317,7 +331,7 @@ export function ScoreSummary({
         >
           {primaryIsReplay ? 'Replay this loop' : 'Play again'}
         </Button>
-        {practiceSummary && onCoach && (
+        {practiceSummary && onCoach && !noMusicalInput && (
           <Button
             data-testid="score-coach"
             className="grow"
@@ -336,7 +350,9 @@ export function ScoreSummary({
           onClick={() => onNextSong()}
           size="large"
         >
-          {receipt?.action === 'continue' ? receipt.actionLabel : nextLabel}
+          {continuationLabelLocked || receipt?.action !== 'continue'
+            ? nextLabel
+            : receipt.actionLabel}
         </Button>
       </div>
     </div>
@@ -393,7 +409,7 @@ export function ScoreSummary({
             {postcardStatus}
           </p>
         ) : null}
-        {practiceSummary?.practiceCard && (
+        {!noMusicalInput && practiceSummary?.practiceCard && (
           <section
             className="w-full border-l-2 border-signal-ember pl-3 text-left"
             data-testid="practice-card-run-receipt"
@@ -407,7 +423,7 @@ export function ScoreSummary({
             </p>
           </section>
         )}
-        {practiceSummary?.audition && (
+        {!noMusicalInput && practiceSummary?.audition && (
           <section
             className="w-full rounded-2xl border border-accent-soft-border bg-accent-soft-bg p-4 text-left"
             data-testid="song-section-audition-receipt"
@@ -426,7 +442,21 @@ export function ScoreSummary({
             </p>
           </section>
         )}
-        {scoreData ? (
+        {noMusicalInput ? (
+          <section
+            className="w-full rounded-2xl border border-accent-soft-border bg-accent-soft-bg p-4 text-left"
+            data-testid="score-no-musical-input"
+            role="status"
+          >
+            <h3 className="font-display text-2xl font-semibold text-text">
+              Nothing from the kit reached the app
+            </h3>
+            <p className="mt-1 text-sm leading-relaxed text-text-muted">
+              This is not a scored performance. Check the selected kit and its
+              mapping, then try the lesson again.
+            </p>
+          </section>
+        ) : scoreData ? (
           // Star rating, accuracy headline and the hit/missed/false-hit grid
           // are all derived from `scoreData` — Perform-only (see
           // ModePolicy.scoring's doc comment). Ordinary Practice does not set
@@ -481,7 +511,7 @@ export function ScoreSummary({
             </div>
           )
         )}
-        {lessonProgression && (
+        {!noMusicalInput && lessonProgression && (
           <div
             className="w-full rounded-xl border border-accent-soft-border bg-accent-soft-bg px-4 py-3 text-left"
             data-testid="lesson-progression-result"
@@ -507,16 +537,20 @@ export function ScoreSummary({
             </div>
           </div>
         )}
-        <PracticeStats
-          summary={practiceSummary}
-          variant="inline"
-          className="w-full"
-        />
-        <LearningEvidenceReceipt
-          summary={practiceSummary}
-          heading="What this run recorded"
-        />
-        {runResult && (
+        {!noMusicalInput && (
+          <>
+            <PracticeStats
+              summary={practiceSummary}
+              variant="inline"
+              className="w-full"
+            />
+            <LearningEvidenceReceipt
+              summary={practiceSummary}
+              heading="What this run recorded"
+            />
+          </>
+        )}
+        {!noMusicalInput && runResult && (
           <div
             className={cn(
               'flex w-full flex-col gap-2 rounded-xl border border-accent-soft-border bg-accent-soft-bg p-3',
@@ -564,10 +598,12 @@ export function ScoreSummary({
             )}
           </div>
         )}
-        <AchievementToastQueue
-          queue={runResult?.newlyUnlocked ?? []}
-          className="w-full"
-        />
+        {!noMusicalInput && (
+          <AchievementToastQueue
+            queue={runResult?.newlyUnlocked ?? []}
+            className="w-full"
+          />
+        )}
       </div>
       {postcardOpen && songData && practiceSummary ? (
         <PerformancePostcard

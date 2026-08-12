@@ -1,0 +1,47 @@
+.drumroll-inactivity-pause-veil {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: rgb(25 22 18 / 48%);
+  pointer-events: none;
+}
+
+.drumroll-inactivity-pause-veil__card {
+  width: min(30rem, 100%);
+  padding: 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--color-coral) 46%, white);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-paper-light) 95%, #f4d6b4);
+  box-shadow: 0 28px 80px rgb(17 23 34 / 34%);
+  color: var(--color-ink);
+  text-align: center;
+}
+
+.drumroll-inactivity-pause-veil__card > span {
+  display: block;
+  color: var(--color-coral);
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.drumroll-inactivity-pause-veil__card > strong {
+  display: block;
+  margin-top: 0.25rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 3.4vw, 2.5rem);
+  letter-spacing: -0.035em;
+}
+
+.drumroll-inactivity-pause-veil__card > p {
+  margin: 0.7rem auto 0;
+  max-width: 34ch;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}

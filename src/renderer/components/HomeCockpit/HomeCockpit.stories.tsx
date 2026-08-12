@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import type { Song } from '../../../types';
 import type { UseGamificationResult } from '../../hooks/useGamification';
-import type { LessonProgress } from '../../hooks/useLessons';
 import type {
   AtomicSkillState,
   SongGoal,
@@ -154,28 +153,17 @@ const goalPayoffCandidate: PracticeCandidate = {
 };
 const gamification = {
   streak: { current: 4, longest: 9 },
-  todayXp: 32,
-  goalXp: 50,
+  todayXp: 411,
+  goalXp: 500,
   totalStars: 18,
   runsBySong: {},
   recentLaneSignals: [],
 } as unknown as UseGamificationResult;
-const lessonProgress = {
-  entries: [],
-  groups: [],
-  totalLessons: 0,
-  unlockedCount: 0,
-  totalStars: 0,
-  clearedCount: 0,
-} as LessonProgress;
 const meta: Meta<typeof HomeCockpit> = {
   title: 'Home cockpit/Evidence cards',
   component: HomeCockpit,
   args: {
-    surface: 'home',
     songList: [song],
-    difficulty: 'expert',
-    lessonProgress,
     gamification,
     recommendation: practiceRanking[0],
     practiceRanking,
@@ -196,8 +184,6 @@ const meta: Meta<typeof HomeCockpit> = {
     onStartSession: () => {},
     onStartPracticeCard: () => {},
     onOpenSongs: () => {},
-    onOpenJourney: () => {},
-    onOpenCoach: () => {},
     onOpenProfile: () => {},
   },
   render: (args) => (

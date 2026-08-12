@@ -1,4 +1,5 @@
 import {
+  PointerEvent as ReactPointerEvent,
   MouseEvent,
   RefObject,
   createRef,
@@ -28,6 +29,10 @@ import {
   LoopEscapeRunway,
   LoopEscapeRunwayModel,
 } from '../ContinuousNotation';
+import {
+  NotationGlossary,
+  useNotationGlossaryIntent,
+} from '../NotationGlossary';
 
 export interface SheetMusicProps {
   engine: Engine | undefined;
@@ -40,6 +45,8 @@ export interface SheetMusicProps {
   focusIndex?: number;
   isLooping?: boolean;
   onPracticeRangeChange?: (range?: PracticeRange) => void;
+  onLoopRangeSelect?: (range: PracticeRange) => void;
+  onClearLoop?: () => void;
   onSelectMeasure: (measure: Measure, event: MouseEvent) => void;
   enableColors: boolean;
   showReference: boolean;
@@ -62,6 +69,8 @@ export function SheetMusic({
   focusIndex,
   isLooping,
   onPracticeRangeChange,
+  onLoopRangeSelect,
+  onClearLoop,
   onSelectMeasure,
   showReference,
   enableColors,
@@ -84,15 +93,32 @@ export function SheetMusic({
   );
   const isSelectable = gameMode === 'practice';
   const dragAnchorRef = useRef<number | undefined>(undefined);
+  const {
+    intent: notationGlossaryIntent,
+    observe: observeNotation,
+    dismiss: dismissNotation,
+  } = useNotationGlossaryIntent();
   // The scroll container a selection drag is happening over, cached for
   // the lifetime of the drag (resolved once on mousedown rather than on
   // every mousemove/wheel event) - see the wheel/auto-scroll effect below.
   const scrollContainerRef = useRef<HTMLElement | undefined>(undefined);
   const autoScrollSpeedRef = useRef(0);
   const autoScrollFrameRef = useRef<number | undefined>(undefined);
+  const selectLoopRange = useCallback(
+    (range: PracticeRange) => {
+      if (onLoopRangeSelect) {
+        onLoopRangeSelect(range);
+
+        return;
+      }
+
+      onPracticeRangeChange?.(range);
+    },
+    [onLoopRangeSelect, onPracticeRangeChange],
+  );
   const handleMeasureMouseDown = useCallback(
     (index: number) => {
-      if (!isSelectable || !isLooping) {
+      if (!isSelectable || dragAnchorRef.current !== undefined) {
         return;
       }
 
@@ -100,9 +126,9 @@ export function SheetMusic({
       scrollContainerRef.current = getScrollParent(
         wrapperRef.current ?? undefined,
       );
-      onPracticeRangeChange?.({ start: index, end: index });
+      selectLoopRange({ start: index, end: index });
     },
-    [isSelectable, onPracticeRangeChange, isLooping],
+    [isSelectable, selectLoopRange],
   );
   const handleMeasureMouseEnter = useCallback(
     (index: number) => {
@@ -112,12 +138,72 @@ export function SheetMusic({
         return;
       }
 
-      onPracticeRangeChange?.({
+      selectLoopRange({
         start: Math.min(anchor, index),
         end: Math.max(anchor, index),
       });
     },
-    [onPracticeRangeChange],
+    [selectLoopRange],
+  );
+  const measureIndexAtPoint = useCallback(
+    (clientX: number, clientY: number): number | undefined => {
+      const index = highlightsRef.findIndex((ref) => {
+        const element = ref.current;
+
+        if (!element) {
+          return false;
+        }
+
+        const rect = element.getBoundingClientRect();
+
+        return (
+          clientX >= rect.left &&
+          clientX <= rect.right &&
+          clientY >= rect.top &&
+          clientY <= rect.bottom
+        );
+      });
+
+      return index === -1 ? undefined : index;
+    },
+    [highlightsRef],
+  );
+  const handleScorePointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const index = measureIndexAtPoint(event.clientX, event.clientY);
+
+      if (index === undefined) {
+        return;
+      }
+
+      dismissNotation();
+      event.preventDefault();
+      handleMeasureMouseDown(index);
+    },
+    [dismissNotation, handleMeasureMouseDown, measureIndexAtPoint],
+  );
+  const handleScorePointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const index = measureIndexAtPoint(event.clientX, event.clientY);
+
+      if (dragAnchorRef.current !== undefined) {
+        dismissNotation();
+
+        if (index !== undefined) {
+          handleMeasureMouseEnter(index);
+        }
+
+        return;
+      }
+
+      observeNotation(event.target, event.clientX, event.clientY);
+    },
+    [
+      dismissNotation,
+      handleMeasureMouseEnter,
+      measureIndexAtPoint,
+      observeNotation,
+    ],
   );
 
   // Keeps the sheet scrollable by mouse wheel / trackpad, and auto-scrolls
@@ -193,11 +279,17 @@ export function SheetMusic({
 
     window.addEventListener('mouseup', endDrag);
     window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('pointerup', endDrag);
+    window.addEventListener('pointercancel', endDrag);
+    window.addEventListener('pointermove', handleMouseMove);
     window.addEventListener('wheel', handleWheel, { passive: false });
 
     return () => {
       window.removeEventListener('mouseup', endDrag);
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('pointerup', endDrag);
+      window.removeEventListener('pointercancel', endDrag);
+      window.removeEventListener('pointermove', handleMouseMove);
       window.removeEventListener('wheel', handleWheel);
       stopAutoScroll();
     };
@@ -281,10 +373,15 @@ export function SheetMusic({
                 focused,
             },
             (isDev || gameMode === 'practice') &&
-              'cursor-pointer hover:bg-accent-medium-bg hover:shadow-accent-soft hover:border hover:border-accent-soft-border hover:z-[-1]',
+              'cursor-pointer touch-none hover:bg-accent-medium-bg hover:shadow-accent-soft hover:border hover:border-accent-soft-border hover:z-[-1]',
           )}
           onMouseDown={() => handleMeasureMouseDown(index)}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            handleMeasureMouseDown(index);
+          }}
           onMouseEnter={() => handleMeasureMouseEnter(index)}
+          onPointerEnter={() => handleMeasureMouseEnter(index)}
           onClick={(event) => {
             if (
               (gameMode !== 'practice' && isDev) ||
@@ -379,7 +476,15 @@ export function SheetMusic({
             <IconButton
               icon={faXmark}
               data-testid="clear-loop"
-              onClick={() => onPracticeRangeChange?.(undefined)}
+              onClick={() => {
+                if (onClearLoop) {
+                  onClearLoop();
+
+                  return;
+                }
+
+                onPracticeRangeChange?.(undefined);
+              }}
             />
           </div>
         )}
@@ -406,7 +511,13 @@ export function SheetMusic({
             </div>
           </>
         )}
-        <div ref={scoreRef} className="min-w-max relative z-0">
+        <div
+          ref={scoreRef}
+          className="min-w-max relative z-0"
+          onPointerDownCapture={handleScorePointerDown}
+          onPointerMoveCapture={handleScorePointerMove}
+          onPointerLeave={dismissNotation}
+        >
           {isFlow && <FlowMeter renderData={renderData} />}
           {isFlow && loopEscape && (
             <LoopEscapeRunway renderData={renderData} model={loopEscape} />
@@ -414,7 +525,7 @@ export function SheetMusic({
           <div
             ref={vexflowContainerRef}
             className={cn(
-              'min-w-max pointer-events-none **:pointer-events-none',
+              'min-w-max drumroll-sheet-music__notation',
               isFlow && 'drumroll-flow-score',
             )}
           />
@@ -431,6 +542,7 @@ export function SheetMusic({
             />
             <div className="absolute w-0.75 bg-accent-bright h-full rounded-[3px] left-1/2 -translate-x-1/2" />
           </div>
+          <NotationGlossary intent={notationGlossaryIntent} />
           <div
             ref={overlayRef}
             data-testid="sheet-music-overlay"

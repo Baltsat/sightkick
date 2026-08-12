@@ -258,9 +258,19 @@ res=192 ts=4/4
 720 yellow
 `;
 
-function SheetHarness({ dsl }: { dsl: string }) {
+function SheetHarness({
+  dsl,
+  practice = false,
+}: {
+  dsl: string;
+  practice?: boolean;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [renderData, setRenderData] = useState<RenderData[]>([]);
+  const [practiceRange, setPracticeRange] = useState<
+    { start: number; end: number } | undefined
+  >(() => (practice ? { start: 0, end: 1 } : undefined));
+  const [isLooping, setIsLooping] = useState(practice);
   const parser = useMemo(() => {
     try {
       return new ChartParser(buildParsedChartFromDsl(dsl), false);
@@ -299,16 +309,28 @@ function SheetHarness({ dsl }: { dsl: string }) {
       enableColors={true}
       showReference={false}
       isDev={false}
+      gameMode={practice ? 'practice' : undefined}
+      practiceRange={practiceRange}
+      isLooping={isLooping}
+      onPracticeRangeChange={setPracticeRange}
+      onLoopRangeSelect={(range) => {
+        setPracticeRange(range);
+        setIsLooping(true);
+      }}
+      onClearLoop={() => {
+        setPracticeRange(undefined);
+        setIsLooping(false);
+      }}
       zoom={1}
       onSelectMeasure={() => {}}
     />
   );
 }
 
-function Sheet({ dsl }: { dsl: string }) {
+function Sheet({ dsl, practice = false }: { dsl: string; practice?: boolean }) {
   return (
     <div style={{ padding: 24, background: '#fff', overflow: 'auto' }}>
-      <SheetHarness dsl={dsl} />
+      <SheetHarness dsl={dsl} practice={practice} />
     </div>
   );
 }
@@ -324,4 +346,8 @@ type Story = StoryObj<typeof Sheet>;
 
 export const Parser: Story = {
   render: () => <Sheet dsl={DSL} />,
+};
+
+export const PracticeLoop: Story = {
+  render: () => <Sheet dsl={DSL} practice />,
 };

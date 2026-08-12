@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Song } from '../../../types';
-import type { LessonProgress } from '../../hooks/useLessons';
 import type { UseGamificationResult } from '../../hooks/useGamification';
 import { InputProvider } from '../../context/InputContext';
 import type { RunSummary } from '../../services/practice-stats';
@@ -48,14 +47,6 @@ const song = {
   name: 'Practice song',
   artist: 'Drumroll',
 } as Song;
-const lessonProgress = {
-  entries: [],
-  groups: [],
-  totalLessons: 0,
-  unlockedCount: 0,
-  totalStars: 0,
-  clearedCount: 0,
-} as LessonProgress;
 const gamification = {
   streak: { current: 0 },
   todayXp: 0,
@@ -154,16 +145,11 @@ describe('HomeCockpit kit home', () => {
     render(
       <InputProvider>
         <HomeCockpit
-          surface="home"
           songList={[song]}
-          difficulty="easy"
-          lessonProgress={lessonProgress}
           gamification={gamification}
           recommendation={recommendation}
           onStartRecommended={onStartRecommended}
           onOpenSongs={vi.fn()}
-          onOpenJourney={vi.fn()}
-          onOpenCoach={vi.fn()}
           onOpenProfile={vi.fn()}
         />
       </InputProvider>,
@@ -215,16 +201,11 @@ describe('HomeCockpit kit home', () => {
     render(
       <InputProvider>
         <HomeCockpit
-          surface="home"
           songList={[song]}
-          difficulty="easy"
-          lessonProgress={lessonProgress}
           gamification={gamification}
           recommendation={recommendation}
           onStartRecommended={onStartRecommended}
           onOpenSongs={vi.fn()}
-          onOpenJourney={vi.fn()}
-          onOpenCoach={vi.fn()}
           onOpenProfile={vi.fn()}
         />
       </InputProvider>,
@@ -246,15 +227,10 @@ describe('HomeCockpit kit home', () => {
     render(
       <InputProvider>
         <HomeCockpit
-          surface="home"
           songList={[song]}
-          difficulty="easy"
-          lessonProgress={lessonProgress}
           gamification={gamification}
           onStartRecommended={vi.fn()}
           onOpenSongs={onOpenSongs}
-          onOpenJourney={vi.fn()}
-          onOpenCoach={vi.fn()}
           onOpenProfile={vi.fn()}
         />
       </InputProvider>,
@@ -279,10 +255,7 @@ describe('HomeCockpit kit home', () => {
     render(
       <InputProvider>
         <HomeCockpit
-          surface="home"
           songList={[lessonSong, song]}
-          difficulty="easy"
-          lessonProgress={lessonProgress}
           gamification={gamification}
           recommendation={lessonRecommendation}
           practiceRanking={[lessonRecommendation, songRecommendation]}
@@ -290,8 +263,6 @@ describe('HomeCockpit kit home', () => {
           onStartRecommended={vi.fn()}
           onStartSession={onStartSession}
           onOpenSongs={vi.fn()}
-          onOpenJourney={vi.fn()}
-          onOpenCoach={vi.fn()}
           onOpenProfile={vi.fn()}
         />
       </InputProvider>,
@@ -315,5 +286,33 @@ describe('HomeCockpit kit home', () => {
         }),
       }),
     );
+  });
+
+  it('keeps the player state, streak, goal, and profile route on Home', () => {
+    const onOpenProfile = vi.fn();
+
+    render(
+      <InputProvider>
+        <HomeCockpit
+          songList={[song]}
+          gamification={gamification}
+          recommendation={recommendation}
+          onStartRecommended={vi.fn()}
+          onOpenSongs={vi.fn()}
+          onOpenProfile={onOpenProfile}
+        />
+      </InputProvider>,
+    );
+
+    expect(screen.getByTestId('home-profile-snapshot')).toHaveTextContent(
+      'No active streak',
+    );
+    expect(screen.getByTestId('home-profile-snapshot')).toHaveTextContent(
+      'Today · 0 / 100 XP',
+    );
+
+    fireEvent.click(screen.getByTestId('home-open-profile'));
+
+    expect(onOpenProfile).toHaveBeenCalledOnce();
   });
 });

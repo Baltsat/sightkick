@@ -1,5 +1,10 @@
 import { MidiDevice, MidiMessage, MidiMessageType } from '../../types';
-import { InputDevice, InputEvent, InputSource } from './types';
+import {
+  InputDevice,
+  InputEvent,
+  InputSource,
+  RawMidiInputEvent,
+} from './types';
 import { makeControlId } from './helpers';
 
 // Enumeration is deliberately short-lived. A renderer can be torn down while
@@ -20,15 +25,28 @@ export class MidiSource implements InputSource {
   readonly id = 'midi' as const;
   private pendingDeviceList?: PendingDeviceList;
 
-  start(emit: (event: InputEvent) => void): () => void {
+  start(
+    emit: (event: InputEvent) => void,
+    emitRawMidi?: (event: RawMidiInputEvent) => void,
+  ): () => void {
     const unsubscribe = window.electron.ipcRenderer.on<MidiMessage>(
       'listen-midi',
       ({ type, note, velocity }) => {
+        const controlId = makeControlId('midi', note);
+
+        emitRawMidi?.({
+          controlId,
+          type,
+          note,
+          velocity,
+          receivedAt: Date.now(),
+        });
+
         if (type !== MidiMessageType.NoteOn || velocity === 0) {
           return;
         }
 
-        emit({ controlId: makeControlId('midi', note), value: velocity });
+        emit({ controlId, value: velocity });
       },
     );
 

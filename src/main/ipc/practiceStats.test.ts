@@ -111,6 +111,12 @@ function fakeCheckpoint(
       playbackSpeed: 0.8,
       positionTick: 960,
       records: [fakeRecord(480)],
+      midiTelemetry: {
+        rawMessageCount: 2,
+        lastMidiTimestamp: 1_786_060_800_000,
+        selectedPortEpoch: 4,
+        lastMappedLane: 'snare' as const,
+      },
     },
   };
 }
@@ -877,6 +883,12 @@ describe('practice attempt checkpoints', () => {
           expect.objectContaining({ tick: 480 }),
           expect.objectContaining({ tick: 960 }),
         ]),
+        midiTelemetry: {
+          rawMessageCount: 2,
+          lastMidiTimestamp: 1_786_060_800_000,
+          selectedPortEpoch: 4,
+          lastMappedLane: 'snare',
+        },
       }),
     ]);
     expect(

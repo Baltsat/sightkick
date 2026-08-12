@@ -63,6 +63,7 @@ import { localDateKey } from '../../services/streaks';
 import { SaveGoalInput, SetGoalModal, useGoals } from '../../components/Goals';
 import { AppShell, ArenaView } from '../../components/AppShell';
 import { HomeCockpit } from '../../components/HomeCockpit';
+import { MyWave } from '../../components/MyWave';
 import { KitCommandPrompt } from '../../components/KitCommandPrompt';
 import ProfileView from '../../components/Profile';
 import { buildDrumLearningProfile } from '../../services/learning-profile';
@@ -270,8 +271,8 @@ export function SongListView() {
     libraryMode === 'drums'
       ? yandexSources?.drums
       : libraryMode === 'favorites'
-      ? yandexSources?.favorites
-      : undefined;
+        ? yandexSources?.favorites
+        : undefined;
   const filteredLibraryCandidates = useMemo(
     () => filterLibraryCandidates(candidateSource?.tracks ?? [], nameFilter),
     [candidateSource?.tracks, nameFilter],
@@ -636,11 +637,11 @@ export function SongListView() {
   ).length;
   const { loadAchievements } = gamification;
 
-  // Home and Coach expose saved lane analytics on their first paint. The
+  // Home and My Wave expose saved lane analytics on their first paint. The
   // request is intentionally scoped to those surfaces: the detailed Songs
   // library remains as light as it was before the cockpit existed.
   useEffect(() => {
-    if (view === 'home' || view === 'coach') {
+    if (view === 'home' || view === 'wave') {
       loadAchievements();
     }
   }, [loadAchievements, view]);
@@ -1082,24 +1083,6 @@ export function SongListView() {
         },
         difficulty: () => setDifficulty(nextDifficulty(difficulty)),
       };
-  const openHomeCoach = () => {
-    const coachSong =
-      songList.find(
-        (song) => song.id === nextPractice.recommendation?.candidate.id,
-      ) ??
-      librarySongs.find((song) => song.id === gamification.latestRun?.songId) ??
-      continuedSong ??
-      librarySongs[0];
-
-    if (!coachSong) {
-      setView('songs');
-
-      return;
-    }
-
-    navigate(`/${coachSong.id}?gameMode=practice&coachOpen=1`);
-  };
-
   return (
     <StemToolsProvider value={stemTools}>
       {gameModeSelector.element}
@@ -1146,10 +1129,7 @@ export function SongListView() {
       >
         {!songOpen && view === 'home' && (
           <HomeCockpit
-            surface="home"
             songList={songList}
-            difficulty={difficulty}
-            lessonProgress={lessonProgress}
             gamification={gamification}
             recommendation={nextPractice.recommendation}
             practiceRanking={nextPractice.ranking}
@@ -1165,8 +1145,6 @@ export function SongListView() {
             onStartSession={startComposedSession}
             onStartPracticeCard={startPracticeCard}
             onOpenSongs={() => setView('songs')}
-            onOpenJourney={() => setView('journey')}
-            onOpenCoach={openHomeCoach}
             onOpenProfile={() => {
               gamification.loadAchievements();
               setView('insights');
@@ -1174,33 +1152,12 @@ export function SongListView() {
           />
         )}
 
-        {!songOpen && view === 'coach' && (
-          <HomeCockpit
-            surface="coach"
-            songList={songList}
-            difficulty={difficulty}
-            lessonProgress={lessonProgress}
-            gamification={gamification}
-            recommendation={nextPractice.recommendation}
-            practiceRanking={nextPractice.ranking}
-            pedagogyRanking={nextPractice.pedagogyRanking}
-            practiceWave={practiceWave}
-            activeGoal={activeGoal}
-            goalPayoffCandidate={activeGoalPayoffCandidate}
-            goalTargetDate={activeGoalRecord?.targetDate}
-            deadlinePacing={nextPractice.deadlinePacing}
-            atomicStates={atomicStates}
-            dueReviews={atomicReviews}
-            onStartRecommended={() => startRecommendedPractice()}
-            onStartSession={startComposedSession}
-            onStartPracticeCard={startPracticeCard}
+        {!songOpen && view === 'wave' && (
+          <MyWave
+            session={profileHomeSession}
+            onStart={startComposedSession}
             onOpenSongs={() => setView('songs')}
             onOpenJourney={() => setView('journey')}
-            onOpenCoach={openHomeCoach}
-            onOpenProfile={() => {
-              gamification.loadAchievements();
-              setView('insights');
-            }}
           />
         )}
 
@@ -1349,9 +1306,9 @@ export function SongListView() {
                         isYandexMode
                           ? filteredLibraryCandidates.length
                           : libraryMode === 'online' &&
-                            onlineTotal !== undefined
-                          ? onlineTotal
-                          : filteredSongList.length
+                              onlineTotal !== undefined
+                            ? onlineTotal
+                            : filteredSongList.length
                       }
                       libraryMode={libraryMode}
                       onlineDownloadsAvailable={onlineDownloadsAvailable}
@@ -1422,10 +1379,10 @@ export function SongListView() {
                       {libraryControls.source === 'kit-lanes'
                         ? 'Kit navigation'
                         : libraryControls.source === 'mixed'
-                        ? 'Mixed navigation'
-                        : libraryControls.source === 'explicit'
-                        ? 'Mapped navigation'
-                        : 'Navigation unavailable'}
+                          ? 'Mixed navigation'
+                          : libraryControls.source === 'explicit'
+                            ? 'Mapped navigation'
+                            : 'Navigation unavailable'}
                     </span>
                     {(libraryControls.source === 'kit-lanes' ||
                       libraryControls.source === 'mixed') && (
@@ -1648,6 +1605,9 @@ export function SongListView() {
               recommendation:
                 activePracticeWave?.result.stops[activePracticeWave.index]
                   ?.recommendation ?? nextPractice.recommendation,
+              recommendationReason:
+                activePracticeWave?.result.stops[activePracticeWave.index]
+                  ?.reason ?? nextPractice.recommendation?.reason,
               continuePractice: startRecommendedPractice,
             } satisfies PracticeOutletContext
           }

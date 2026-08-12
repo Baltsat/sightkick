@@ -19,7 +19,7 @@ import {
   Flow,
 } from 'vexflow';
 import { ChartParser } from './parser';
-import { Measure, RenderData, TempoMark } from './types';
+import { Measure, Note, RenderData, TempoMark } from './types';
 import { KEY_TO_ELEMENT } from './constants';
 
 export interface SheetMusicColors {
@@ -392,6 +392,54 @@ function applyNoteClasses(staveNotes: StaveNote[], enableColors: boolean) {
   });
 }
 
+function notationKinds(note: Note): string[] {
+  const kinds = [note.isRest ? 'rest' : 'colored-head'];
+
+  if (note.dots > 0) {
+    kinds.push('dot');
+  }
+
+  if (note.duration === '32') {
+    kinds.push('triple-beam');
+  } else if (note.duration === '8' || note.duration === '16') {
+    kinds.push('beam');
+  }
+
+  if (note.tupletId !== undefined) {
+    kinds.push('tuplet');
+  }
+
+  if (note.graceNotes?.length) {
+    kinds.push('grace');
+  }
+
+  if (note.ghosts?.length) {
+    kinds.push('ghost');
+  }
+
+  return kinds;
+}
+
+function annotateNotation(staveNotes: StaveNote[], measure: Measure) {
+  staveNotes.forEach((staveNote, index) => {
+    const note = measure.notes[index];
+    const kinds = notationKinds(note);
+
+    staveNote
+      .getSVGElement()
+      ?.setAttribute('data-notation-kinds', kinds.join(' '));
+    staveNote.noteHeads.forEach(
+      (head) =>
+        head
+          ?.getSVGElement()
+          ?.setAttribute(
+            'data-notation-kind',
+            note.isRest ? 'rest' : 'colored-head',
+          ),
+    );
+  });
+}
+
 function drawAccentGlyph(
   context: RenderContext,
   x: number,
@@ -409,6 +457,7 @@ function drawAccentGlyph(
   const group = context.openGroup('accent') as SVGGElement;
 
   group.classList.add(accentClass);
+  group.setAttribute('data-notation-kind', 'accent');
   context.setFillStyle(noteColor);
   context.setStrokeStyle(noteColor);
   glyph.render(context, x, y);
@@ -547,6 +596,7 @@ function renderMeasure(
   });
 
   applyNoteClasses(staveNotes, enableColors);
+  annotateNotation(staveNotes, measure);
   drawAccents(context, stave, measure, staveNotes, enableColors, colors.note);
 
   const renderedNotes = staveNotes.map((staveNote, i) => ({

@@ -4,6 +4,7 @@ import type {
   PracticeAttemptCheckpointBySong,
   PracticeRunArchive,
   HitRecord,
+  MidiInputTelemetry,
   RunSummary,
   StoredHitRecord,
   StoredPracticeRun,
@@ -171,6 +172,29 @@ function isHitRecord(value: unknown): value is HitRecord {
   );
 }
 
+function isMidiInputTelemetry(value: unknown): value is MidiInputTelemetry {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    isFiniteNumber(value.rawMessageCount) &&
+    value.rawMessageCount >= 0 &&
+    isOptionalFiniteNumber(value.lastMidiTimestamp) &&
+    isFiniteNumber(value.selectedPortEpoch) &&
+    value.selectedPortEpoch >= 0 &&
+    (value.lastMappedLane === undefined ||
+      value.lastMappedLane === 'hihat' ||
+      value.lastMappedLane === 'ride' ||
+      value.lastMappedLane === 'crash' ||
+      value.lastMappedLane === 'kick' ||
+      value.lastMappedLane === 'snare' ||
+      value.lastMappedLane === 'tom1' ||
+      value.lastMappedLane === 'tom2' ||
+      value.lastMappedLane === 'tom3')
+  );
+}
+
 function assertValidCheckpointPayload(
   checkpoint: IpcSavePracticeAttemptCheckpointPayload['checkpoint'] | undefined,
 ): asserts checkpoint is IpcSavePracticeAttemptCheckpointPayload['checkpoint'] {
@@ -216,6 +240,13 @@ function assertValidCheckpointPayload(
   ) {
     throw new Error('checkpoint records must be scored hit records');
   }
+
+  if (
+    checkpoint.midiTelemetry !== undefined &&
+    !isMidiInputTelemetry(checkpoint.midiTelemetry)
+  ) {
+    throw new Error('checkpoint MIDI telemetry is invalid');
+  }
 }
 
 /**
@@ -237,6 +268,9 @@ export function readPracticeAttemptCheckpoints(
 
       const mode = value.mode;
       const difficulty = value.difficulty;
+      const midiTelemetry = isMidiInputTelemetry(value.midiTelemetry)
+        ? value.midiTelemetry
+        : undefined;
 
       if (
         value.state !== 'in-progress' ||
@@ -278,6 +312,7 @@ export function readPracticeAttemptCheckpoints(
           records: value.records
             .filter(isStoredHitRecord)
             .slice(-MAX_PRACTICE_ATTEMPT_RECORDS),
+          ...(midiTelemetry ? { midiTelemetry } : {}),
         },
       ];
     })
@@ -438,6 +473,9 @@ export function savePracticeAttemptCheckpoint(
       records: checkpoint.records
         .map(compactRecord)
         .slice(-MAX_PRACTICE_ATTEMPT_RECORDS),
+      ...(checkpoint.midiTelemetry
+        ? { midiTelemetry: checkpoint.midiTelemetry }
+        : {}),
     };
     const checkpoints = [
       ...existing.filter(

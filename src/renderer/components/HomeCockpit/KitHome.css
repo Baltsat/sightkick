@@ -94,7 +94,8 @@
 
 .kit-home__primary-action:focus-visible,
 .kit-home__pad:focus-visible,
-.kit-home__session-summary summary:focus-visible {
+.kit-home__session-summary summary:focus-visible,
+.kit-home__profile-snapshot button:focus-visible {
   outline: 2px solid var(--signal-ember);
   outline-offset: 3px;
 }
@@ -275,6 +276,61 @@
   border-top: 1px solid var(--line-soft);
   color: var(--ink-strong);
   background: transparent;
+}
+
+.kit-home__profile-snapshot {
+  display: grid;
+  min-width: 0;
+  gap: 0.22rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.kit-home__profile-snapshot p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.kit-home__profile-snapshot strong {
+  overflow: hidden;
+  color: var(--ink-strong);
+  font-family: var(--font-display);
+  font-size: clamp(1.05rem, 1.45vw, 1.32rem);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kit-home__profile-snapshot > span {
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 0.73rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kit-home__profile-snapshot button {
+  width: fit-content;
+  margin-top: 0.2rem;
+  padding: 0;
+  border: 0;
+  color: var(--signal-wine);
+  background: transparent;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.kit-home__profile-snapshot button:hover {
+  color: color-mix(in srgb, var(--signal-wine) 78%, var(--ink-strong));
 }
 
 .kit-home__session-summary > strong {

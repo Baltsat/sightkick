@@ -129,6 +129,12 @@
   box-shadow: 0 0 0 3px rgb(17 23 34 / 8%);
 }
 
+.drumroll-practice-input-telemetry {
+  color: color-mix(in srgb, var(--color-cyan) 76%, var(--color-text-muted));
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+}
+
 .drumroll-practice-toolbar__identity {
   flex: 0 1 16rem;
 }

@@ -18,6 +18,7 @@ import {
 import { multiLaneRunFixture } from '../../components/PracticeStats/test-fixtures';
 import { chartContentRevision } from '../../services/chart-revision';
 import { remediationQueueSlotKey } from '../../services/remediation';
+import { canAutoContinuePractice } from './SongView';
 
 const TEST_CHART_REVISION = chartContentRevision({
   songId: 'song-1',
@@ -1032,16 +1033,20 @@ describe('practice loop selection', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
-    view.clickTestId('loop-toggle');
 
     const [a, b] = view.measureHighlights();
 
-    fireEvent.mouseDown(a);
-    fireEvent.mouseEnter(b);
+    fireEvent.pointerDown(a);
+    fireEvent.pointerEnter(b);
+    fireEvent.pointerUp(document.body);
 
     expect(screen.getByText('Measure 1 - 2')).toBeInTheDocument();
     expect(a).toHaveAttribute('data-selected', 'true');
     expect(b).toHaveAttribute('data-selected', 'true');
+    expect(screen.getByTestId('practice-mode-indicator')).toHaveAttribute(
+      'data-looping',
+      'true',
+    );
   });
 
   it('normalizes a backward drag', async () => {
@@ -1073,15 +1078,14 @@ describe('practice loop selection', () => {
     expect(screen.getByText('Measure 1')).toBeInTheDocument();
   });
 
-  it('does not select while looping is off', async () => {
+  it('arms looping directly from a score gesture', async () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
-    // Looping defaults off - nothing to toggle.
     await view.loadSong();
 
     fireEvent.mouseDown(view.measureHighlights()[0]);
 
-    expect(screen.queryByText('Looping Section')).not.toBeInTheDocument();
+    expect(screen.getByText('Looping Section')).toBeInTheDocument();
   });
 
   it('clears the selected range from the loop control', async () => {
@@ -1096,6 +1100,10 @@ describe('practice loop selection', () => {
     view.clickTestId('clear-loop');
 
     expect(screen.queryByText('Looping Section')).not.toBeInTheDocument();
+    expect(screen.getByTestId('practice-mode-indicator')).not.toHaveAttribute(
+      'data-looping',
+      'true',
+    );
   });
 
   it('plays from a clicked measure once looping is off', async () => {
@@ -1306,6 +1314,40 @@ describe('the stem mixer', () => {
 });
 
 describe('the score summary', () => {
+  it('keeps a completed lesson on its own result instead of auto-jumping to songs', () => {
+    expect(
+      canAutoContinuePractice(
+        'practice',
+        true,
+        'saved',
+        makeSong({
+          lesson: {
+            id: '01.01',
+            starsToUnlock: 0,
+            unit: 'Unit 1',
+            title: 'First beat',
+          },
+        }),
+      ),
+    ).toBe(false);
+    expect(canAutoContinuePractice('practice', true, 'saved', makeSong())).toBe(
+      true,
+    );
+  });
+
+  it('shows the current My Wave reason while a practice stop is open', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      recommendationReason: 'Alternating singles need one clean second pass',
+    });
+
+    await view.loadSong();
+
+    expect(screen.getByTestId('practice-wave-reason')).toHaveTextContent(
+      'My Wave · Alternating singles need one clean second pass',
+    );
+  });
+
   it('reports the accuracy and note counts of a run', async () => {
     const view = setupSongView({
       settings: { countIn: false },

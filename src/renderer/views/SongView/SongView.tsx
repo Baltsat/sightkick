@@ -61,7 +61,7 @@ import {
   loopEscapePhase,
   NotationLocationReadout,
 } from '../../components/ContinuousNotation';
-import { InputMapping, ScoreData } from '../../../types';
+import { InputMapping, ScoreData, Song } from '../../../types';
 import {
   computeRunsTrend,
   decideRunEvidence,
@@ -95,8 +95,13 @@ import {
   PracticeReadinessPhase,
 } from '../../components/PracticeReadinessCue';
 import { KitCommandPrompt } from '../../components/KitCommandPrompt';
+import {
+  InactivityPauseVeil,
+  useInactivityPauseVeil,
+} from '../../components/InactivityPauseVeil';
 import { useTutorSession } from '../../hooks/useTutorSession';
 import { usePracticeAttemptCheckpoint } from '../../hooks/usePracticeAttemptCheckpoint';
+import { useMidiInputTelemetry } from '../../hooks/useMidiInputTelemetry';
 import { useDrumGestures } from '../../hooks/useDrumGestures';
 import { DrumGestureAction, DrumGestureSurface } from '../../services/gestures';
 import { CountInPolicy } from '../../services/engine';
@@ -128,6 +133,20 @@ import './SongView.css';
 interface PracticeRunIdentity {
   sessionId: string;
   startedAt?: string;
+}
+
+export function canAutoContinuePractice(
+  gameMode: GameMode | undefined,
+  enabled: boolean,
+  persistenceState: 'saving' | 'saved' | 'failed' | 'no-evidence',
+  songData: Song | undefined,
+): boolean {
+  return (
+    gameMode === 'practice' &&
+    !songData?.lesson &&
+    enabled &&
+    persistenceState === 'saved'
+  );
 }
 
 const APP_VERSION =
@@ -247,6 +266,7 @@ export function SongView() {
     kitControlIds,
     selectedDevice,
     inputReadiness,
+    midiPortEpoch,
     inputLatencyMs,
     reconnectMidi,
   } = useInput();
@@ -266,6 +286,7 @@ export function SongView() {
   const [practicePersistenceState, setPracticePersistenceState] = useState<
     'saving' | 'saved' | 'failed' | 'no-evidence'
   >('no-evidence');
+  const [noMusicalInput, setNoMusicalInput] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isCoachOpen, setIsCoachOpen] = useState(false);
@@ -334,11 +355,17 @@ export function SongView() {
     outletContext && 'gamification' in outletContext
       ? outletContext.gamification
       : outletContext;
+  const outletRecommendationReason =
+    outletContext && 'recommendationReason' in outletContext
+      ? outletContext.recommendationReason
+      : undefined;
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const gameMode = useMemo<GameMode | undefined>(() => {
     return (searchParams.get('gameMode') as GameMode) ?? undefined;
   }, [searchParams]);
+  const practiceRecommendationReason =
+    gameMode === 'practice' ? outletRecommendationReason : undefined;
   const requestedPracticeSpeed = useMemo(() => {
     const configured = searchParams.get('practiceSpeed');
     const value = configured === null ? Number.NaN : Number(configured);
@@ -382,6 +409,20 @@ export function SongView() {
   const [runIdentity, setRunIdentity] = useState<PracticeRunIdentity>(
     createPracticeRunIdentity,
   );
+  const { telemetry: midiTelemetry, readTelemetry: readMidiTelemetry } =
+    useMidiInputTelemetry({
+      sessionId: runIdentity.sessionId,
+      selectedDevice,
+      inputMapping,
+      selectedPortEpoch: midiPortEpoch,
+    });
+  const lastMidiTime = midiTelemetry?.lastMidiTimestamp
+    ? new Date(midiTelemetry.lastMidiTimestamp).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    : 'none';
   const runIdentityRef = useRef<PracticeRunIdentity>(runIdentity);
   const attemptCheckpointControlRef = useRef<
     | {
@@ -636,6 +677,10 @@ export function SongView() {
       // can tell a Practice rep at 0.7x apart from a full-speed Perform
       // pass.
       const identity = runIdentityRef.current;
+      const completedMidiTelemetry = readMidiTelemetry();
+      const missingMusicalInput =
+        selectedDevice?.sourceId === 'midi' &&
+        completedMidiTelemetry?.rawMessageCount === 0;
 
       // Capture the final Judge journal synchronously before Transport's
       // ended-state render can tear down the checkpoint hook. This seals its
@@ -708,12 +753,15 @@ export function SongView() {
         ...baseRunSummary,
         ...(coachEvidence.length > 0 ? { coachEvidence } : {}),
       };
-      const { persistEligible, rewardEligible } = decideRunEvidence({
+      const runEvidence = decideRunEvidence({
         score,
         records,
         guidedReady: guidedReadyRef.current,
         tutor: tutorEvidence,
       });
+      const persistEligible =
+        runEvidence.persistEligible && !missingMusicalInput;
+      const rewardEligible = runEvidence.rewardEligible && !missingMusicalInput;
       const lessonProgression = decideLessonProgression({
         isLesson: Boolean(songData?.lesson),
         gameMode,
@@ -724,6 +772,7 @@ export function SongView() {
         policy.scoring || lessonProgression.qualifies;
 
       setPracticeSummary(runSummary);
+      setNoMusicalInput(missingMusicalInput);
       setPracticePersistenceState(
         gameMode === 'practice' && id && persistEligible
           ? 'saving'
@@ -868,6 +917,7 @@ export function SongView() {
             chart.tempos,
           ),
         ),
+      midiTelemetry: readMidiTelemetry,
     };
   }, [
     chart,
@@ -878,6 +928,7 @@ export function SongView() {
     gameMode,
     id,
     policy.speedControl,
+    readMidiTelemetry,
     timeStore,
   ]);
   const attemptCheckpointOptions = useMemo(
@@ -1042,6 +1093,7 @@ export function SongView() {
 
     setIsScoreModalOpen(false);
     setPracticePersistenceState('no-evidence');
+    setNoMusicalInput(false);
     playRunFromTick(0);
   }, [gameMode, playRunFromTick, practicePersistenceState]);
   const loadStoredRuns = useCallback(
@@ -1154,6 +1206,18 @@ export function SongView() {
     onPlay: playRun,
     onPlayFromTick: playRunFromTick,
   });
+  const selectPracticeLoop = useCallback(
+    (range: PracticeRange) => {
+      setIsLooping(true);
+      onPracticeRangeChange(range);
+    },
+    [onPracticeRangeChange, setIsLooping],
+  );
+  const clearPracticeLoop = useCallback(() => {
+    setIsLooping(false);
+    onPracticeRangeChange(undefined);
+    clearSelection();
+  }, [clearSelection, onPracticeRangeChange, setIsLooping]);
   const applyCoachLoop = useCallback(
     (barStart: number, barEnd: number, speed: number): boolean => {
       const start = barStart - 1;
@@ -1354,6 +1418,11 @@ export function SongView() {
     onPark: parkForInactivity,
     onResume: resumeAfterInactivity,
   });
+  const inactivityPauseVeil = useInactivityPauseVeil(
+    gameMode === 'practice' && inactivityRecovery.phase === 'parked'
+      ? inactivityRecovery.pauseEpoch
+      : undefined,
+  );
 
   useEffect(() => {
     if (
@@ -2137,8 +2206,13 @@ export function SongView() {
             aria-label="Loop section"
             checked={isLooping}
             onChange={(checked) => {
-              setIsLooping(checked);
-              clearSelection();
+              if (checked) {
+                setIsLooping(true);
+
+                return;
+              }
+
+              clearPracticeLoop();
             }}
           />
         </div>
@@ -2397,16 +2471,29 @@ export function SongView() {
       className="drumroll-practice-shell h-full pointer-events-auto"
       data-session-phase={practicePresentationPhase}
       data-loop-escape={loopEscape ? 'active' : undefined}
+      onPointerDownCapture={inactivityPauseVeil.release}
+      onPointerMoveCapture={inactivityPauseVeil.release}
+      onWheelCapture={inactivityPauseVeil.release}
     >
+      <InactivityPauseVeil
+        visible={inactivityPauseVeil.visible}
+        checkpointMeasure={
+          inactivityRecovery.phase === 'parked'
+            ? inactivityRecovery.checkpointMeasure
+            : 0
+        }
+      />
       <ScoreSummary
         isOpen={isScoreModalOpen}
         onNextSong={onNextSong}
-        nextLabel={gameMode === 'practice' ? 'Next practice' : undefined}
-        autoContinueEnabled={
-          gameMode === 'practice' &&
-          autoContinueEnabled &&
-          practicePersistenceState === 'saved'
-        }
+        nextLabel={gameMode === 'practice' ? 'Continue My Wave' : undefined}
+        continuationLabelLocked={gameMode === 'practice'}
+        autoContinueEnabled={canAutoContinuePractice(
+          gameMode,
+          autoContinueEnabled,
+          practicePersistenceState,
+          songData,
+        )}
         persistenceState={
           gameMode === 'practice' ? practicePersistenceState : undefined
         }
@@ -2416,6 +2503,7 @@ export function SongView() {
         difficulty={difficulty}
         scoreData={scoreData}
         practiceSummary={practiceSummary}
+        noMusicalInput={noMusicalInput}
         previousPracticeSummary={previousPracticeSummary}
         gamification={gamification}
         runResult={gamificationResult}
@@ -2545,9 +2633,18 @@ export function SongView() {
           </h1>
           <p
             className="m-0 truncate text-xs leading-tight text-text-faint"
-            title={songData?.artist}
+            data-testid={
+              practiceRecommendationReason ? 'practice-wave-reason' : undefined
+            }
+            title={
+              practiceRecommendationReason
+                ? `My Wave: ${practiceRecommendationReason}`
+                : songData?.artist
+            }
           >
-            {songData?.artist}
+            {practiceRecommendationReason
+              ? `My Wave · ${practiceRecommendationReason}`
+              : songData?.artist}
           </p>
         </div>
 
@@ -2600,6 +2697,21 @@ export function SongView() {
             <span aria-hidden="true" />
             {practiceInputStatus.shortLabel}
           </span>
+          {midiTelemetry && (
+            <span
+              className="drumroll-practice-input-telemetry"
+              data-testid="practice-midi-telemetry"
+              title={`MIDI ${
+                midiTelemetry.rawMessageCount
+              }; last message: ${lastMidiTime}; selected port epoch ${
+                midiTelemetry.selectedPortEpoch
+              }; last mapped lane: ${midiTelemetry.lastMappedLane ?? 'none'}`}
+            >
+              MIDI {midiTelemetry.rawMessageCount} · last {lastMidiTime} · E
+              {midiTelemetry.selectedPortEpoch} ·{' '}
+              {midiTelemetry.lastMappedLane ?? 'unmapped'}
+            </span>
+          )}
         </div>
         <SettingsButton
           page="song-view"
@@ -2693,6 +2805,8 @@ export function SongView() {
               practiceRange={practiceRange}
               focusIndex={focusIndex}
               onPracticeRangeChange={onPracticeRangeChange}
+              onLoopRangeSelect={selectPracticeLoop}
+              onClearLoop={clearPracticeLoop}
               gameMode={gameMode}
               songData={songData}
               isDev={isDev}
@@ -2740,6 +2854,7 @@ export function SongView() {
           <TutorHud
             state={tutorSession.state}
             message={tutorHudMessage}
+            midiTelemetry={midiTelemetry}
             recoveryCaption={recoveryCaption}
             displayState={tutorDisplayState}
             controlPrompt={kitControlPrompt}

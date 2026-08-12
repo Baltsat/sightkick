@@ -44,6 +44,7 @@ interface InputContextValue {
    * than pretending that the keyboard was chosen instead.
    */
   inputReadiness: InputReadiness;
+  midiPortEpoch: number;
   inputMapping: InputMapping;
   controlMapping: ControlMapping;
   kitControlIds: Set<string>;
@@ -463,6 +464,7 @@ export function InputProvider({ children }: { children: ReactNode }) {
           clearMidiRetry();
           setPersistedSelectedDevice(liveDevice);
           setInputReadiness('reconnecting');
+          setMidiOpenEpoch((epoch) => epoch + 1);
         }
 
         scheduleHealthCheck();
@@ -612,6 +614,7 @@ export function InputProvider({ children }: { children: ReactNode }) {
       setSelectedDevice,
       reconnectMidi,
       inputReadiness,
+      midiPortEpoch: midiOpenEpoch,
       inputMapping,
       controlMapping,
       kitControlIds,
@@ -625,6 +628,7 @@ export function InputProvider({ children }: { children: ReactNode }) {
       setSelectedDevice,
       reconnectMidi,
       inputReadiness,
+      midiOpenEpoch,
       inputMapping,
       controlMapping,
       kitControlIds,
