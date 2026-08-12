@@ -1,5 +1,7 @@
 export * from './item-manifest';
 
+export * from './my-wave';
+
 export * from './evidence-receipt';
 
 export * from './review-scheduler';

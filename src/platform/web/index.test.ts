@@ -605,22 +605,18 @@ describe('web platform channel mapping', () => {
   });
 
   it('reports a quota failure and leaves existing run history unchanged', async () => {
-    const originalSetItem = Storage.prototype.setItem;
+    const original_set_item = localStorage.setItem.bind(localStorage);
 
     localStorage.setItem(
       'drumroll.web.practice-runs',
       JSON.stringify({ existing: [{ completedAt: 'legacy' }] }),
     );
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function setItem(
-      this: Storage,
-      key,
-      value,
-    ) {
+    vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
       if (key === 'drumroll.web.practice-runs') {
         throw new DOMException('Storage quota exceeded', 'QuotaExceededError');
       }
 
-      return originalSetItem.call(this, key, value);
+      return original_set_item(key, value);
     });
 
     await expect(

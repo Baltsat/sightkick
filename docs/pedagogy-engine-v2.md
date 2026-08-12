@@ -569,3 +569,40 @@ core map items 1–7 are implemented as the `services/pedagogy` layer.
 - item 7: favourite-song paths expose at most three blockers, matching near-ready exercises, a safe section probe when chart confidence permits it, and unrestricted free play.
 
 the named proof lives in `atomic skill graph and curriculum manifests`, `atomic skill-state replay`, `graph-aware ZPD frontier`, `intent-aware session composer`, `favourite-song goal paths`, `favourite-song prerequisite paths`, `practice-stats atomic evidence persistence`, and the atomic Coach/deadline cases in `recommendNextPractice`. UI, library ingestion, and main-process IPC remain intentionally unchanged for the next surface-integration wave.
+
+## my wave — skill-similar continuation
+
+status: the deterministic service layer is implemented in `services/pedagogy/my-wave.ts`. it is re-exported through `services/next-practice` for the continuation surface; this slice intentionally does not alter the live song, lesson, or score screens.
+
+### model
+
+`extract_drum_chart_features` reads the parsed drum event groups already used by the app. it derives source-chart tempo, beat-grid subdivision and density, simultaneous foot/hand and kick/snare/timekeeper interplay, tom-based fill density, offbeat kick/snare syncopation, charted hand-stroke density, accent/ghost range, active lanes, meter, and repeated bar signatures. similarity combines atomic-demand cosine similarity (55%), chart-feature distance (35%), and meter/subdivision/lane context (10%) when all evidence exists. with thinner input it uses only the evidence that actually exists and labels the result accordingly.
+
+the chart can show note density and a scored hand-pattern proxy; it cannot establish which hand played a same-lane hit, grip, rebound, or physical sticking. authored atomic manifests may state a specific rudiment demand, while a chart-only item never claims one. dynamic range similarly reflects charted accent/ghost instructions, not a physical-technique assessment.
+
+the static feature scale is a policy, not a claim that the coefficients are biologically calibrated:
+
+```text
+chart_difficulty = weighted tempo, subdivision, independence, interplay,
+                   fill, syncopation, hand-density, dynamics, and novelty
+
+learner_relative_difficulty = 0.45 × chart_difficulty
+                            + 0.45 × (1 - weighted_harmonic_atomic_readiness)
+                            + 0.10 × (1 - atomic_evidence_confidence)
+```
+
+atomic readiness is decayed from the learner’s measured skill state, so the same 16th-note groove can be a consolidation item for one drummer and a scaffolded stretch for another. playback speed also scales the manifest tempo before the existing graph-aware ZPD scorer runs.
+
+the default deterministic wave is `step_up → consolidate → step_up → stretch → step_up`. it targets a small positive learner-relative difference for step-ups, a small negative difference for consolidation, and a larger positive difference only when the graph scorer supplies a scaffold. ties resolve by authored sequence and item id, so candidate order does not affect the result. song intent filters to playable, unlocked songs; learning intent favors lessons but does not remove an available song application. an unavailable, locked, or `goal_preview_only` candidate cannot enter the continuation stream. when none remain in the ZPD, the engine returns `no_zpd_candidate` instead of pretending that a free-play destination is a practice recommendation.
+
+every item includes a one-line reason such as “same 16th-hat groove, one notch faster.” its receipt records the policy version, planned and selected step, similarity factors, learner-relative delta, predicted success and full ZPD factor trace when present, source/candidate chart and manifest revisions, playback speeds, chart-note counts, demanded atomic skill ids, and atomic-state count. a chartless or manifestless continuation remains possible only as `thin_evidence_wave` and says so explicitly.
+
+### applied research
+
+the selection band follows the challenge-point idea that useful task difficulty is relative to the learner and task, rather than a global song label. the consolidation slot and delayed atomic review keep immediate clean performance distinct from retention; the transfer-oriented steps vary musical context only after the skill is close enough to survive that variation. the stretch is deliberately bounded and scaffolded, rather than treating friction as inherently productive. this is compatible with the evidence for contextual interference while respecting its heterogeneous applied findings.
+
+1. Guadagnoli, M. A., and T. D. Lee. 2004. _Challenge Point: A Framework for Conceptualizing the Effects of Various Practice Conditions in Motor Learning._ Journal of Motor Behavior 36(2): 212–224. doi: [10.3200/JMBR.36.2.212-224](https://doi.org/10.3200/JMBR.36.2.212-224). [PubMed PMID 15130871](https://pubmed.ncbi.nlm.nih.gov/15130871/). applied to the learner-relative difficulty and predicted-success band.
+2. Kantak, S. S., and C. J. Winstein. 2012. _Learning-performance distinction and memory processes for motor skills: a focused review and perspective._ Behavioural Brain Research 228(1): 219–231. doi: [10.1016/j.bbr.2011.11.028](https://doi.org/10.1016/j.bbr.2011.11.028). [PubMed PMID 22142953](https://pubmed.ncbi.nlm.nih.gov/22142953/). applied to the separation of acquisition, delayed retention, and changed-context transfer evidence.
+3. Czyż, S. H., A. M. Wójcik, and P. Solarská. 2024. _The effect of contextual interference on transfer in motor learning: a systematic review and meta-analysis._ Frontiers in Psychology 15:1377122. doi: [10.3389/fpsyg.2024.1377122](https://doi.org/10.3389/fpsyg.2024.1377122). [full article](https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2024.1377122/full). applied to occasional, bounded alternate-context transfer rather than indiscriminate randomization.
+4. Mawson, R. D., and S. H. K. Kang. 2025. _The Distributed Practice Effect on Classroom Learning: A Meta-Analytic Review of Applied Research._ Behavioral Sciences 15(6): 771. doi: [10.3390/bs15060771](https://doi.org/10.3390/bs15060771). [PubMed Central](https://pmc.ncbi.nlm.nih.gov/articles/PMC12189222/). applied to due-review preference, while the product continues to test motor retention directly.
+5. de Bruin, A. B. H., F. Biwer, L. Hui, E. Onan, L. David, and W. Wiradhany. 2023. _Worth the Effort: the Start and Stick to Desirable Difficulties (S2D2) Framework._ Educational Psychology Review 35:41. doi: [10.1007/s10648-023-09766-w](https://doi.org/10.1007/s10648-023-09766-w). [full article](https://link.springer.com/article/10.1007/s10648-023-09766-w). applied as a guardrail: a stretch must be at the right level and show its payoff, rather than becoming generic “harder is better” copy.
