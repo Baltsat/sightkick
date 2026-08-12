@@ -64,7 +64,11 @@ export type Channels =
   | 'load-goals'
   | 'delete-goal'
   | 'set-primary-goal'
-  | 'export-pdf';
+  | 'export-pdf'
+  | 'get-practice-presence-settings'
+  | 'practice-presence-settings'
+  | 'save-practice-presence-settings'
+  | 'practice-presence-settings-saved';
 
 const electronHandler = {
   ipcRenderer: {

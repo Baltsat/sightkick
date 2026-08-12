@@ -9,11 +9,8 @@
   max-height: calc(100vh - 5rem);
   min-height: 0;
   overflow: hidden;
-  background: radial-gradient(
-      circle at 82% 5%,
-      rgb(86 216 242 / 16%),
-      transparent 28rem
-    ),
+  background:
+    radial-gradient(circle at 82% 5%, rgb(86 216 242 / 16%), transparent 28rem),
     linear-gradient(135deg, #f8f5ef 0%, #eee8dc 52%, #e5eef0 100%);
 }
 
@@ -42,7 +39,8 @@
   z-index: -1;
   inset: 0;
   content: '';
-  background: linear-gradient(
+  background:
+    linear-gradient(
       90deg,
       rgb(248 245 239 / 78%) 0%,
       rgb(248 245 239 / 52%) 27%,
@@ -187,8 +185,8 @@
   padding: 0.48rem 0.7rem;
   color: #3a4553;
   background: rgb(255 255 255 / 66%);
-  font-family: 'Instrument Sans Variable', 'Instrument Sans', system-ui,
-    sans-serif;
+  font-family:
+    'Instrument Sans Variable', 'Instrument Sans', system-ui, sans-serif;
   font-size: 0.74rem;
   font-weight: 700;
   line-height: 1;
@@ -320,7 +318,8 @@
 
 .daybreak-next-up {
   border-color: rgb(247 53 134 / 33%);
-  background: linear-gradient(
+  background:
+    linear-gradient(
       120deg,
       rgb(255 255 255 / 90%),
       rgb(255 231 242 / 87%) 52%,
@@ -699,11 +698,6 @@
   margin-top: 0.04rem;
 }
 
-.daybreak-lesson-node:hover {
-  transform: translate(-50%, -50%) scale(1.035);
-  filter: saturate(1.06);
-}
-
 .daybreak-lesson-node:focus-visible .daybreak-lesson-node__plaque {
   outline: 3px solid rgb(86 216 242 / 82%);
   outline-offset: 3px;
@@ -852,7 +846,8 @@
   }
 
   .daybreak-journey-stage::before {
-    background: linear-gradient(
+    background:
+      linear-gradient(
         180deg,
         rgb(248 245 239 / 91%) 0%,
         rgb(248 245 239 / 66%) 38%,

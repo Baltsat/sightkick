@@ -5,6 +5,7 @@ import { cn } from '../../cn';
 import { SongListItem } from '../SongListItem';
 import { Difficulty } from 'scan-chart';
 import { OnlineSong } from '../../types';
+import { useSongHoverPreview } from '../../hooks/useSongHoverPreview';
 
 export interface SongListProps {
   songList: (Song | OnlineSong)[];
@@ -22,6 +23,7 @@ export interface SongListProps {
   scrollKey?: string;
   downloadingDisabled: boolean;
   focusedIndex?: number;
+  previewEnabled?: boolean;
 }
 
 const LOAD_MORE_THRESHOLD = 2;
@@ -42,8 +44,13 @@ export function SongList({
   onSetGoal,
   onLoadMore,
   focusedIndex,
+  previewEnabled = true,
 }: SongListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const { preview, startPreview, stopPreview } = useSongHoverPreview(
+    previewEnabled,
+    difficulty,
+  );
 
   useEffect(() => {
     parentRef.current?.scrollTo(0, 0);
@@ -85,6 +92,7 @@ export function SongList({
       >
         {rowVirtualizer.getVirtualItems().map((virtualItem) => {
           const songData = songList[virtualItem.index];
+          const localSong = 'source' in songData ? undefined : songData;
 
           return (
             <div
@@ -112,6 +120,13 @@ export function SongList({
                 splitting={splittingIds.has(songData.id)}
                 downloadingDisabled={downloadingDisabled}
                 focused={virtualItem.index === focusedIndex}
+                preview={preview?.songId === songData.id ? preview : undefined}
+                onPreviewStart={
+                  localSong ? () => startPreview(localSong) : undefined
+                }
+                onPreviewEnd={
+                  localSong ? () => stopPreview(localSong.id) : undefined
+                }
               />
             </div>
           );

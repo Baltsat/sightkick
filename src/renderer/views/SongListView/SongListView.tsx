@@ -183,6 +183,10 @@ function candidateProvenance(
 
 export function SongListView() {
   const { currentPath, difficulty, setDifficulty } = useApp();
+  const [hoverPreviewEnabled, setHoverPreviewEnabled] = usePersisted(
+    'settings.songHoverPreview',
+    true,
+  );
   const { controlMapping, inputMapping } = useInput();
   const libraryControls = useMemo(
     () => resolveLibraryControls(controlMapping, inputMapping),
@@ -1128,7 +1132,12 @@ export function SongListView() {
           />
         }
         settingsSlot={
-          <SettingsButton page="song-list" scanPercent={scanPercent} />
+          <SettingsButton
+            page="song-list"
+            scanPercent={scanPercent}
+            hoverPreviewEnabled={hoverPreviewEnabled}
+            onHoverPreviewEnabledChange={setHoverPreviewEnabled}
+          />
         }
         onOpenProfile={() => {
           gamification.loadAchievements();
@@ -1551,6 +1560,7 @@ export function SongListView() {
                     downloadingIds={downloadingIds}
                     downloadingDisabled={currentPath === null}
                     difficulty={difficulty}
+                    previewEnabled={hoverPreviewEnabled}
                     onClickSong={(id) => {
                       if (libraryMode === 'local') {
                         play(id);

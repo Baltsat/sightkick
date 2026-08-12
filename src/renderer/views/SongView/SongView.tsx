@@ -248,6 +248,7 @@ export function SongView() {
     selectedDevice,
     inputReadiness,
     inputLatencyMs,
+    reconnectMidi,
   } = useInput();
   const {
     playheadStyle,
@@ -1318,6 +1319,7 @@ export function SongView() {
         return;
       }
 
+      reconnectMidi();
       pause();
       seekSeconds(
         ticksToSeconds(
@@ -1327,7 +1329,7 @@ export function SongView() {
         ) + delaySeconds,
       );
     },
-    [chart, delaySeconds, pause, seekSeconds],
+    [chart, delaySeconds, pause, reconnectMidi, seekSeconds],
   );
   const resumeAfterInactivity = useCallback(
     (checkpoint: InactivityCheckpoint) => {
@@ -1658,11 +1660,18 @@ export function SongView() {
 
   const tutorHudMessage = useMemo(() => {
     if (inactivityRecovery.phase === 'parked') {
+      const kitName =
+        selectedDevice?.sourceId === 'midi' ? selectedDevice.name : undefined;
+
       return {
-        title: 'Paused — no hits detected',
-        detail: `Rewound to bar ${
-          inactivityRecovery.checkpointMeasure + 1
-        }. Hit any pad to count in and resume.`,
+        title: kitName
+          ? 'Paused — checking kit input'
+          : 'Paused — no hits detected',
+        detail: `Rewound to bar ${inactivityRecovery.checkpointMeasure + 1}.${
+          kitName
+            ? ` Reopening ${kitName}; hit any pad to count in and resume.`
+            : ' Hit any pad to count in and resume.'
+        }`,
         tone: 'warning' as const,
       };
     }
@@ -1740,6 +1749,7 @@ export function SongView() {
     interruptedResumeMeasure,
     remediationSession.activeTask,
     playbackSpeed,
+    selectedDevice,
     songData?.lesson,
     tutorSession.message,
   ]);

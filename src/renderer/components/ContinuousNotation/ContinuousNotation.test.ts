@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { Stave, StaveNote } from 'vexflow';
 import { Measure, ParsedChart, RenderData } from '../../../chart-parser/types';
 import { TimeStore } from '../../services/time-store';
+import { secondsToTicks } from '../../../chart-parser/timing';
+import { getXForTick } from '../../services/engine/cursor-geometry';
 import {
   flowBeatCount,
   flowFixedPlayheadGeometry,
@@ -11,6 +13,7 @@ import {
   flowMeterBars,
   flowPlayheadOffset,
   flowScrollStep,
+  flowViewportPlayheadGeometry,
   horizontalScrollParent,
   LoopEscapeRunway,
   loopEscapeEnergy,
@@ -122,6 +125,48 @@ describe('ContinuousNotation camera viewport', () => {
     expect(flowScrollStep(0, 2400, true)).toEqual({
       nextScrollLeft: 2400,
       continueSettling: false,
+    });
+  });
+
+  it('keeps the transport, bar label, and viewport playhead aligned through speed changes and a rewind', () => {
+    const chart = {
+      resolution: 100,
+      tempos: [{ tick: 0, beatsPerMinute: 60, msTime: 0 }],
+    } as unknown as ParsedChart;
+    const data = [measureData(0, 400, 0, 400), measureData(400, 800, 400, 400)];
+    const samples = [
+      { phase: 'playing', speed: 0.5, seconds: 2.99, bar: 1, beat: 3 },
+      { phase: 'paused', speed: 0.5, seconds: 2.99, bar: 1, beat: 3 },
+      { phase: 'resumed', speed: 0.7, seconds: 4, bar: 2, beat: 1 },
+      { phase: 'playing', speed: 1, seconds: 5, bar: 2, beat: 2 },
+      { phase: 'remediation rewind', speed: 0.7, seconds: 1, bar: 1, beat: 2 },
+    ];
+    const viewportLeft = 48;
+    const anchor = 220;
+    const scoreLeft = 500;
+    const zoom = 1.15;
+
+    samples.forEach(({ seconds, bar, beat }) => {
+      const tick = secondsToTicks(seconds, chart.resolution, chart.tempos);
+      const location = flowLocationForTick(data, tick)!;
+      const x = getXForTick(tick, data[location.measureIndex]);
+      const target = scoreLeft + x * zoom - anchor;
+      const geometry = flowViewportPlayheadGeometry({
+        viewportLeft,
+        anchor,
+        scoreTop: 120,
+        scoreBottom: 420,
+        beatY: 200,
+      });
+
+      expect(location).toMatchObject({ barNumber: bar, beatNumber: beat });
+      expect(geometry).toEqual({
+        left: viewportLeft + anchor,
+        top: 120,
+        height: 300,
+        beatOffset: 80,
+      });
+      expect(target + anchor).toBeCloseTo(scoreLeft + x * zoom);
     });
   });
 });

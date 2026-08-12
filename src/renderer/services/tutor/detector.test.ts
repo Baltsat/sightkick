@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { ResolvedJudgement } from '../engine';
-import { detectTutorTrigger, summarizeTutorWindow } from './detector';
-import { DEFAULT_TUTOR_SETTINGS, TutorChartPlan } from './types';
+import {
+  detectTutorTrigger,
+  isCleanRecovery,
+  summarizeTutorWindow,
+} from './detector';
+import {
+  DEFAULT_TUTOR_SETTINGS,
+  GUIDED_PRACTICE_TUTOR_SETTINGS,
+  TutorChartPlan,
+} from './types';
 
 const CHART: TutorChartPlan = {
   measures: Array.from({ length: 4 }, (_, index) => ({
@@ -48,12 +56,13 @@ function detect(
   judgements: Record<number, ResolvedJudgement[]>,
   completedMeasure = 0,
   barFailureHistory = {},
+  settings = DEFAULT_TUTOR_SETTINGS,
 ) {
   return detectTutorTrigger(
     CHART,
     judgements,
     completedMeasure,
-    DEFAULT_TUTOR_SETTINGS,
+    settings,
     'trigger:1',
     barFailureHistory,
   );
@@ -273,14 +282,25 @@ describe('tutor detector', () => {
         expected(0, 3, 'hit', 160),
       ],
     });
-    const sustainedSpread = detect({
-      0: [
-        expected(0, 0, 'hit', -80),
-        expected(0, 1, 'hit', 80),
-        expected(0, 2, 'hit', -80),
-        expected(0, 3, 'hit', 80),
-      ],
-    });
+    const sustainedSpread = detect(
+      {
+        0: [
+          expected(0, 0, 'hit', -80),
+          expected(0, 1, 'hit', 80),
+          expected(0, 2, 'hit', -80),
+          expected(0, 3, 'hit', 80),
+        ],
+        1: [
+          expected(1, 0, 'miss'),
+          expected(1, 1, 'miss'),
+          expected(1, 2, 'miss'),
+          expected(1, 3, 'miss'),
+        ],
+      },
+      1,
+      {},
+      { ...DEFAULT_TUTOR_SETTINGS, minimumDistinctErrors: 5 },
+    );
 
     expect(isolatedOutlier).toBeUndefined();
     expect(sustainedSpread).toMatchObject({
@@ -288,6 +308,94 @@ describe('tutor detector', () => {
       stats: { timingSampleCount: 4, timingOutlierCount: 4 },
     });
   });
+
+  it('replays the recorded DTX timing spread without interrupting a 100%-hit lesson', () => {
+    const chart: TutorChartPlan = {
+      measures: [
+        { index: 0, startTick: 0, endTick: 600, expectedKeys: 6 },
+        { index: 1, startTick: 600, endTick: 1_200, expectedKeys: 6 },
+      ],
+    };
+    const deltas = [
+      216.25, -115, -87.5, -46.25, 56.25, -198.75, 38.75, 7.5, -8.75, -40,
+      -56.25, -87.5,
+    ];
+    const judgements: Record<number, ResolvedJudgement[]> = {
+      0: deltas.slice(0, 6).map((deltaMs, index) => ({
+        ...expected(0, index * 100, 'hit', deltaMs),
+        id: `dtx:0:${index}`,
+      })),
+      1: [
+        ...deltas.slice(6).map((deltaMs, index) => ({
+          ...expected(1, index * 100, 'hit', deltaMs),
+          id: `dtx:1:${index}`,
+        })),
+        wrong(1, 610),
+        wrong(1, 620),
+      ],
+    };
+    const settings = {
+      ...DEFAULT_TUTOR_SETTINGS,
+      ...GUIDED_PRACTICE_TUTOR_SETTINGS,
+    };
+    const stats = summarizeTutorWindow(chart, judgements, 0, 1);
+
+    expect(stats).toMatchObject({
+      resolved: 12,
+      hits: 12,
+      misses: 0,
+      wrong: 2,
+      accuracy: 1,
+      timingSampleCount: 12,
+    });
+    expect(stats.timingSpreadMs).toBeGreaterThan(
+      settings.timingSpreadThresholdMs,
+    );
+    expect(stats.timingOutlierCount).toBeGreaterThanOrEqual(
+      settings.minimumTimingOutliers,
+    );
+    expect(
+      detectTutorTrigger(
+        chart,
+        judgements,
+        1,
+        { ...settings, minimumResolvedEvents: 8 },
+        'recorded-dtx-run',
+      ),
+    ).toBeUndefined();
+  });
+
+  it.each([2, 3])(
+    'accepts the recorded 20-hit recovery pass with %i wrong pads',
+    (wrongPads) => {
+      const chart: TutorChartPlan = {
+        measures: [
+          { index: 0, startTick: 0, endTick: 2_000, expectedKeys: 20 },
+        ],
+      };
+      const judgements: Record<number, ResolvedJudgement[]> = {
+        0: [
+          ...Array.from({ length: 20 }, (_, index) =>
+            expected(0, index * 100, 'hit', 0),
+          ),
+          ...Array.from({ length: wrongPads }, (_, index) =>
+            wrong(0, 2_000 + index),
+          ),
+        ],
+      };
+      const settings = {
+        ...DEFAULT_TUTOR_SETTINGS,
+        ...GUIDED_PRACTICE_TUTOR_SETTINGS,
+      };
+
+      expect(
+        isCleanRecovery(
+          summarizeTutorWindow(chart, judgements, 0, 0),
+          settings,
+        ),
+      ).toBe(true);
+    },
+  );
 
   it('ignores warm-up taps and deduplicates authoritative judgement ids', () => {
     const hit = expected(0, 0, 'hit');

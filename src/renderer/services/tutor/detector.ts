@@ -280,6 +280,7 @@ export function detectTutorTrigger(
   }
 
   if (
+    stats.accuracy < settings.triggerAccuracy &&
     stats.timingSampleCount >= settings.minimumTimingSamples &&
     stats.timingSpreadMs >= settings.timingSpreadThresholdMs &&
     stats.timingOutlierCount >= settings.minimumTimingOutliers

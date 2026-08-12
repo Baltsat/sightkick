@@ -194,9 +194,15 @@ export function messageForTutorCommand(
       settings.requiredCleanRepetitions,
       command.recovery.qualityProgress,
     );
+    const speedChanged =
+      Math.abs(command.speed - command.attempt.speed) > 0.001;
 
     return {
-      title: qualityPass ? 'Quality pass saved' : 'Tempo adjusted',
+      title: qualityPass
+        ? 'Quality pass saved'
+        : speedChanged
+        ? 'Tempo adjusted'
+        : 'One more focused pass',
       detail: qualityPass
         ? `${retainedProgress.toFixed(1)} of ${
             settings.requiredCleanRepetitions
@@ -209,7 +215,11 @@ export function messageForTutorCommand(
             settings.requiredCleanRepetitions
           } progress remains (${attemptEvidence}; a quality pass is ${qualityPredicate(
             settings,
-          )}). Lower from ${previousSpeed} to ${nextSpeed} for a playable next lead-in.`,
+          )}). ${
+            speedChanged
+              ? `Lower from ${previousSpeed} to ${nextSpeed} for a playable next lead-in.`
+              : `Hold ${nextSpeed} for one focused pass, then continue.`
+          }`,
       tone: 'recovery',
     };
   }

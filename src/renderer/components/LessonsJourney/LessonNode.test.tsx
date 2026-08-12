@@ -54,4 +54,39 @@ describe('LessonNode kit color maturity', () => {
       'var(--color-red) var(--kit-color-vividness)',
     );
   });
+
+  it('names the action a hover is about to reveal', () => {
+    const lockedEntry = { ...entry(), unlocked: false, clearsNeeded: 1 };
+    const { rerender } = render(
+      <LessonNode
+        entry={entry()}
+        state="available"
+        xPercent={40}
+        yPercent={40}
+        onPlay={vi.fn()}
+        onLockedClick={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('lesson-item-01.01')).toHaveAttribute(
+      'data-action',
+      'start',
+    );
+
+    rerender(
+      <LessonNode
+        entry={lockedEntry}
+        state="locked"
+        xPercent={40}
+        yPercent={40}
+        onPlay={vi.fn()}
+        onLockedClick={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('lesson-item-01.01')).toHaveAttribute(
+      'data-action',
+      'requirements',
+    );
+  });
 });

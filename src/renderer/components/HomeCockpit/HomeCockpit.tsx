@@ -2,6 +2,7 @@ import {
   type CSSProperties,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -18,7 +19,6 @@ import { Difficulty } from 'scan-chart';
 import { Song } from '../../../types';
 import { useInput } from '../../context/InputContext';
 import { inputBus } from '../../input';
-import { useDrumGestures } from '../../hooks/useDrumGestures';
 import { UseGamificationResult } from '../../hooks/useGamification';
 import { LessonProgress } from '../../hooks/useLessons';
 import { calculateAccuracy } from '../../scoring';
@@ -45,7 +45,6 @@ import type {
   ZpdRankedCandidate,
 } from '../../services/pedagogy/types';
 import { composePracticeCards } from '../../services/pedagogy';
-import { DrumGestureAction } from '../../services/gestures';
 import { KitElement } from '../../services/practice-stats';
 import {
   useKitColorMaturity,
@@ -55,6 +54,7 @@ import { EvidencePracticeCards } from '../PracticeCards';
 import { playKitPreview } from '../../services/kit-preview-audio';
 import homeKitStudio from '../../assets/daybreak/home-kit-studio.png';
 import drumstickCursor from '../../assets/daybreak/drumstick-cursor-reversed.png';
+import { fitKitZone, HOME_KIT_ZONE_MAP } from './kit-zone-map';
 import './HomeCockpit.css';
 import './KitHome.css';
 
@@ -90,7 +90,6 @@ interface HomeCockpitProps {
 interface KitHotspot {
   element: KitElement;
   label: string;
-  position: string;
 }
 
 const KIT_COLOR_LANE: Record<KitElement, KitColorLane> = {
@@ -103,27 +102,15 @@ const KIT_COLOR_LANE: Record<KitElement, KitColorLane> = {
   crash: 'green',
   tom3: 'green',
 };
-const HOME_KIT_NAVIGATION: Partial<Record<KitElement, DrumGestureAction>> = {
-  snare: 'open-songs',
-  tom1: 'open-journey',
-  ride: 'open-coach',
-  crash: 'open-profile',
-};
-const HOME_KIT_NAV_LABEL: Partial<Record<KitElement, string>> = {
-  snare: 'Songs',
-  tom1: 'Journey',
-  ride: 'Coach',
-  crash: 'Profile',
-};
 const KIT_HOTSPOTS: KitHotspot[] = [
-  { element: 'hihat', label: 'Hi-hat', position: 'hihat' },
-  { element: 'crash', label: 'Crash', position: 'crash' },
-  { element: 'tom1', label: 'Tom 1', position: 'tom1' },
-  { element: 'tom2', label: 'Tom 2', position: 'tom2' },
-  { element: 'ride', label: 'Ride', position: 'ride' },
-  { element: 'snare', label: 'Snare', position: 'snare' },
-  { element: 'tom3', label: 'Floor tom', position: 'tom3' },
-  { element: 'kick', label: 'Kick', position: 'kick' },
+  { element: 'hihat', label: 'Hi-hat' },
+  { element: 'crash', label: 'Crash' },
+  { element: 'tom1', label: 'Tom 1' },
+  { element: 'tom2', label: 'Tom 2' },
+  { element: 'ride', label: 'Ride' },
+  { element: 'snare', label: 'Snare' },
+  { element: 'tom3', label: 'Floor tom' },
+  { element: 'kick', label: 'Kick' },
 ];
 
 function trendSummary(trendPp: number | undefined) {
@@ -201,8 +188,6 @@ export function HomeCockpit({
   onStartPracticeCard,
   onOpenSongs,
   onOpenJourney,
-  onOpenCoach,
-  onOpenProfile,
 }: HomeCockpitProps) {
   const { inputMapping, inputReadiness, selectedDevice } = useInput();
   const [activeLane, setActiveLane] = useState<KitElement>();
@@ -210,8 +195,10 @@ export function HomeCockpit({
   const [sessionState, setSessionState] = useState<'armed' | 'count-in'>(
     'armed',
   );
+  const [studioSize, setStudioSize] = useState({ width: 0, height: 0 });
   const clearPulseRef = useRef<number | undefined>(undefined);
   const clearPointerStrikeRef = useRef<number | undefined>(undefined);
+  const studioRef = useRef<HTMLElement>(null);
   const homeRanking = useMemo(() => {
     const ranked: RankedPracticeCandidate[] = [];
     const seen = new Set<string>();
@@ -308,6 +295,37 @@ export function HomeCockpit({
     [gamification.runsBySong],
   );
   const kitColors = useKitColorMaturity(kitColorRuns);
+
+  useLayoutEffect(() => {
+    const studio = studioRef.current;
+
+    if (!studio) {
+      return undefined;
+    }
+
+    const measure = () => {
+      const { width, height } = studio.getBoundingClientRect();
+
+      setStudioSize((current) =>
+        current.width === width && current.height === height
+          ? current
+          : { width, height },
+      );
+    };
+
+    measure();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return undefined;
+    }
+
+    const observer = new ResizeObserver(measure);
+
+    observer.observe(studio);
+
+    return () => observer.disconnect();
+  }, []);
+
   const elementByControlId = useMemo(() => {
     const map = new Map<string, KitElement>();
 
@@ -341,37 +359,6 @@ export function HomeCockpit({
     },
     [homeSession, onStartRecommended, onStartSession, pulseLane],
   );
-  const handleHomeKitAction = useCallback(
-    (action: DrumGestureAction) => {
-      if (action === 'start') {
-        if (hasPracticeTarget) {
-          startCurrentPractice('kick');
-        } else {
-          onOpenSongs();
-        }
-
-        return;
-      }
-
-      if (action === 'open-songs') {
-        onOpenSongs();
-      } else if (action === 'open-journey') {
-        onOpenJourney();
-      } else if (action === 'open-coach') {
-        onOpenCoach();
-      } else if (action === 'open-profile') {
-        onOpenProfile();
-      }
-    },
-    [
-      hasPracticeTarget,
-      onOpenCoach,
-      onOpenJourney,
-      onOpenProfile,
-      onOpenSongs,
-      startCurrentPractice,
-    ],
-  );
   const handlePointerStrike = useCallback(
     (element: KitElement) => {
       playKitPreview(element);
@@ -394,25 +381,11 @@ export function HomeCockpit({
       handlePointerStrike(element);
 
       if (!hasPracticeTarget) {
-        const action = HOME_KIT_NAVIGATION[element];
-
-        if (action) {
-          handleHomeKitAction(action);
-        }
+        onOpenSongs();
       }
     },
-    [handleHomeKitAction, handlePointerStrike, hasPracticeTarget],
+    [handlePointerStrike, hasPracticeTarget, onOpenSongs],
   );
-
-  useDrumGestures({
-    enabled:
-      surface === 'home' &&
-      inputReadiness === 'connected' &&
-      !hasPracticeTarget,
-    surface: 'home',
-    mapping: inputMapping,
-    onAction: handleHomeKitAction,
-  });
 
   useEffect(() => {
     if (surface !== 'home') {
@@ -570,14 +543,7 @@ export function HomeCockpit({
       data-kit-color-maturity={kitColors.presentation.maturity.toFixed(3)}
       aria-labelledby="home-cockpit-title"
     >
-      <section className="kit-home__studio" data-testid="home-kit-stage">
-        <img
-          className="kit-home__photo"
-          src={homeKitStudio}
-          alt="A pearl drum kit in a sunlit studio"
-        />
-        <div className="kit-home__wash" aria-hidden="true" />
-
+      <aside className="kit-home__context" aria-label="Current practice">
         <div
           className="kit-home__manifest"
           data-testid="home-session-manifest"
@@ -600,6 +566,50 @@ export function HomeCockpit({
           </button>
         </div>
 
+        <section
+          className="kit-home__session-summary"
+          aria-label="Today’s practice"
+          data-testid="home-session-summary"
+        >
+          <strong>{sessionSummary?.title ?? 'Choose a song to begin'}</strong>
+          <span>
+            {sessionSummary?.detail ??
+              'Pick a song, then strike a highlighted drum to start.'}
+          </span>
+          <details>
+            <summary>Session details</summary>
+            <div className="kit-home__session-details">
+              {sessionDetails.map(({ label, stop }) =>
+                stop ? (
+                  <p key={stop.title}>
+                    <strong>{label}</strong>
+                    <span>{stop.title}</span>
+                  </p>
+                ) : null,
+              )}
+              <EvidencePracticeCards
+                compact
+                cards={homePracticeCards.cards}
+                onStart={onStartPracticeCard}
+                testId="home-practice-card"
+              />
+            </div>
+          </details>
+        </section>
+      </aside>
+
+      <section
+        ref={studioRef}
+        className="kit-home__studio"
+        data-testid="home-kit-stage"
+      >
+        <img
+          className="kit-home__photo"
+          src={homeKitStudio}
+          alt="A pearl drum kit in a sunlit studio"
+        />
+        <div className="kit-home__wash" aria-hidden="true" />
+
         <p
           className="sr-only"
           data-testid="home-input-readiness"
@@ -618,22 +628,26 @@ export function HomeCockpit({
             const isPointerStrike = pointerStrikeLane === hotspot.element;
             const targetLabel =
               practiceTarget?.name ?? 'the selected practice target';
-            const navigationLabel = HOME_KIT_NAV_LABEL[hotspot.element];
 
             return (
               <button
                 key={hotspot.element}
                 type="button"
                 data-testid={`kit-hotspot-${hotspot.element}`}
-                className={`kit-home__pad kit-home__pad--${hotspot.position}`}
+                className="kit-home__pad"
                 data-active={isActive}
                 data-color-lane={KIT_COLOR_LANE[hotspot.element]}
+                style={
+                  fitKitZone(
+                    HOME_KIT_ZONE_MAP.zones[hotspot.element],
+                    HOME_KIT_ZONE_MAP.image,
+                    studioSize,
+                  ) as CSSProperties
+                }
                 aria-label={
                   hasPracticeTarget
                     ? `${hotspot.label}. Start ${targetLabel}.`
-                    : navigationLabel
-                    ? `${hotspot.label}. Open ${navigationLabel}.`
-                    : `${hotspot.label}. Preview this drum.`
+                    : `${hotspot.label}. Choose a song to arm practice.`
                 }
                 onClick={() => handlePadClick(hotspot.element)}
               >
@@ -646,11 +660,7 @@ export function HomeCockpit({
                   alt=""
                   aria-hidden="true"
                 />
-                <span className="kit-home__pad-label">
-                  {hasPracticeTarget
-                    ? hotspot.label
-                    : navigationLabel ?? hotspot.label}
-                </span>
+                <span className="kit-home__pad-label">{hotspot.label}</span>
               </button>
             );
           })}
@@ -667,37 +677,6 @@ export function HomeCockpit({
         </p>
       </section>
 
-      <section
-        className="kit-home__session-summary"
-        aria-label="Today’s practice"
-        data-testid="home-session-summary"
-      >
-        <strong>{sessionSummary?.title ?? 'Choose a song to begin'}</strong>
-        <span>
-          {sessionSummary?.detail ??
-            'Pick a song, then strike a highlighted drum to start.'}
-        </span>
-        <details>
-          <summary>Session details</summary>
-          <div className="kit-home__session-details">
-            {sessionDetails.map(({ label, stop }) =>
-              stop ? (
-                <p key={stop.title}>
-                  <strong>{label}</strong>
-                  <span>{stop.title}</span>
-                </p>
-              ) : null,
-            )}
-            <EvidencePracticeCards
-              compact
-              cards={homePracticeCards.cards}
-              onStart={onStartPracticeCard}
-              testId="home-practice-card"
-            />
-          </div>
-        </details>
-      </section>
-
       <p
         className="sr-only"
         role="status"
@@ -711,7 +690,7 @@ export function HomeCockpit({
           ? `${practiceTarget?.name} is armed at ${(
               homeSession?.launchSpeed ?? targetRecommendation.suggestedSpeed
             ).toFixed(1)} times speed. Any mapped pad starts it.`
-          : 'Choose a song, then hit a highlighted drum to start. Snare opens Songs, Tom 1 opens Journey, Ride opens Coach, and Crash opens Profile.'}
+          : 'Choose a song to arm a practice target. Any mapped drum then starts it.'}
       </p>
     </section>
   );

@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '../../cn';
 import { Measure, RenderData } from '../../../chart-parser/types';
 import { ParsedChart } from '../../../chart-parser/types';
@@ -308,6 +309,26 @@ export function SheetMusic({
     handleMeasureMouseEnter,
   ]);
   const isFlow = layout === 'flow';
+  const flowPlayhead = !isFlow ? null : (
+    <div
+      ref={fixedFlowPlayheadRef}
+      className="drumroll-flow-fixed-playhead"
+      data-testid="flow-fixed-playhead"
+      aria-hidden="true"
+      style={{ display: 'none' }}
+    >
+      <span className="drumroll-flow-fixed-playhead__label">
+        <span className="drumroll-flow-fixed-playhead__now">Now</span>
+        <span
+          className="drumroll-flow-fixed-playhead__location"
+          data-flow-location
+        >
+          Bar 1 / {renderData.length} · Beat 1
+        </span>
+      </span>
+      <span className="drumroll-flow-fixed-playhead__beat" />
+    </div>
+  );
   // Both layouts use the exact same canonical VexFlow glyph scale. Flow
   // changes only the camera and viewport; switching modes must never make
   // the score subtly smaller or force the drummer to relearn its proportions.
@@ -334,26 +355,10 @@ export function SheetMusic({
           delaySeconds={delaySeconds}
         />
       )}
-      {isFlow && (
-        <div
-          ref={fixedFlowPlayheadRef}
-          className="drumroll-flow-fixed-playhead"
-          data-testid="flow-fixed-playhead"
-          aria-hidden="true"
-          style={{ display: 'none' }}
-        >
-          <span className="drumroll-flow-fixed-playhead__label">
-            <span className="drumroll-flow-fixed-playhead__now">Now</span>
-            <span
-              className="drumroll-flow-fixed-playhead__location"
-              data-flow-location
-            >
-              Bar 1 / {renderData.length} · Beat 1
-            </span>
-          </span>
-          <span className="drumroll-flow-fixed-playhead__beat" />
-        </div>
-      )}
+      {flowPlayhead &&
+        (typeof document === 'undefined'
+          ? flowPlayhead
+          : createPortal(flowPlayhead, document.body))}
       {gameMode === 'practice' &&
         isLooping &&
         practiceRange &&

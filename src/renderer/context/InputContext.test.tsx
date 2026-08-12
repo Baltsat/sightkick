@@ -125,6 +125,25 @@ describe('InputContext midi stream ownership', () => {
     expect(stopCount()).toBe(1);
   });
 
+  it('reopens a same-port kit after a silent physical reconnect', async () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(DTX_DEVICE));
+    await respondWithMidiDevices([{ name: 'Yamaha DTX402', port: 4 }]);
+    acknowledgeMidi(4);
+
+    act(() => result.current.reconnectMidi());
+    await respondWithMidiDevices([{ name: 'Yamaha DTX402', port: 4 }]);
+
+    expect(result.current.inputReadiness).toBe('reconnecting');
+    expect(listenPorts()).toEqual([4, 4]);
+    expect(stopCount()).toBe(1);
+
+    acknowledgeMidi(4);
+
+    expect(result.current.inputReadiness).toBe('connected');
+  });
+
   it('stops listening when the device is cleared', async () => {
     const { result } = renderHook(() => useInput(), { wrapper });
 

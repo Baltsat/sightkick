@@ -9,6 +9,7 @@ import { SongListSettings } from './SongListSettings';
 import { SongViewSettings } from './SongViewSettings';
 import { GameMode } from '../../types';
 import { CoachSettings } from '../AICoach/CoachSettings';
+import { PracticePresenceSettings } from '../PracticePresence';
 
 interface Props {
   volumeSliders?: ReactNode[];
@@ -22,6 +23,8 @@ interface Props {
   tutorControls?: ReactNode;
   performanceControls?: ReactNode;
   label?: string;
+  hoverPreviewEnabled?: boolean;
+  onHoverPreviewEnabledChange?: (enabled: boolean) => void;
 }
 
 export const SettingsButton = memo(function Settings({
@@ -36,6 +39,8 @@ export const SettingsButton = memo(function Settings({
   tutorControls,
   performanceControls,
   label,
+  hoverPreviewEnabled,
+  onHoverPreviewEnabledChange,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [inputConfigOpen, setInputConfigOpen] = useState(false);
@@ -78,6 +83,8 @@ export const SettingsButton = memo(function Settings({
                 scanPercent={scanPercent}
                 onSetupInput={openInput}
                 currentInputName={currentInputName}
+                hoverPreviewEnabled={hoverPreviewEnabled}
+                onHoverPreviewEnabledChange={onHoverPreviewEnabledChange}
               />
             ) : (
               <SongViewSettings
@@ -93,6 +100,7 @@ export const SettingsButton = memo(function Settings({
                 performanceControls={performanceControls}
               />
             )}
+            <PracticePresenceSettings />
             <Collapse
               size="small"
               items={[

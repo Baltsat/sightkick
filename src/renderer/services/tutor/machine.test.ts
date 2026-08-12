@@ -408,6 +408,7 @@ describe('tutor machine', () => {
   it('accepts developing guided-practice passes without demanding perfection', () => {
     let { state } = beginFailedSession({
       ...GUIDED_PRACTICE_TUTOR_SETTINGS,
+      minimumResolvedEvents: 8,
       minimumDistinctErrors: 3,
     });
     const region = state.recovery!.region;
@@ -438,6 +439,45 @@ describe('tutor machine', () => {
       status: 'mastered',
       qualityProgress: 2,
     });
+  });
+
+  it('keeps a guided-practice recovery at the player-selected speed and exits after one failed pass', () => {
+    let state = dispatch(
+      createTutorState({
+        ...GUIDED_PRACTICE_TUTOR_SETTINGS,
+        minimumResolvedEvents: 8,
+        minimumDistinctErrors: 3,
+      }),
+      { type: 'start', targetSpeed: 0.7 },
+    ).state;
+
+    state = addMeasure(state, 0, ['hit', 'hit', 'hit', 'hit']);
+    state = addMeasure(state, 1, ['hit', 'miss', 'miss', 'miss']);
+    state = dispatch(state, {
+      type: 'measure-complete',
+      measureIndex: 1,
+    }).state;
+
+    const region = state.recovery!.region;
+
+    state = addFailedRegion(state, region.startMeasure, region.endMeasure);
+
+    const result = dispatch(state, {
+      type: 'measure-complete',
+      measureIndex: region.endMeasure,
+    });
+
+    expect(result.state).toMatchObject({
+      phase: 'observing',
+      currentSpeed: 0.7,
+    });
+    expect(result.commands).toEqual([
+      expect.objectContaining({
+        type: 'resume-main',
+        speed: 0.7,
+        reason: 'maximum-failed-attempts',
+      }),
+    ]);
   });
 
   it('slows after a failed recovery and releases after two quality passes', () => {

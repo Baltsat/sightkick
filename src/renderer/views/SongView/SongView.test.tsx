@@ -117,6 +117,9 @@ describe('opening a song', () => {
     expect(flowNotation).toHaveAttribute('data-presentation-zoom', '1.15');
     expect(flowNotation).toHaveStyle({ zoom: '1.15' });
     expect(screen.getByTestId('flow-fixed-playhead')).toBeInTheDocument();
+    expect(screen.getByTestId('flow-fixed-playhead').parentElement).toBe(
+      document.body,
+    );
     await waitFor(() => {
       expect(
         flowNotation.querySelectorAll('[data-flow-bar]').length,

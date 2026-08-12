@@ -240,7 +240,7 @@ describe('HomeCockpit kit home', () => {
     );
   });
 
-  it('uses the restored Songs zone when no target is selected', () => {
+  it('takes every kit surface to the single song chooser when no target is selected', () => {
     const onOpenSongs = vi.fn();
 
     render(
@@ -260,14 +260,17 @@ describe('HomeCockpit kit home', () => {
       </InputProvider>,
     );
 
-    fireEvent.click(screen.getByTestId('kit-hotspot-snare'));
+    ['kick', 'snare', 'hihat', 'tom1', 'tom2', 'tom3', 'ride', 'crash'].forEach(
+      (element) =>
+        fireEvent.click(screen.getByTestId(`kit-hotspot-${element}`)),
+    );
 
-    expect(onOpenSongs).toHaveBeenCalledTimes(1);
+    expect(onOpenSongs).toHaveBeenCalledTimes(8);
     expect(screen.getByTestId('home-choose-song')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('home-choose-song'));
 
-    expect(onOpenSongs).toHaveBeenCalledTimes(2);
+    expect(onOpenSongs).toHaveBeenCalledTimes(9);
   });
 
   it('keeps one composed session behind the compact disclosure', () => {

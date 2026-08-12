@@ -23,6 +23,11 @@ import type { LessonProgressionDecision } from '../../services/lesson-progressio
 import { KitCommandPrompt } from '../KitCommandPrompt';
 import { LearningEvidenceReceipt } from '../LearningEvidenceReceipt';
 import { musicalReceipt } from './musicalReceipt';
+import {
+  buildPerformancePostcard,
+  PerformancePostcard,
+  type PerformancePostcardField,
+} from '../PerformancePostcard';
 
 interface Props {
   isOpen: boolean;
@@ -168,11 +173,47 @@ export function ScoreSummary({
     () => musicalReceipt(practiceSummary, previousPracticeSummary),
     [practiceSummary, previousPracticeSummary],
   );
+  const [postcardOpen, setPostcardOpen] = useState(false);
+  const [postcardExporting, setPostcardExporting] = useState(false);
+  const [postcardStatus, setPostcardStatus] = useState<string>();
   const primaryIsReplay = receipt?.action === 'replay';
   // A player may explicitly continue after an honest failure/no-evidence
   // warning, but never while the main-process write is still unresolved:
   // leaving then would tear down the only acknowledgement listener.
   const continuationBlocked = persistenceState === 'saving';
+  const canExportPostcard = Boolean(
+    songData && practiceSummary && persistenceState === 'saved',
+  );
+  const exportPostcard = (fields: PerformancePostcardField[]) => {
+    if (!songData || !practiceSummary) {
+      return;
+    }
+
+    const postcard = buildPerformancePostcard({
+      song: songData,
+      summary: practiceSummary,
+      previous: previousPracticeSummary,
+      fields,
+    });
+
+    setPostcardExporting(true);
+    setPostcardStatus(undefined);
+    window.electron.ipcRenderer.once<{
+      ok?: boolean;
+      canceled?: boolean;
+      error?: string;
+    }>('export-pdf', (reply) => {
+      setPostcardExporting(false);
+
+      if (reply.ok) {
+        setPostcardOpen(false);
+        setPostcardStatus('Private postcard saved locally.');
+      } else if (reply.error) {
+        setPostcardStatus(`Postcard was not saved: ${reply.error}`);
+      }
+    });
+    window.electron.ipcRenderer.sendMessage('export-pdf', postcard);
+  };
   const header = (
     <>
       <div className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
@@ -254,6 +295,16 @@ export function ScoreSummary({
           />
         </section>
       )}
+      {canExportPostcard && (
+        <Button
+          data-testid="score-performance-postcard"
+          type="text"
+          className="w-full"
+          onClick={() => setPostcardOpen(true)}
+        >
+          Export private performance postcard
+        </Button>
+      )}
       <div className="flex w-full gap-3">
         <Button
           data-testid="score-retry"
@@ -333,6 +384,15 @@ export function ScoreSummary({
             </p>
           </section>
         )}
+        {postcardStatus ? (
+          <p
+            className="w-full rounded-xl border border-accent-soft-border bg-accent-soft-bg px-3 py-2 text-sm text-text-muted"
+            role="status"
+            data-testid="performance-postcard-status"
+          >
+            {postcardStatus}
+          </p>
+        ) : null}
         {practiceSummary?.practiceCard && (
           <section
             className="w-full border-l-2 border-signal-ember pl-3 text-left"
@@ -509,6 +569,17 @@ export function ScoreSummary({
           className="w-full"
         />
       </div>
+      {postcardOpen && songData && practiceSummary ? (
+        <PerformancePostcard
+          open={postcardOpen}
+          onClose={() => setPostcardOpen(false)}
+          onExport={exportPostcard}
+          exporting={postcardExporting}
+          song={songData}
+          summary={practiceSummary}
+          previous={previousPracticeSummary}
+        />
+      ) : null}
     </Modal>
   );
 }

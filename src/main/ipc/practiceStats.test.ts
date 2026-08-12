@@ -15,6 +15,9 @@ const storeSetControl = vi.hoisted(() => ({
   calls: [] as (string | Record<string, unknown>)[],
   failNext: undefined as Error | undefined,
 }));
+const practicePresence = vi.hoisted(() => ({
+  recordPractice: vi.fn(),
+}));
 
 vi.mock('../AppState', () => ({
   appState: {
@@ -45,6 +48,7 @@ vi.mock('../AppState', () => ({
         });
       },
     },
+    practicePresence,
   },
 }));
 
@@ -150,6 +154,7 @@ function evidenceSummary(index: number, completedAt: string): RunSummary {
 beforeEach(() => {
   storeSetControl.calls.length = 0;
   storeSetControl.failNext = undefined;
+  practicePresence.recordPractice.mockReset();
 });
 
 describe('savePracticeRun', () => {
@@ -162,6 +167,9 @@ describe('savePracticeRun', () => {
     savePracticeRun(event as never, { songId: 'song-1', summary });
 
     expect(storeHolder.current.get('practiceRuns.song-1')).toEqual([summary]);
+    expect(practicePresence.recordPractice).toHaveBeenCalledWith(
+      summary.completedAt,
+    );
     expect(lastReply(event, 'save-practice-run')!.args[0]).toEqual({
       songId: 'song-1',
       runs: [summary],

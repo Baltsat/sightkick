@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useInput } from '../../context/InputContext';
 import { InputElement } from '../../../types';
 import {
@@ -24,7 +24,6 @@ export function useInputConfig(isOpen: boolean) {
   const [devices, setDevices] = useState<InputDevice[]>([]);
   const [listeningTo, setListeningTo] = useState<InputElement>();
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
-  const listeningToRef = useRef(listeningTo);
 
   if (isOpen !== prevIsOpen) {
     setPrevIsOpen(isOpen);
@@ -33,10 +32,6 @@ export function useInputConfig(isOpen: boolean) {
       setListeningTo(undefined);
     }
   }
-
-  useEffect(() => {
-    listeningToRef.current = listeningTo;
-  }, [listeningTo]);
 
   const refreshDevices = useCallback(() => {
     inputBus.listDevices().then((list) => {
@@ -53,23 +48,20 @@ export function useInputConfig(isOpen: boolean) {
   }, [isOpen, refreshDevices]);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen || listeningTo === undefined) {
       return undefined;
     }
 
     return inputBus.capture(({ controlId }) => {
-      const listening = listeningToRef.current;
-
       if (
-        listening &&
         selectedDevice &&
         controlSource(controlId) === selectedDevice.sourceId
       ) {
-        assignControl(listening, controlId);
+        assignControl(listeningTo, controlId);
         setListeningTo(undefined);
       }
     });
-  }, [assignControl, selectedDevice, isOpen]);
+  }, [assignControl, selectedDevice, isOpen, listeningTo]);
 
   useEffect(() => {
     if (listeningTo === undefined) {

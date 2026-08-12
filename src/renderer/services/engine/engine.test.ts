@@ -8,7 +8,12 @@ import {
   RenderData,
   RenderedNote,
 } from '../../../chart-parser/types';
+import { MidiMessageType } from '../../../types';
+import { installIpcMock } from '../../hooks/test-support';
+import { InputBus } from '../../input/input-bus';
+import { MidiSource } from '../../input/midi-source';
 import { InputEvent } from '../../input/types';
+import { createPracticeAttemptCheckpointController } from '../../hooks/usePracticeAttemptCheckpoint';
 import { Engine } from './engine';
 import { EngineContext, ResolvedJudgement } from './types';
 
@@ -184,20 +189,25 @@ function emitInput(controlId: string, value = 100) {
   inputListeners.forEach((listener) => listener({ controlId, value }));
 }
 
-async function setup(over: Partial<EngineContext> = {}) {
+async function setup(
+  over: Partial<EngineContext> = {},
+  subscribeInput: (listener: (event: InputEvent) => void) => () => void = (
+    listener,
+  ) => {
+    inputListeners.add(listener);
+
+    return () => {
+      inputListeners.delete(listener);
+    };
+  },
+) {
   const onEnded = vi.fn();
   const onError = vi.fn();
   const engine = new Engine({
     trackData: TRACKS,
     isDev: false,
     player: 'default',
-    subscribeInput: (listener) => {
-      inputListeners.add(listener);
-
-      return () => {
-        inputListeners.delete(listener);
-      };
-    },
+    subscribeInput,
     onEnded,
     onError,
   });
@@ -258,6 +268,107 @@ afterEach(() => {
 });
 
 describe('Engine', () => {
+  it('records a real MIDI stream into an interrupted practice checkpoint across pause, resume, and reattach', async () => {
+    const ipc = installIpcMock();
+    const bus = new InputBus([new MidiSource()]);
+    const checkpoints: unknown[] = [];
+    const notes = ['c/5', 'c/5', 'c/5'].map((key) => staveNote([key]));
+    const { engine } = await setup(
+      {
+        renderData: [
+          measureData(
+            0,
+            1_920,
+            [
+              rendered(480, notes[0]),
+              rendered(960, notes[1]),
+              rendered(1_440, notes[2]),
+            ],
+            [
+              { tick: 480, isRest: false, notes: ['c/5'] } as Note,
+              { tick: 960, isRest: false, notes: ['c/5'] } as Note,
+              { tick: 1_440, isRest: false, notes: ['c/5'] } as Note,
+            ],
+          ),
+        ],
+      },
+      bus.subscribe,
+    );
+    const checkpoint = createPracticeAttemptCheckpointController({
+      readSeed: () => ({
+        songId: 'song-1',
+        sessionId: 'dtx-session',
+        startedAt: '2026-08-12T04:31:28.096Z',
+        chartRevision: 'chart:fixture',
+        mode: 'practice',
+        difficulty: 'expert',
+        playbackSpeed: 0.7,
+        positionTick: () => 1_440,
+      }),
+      evidence: { getAttemptRecords: () => engine.getAttemptRecords() },
+      send: (_channel, payload) => checkpoints.push(payload),
+    });
+
+    bus.start();
+    engine.setMapping({ snare: ['midi:38'] });
+    engine.setPlaybackSpeed(0.5);
+    engine.playFromTick(0);
+    engine.seekSeconds(0.5);
+    ipc.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 38,
+      velocity: 103,
+    });
+
+    engine.pause();
+    engine.setPlaybackSpeed(0.7);
+    engine.playFromTick(480);
+    engine.seekSeconds(1);
+    ipc.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 38,
+      velocity: 96,
+    });
+
+    bus.stop();
+    bus.start();
+    engine.setPlaybackSpeed(1);
+    engine.seekSeconds(1.5);
+    ipc.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 38,
+      velocity: 91,
+    });
+    checkpoint.flush();
+
+    expect(checkpoints).toEqual([
+      expect.objectContaining({
+        checkpoint: expect.objectContaining({
+          records: [
+            expect.objectContaining({
+              tick: 480,
+              verdict: 'hit',
+              element: 'snare',
+            }),
+            expect.objectContaining({
+              tick: 960,
+              verdict: 'hit',
+              element: 'snare',
+            }),
+            expect.objectContaining({
+              tick: 1_440,
+              verdict: 'hit',
+              element: 'snare',
+            }),
+          ],
+        }),
+      }),
+    ]);
+
+    engine.dispose();
+    bus.stop();
+  });
+
   it('delegates transport to playback and reflects state', async () => {
     const { engine, player } = await setup({
       renderData: [measureData(0, 1920, [])],

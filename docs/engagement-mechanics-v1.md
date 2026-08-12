@@ -319,17 +319,25 @@ No comparison with an ideal week, missed-session count, or pseudo-coach guilt. T
 
 ### P2 — macOS presence and private proof artifacts
 
+Implemented on 2026-08-12 as an explicit opt-in source slice. Its proof is
+focused controller/renderer tests and `docs/design-qa/2026-08-12-p2/`; it does
+not claim a delivered macOS notification from an unsigned development build or
+any retention or learning effect.
+
 #### P2.1 — opt-in menu-bar practice presence
 
-**Where:** new native practice-presence module; AppState.ts; menu.ts; preload/index.ts; a small renderer settings surface; focused native and IPC tests.
+**Where:** `src/main/practicePresence.ts`, `AppState.ts`, `preload/index.ts`,
+the Practice presence Settings section, and focused native/IPC tests.
 
-**Change:** add a menu-bar item only after P0 produces an accurate armed session. It displays one of:
+**Change:** the tray is absent until the player turns on Menu-bar presence. It
+shows one of:
 
-- “Drumroll · 8 min review ready”
-- “Drumroll · chorus probe ready”
+- “Drumroll · practice ready”
 - “Drumroll · played today”
 
-Clicking opens or focuses the app and arms the existing session. The menu offers Start, Snooze until the next chosen slot, and Turn off reminders. It does not display a streak length as a threat.
+Clicking opens or focuses the app. The menu offers Start practice, Snooze until
+the selected time, and Turn off reminders. It does not display a streak length
+as a threat.
 
 **Acceptance proof:** the state is derived locally, no network request or account exists, and an app-session completion suppresses the same day’s reminder.
 
@@ -337,15 +345,22 @@ Clicking opens or focuses the app and arms the existing session. The menu offers
 
 **Where:** the same native practice-presence module and Settings.
 
-**Change:** request permission only after the player selects a schedule. At most one notification per scheduled practice day, using concrete copy such as “your 8-minute tom review is ready” or “the [song] chorus probe is ready.” The player can choose silent presence only.
+**Change:** the player selects one local time, then chooses whether to grant
+notification permission. At most one notification appears on a local calendar
+day, using the copy “Your practice set is ready when you are.” The player can
+choose silent presence only.
 
 **Acceptance proof:** no notification fires after practice, after Snooze, outside the chosen window, or based solely on an “at risk” streak. Copy contains no guilt, urgency, mascot emotion, or artificial deadline.
 
 #### P2.3 — private performance postcard
 
-**Where:** GoalCard; ScoreSummary; export surface; existing local image/PDF utilities only if they already fit the export path.
+**Where:** saved Practice `ScoreSummary`, the postcard dialog, and the existing
+local PDF export channel.
 
-**Change:** let the player explicitly export a small, local artifact for a real milestone: song section, speed, accuracy range, date, and one before/after measure. Make it useful for a teacher or a friend, never an automatic social post.
+**Change:** a player can explicitly export a small local artifact from a real
+saved Practice run. They choose any combination of song section, saved
+performance, date, and a comparable before/after measure. It never posts
+automatically anywhere.
 
 **Acceptance proof:** export is manual, contains only user-selected data, and never implies a performance capability beyond the saved evidence.
 
@@ -354,7 +369,9 @@ Clicking opens or focuses the app and arms the existing session. The menu offers
 1. P0.0 through P0.3 first. They correct the incentive structure and make the current practice loop intelligible without expanding the product surface.
 2. P0.4 and P0.5 next. They sharpen existing XP, streak, and achievement contracts.
 3. P1.1 through P1.4 once the player has used the P0 loop enough to expose which cards and recap facts are actually useful.
-4. P2 only after a real armed-session contract exists. Native reminders before then would merely remind the player that the app has not chosen a good next action.
+4. P2 is implemented as local, optional source-level work. It cannot compensate
+   for an inaccurate session or substitute for the real-kit and longitudinal proof
+   requirements.
 
 ## local validation plan
 

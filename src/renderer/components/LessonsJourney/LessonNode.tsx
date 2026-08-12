@@ -242,6 +242,7 @@ export function LessonNode({
       data-testid={`lesson-item-${lesson.id}`}
       data-locked={unlocked ? undefined : 'true'}
       data-node-state={state}
+      data-action={unlocked ? 'start' : 'requirements'}
       data-node-instrument={visual.instrument}
       data-color-lane={visual.colorLane}
       data-kit-color-mode={kitColors.override}

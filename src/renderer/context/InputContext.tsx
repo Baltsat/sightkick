@@ -36,6 +36,7 @@ import {
 interface InputContextValue {
   selectedDevice: InputDevice | null;
   setSelectedDevice: (d: InputDevice | null) => void;
+  reconnectMidi: () => void;
   /**
    * MIDI is only "connected" after the remembered device is present in a
    * fresh enumeration and its current port has been opened. A remembered kit
@@ -270,6 +271,18 @@ export function InputProvider({ children }: { children: ReactNode }) {
     },
     [clearMidiRetry, setMidiAutoConnectOptOut, setPersistedSelectedDevice],
   );
+  const reconnectMidi = useCallback(() => {
+    if (selectedDevice?.sourceId !== 'midi') {
+      return;
+    }
+
+    clearMidiRetry();
+    reconnectAttempts.current = 0;
+    setConfirmedMidiPort(undefined);
+    setInputReadiness('reconnecting');
+    setMidiReconnectEpoch((epoch) => epoch + 1);
+    setMidiOpenEpoch((epoch) => epoch + 1);
+  }, [clearMidiRetry, selectedDevice]);
   const inputMapping = useMemo(() => {
     const stored = selectedDevice
       ? inputMappings[selectedDevice.id]
@@ -597,6 +610,7 @@ export function InputProvider({ children }: { children: ReactNode }) {
     () => ({
       selectedDevice,
       setSelectedDevice,
+      reconnectMidi,
       inputReadiness,
       inputMapping,
       controlMapping,
@@ -609,6 +623,7 @@ export function InputProvider({ children }: { children: ReactNode }) {
     [
       selectedDevice,
       setSelectedDevice,
+      reconnectMidi,
       inputReadiness,
       inputMapping,
       controlMapping,

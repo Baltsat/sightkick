@@ -14,6 +14,7 @@ import { StorageSchema } from '../types';
 import MenuBuilder from './menu';
 import { ASSET_PROTOCOL, resolveAssetFilePath, resolveHtmlPath } from './util';
 import { AppUpdater } from './AppUpdater';
+import { PracticePresenceController } from './practicePresence';
 import { loadSong } from './ipc/loadSong';
 import { loadSongList } from './ipc/loadSongList';
 import { downloadSong } from './ipc/downloadSong';
@@ -78,6 +79,10 @@ class AppState {
   private mainWindow: BrowserWindow | null = null;
   private powerSaveBlockerId: number = -1;
   readonly store = new Store();
+  readonly practicePresence = new PracticePresenceController({
+    store: this.store,
+    openPractice: () => this.openPracticeWindow(),
+  });
   private libraryRoot = this.store.get('lastOpenedPath') as string | undefined;
   private lessonLibraryRoot: string | undefined;
 
@@ -122,6 +127,7 @@ class AppState {
       }
     });
     app.on('before-quit', () => {
+      this.practicePresence.dispose();
       this.cleanup();
     });
     app
@@ -142,6 +148,7 @@ class AppState {
         });
         this.setupIpc();
         this.createWindow();
+        this.practicePresence.initialize();
         app.on('activate', () => {
           if (!this.mainWindow) {
             this.createWindow();
@@ -216,6 +223,24 @@ class AppState {
     ipcMain.on('delete-goal', deleteGoal);
     ipcMain.on('set-primary-goal', setPrimaryGoal);
     ipcMain.on('export-pdf', exportPdf);
+    ipcMain.on('get-practice-presence-settings', (event) => {
+      event.reply(
+        'practice-presence-settings',
+        this.practicePresence.getSnapshot(),
+      );
+    });
+    ipcMain.on('save-practice-presence-settings', (event, settings) => {
+      try {
+        event.reply(
+          'practice-presence-settings-saved',
+          this.practicePresence.saveSettings(settings),
+        );
+      } catch (error) {
+        event.reply('practice-presence-settings-saved', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
     ipcMain.on('midi-device-list', loadMidiDeviceList);
     ipcMain.on('listen-midi', listenMidi);
     ipcMain.on('stop-listen-midi', stopListenMidi);
@@ -325,6 +350,21 @@ class AppState {
       return { action: 'deny' };
     });
     AppUpdater.attach(this.mainWindow);
+  }
+
+  private openPracticeWindow(): void {
+    if (!this.mainWindow) {
+      void this.createWindow();
+
+      return;
+    }
+
+    if (this.mainWindow.isMinimized()) {
+      this.mainWindow.restore();
+    }
+
+    this.mainWindow.show();
+    this.mainWindow.focus();
   }
 
   preventSleep(): void {

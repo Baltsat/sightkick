@@ -20,6 +20,7 @@ import { calculateAccuracy, getStarRating } from '../../scoring';
 import { DifficultyRing } from './DifficultyRing';
 import { OnlineSong } from '../../types';
 import { isPlayableEvidence } from '../../../library-sources/playability';
+import { SongHoverPreviewState } from '../../services/song-hover-preview';
 
 export interface SongListItemProps {
   songData: Song | OnlineSong;
@@ -36,6 +37,9 @@ export interface SongListItemProps {
   downloaded?: boolean;
   downloadingDisabled: boolean;
   focused?: boolean;
+  preview?: SongHoverPreviewState;
+  onPreviewStart?: () => void;
+  onPreviewEnd?: () => void;
 }
 
 export function SongListItem({
@@ -51,6 +55,9 @@ export function SongListItem({
   onSetGoal,
   downloadingDisabled,
   focused,
+  preview,
+  onPreviewStart,
+  onPreviewEnd,
 }: SongListItemProps) {
   const local = 'source' in songData ? undefined : songData;
   const playable =
@@ -156,6 +163,12 @@ export function SongListItem({
     <div className="relative inline-flex w-full">
       <div
         onClick={playable ? onClick : undefined}
+        onPointerEnter={
+          local && playable && onPreviewStart ? onPreviewStart : undefined
+        }
+        onPointerLeave={
+          local && playable && onPreviewEnd ? onPreviewEnd : undefined
+        }
         onKeyDown={(event) => {
           if (
             local &&
@@ -173,6 +186,7 @@ export function SongListItem({
         aria-disabled={local && !playable ? true : undefined}
         data-testid={`song-item-${id}`}
         data-focused={focused ? 'true' : undefined}
+        data-previewing={preview ? 'true' : undefined}
         className={cn(
           'flex min-w-0 border border-border-soft grow no-underline bg-surface rounded-xl duration-100 ease-out cursor-default p-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
           {
@@ -200,11 +214,23 @@ export function SongListItem({
             >
               {name}
             </div>
-            <div
-              className="mt-1 truncate font-ui text-sm text-text-muted"
-              title={artist}
-            >
-              {artist}
+            <div className="mt-1 flex min-w-0 items-center gap-2">
+              <div
+                className="truncate font-ui text-sm text-text-muted"
+                title={artist}
+              >
+                {artist}
+              </div>
+              {preview && (
+                <div
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-soft-bg px-1.5 py-0.5 font-ui text-[10px] font-semibold text-accent"
+                  data-testid="song-preview-status"
+                  aria-live="polite"
+                >
+                  <span className="size-1.5 animate-pulse rounded-full bg-accent" />
+                  {preview.label}
+                </div>
+              )}
             </div>
           </div>
         </div>

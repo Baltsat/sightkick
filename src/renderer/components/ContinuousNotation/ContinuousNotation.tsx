@@ -37,6 +37,29 @@ export function flowPlayheadOffset(viewportWidth: number): number {
   return Math.min(272, Math.max(160, viewportWidth * 0.22));
 }
 
+export interface FlowViewportPlayheadGeometryInput {
+  viewportLeft: number;
+  anchor: number;
+  scoreTop: number;
+  scoreBottom: number;
+  beatY: number;
+}
+
+export function flowViewportPlayheadGeometry({
+  viewportLeft,
+  anchor,
+  scoreTop,
+  scoreBottom,
+  beatY,
+}: FlowViewportPlayheadGeometryInput) {
+  return {
+    left: viewportLeft + anchor,
+    top: scoreTop,
+    height: Math.max(1, scoreBottom - scoreTop),
+    beatOffset: Math.max(0, beatY - scoreTop),
+  };
+}
+
 export interface FlowFixedPlayheadGeometryInput {
   viewportLeft: number;
   /** Viewport-space origin of the playhead's actual zoomed parent. */
@@ -484,7 +507,6 @@ export function ContinuousNotationCamera({
       const viewportRect = viewport.getBoundingClientRect();
       const stageRect = stage.getBoundingClientRect();
       const notationRect = notation.getBoundingClientRect();
-      const fixedSurfaceRect = fixedSurface.getBoundingClientRect();
       const anchor = flowPlayheadOffset(viewport.clientWidth);
       const scoreTop = Math.max(stageRect.top + 82, notationRect.top - 32);
       const scoreBottom = Math.min(
@@ -568,25 +590,38 @@ export function ContinuousNotationCamera({
       const horizontalScrollDelta = scrollStep
         ? scrollStep.nextScrollLeft - viewport.scrollLeft
         : 0;
-      const fixedHorizontalScale =
-        fixedSurface.offsetWidth > 0
-          ? fixedSurfaceRect.width / fixedSurface.offsetWidth
-          : visualScale;
-      const fixedVerticalScale =
-        fixedSurface.offsetHeight > 0
-          ? fixedSurfaceRect.height / fixedSurface.offsetHeight
-          : verticalScale;
-      const fixedGeometry = flowFixedPlayheadGeometry({
-        viewportLeft: viewportRect.left,
-        surfaceLeft: fixedSurfaceRect.left,
-        horizontalScrollDelta,
-        anchor,
-        scoreTop,
-        scoreBottom,
-        beatY,
-        visualScale: fixedHorizontalScale,
-        verticalScale: fixedVerticalScale,
-      });
+      const fixedGeometry =
+        fixedSurface === document.body
+          ? flowViewportPlayheadGeometry({
+              viewportLeft: viewportRect.left,
+              anchor,
+              scoreTop,
+              scoreBottom,
+              beatY,
+            })
+          : (() => {
+              const fixedSurfaceRect = fixedSurface.getBoundingClientRect();
+              const fixedHorizontalScale =
+                fixedSurface.offsetWidth > 0
+                  ? fixedSurfaceRect.width / fixedSurface.offsetWidth
+                  : visualScale;
+              const fixedVerticalScale =
+                fixedSurface.offsetHeight > 0
+                  ? fixedSurfaceRect.height / fixedSurface.offsetHeight
+                  : verticalScale;
+
+              return flowFixedPlayheadGeometry({
+                viewportLeft: viewportRect.left,
+                surfaceLeft: fixedSurfaceRect.left,
+                horizontalScrollDelta,
+                anchor,
+                scoreTop,
+                scoreBottom,
+                beatY,
+                visualScale: fixedHorizontalScale,
+                verticalScale: fixedVerticalScale,
+              });
+            })();
 
       viewport.style.setProperty('--flow-playhead-px', `${anchor}px`);
       fixedPlayhead.style.left = `${fixedGeometry.left}px`;

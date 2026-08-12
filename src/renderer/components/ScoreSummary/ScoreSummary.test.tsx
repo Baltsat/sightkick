@@ -7,6 +7,7 @@ import {
   RecordRunResult,
   UseGamificationResult,
 } from '../../hooks/useGamification';
+import { installIpcMock } from '../../hooks/test-support';
 import { ScoreSummary } from './ScoreSummary';
 
 const songData = {
@@ -145,6 +146,44 @@ describe('ScoreSummary', () => {
     fireEvent.click(modal.getByTestId('score-coach'));
 
     expect(onCoach).toHaveBeenCalledOnce();
+  });
+
+  it('exports a private postcard only after this run has reached disk', async () => {
+    const ipc = installIpcMock();
+    const summary = {
+      ...multiLaneRunFixture(),
+      completedAt: '2026-08-12T08:30:00.000Z',
+      overallAccuracy: 0.84,
+    };
+    const { modal } = renderSummary({
+      persistenceState: 'saved',
+      practiceSummary: summary,
+    });
+
+    fireEvent.click(modal.getByTestId('score-performance-postcard'));
+
+    const postcard = within(screen.getByTestId('performance-postcard-dialog'));
+
+    expect(postcard.getByTestId('performance-postcard-export')).toBeDisabled();
+    fireEvent.click(postcard.getByTestId('performance-postcard-milestone'));
+    fireEvent.click(postcard.getByTestId('performance-postcard-export'));
+
+    expect(ipc.sent).toContainEqual({
+      channel: 'export-pdf',
+      args: [
+        expect.objectContaining({
+          fileName: 'master-of-puppets-performance-2026-08-12.pdf',
+        }),
+      ],
+    });
+
+    await act(async () => {
+      ipc.emit('export-pdf', { ok: true });
+    });
+
+    expect(modal.getByTestId('performance-postcard-status')).toHaveTextContent(
+      'Private postcard saved locally.',
+    );
   });
 
   it('blocks explicit continuation only while the run save is unresolved', () => {

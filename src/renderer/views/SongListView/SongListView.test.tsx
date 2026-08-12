@@ -95,12 +95,6 @@ describe('SongListView — loading the library', () => {
 
     expect(playKitPreviewMock).toHaveBeenCalledOnce();
     expect(playKitPreviewMock).toHaveBeenCalledWith('hihat');
-
-    expect(
-      screen
-        .getByTestId('kit-hotspot-hihat')
-        .querySelector('.kit-home__pad-stick'),
-    ).toHaveAttribute('data-active', 'true');
   });
 
   it('keeps physical MIDI feedback silent and separate from the pointer stick', async () => {

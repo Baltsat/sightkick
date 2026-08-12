@@ -389,6 +389,12 @@ export function savePracticeRun(
         : {}),
     });
 
+    try {
+      appState.practicePresence.recordPractice(summary.completedAt);
+    } catch (error) {
+      console.warn('Could not update practice presence:', error);
+    }
+
     event.reply('save-practice-run', { songId, runs: next, fullRuns, archive });
   } catch (error) {
     event.reply('save-practice-run', { error: toErrorMessage(error) });

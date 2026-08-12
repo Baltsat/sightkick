@@ -83,7 +83,7 @@ export const DEFAULT_TUTOR_SETTINGS: TutorSettings = {
  */
 export const GUIDED_PRACTICE_TUTOR_SETTINGS: Partial<TutorSettings> = {
   triggerAccuracy: 0.68,
-  minimumResolvedEvents: 8,
+  minimumResolvedEvents: 16,
   minimumDistinctErrors: 5,
   minimumRepeatedBarFailures: 3,
   minimumRepeatedBarErrors: 3,
@@ -96,11 +96,12 @@ export const GUIDED_PRACTICE_TUTOR_SETTINGS: Partial<TutorSettings> = {
   cleanMinimumAccuracy: 0.84,
   cleanMinimumResolvedEvents: 6,
   cleanMaximumMisses: 2,
-  cleanMaximumWrongHits: 1,
+  cleanMaximumWrongHits: 3,
   requiredCleanRepetitions: 2,
   recoveryProgressRetention: 0.5,
   strongRecoveryAccuracy: 0.94,
-  maximumFailedRecoveryAttempts: 3,
+  speedStep: 0,
+  maximumFailedRecoveryAttempts: 1,
 };
 
 export interface TutorMeasureSpec {
