@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { faFileImport } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { App, Button, Input, Modal, Tag, Tooltip } from 'antd';
+import { App, Button, Input, Modal, Tooltip } from 'antd';
 import appIcon from '../../../../assets/icon.png';
 import {
   IpcImportSongPreview,
@@ -100,7 +100,9 @@ export function SongImportReview({
                 </div>
               )}
               {toolName && (
-                <Tag color="purple">Auto-charted with {toolName}</Tag>
+                <div className="text-sm text-text-faint">
+                  Auto-charted with {toolName}
+                </div>
               )}
             </div>
           </div>

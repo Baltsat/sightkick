@@ -55,4 +55,47 @@ describe('PracticeStats', () => {
       'panel',
     );
   });
+
+  it('shows best streak on the run summary line when the run has one', () => {
+    const summary = { ...multiLaneRunFixture(), bestStreak: 42 };
+
+    render(<PracticeStats summary={summary} />);
+
+    expect(screen.getByTestId('practice-best-streak')).toHaveTextContent(
+      'Best streak 42',
+    );
+  });
+
+  it('omits the best-streak line for a run with no streak field (pre-feature data)', () => {
+    const summary = multiLaneRunFixture(); // no bestStreak set
+
+    render(<PracticeStats summary={summary} />);
+
+    expect(
+      screen.queryByTestId('practice-best-streak'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('omits the best-streak line when bestStreak is 0 - nothing to brag about', () => {
+    const summary = { ...multiLaneRunFixture(), bestStreak: 0 };
+
+    render(<PracticeStats summary={summary} />);
+
+    expect(
+      screen.queryByTestId('practice-best-streak'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('still shows the mode label unaffected by an absent best streak', () => {
+    const summary = { ...multiLaneRunFixture(), mode: 'perform' as const };
+
+    render(<PracticeStats summary={summary} />);
+
+    expect(screen.getByTestId('practice-run-mode')).toHaveTextContent(
+      'Perform run',
+    );
+    expect(
+      screen.queryByTestId('practice-best-streak'),
+    ).not.toBeInTheDocument();
+  });
 });

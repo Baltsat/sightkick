@@ -6,10 +6,11 @@ import {
   faCheck,
 } from '@fortawesome/free-solid-svg-icons';
 import { faHeart } from '@fortawesome/free-regular-svg-icons';
+import { faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
 import appIcon from '../../../../assets/icon.png';
 import { Song } from '../../../types';
 import { cn } from '../../cn';
-import { Button, Tag, Tooltip } from 'antd';
+import { Button, Tooltip } from 'antd';
 import { useMemo } from 'react';
 import { SongMenu } from '../SongMenu';
 import { Stars } from '../Stars';
@@ -18,6 +19,8 @@ import { Difficulty } from 'scan-chart';
 import { calculateAccuracy, getStarRating } from '../../scoring';
 import { DifficultyRing } from './DifficultyRing';
 import { OnlineSong } from '../../types';
+import { isPlayableEvidence } from '../../../library-sources/playability';
+import { SongHoverPreviewState } from '../../services/song-hover-preview';
 
 export interface SongListItemProps {
   songData: Song | OnlineSong;
@@ -25,12 +28,18 @@ export interface SongListItemProps {
   onDownload: (id: string) => void;
   onClick: () => void;
   onSplit: (id: string) => void;
+  /** Omitted when the caller doesn't wire up a goal-setting flow (e.g.
+   * Storybook, the online-library rows this menu never renders for). */
+  onSetGoal?: (song: Song) => void;
   downloading?: boolean;
   difficulty: Difficulty;
   splitting: boolean;
   downloaded?: boolean;
   downloadingDisabled: boolean;
   focused?: boolean;
+  preview?: SongHoverPreviewState;
+  onPreviewStart?: () => void;
+  onPreviewEnd?: () => void;
 }
 
 export function SongListItem({
@@ -43,10 +52,17 @@ export function SongListItem({
   difficulty,
   splitting,
   onSplit,
+  onSetGoal,
   downloadingDisabled,
   focused,
+  preview,
+  onPreviewStart,
+  onPreviewEnd,
 }: SongListItemProps) {
   const local = 'source' in songData ? undefined : songData;
+  const playable =
+    !(local?.sourceLinked || local?.sourceProvenance) ||
+    isPlayableEvidence(local.playability);
   const { albumCover, id, name, artist, charter, drumDifficulty } = songData;
   const autoChartTool =
     'autoChartTool' in songData ? songData.autoChartTool : undefined;
@@ -70,6 +86,7 @@ export function SongListItem({
             canSplit={(local.audio?.length ?? 0) === 1}
             splitting={splitting}
             onSplit={() => onSplit(id)}
+            onSetGoal={onSetGoal && (() => onSetGoal(local))}
           />
 
           <IconButton
@@ -137,6 +154,7 @@ export function SongListItem({
     onLikeChange,
     downloadingDisabled,
     onSplit,
+    onSetGoal,
     splitting,
     name,
   ]);
@@ -144,10 +162,17 @@ export function SongListItem({
   return (
     <div className="relative inline-flex w-full">
       <div
-        onClick={onClick}
+        onClick={playable ? onClick : undefined}
+        onPointerEnter={
+          local && playable && onPreviewStart ? onPreviewStart : undefined
+        }
+        onPointerLeave={
+          local && playable && onPreviewEnd ? onPreviewEnd : undefined
+        }
         onKeyDown={(event) => {
           if (
             local &&
+            playable &&
             event.currentTarget === event.target &&
             (event.key === 'Enter' || event.key === ' ')
           ) {
@@ -155,16 +180,18 @@ export function SongListItem({
             onClick();
           }
         }}
-        role={local ? 'button' : undefined}
-        tabIndex={local ? 0 : undefined}
-        aria-label={local ? `Play ${name}` : undefined}
+        role={local && playable ? 'button' : undefined}
+        tabIndex={local && playable ? 0 : undefined}
+        aria-label={local && playable ? `Play ${name}` : undefined}
+        aria-disabled={local && !playable ? true : undefined}
         data-testid={`song-item-${id}`}
         data-focused={focused ? 'true' : undefined}
+        data-previewing={preview ? 'true' : undefined}
         className={cn(
           'flex min-w-0 border border-border-soft grow no-underline bg-surface rounded-xl duration-100 ease-out cursor-default p-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
           {
             'hover:bg-accent-soft-bg hover:border-accent-soft-border cursor-pointer transition-[background-color,border-color,box-shadow]':
-              Boolean(local),
+              Boolean(local && playable),
             'bg-accent-soft-bg border-accent-soft-border outline-2 outline-accent shadow-accent-soft':
               focused,
           },
@@ -187,11 +214,23 @@ export function SongListItem({
             >
               {name}
             </div>
-            <div
-              className="mt-1 truncate font-ui text-sm text-text-muted"
-              title={artist}
-            >
-              {artist}
+            <div className="mt-1 flex min-w-0 items-center gap-2">
+              <div
+                className="truncate font-ui text-sm text-text-muted"
+                title={artist}
+              >
+                {artist}
+              </div>
+              {preview && (
+                <div
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-soft-bg px-1.5 py-0.5 font-ui text-[10px] font-semibold text-accent"
+                  data-testid="song-preview-status"
+                  aria-live="polite"
+                >
+                  <span className="size-1.5 animate-pulse rounded-full bg-accent" />
+                  {preview.label}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -210,9 +249,15 @@ export function SongListItem({
           )}
 
           {autoChartToolName && (
-            <Tag className="hidden xl:inline-flex" color="purple">
-              Auto-charted with {autoChartToolName}
-            </Tag>
+            <Tooltip title={`Auto-charted with ${autoChartToolName}`}>
+              <span
+                className="hidden items-center text-text-dim xl:inline-flex"
+                tabIndex={0}
+                aria-label={`Auto-charted with ${autoChartToolName}`}
+              >
+                <FontAwesomeIcon icon={faWandMagicSparkles} />
+              </span>
+            </Tooltip>
           )}
 
           {local && (
@@ -256,6 +301,17 @@ export function SongListItem({
                 </div>
               </Tooltip>
             </div>
+          )}
+
+          {local && !playable && (
+            <Tooltip title="This source-linked song still needs identity, lawful audio, reviewed chart, scan-chart, and launch proof">
+              <span
+                className="text-xs text-orange"
+                aria-label={`${name} is not playable yet`}
+              >
+                Needs proof
+              </span>
+            </Tooltip>
           )}
 
           <DifficultyRing value={drumDifficulty} />

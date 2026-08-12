@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { ElementMapping, InputElement } from '../../types';
 import { inputBus } from '../input';
 
@@ -15,21 +15,15 @@ export function useInputControls(
   const enabledRef = useRef(enabled);
   const blockedRef = useRef(blockedControlIds);
 
-  useEffect(() => {
+  // MIDI events can arrive only a few milliseconds apart. A layout effect
+  // updates the subscriber before the browser can deliver input for the new
+  // committed screen, so a Crash after opening Sort cannot run stale Back.
+  useLayoutEffect(() => {
     mappingRef.current = mapping;
-  }, [mapping]);
-
-  useEffect(() => {
     handlersRef.current = handlers;
-  }, [handlers]);
-
-  useEffect(() => {
     enabledRef.current = enabled;
-  }, [enabled]);
-
-  useEffect(() => {
     blockedRef.current = blockedControlIds;
-  }, [blockedControlIds]);
+  }, [blockedControlIds, enabled, handlers, mapping]);
 
   useEffect(() => {
     return inputBus.subscribe(({ controlId, value }) => {

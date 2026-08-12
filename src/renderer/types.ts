@@ -23,13 +23,15 @@ export type MappingElement = {
   icon: IconDefinition;
 };
 
-export type LibraryMode = 'local' | 'online';
+export type LibraryMode = 'local' | 'drums' | 'favorites' | 'online';
 
 /** Which top-level surface of the library the user is looking at. */
 export type LibraryView = 'songs' | 'lessons';
 
 export interface OnlineSong {
   source: 'online';
+  chartSource?: 'chorus-encore';
+  reviewed?: boolean;
   id: string;
   downloadUrl: string;
   albumCover?: string;
@@ -37,6 +39,7 @@ export interface OnlineSong {
   artist: string;
   charter: string;
   drumDifficulty: number;
+  durationSeconds?: number;
 }
 
 export type GameMode = 'perform' | 'practice';

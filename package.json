@@ -1,7 +1,7 @@
 {
   "name": "sight-kick",
-  "description": "Play your favorite Clone Hero drum tracks",
-  "version": "1.2.0-kb.1",
+  "description": "An adaptive drum tutor and performance game for MIDI kits",
+  "version": "1.2.0-kb.11",
   "keywords": [
     "clonehero",
     "drums",
@@ -21,13 +21,28 @@
   "main": "./out/main/index.js",
   "scripts": {
     "build": "electron-vite build",
+    "package:lesson-library": "node web/scripts/package-lessons.mjs",
+    "validate:yandex-library": "node scripts/validate-yandex-library-manifests.mjs",
+    "distribution:integrity": "node scripts/generate-distribution-integrity.mjs",
+    "prepare:ffmpeg:mac": "scripts/prepare-ffmpeg-runtime.sh",
+    "verify:ffmpeg:mac": "node scripts/verify-ffmpeg-runtime.mjs",
+    "verify:ffmpeg:transcriber": "SK_FFMPEG=./node_modules/.cache/drumroll-ffmpeg/macos-arm64/bin/ffmpeg SK_FFPROBE=./node_modules/.cache/drumroll-ffmpeg/macos-arm64/bin/ffprobe uv run --python 3.12 --with numpy==2.4.6 python scripts/verify-transcriber-ffmpeg-runtime.py",
+    "web:functions:check": "scripts/check-web-functions.sh",
+    "web:release:check": "scripts/check-web-release.sh",
+    "release:checksums": "scripts/generate-sha256sums.sh",
+    "release:metadata": "node scripts/finalize-macos-release-metadata.mjs",
+    "release:stage-ffmpeg-source": "scripts/stage-ffmpeg-source.sh",
+    "package:prepare": "yarn validate:yandex-library && yarn package:lesson-library && yarn build",
+    "package:prepare:mac": "yarn prepare:ffmpeg:mac && yarn validate:yandex-library && yarn package:lesson-library && yarn distribution:integrity && yarn build",
     "postinstall": "node scripts/postinstall.js",
     "lint": "cross-env NODE_ENV=development eslint . --cache --cache-strategy content",
     "lint:fix": "cross-env NODE_ENV=development eslint . --cache --cache-strategy content --fix",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "package": "yarn build && electron-builder build --mac --publish never",
-    "package:win": "yarn build && electron-builder build -w --x64 --publish never",
-    "package:linux": "yarn build && electron-builder build -l --x64 --publish never",
+    "package": "yarn package:prepare:mac && yarn verify:ffmpeg:transcriber && electron-builder build --mac --arm64 --publish never",
+    "package:win": "yarn package:prepare && electron-builder build -w --x64 --publish never",
+    "package:linux": "yarn package:prepare && electron-builder build -l --x64 --publish never",
+    "release:build:mac:api-key": "scripts/build-macos-release-api-key.sh",
+    "release:verify:mac": "scripts/verify-macos-release.sh",
     "rebuild": "electron-rebuild --parallel --types prod,dev,optional",
     "start": "cross-env SK_USER_DATA_DIR=./.userdata/main electron-vite dev",
     "start:clean": "node scripts/clean-userdata.js && cross-env SK_USER_DATA_DIR=./.userdata/clean electron-vite dev",
@@ -59,6 +74,7 @@
   "dependencies": {
     "@ant-design/icons": "^6.2.5",
     "@eliwhite/parse-sng": "^4.0.3-eliwhite.0",
+    "@fontsource-variable/instrument-sans": "^5.3.0",
     "@fortawesome/fontawesome-svg-core": "^6.5.1",
     "@fortawesome/free-regular-svg-icons": "^6.5.1",
     "@fortawesome/free-solid-svg-icons": "^6.5.1",
@@ -67,26 +83,26 @@
     "@tanstack/react-virtual": "^3.13.2",
     "antd": "^6.4.4",
     "clsx": "^2.1.1",
+    "dayjs": "^1.11.21",
     "dompurify": "^3.4.12",
     "electron-debug": "^3.2.0",
     "electron-log": "^4.4.8",
     "electron-store": "^8.1.0",
     "electron-updater": "^6.8.9",
     "es-toolkit": "^1.47.1",
-    "ffmpeg-static": "^5.3.0",
     "fuse.js": "^7.0.0",
     "ini": "^4.1.1",
     "music-metadata": "^11.14.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.18.1",
+    "recharts": "^3.10.1",
     "scan-chart": "^8.0.1",
     "tailwind-merge": "^3.6.0",
     "use-debounce": "^10.0.0",
     "vexflow": "^4.2.3"
   },
   "devDependencies": {
-    "@electron/notarize": "^2.1.0",
     "@electron/rebuild": "^4.0.4",
     "@eslint/compat": "^2.1.0",
     "@eslint/js": "^10.0.1",
@@ -134,35 +150,67 @@
     "ts-node": "^10.9.1",
     "typescript": "^6.0.3",
     "vite": "^7.0.0",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "wrangler": "4.120.0"
   },
   "build": {
-    "productName": "SightKick",
-    "buildVersion": "1.2.1",
+    "productName": "Drumroll",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "buildVersion": "1.2.11",
     "appId": "org.sk.SightKick",
     "asar": true,
     "asarUnpack": "**\\*.{node,dll}",
     "files": [
       "out/**",
       "node_modules/**",
+      "!node_modules/.cache/**",
       "package.json"
     ],
-    "afterSign": "scripts/notarize.js",
     "mac": {
       "target": {
         "target": "default",
         "arch": [
-          "arm64",
-          "x64"
+          "arm64"
         ]
       },
       "type": "distribution",
+      "bundleShortVersion": "1.2.0",
+      "bundleVersion": "1.2.11",
+      "minimumSystemVersion": "12.0",
+      "identity": "Konstantin Baltsat (3BGK34ZGS6)",
+      "binaries": [
+        "Contents/Resources/ffmpeg-runtime/bin/ffmpeg",
+        "Contents/Resources/ffmpeg-runtime/bin/ffprobe"
+      ],
+      "signIgnore": [
+        "Contents/Resources/lesson-library/"
+      ],
+      "forceCodeSigning": true,
       "hardenedRuntime": true,
       "entitlements": "assets/entitlements.mac.plist",
       "entitlementsInherit": "assets/entitlements.mac.plist",
-      "gatekeeperAssess": false
+      "gatekeeperAssess": false,
+      "notarize": true,
+      "extraResources": [
+        {
+          "from": "node_modules/.cache/drumroll-ffmpeg/macos-arm64",
+          "to": "ffmpeg-runtime",
+          "filter": [
+            "bin/ffmpeg",
+            "bin/ffprobe",
+            "licenses/COPYING.LGPLv2.1",
+            "licenses/LICENSE.md",
+            "provenance.json"
+          ]
+        },
+        {
+          "from": "distribution-integrity.json",
+          "to": "distribution-integrity.json"
+        }
+      ]
     },
     "dmg": {
+      "sign": true,
       "contents": [
         {
           "x": 130,
@@ -197,23 +245,32 @@
         "from": "resources/transcriber",
         "to": "transcriber",
         "filter": [
-          "**/*",
-          "!.venv/**",
-          "!.uvtmp/**",
-          "!verify_out/**",
-          "!**/__pycache__/**",
-          "!**/*.pyc",
-          "!*.log"
+          "README.md",
+          "pyproject.toml",
+          "run.sh",
+          "uv.lock",
+          "sk_transcriber/*.py"
         ]
       },
       {
-        "from": "node_modules/ffmpeg-static",
-        "to": "ffmpeg-static",
+        "from": "web/public/library",
+        "to": "lesson-library"
+      },
+      {
+        "from": "resources/library-sources",
+        "to": "library-sources",
         "filter": [
-          "ffmpeg",
-          "ffmpeg.exe",
-          "package.json"
+          "yandex-drums-2026-08-09.json",
+          "yandex-favorites-2026-08-10.json"
         ]
+      },
+      {
+        "from": "LICENSE",
+        "to": "licenses/Drumroll-MIT.txt"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "licenses/THIRD_PARTY_NOTICES.md"
       }
     ],
     "publish": {

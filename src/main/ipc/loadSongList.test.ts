@@ -15,6 +15,17 @@ vi.mock('../AppState', () => ({
       set: (key: string, value: unknown) =>
         storeHolder.current!.set(key, value),
     },
+    getLibraryRoots: () => {
+      const explicit = storeHolder.current!.get('__libraryRoots');
+
+      if (Array.isArray(explicit)) {
+        return explicit;
+      }
+
+      const root = storeHolder.current!.get('lastOpenedPath');
+
+      return typeof root === 'string' ? [root] : [];
+    },
   },
 }));
 
@@ -84,6 +95,39 @@ describe('loadSongList', () => {
     expect(payload.songs[0].updatedAt).toBe(storedUpdatedAt);
 
     fs.rmSync(outside, { recursive: true, force: true });
+  });
+
+  it('returns personal songs and app-private lessons when both roots are active', async () => {
+    const selected = path.join(root, 'selected');
+    const lessons = path.join(root, 'profile', 'Drumroll Lessons');
+    const personal = path.join(selected, 'Personal Song');
+    const lesson = path.join(lessons, 'Lesson 01.01');
+
+    fs.mkdirSync(personal, { recursive: true });
+    fs.mkdirSync(lesson, { recursive: true });
+    storeHolder.current = makeStore({
+      lastOpenedPath: selected,
+      __libraryRoots: [selected, lessons],
+      songs: {
+        personal: { id: 'personal', dir: personal },
+        'lesson:01.01': { id: 'lesson:01.01', dir: lesson },
+      },
+    });
+
+    const event = makeEvent();
+
+    await loadSongList(event as never);
+
+    const payload = lastReply(event, 'load-song-list')!.args[0] as {
+      songs: { id: string }[];
+      lastOpenedPath: string;
+    };
+
+    expect(payload.songs.map((song) => song.id).sort()).toEqual([
+      'lesson:01.01',
+      'personal',
+    ]);
+    expect(payload.lastOpenedPath).toBe(selected);
   });
 
   it('skips songs whose directory no longer exists', async () => {

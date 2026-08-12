@@ -224,7 +224,7 @@ async function runSearch(
   if (!ytDlpPath) {
     event.reply('search-youtube', {
       error:
-        'YouTube search needs yt-dlp. Reinstall SightKick, or install yt-dlp and add it to PATH.',
+        'YouTube search needs yt-dlp. Reinstall Drumroll, or install yt-dlp and add it to PATH.',
     } satisfies IpcSearchYoutubeReply);
 
     return;

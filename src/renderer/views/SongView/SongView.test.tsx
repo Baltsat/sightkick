@@ -9,12 +9,27 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   BEAT_SECONDS,
   COUNT_IN_BEATS,
+  DRUM_CHART,
   GUITAR_ONLY_CHART,
   SINGLE_NOTE_CHART,
   makeSong,
   setupSongView,
 } from '../test-support';
+import { multiLaneRunFixture } from '../../components/PracticeStats/test-fixtures';
+import { chartContentRevision } from '../../services/chart-revision';
+import { remediationQueueSlotKey } from '../../services/remediation';
+import { canAutoContinuePractice } from './SongView';
 
+const TEST_CHART_REVISION = chartContentRevision({
+  songId: 'song-1',
+  difficulty: 'expert',
+  format: 'chart',
+  fileData: new TextEncoder().encode(DRUM_CHART),
+});
+const TEST_REMEDIATION_STORAGE_KEY = remediationQueueSlotKey(
+  'song-1',
+  TEST_CHART_REVISION,
+);
 const MULTI_STEM = {
   audio: [
     { src: 'drums.ogg', name: 'drums' },
@@ -22,13 +37,21 @@ const MULTI_STEM = {
   ],
 };
 
+function confirmPracticeRunSaved(view: ReturnType<typeof setupSongView>): void {
+  act(() => {
+    view.ipc.emit('save-practice-run', { songId: 'song-1' });
+  });
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe('opening a song', () => {
   it('shows the song header and real rendered sheet music', async () => {
-    const view = setupSongView();
+    const view = setupSongView({
+      settings: { handsFreeControlsEnabled: true },
+    });
 
     await view.loadSong();
 
@@ -37,6 +60,11 @@ describe('opening a song', () => {
     await waitFor(() => {
       expect(document.querySelectorAll('svg').length).toBeGreaterThan(0);
     });
+    expect(
+      within(screen.getByTestId('perform-kit-control-prompt')).getByTestId(
+        'kit-command-prompt',
+      ),
+    ).toHaveAccessibleName('Kick to start the count-in: Kick');
   });
 
   it('prevents display sleep while open and releases it on leave', () => {
@@ -75,6 +103,108 @@ describe('opening a song', () => {
 
     expect(screen.getByText('hard')).toBeInTheDocument();
   });
+
+  it('switches the same chart between continuous Flow and Classic notation', async () => {
+    const view = setupSongView({
+      settings: { practiceNotationLayout: 'flow' },
+    });
+
+    await view.loadSong();
+
+    const flowNotation = screen.getByTestId('flow-notation');
+    const flowHud = screen.getByTestId('flow-viewport-hud');
+
+    expect(flowNotation).toBeInTheDocument();
+    expect(flowNotation).toHaveAttribute('data-presentation-zoom', '1.15');
+    expect(flowNotation).toHaveStyle({ zoom: '1.15' });
+    expect(screen.getByTestId('flow-fixed-playhead')).toBeInTheDocument();
+    expect(screen.getByTestId('flow-fixed-playhead').parentElement).toBe(
+      document.body,
+    );
+    await waitFor(() => {
+      expect(
+        flowNotation.querySelectorAll('[data-flow-bar]').length,
+      ).toBeGreaterThan(0);
+    });
+    expect(
+      flowNotation.querySelectorAll('[data-flow-beat]').length,
+    ).toBeGreaterThanOrEqual(4);
+    expect(
+      screen
+        .getByTestId('flow-fixed-playhead')
+        .querySelector('[data-flow-location]'),
+    ).toHaveTextContent(/Bar 1 \/ \d+ · Beat 1/);
+    expect(flowHud).toHaveAttribute('data-mode', 'perform');
+    expect(
+      screen.queryByRole('group', { name: 'Notation view' }),
+    ).not.toBeInTheDocument();
+    expect(within(flowHud).getByText('Master of Puppets')).toBeInTheDocument();
+    expect(within(flowHud).getByText('Metallica')).toBeInTheDocument();
+    expect(within(flowHud).getByText('Perform flow')).toBeInTheDocument();
+    expect(
+      within(flowNotation).queryByRole('heading', {
+        name: 'Master of Puppets',
+      }),
+    ).not.toBeInTheDocument();
+    view.openSettings();
+    expect(screen.getByTestId('notation-flow-toggle')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByTestId('practice-input-readiness')).toHaveAttribute(
+      'data-state',
+      'waiting',
+    );
+    expect(screen.getByTestId('practice-input-readiness')).toHaveAccessibleName(
+      'Waiting for a MIDI drum kit',
+    );
+
+    fireEvent.click(screen.getByTestId('notation-classic-toggle'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('flow-notation')).not.toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('flow-viewport-hud')).not.toBeInTheDocument();
+    expect(screen.getByTestId('notation-classic-toggle')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByTestId('notation-location')).toHaveAccessibleName(
+      /Bar 1 of \d+, beat 1 of 4/,
+    );
+
+    const classicHeading = screen
+      .getAllByRole('heading', { name: 'Master of Puppets' })
+      .find((heading) => heading.classList.contains('text-4xl'));
+
+    expect(classicHeading).toBeDefined();
+    expect(classicHeading?.parentElement?.parentElement).toHaveStyle({
+      zoom: '1.15',
+    });
+    expect(screen.getByTestId('classic-notation')).toHaveAttribute(
+      'data-presentation-zoom',
+      '1.15',
+    );
+    expect(
+      JSON.parse(
+        window.localStorage.getItem('settings.practiceNotationLayout') ?? '""',
+      ),
+    ).toBe('classic');
+  });
+
+  it('opens Coach from a Home deep link without consuming any loop params', async () => {
+    const view = setupSongView({ route: '/song-1?coachOpen=1' });
+
+    await view.loadSong();
+
+    await waitFor(() => {
+      expect(view.ipc.sent).toContainEqual({
+        channel: 'load-practice-runs',
+        args: ['song-1'],
+      });
+    });
+    expect(screen.getByText('AI practice coach')).toBeInTheDocument();
+  });
 });
 
 describe('playing with count-in', () => {
@@ -87,7 +217,9 @@ describe('playing with count-in', () => {
       await view.loadSong();
       view.clickPlay();
 
-      expect(screen.getByText('1')).toBeInTheDocument();
+      expect(
+        within(screen.getByTestId('count-in')).getByText('1'),
+      ).toBeInTheDocument();
 
       const songStart = COUNT_IN_BEATS * BEAT_SECONDS;
       const scheduled = view.audio.bufferSources.flatMap((s) => s.starts);
@@ -96,7 +228,7 @@ describe('playing with count-in', () => {
 
       await view.completeCountIn();
 
-      expect(screen.queryByText('1')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('count-in')).not.toBeInTheDocument();
       expect(view.startedSources().length).toBeGreaterThan(0);
     } finally {
       vi.useRealTimers();
@@ -112,12 +244,14 @@ describe('playing with count-in', () => {
       await view.loadSong();
       view.clickPlay();
 
-      expect(screen.getByText('1')).toBeInTheDocument();
+      expect(
+        within(screen.getByTestId('count-in')).getByText('1'),
+      ).toBeInTheDocument();
 
       view.clickPlay();
       await view.completeCountIn();
 
-      expect(screen.queryByText('1')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('count-in')).not.toBeInTheDocument();
       expect(view.startedSources()).toHaveLength(0);
     } finally {
       vi.useRealTimers();
@@ -136,7 +270,7 @@ describe('disabling the count-in from settings', () => {
     view.toggleSetting('count-in');
     view.clickPlay();
 
-    expect(screen.queryByText('1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('count-in')).not.toBeInTheDocument();
     expect(view.startedSources().length).toBeGreaterThan(0);
   });
 
@@ -201,7 +335,7 @@ describe('playhead', () => {
 });
 
 describe('sheet appearance', () => {
-  it('renders drum-colored noteheads until colors are switched off in settings', async () => {
+  it('keeps Flow lane colors readable and lets Classic colors be switched off', async () => {
     const view = setupSongView();
 
     await view.loadSong();
@@ -214,6 +348,15 @@ describe('sheet appearance', () => {
     view.openSettings();
     view.openMoreSettings();
     view.toggleSetting('colors');
+
+    await waitFor(() => {
+      expect(
+        document.querySelectorAll('.vf-note-snare').length,
+      ).toBeGreaterThan(0);
+      expect(document.querySelectorAll('.vf-note-uncolored')).toHaveLength(0);
+    });
+
+    fireEvent.click(screen.getByTestId('notation-classic-toggle'));
 
     await waitFor(() => {
       expect(
@@ -236,6 +379,7 @@ describe('drumming and scoring', () => {
     view.clickPlay();
     await view.pressKey('KeyJ');
     await view.finishSong();
+    confirmPracticeRunSaved(view);
 
     expect(screen.getByTestId('score-modal')).toBeInTheDocument();
     expect(view.updateSongPayloads()).toEqual([
@@ -260,6 +404,7 @@ describe('drumming and scoring', () => {
     await view.pressKey('KeyJ');
     await view.pressKey('KeyK');
     await view.finishSong();
+    confirmPracticeRunSaved(view);
 
     expect(view.updateSongPayloads()).toEqual([
       {
@@ -318,6 +463,7 @@ describe('drumming and scoring', () => {
     expect(view.audio.state).toBe('running');
 
     await view.finishSong();
+    confirmPracticeRunSaved(view);
 
     expect(view.updateSongPayloads()).toEqual([
       {
@@ -569,6 +715,7 @@ describe('keyboard transport shortcuts', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.openSettings();
 
     const speed = () =>
       (screen.getByRole('spinbutton') as HTMLInputElement).value;
@@ -593,10 +740,61 @@ describe('keyboard transport shortcuts', () => {
     expect(screen.getByText('Speed locked in Perform')).toBeInTheDocument();
   });
 
+  it('recreates the default 1x player when the same song switches from slowed Practice to Perform', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      settings: { countIn: false },
+      keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+    });
+
+    await view.loadSong();
+    view.openSettings();
+    await view.pressKey('ArrowDown');
+    await view.pressKey('ArrowDown');
+    await view.pressKey('ArrowDown');
+    expect((screen.getByRole('spinbutton') as HTMLInputElement).value).toBe(
+      '0.7',
+    );
+
+    view.navigate('/song-1?gameMode=perform');
+
+    await waitFor(() =>
+      expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('play-toggle')).not.toBeDisabled(),
+    );
+
+    view.clickPlay();
+    await view.pressKey('KeyJ');
+    expect(view.startedSources().length).toBeGreaterThan(0);
+    await view.finishSong();
+
+    await waitFor(() =>
+      expect(
+        view.ipc.sent.some((entry) => entry.channel === 'save-practice-run'),
+      ).toBe(true),
+    );
+
+    const payload = view.ipc.sent.find(
+      (entry) => entry.channel === 'save-practice-run',
+    )?.args[0];
+
+    expect(payload).toEqual(
+      expect.objectContaining({
+        summary: expect.objectContaining({
+          mode: 'perform',
+          playbackSpeed: 1,
+        }),
+      }),
+    );
+  });
+
   it('ignores the shortcuts while a text input has focus', async () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.openSettings();
 
     const spinbutton = screen.getByRole('spinbutton');
 
@@ -654,15 +852,21 @@ describe('practice mode', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
+    view.openSettings();
 
-    expect(screen.getByText('Speed:')).toBeInTheDocument();
-    expect(screen.getByText('Loop:')).toBeInTheDocument();
+    expect(
+      screen.getByRole('spinbutton', { name: 'Playback speed' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('switch', { name: 'Loop section' }),
+    ).toBeInTheDocument();
   });
 
   it('shows no speed or loop controls when performing', async () => {
     const view = setupSongView();
 
     await view.loadSong();
+    view.openSettings();
 
     expect(screen.queryByText('Speed:')).toBeNull();
     expect(screen.queryByText('Loop:')).toBeNull();
@@ -751,6 +955,7 @@ describe('practice mode', () => {
     });
 
     await view.loadSong();
+    view.openSettings();
 
     const speed = () =>
       (screen.getByRole('spinbutton') as HTMLInputElement).value;
@@ -828,16 +1033,20 @@ describe('practice loop selection', () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
-    view.clickTestId('loop-toggle');
 
     const [a, b] = view.measureHighlights();
 
-    fireEvent.mouseDown(a);
-    fireEvent.mouseEnter(b);
+    fireEvent.pointerDown(a);
+    fireEvent.pointerEnter(b);
+    fireEvent.pointerUp(document.body);
 
     expect(screen.getByText('Measure 1 - 2')).toBeInTheDocument();
     expect(a).toHaveAttribute('data-selected', 'true');
     expect(b).toHaveAttribute('data-selected', 'true');
+    expect(screen.getByTestId('practice-mode-indicator')).toHaveAttribute(
+      'data-looping',
+      'true',
+    );
   });
 
   it('normalizes a backward drag', async () => {
@@ -869,15 +1078,14 @@ describe('practice loop selection', () => {
     expect(screen.getByText('Measure 1')).toBeInTheDocument();
   });
 
-  it('does not select while looping is off', async () => {
+  it('arms looping directly from a score gesture', async () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
-    // Looping defaults off - nothing to toggle.
     await view.loadSong();
 
     fireEvent.mouseDown(view.measureHighlights()[0]);
 
-    expect(screen.queryByText('Looping Section')).not.toBeInTheDocument();
+    expect(screen.getByText('Looping Section')).toBeInTheDocument();
   });
 
   it('clears the selected range from the loop control', async () => {
@@ -892,6 +1100,10 @@ describe('practice loop selection', () => {
     view.clickTestId('clear-loop');
 
     expect(screen.queryByText('Looping Section')).not.toBeInTheDocument();
+    expect(screen.getByTestId('practice-mode-indicator')).not.toHaveAttribute(
+      'data-looping',
+      'true',
+    );
   });
 
   it('plays from a clicked measure once looping is off', async () => {
@@ -1102,6 +1314,40 @@ describe('the stem mixer', () => {
 });
 
 describe('the score summary', () => {
+  it('keeps a completed lesson on its own result instead of auto-jumping to songs', () => {
+    expect(
+      canAutoContinuePractice(
+        'practice',
+        true,
+        'saved',
+        makeSong({
+          lesson: {
+            id: '01.01',
+            starsToUnlock: 0,
+            unit: 'Unit 1',
+            title: 'First beat',
+          },
+        }),
+      ),
+    ).toBe(false);
+    expect(canAutoContinuePractice('practice', true, 'saved', makeSong())).toBe(
+      true,
+    );
+  });
+
+  it('shows the current My Wave reason while a practice stop is open', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      recommendationReason: 'Alternating singles need one clean second pass',
+    });
+
+    await view.loadSong();
+
+    expect(screen.getByTestId('practice-wave-reason')).toHaveTextContent(
+      'My Wave · Alternating singles need one clean second pass',
+    );
+  });
+
   it('reports the accuracy and note counts of a run', async () => {
     const view = setupSongView({
       settings: { countIn: false },
@@ -1159,6 +1405,11 @@ describe('the score summary', () => {
     expect(practiceRunPayloads).toEqual([
       {
         songId: 'song-1',
+        finalizeAttemptSessionIds: [expect.any(String)],
+        records: expect.arrayContaining([
+          expect.objectContaining({ verdict: 'hit', element: 'snare' }),
+          expect.objectContaining({ verdict: 'miss', element: 'snare' }),
+        ]),
         summary: expect.objectContaining({
           mode: 'perform',
           playbackSpeed: 1,
@@ -1170,6 +1421,75 @@ describe('the score summary', () => {
     const modal = screen.getByTestId('score-modal');
 
     expect(within(modal).getByTestId('practice-stats')).toBeInTheDocument();
+  });
+
+  it('opens the coach with stored findings and presets a targeted practice loop', async () => {
+    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+
+    await view.loadSong();
+    view.openSettings();
+    fireEvent.click(screen.getByTestId('ai-coach-button'));
+
+    expect(view.ipc.sent).toContainEqual({
+      channel: 'load-practice-runs',
+      args: ['song-1'],
+    });
+
+    const summary = {
+      ...multiLaneRunFixture(),
+      mode: 'practice' as const,
+      playbackSpeed: 0.7,
+    };
+
+    act(() => {
+      view.ipc.emit('load-practice-runs', {
+        songId: 'song-1',
+        runs: [summary],
+        fullRuns: [
+          {
+            summary,
+            records: [
+              { tick: 0, deltaMs: 4, element: 'snare', verdict: 'hit' },
+              { tick: 192, deltaMs: 0, element: 'snare', verdict: 'miss' },
+              { tick: 384, deltaMs: 0, element: 'snare', verdict: 'miss' },
+              { tick: 576, deltaMs: 0, element: 'snare', verdict: 'miss' },
+            ],
+          },
+        ],
+      });
+    });
+
+    expect(
+      await screen.findByTestId('coach-finding-trouble-bars'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('coach-notation')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('coach-practice-bars'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('practice-mode-indicator')).toHaveAttribute(
+        'data-looping',
+        'true',
+      );
+      expect(screen.getByTestId('practice-mode-indicator')).toHaveAttribute(
+        'data-speed',
+        '0.7',
+      );
+      expect(view.measureHighlights()[0]).toHaveAttribute(
+        'data-selected',
+        'true',
+      );
+      expect(screen.getByTestId('loop-escape-runway')).toHaveAttribute(
+        'data-phase',
+        'control',
+      );
+      expect(screen.getByTestId('tutor-recovery-caption')).toHaveTextContent(
+        'Coach loop armed',
+      );
+    });
+    expect(window.localStorage.getItem(TEST_REMEDIATION_STORAGE_KEY)).toContain(
+      '"status":"active"',
+    );
   });
 });
 
@@ -1195,16 +1515,33 @@ describe('the reference legend', () => {
 
     await view.loadSong();
 
-    expect(screen.getByText('Snare')).toBeInTheDocument();
-    expect(screen.getByText('Kick')).toBeInTheDocument();
+    const reference = within(screen.getByTestId('drum-reference'));
+
+    expect(reference.getByText('Snare')).toBeInTheDocument();
+    expect(reference.getByText('Kick')).toBeInTheDocument();
 
     view.openSettings();
     view.openMoreSettings();
     view.toggleSetting('reference');
 
     await waitFor(() => {
-      expect(screen.queryByText('Snare')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('drum-reference')).not.toBeInTheDocument();
     });
+  });
+
+  it('docks the color key above the adaptive Tutor instead of behind it', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      settings: { countIn: false },
+    });
+
+    await view.loadSong();
+    view.clickPlay();
+
+    expect(
+      document.querySelector('.drumroll-reference--above-tutor'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('tutor-hud')).toBeInTheDocument();
   });
 });
 
@@ -1243,8 +1580,16 @@ const MULTI_DIFFICULTY_CHART = `[Song]
 }
 `;
 
+function getDifficultySelect() {
+  if (!screen.queryByRole('combobox', { name: 'Difficulty' })) {
+    fireEvent.click(screen.getByTestId('settings-trigger'));
+  }
+
+  return screen.getByRole('combobox', { name: 'Difficulty' });
+}
+
 function openDifficultySelect() {
-  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Difficulty' }));
+  fireEvent.mouseDown(getDifficultySelect());
 }
 
 function pickDifficulty(value: string) {
@@ -1275,7 +1620,7 @@ describe('in-practice difficulty switching', () => {
 
     await view.loadSong(makeSong({ drumDifficulties: ['expert'] }));
 
-    expect(screen.getByRole('combobox', { name: 'Difficulty' })).toBeDisabled();
+    expect(getDifficultySelect()).toBeDisabled();
   });
 
   it('reloads the parsed chart at the new difficulty', async () => {
@@ -1428,6 +1773,7 @@ describe('in-practice difficulty switching', () => {
     await view.pressKey('KeyJ'); // the only hit that should count
 
     await view.finishSong();
+    confirmPracticeRunSaved(view);
 
     expect(view.updateSongPayloads()).toEqual([
       {
@@ -1463,5 +1809,57 @@ describe('in-practice difficulty switching', () => {
     await waitFor(() => {
       expect(screen.queryByText('Looping Section')).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('practice motion', () => {
+  it('starts active notation motion with transport and hit feedback only after a real strike', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      settings: { countIn: false },
+      keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+    });
+
+    await view.loadSong();
+
+    const shell = document.querySelector('.drumroll-practice-shell');
+
+    expect(shell).toHaveAttribute('data-session-phase', 'ready');
+    expect(document.querySelector('.vf-note-pop')).toBeNull();
+
+    view.clickPlay();
+    await waitFor(() =>
+      expect(shell).toHaveAttribute('data-session-phase', 'playing'),
+    );
+
+    await view.pressKey('KeyJ');
+
+    expect(document.querySelector('.vf-note-pop')).not.toBeNull();
+  });
+
+  it('adds wrong-hit feedback only for a mapped, judged wrong pad', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      settings: { countIn: false },
+      keyboard: {
+        kit: {
+          snare: ['keyboard:KeyJ'],
+          kick: ['keyboard:KeyK'],
+        },
+      },
+    });
+
+    await view.loadSong();
+    view.clickPlay();
+    await waitFor(() =>
+      expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+        'aria-label',
+        'Pause',
+      ),
+    );
+
+    await view.pressKey('KeyK');
+
+    expect(document.querySelector('.vf-wronghit-marker')).not.toBeNull();
   });
 });

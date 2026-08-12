@@ -1,14 +1,27 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Button, Modal, Spin, Tooltip } from 'antd';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button, Drawer, Modal, Spin, Tooltip } from 'antd';
+import { Difficulty } from 'scan-chart';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faMusic, faPlay } from '@fortawesome/free-solid-svg-icons';
 import {
-  faGraduationCap,
-  faMusic,
-  faPlay,
-} from '@fortawesome/free-solid-svg-icons';
-import { Outlet, useNavigate, useOutlet } from 'react-router-dom';
+  Outlet,
+  useNavigate,
+  useOutlet,
+  useSearchParams,
+} from 'react-router-dom';
 import appIcon from '../../../../assets/icon.png';
-import { Song } from '../../../types';
+import {
+  ControlMapping,
+  IpcResolveLibraryCandidatesResponse,
+  IpcResult,
+  isIpcError,
+  LibraryCandidateResolution,
+  LibrarySourceTrackProvenance,
+  Song,
+  YandexPlaylistCandidate,
+  YandexPlaylistCandidateCollection,
+} from '../../../types';
+import type { LibraryMode } from '../../types';
 import { SongFilter } from '../../components/SongFilter';
 import { SongList } from '../../components/SongList';
 import { SettingsButton } from '../../components/SettingsButton';
@@ -27,8 +40,13 @@ import { useStemTools } from '../../hooks/useStemTools';
 import { useSongList } from '../../hooks/useSongList';
 import { useDownload } from '../../hooks/useDownload';
 import { useSongFilter } from '../../hooks/useSongFilter';
-import { useInputControls } from '../../hooks/useInputControls';
+import { useLibraryCandidates } from '../../hooks/useLibraryCandidates';
+import {
+  InputControlHandlers,
+  useInputControls,
+} from '../../hooks/useInputControls';
 import { useGameModeSelector } from '../../hooks/useGameModeSelector';
+import { usePersisted } from '../../hooks/usePersisted';
 import {
   highestAvailableDifficulty,
   isLessonSong,
@@ -38,7 +56,48 @@ import {
 } from '../../hooks/useLessons';
 import { calculateAccuracy, getStarRating } from '../../scoring';
 import { Stars } from '../../components/Stars';
-import { LibraryView } from '../../types';
+import { last7Dates, useGamification } from '../../hooks/useGamification';
+import { GamificationHeaderStrip } from '../../components/GamificationHeaderStrip';
+import { StatsPanel } from '../../components/StatsPanel';
+import { localDateKey } from '../../services/streaks';
+import { SaveGoalInput, SetGoalModal, useGoals } from '../../components/Goals';
+import { AppShell, ArenaView } from '../../components/AppShell';
+import { HomeCockpit } from '../../components/HomeCockpit';
+import { MyWave } from '../../components/MyWave';
+import { KitCommandPrompt } from '../../components/KitCommandPrompt';
+import ProfileView from '../../components/Profile';
+import { buildDrumLearningProfile } from '../../services/learning-profile';
+import {
+  buildPracticeWave,
+  composeHomeSession,
+  OneKickHomeSession,
+  PracticeCandidate,
+  PracticeHistoryEntry,
+  PracticeWaveResult,
+  RankedPracticeCandidate,
+  recommendNextPractice,
+} from '../../services/next-practice';
+import {
+  bestSongSectionAudition,
+  buildWeeklyMusicalRecap,
+  buildWeeklyRhythm,
+  composePracticeCards,
+  CURRICULUM_ITEM_MANIFESTS,
+  dueReviews,
+  replayAtomicSkillState,
+  selectWeeklyPracticeSet,
+  SongGoal,
+} from '../../services/pedagogy';
+import type {
+  PracticeCardKind,
+  PracticeCardOption,
+  PracticeRhythm,
+} from '../../services/pedagogy';
+import { PracticeOutletContext } from '../practice-context';
+import {
+  filterLibraryCandidates,
+  LibraryCandidateList,
+} from '../../components/LibraryCandidateList';
 import {
   nextDifficulty,
   nextSongIndex,
@@ -47,11 +106,112 @@ import {
   toggledSortForIndex,
   wrapSortIndex,
 } from './helpers';
+import { resolveLibraryControls } from './library-controls';
+import { isPlayableEvidence } from '../../../library-sources/playability';
+
+const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard', 'expert'];
+
+interface PracticeLaunchContext {
+  card?: PracticeCardOption;
+  audition?: NonNullable<PracticeCardOption['audition']>;
+}
+
+function LibraryInputControls({
+  mapping,
+  handlers,
+}: {
+  mapping: ControlMapping;
+  handlers: InputControlHandlers;
+}) {
+  useInputControls(mapping, handlers);
+
+  return null;
+}
+
+function candidateDifficulty(
+  song: Song,
+  selected: Difficulty,
+): Difficulty | undefined {
+  if (!song.drumDifficulties || song.drumDifficulties.length === 0) {
+    return selected;
+  }
+
+  if (song.drumDifficulties.includes(selected)) {
+    return selected;
+  }
+
+  return [...DIFFICULTIES]
+    .reverse()
+    .find((difficulty) => song.drumDifficulties?.includes(difficulty));
+}
+
+function appendCompletedRun(
+  history: PracticeHistoryEntry[],
+  completedRun: PracticeHistoryEntry | undefined,
+): PracticeHistoryEntry[] {
+  if (!completedRun) {
+    return history;
+  }
+
+  const sessionId = completedRun.summary.context?.sessionId;
+  const exists = history.some(
+    (entry) =>
+      entry.candidateId === completedRun.candidateId &&
+      sessionId !== undefined &&
+      entry.summary.context?.sessionId === sessionId,
+  );
+
+  return exists ? history : [...history, completedRun];
+}
+
+function candidateProvenance(
+  source: YandexPlaylistCandidateCollection,
+  track: YandexPlaylistCandidate,
+): LibrarySourceTrackProvenance {
+  return {
+    provider: 'yandex-music',
+    collectionId: source.playlist.id,
+    collectionName: source.playlist.name,
+    trackId: track.id,
+    title: track.title,
+    artists: [...track.artists],
+    ...(track.durationSeconds !== null
+      ? { durationSeconds: track.durationSeconds }
+      : {}),
+    ...(track.sourceTrackUrl ? { sourceUrl: track.sourceTrackUrl } : {}),
+  };
+}
 
 export function SongListView() {
   const { currentPath, difficulty, setDifficulty } = useApp();
-  const { controlMapping } = useInput();
+  const [hoverPreviewEnabled, setHoverPreviewEnabled] = usePersisted(
+    'settings.songHoverPreview',
+    true,
+  );
+  const { controlMapping, inputMapping } = useInput();
+  const libraryControls = useMemo(
+    () => resolveLibraryControls(controlMapping, inputMapping),
+    [controlMapping, inputMapping],
+  );
+  const libraryMoveSteps = [
+    ...(libraryControls.kitActions.includes('up') ? (['tom1'] as const) : []),
+    ...(libraryControls.kitActions.includes('down') ? (['tom2'] as const) : []),
+  ];
+  const libraryMoveHints = [
+    ...(libraryControls.kitActions.includes('up') ? ['Previous'] : []),
+    ...(libraryControls.kitActions.includes('down') ? ['Next'] : []),
+  ];
+  const platformCapabilities = window.drumrollPlatform?.capabilities;
+  const youtubeImportAvailable = platformCapabilities?.youtubeImport ?? true;
+  const onlineDownloadsAvailable =
+    platformCapabilities?.onlineSongDownloads ?? true;
+  const localFolderImportAvailable =
+    platformCapabilities?.localFolderImport ?? true;
+  const myMusicAvailable = platformCapabilities?.myMusic ?? true;
+  const hasAddMusicAction =
+    youtubeImportAvailable || localFolderImportAvailable || myMusicAvailable;
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const songOpen = useOutlet() !== null;
   const stemTools = useStemTools();
   const {
@@ -67,6 +227,29 @@ export function SongListView() {
     scanProgress && scanProgress.total > 0
       ? Math.round((scanProgress.current / scanProgress.total) * 100)
       : undefined;
+  // Full songList (lesson songs included) - Century/Season Finale/Speed
+  // Demon all need to see the whole library, not just the non-lesson
+  // subset `librarySongs` (below) filters down to for the songs grid.
+  // Mounted once here, passed to SongView via <Outlet context> below
+  // (SongView renders inside this component's Outlet - see App.tsx's
+  // nested route - so one instance is enough for both surfaces to share
+  // live state without a separate context provider).
+  const goals = useGoals();
+  const activeGoalRecord = goals.primaryGoal ?? goals.goals[0];
+  const gamification = useGamification(songList, activeGoalRecord?.songId);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [isSetGoalOpen, setIsSetGoalOpen] = useState(false);
+  const [goalModalSongId, setGoalModalSongId] = useState<string | undefined>(
+    undefined,
+  );
+  const weeklyXp = useMemo(() => {
+    const today = new Date();
+
+    return last7Dates(today).map((date) => ({
+      date,
+      xp: gamification.days[localDateKey(date)]?.xp ?? 0,
+    }));
+  }, [gamification.days]);
   const {
     nameFilter,
     setNameFilter,
@@ -81,6 +264,36 @@ export function SongListView() {
     onlineLoading,
     loadMore,
   } = useSongFilter(songList, difficulty);
+  const libraryCandidates = useLibraryCandidates();
+  const yandexSources = libraryCandidates.candidates?.yandex;
+  const isYandexMode = libraryMode === 'drums' || libraryMode === 'favorites';
+  const candidateSource =
+    libraryMode === 'drums'
+      ? yandexSources?.drums
+      : libraryMode === 'favorites'
+        ? yandexSources?.favorites
+        : undefined;
+  const filteredLibraryCandidates = useMemo(
+    () => filterLibraryCandidates(candidateSource?.tracks ?? [], nameFilter),
+    [candidateSource?.tracks, nameFilter],
+  );
+  const linkedCandidateIds = useMemo(() => {
+    if (!candidateSource) {
+      return new Set<string>();
+    }
+
+    return new Set(
+      songList
+        .filter((song) => isPlayableEvidence(song.playability))
+        .map((song) => song.sourceProvenance)
+        .filter(
+          (source) =>
+            source?.provider === candidateSource.source &&
+            source.collectionId === candidateSource.playlist.id,
+        )
+        .map((source) => source!.trackId),
+    );
+  }, [candidateSource, songList]);
   const { downloadingIds, handleDownload } = useDownload(
     onlineResults,
     addSong,
@@ -90,26 +303,319 @@ export function SongListView() {
   );
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [focusedSortIndex, setFocusedSortIndex] = useState(0);
-  const sortAvailable = libraryMode !== 'online';
+  const sortAvailable = libraryMode === 'local';
   const [prevNameFilter, setPrevNameFilter] = useState(nameFilter);
   const [prevLibraryMode, setPrevLibraryMode] = useState(libraryMode);
   const [prevSort, setPrevSort] = useState(sort);
   const [prevSortAvailable, setPrevSortAvailable] = useState(sortAvailable);
   const gameModeSelector = useGameModeSelector();
-  const [view, setView] = useState<LibraryView>('songs');
+  const [view, setView] = useState<ArenaView>('home');
   const [myMusicOpen, setMyMusicOpen] = useState(false);
+  const [candidateResolutions, setCandidateResolutions] = useState<
+    Record<string, LibraryCandidateResolution>
+  >({});
+  const [resolvingCandidateIds, setResolvingCandidateIds] = useState<
+    Set<string>
+  >(new Set());
+  const [recommendationNowMs, setRecommendationNowMs] = useState(() =>
+    Date.now(),
+  );
+
+  useEffect(() => {
+    if (!onlineDownloadsAvailable && libraryMode === 'online') {
+      setLibraryMode('local');
+    }
+  }, [libraryMode, onlineDownloadsAvailable, setLibraryMode]);
+
+  useEffect(() => {
+    const timer = window.setInterval(
+      () => setRecommendationNowMs(Date.now()),
+      60_000,
+    );
+
+    return () => window.clearInterval(timer);
+  }, []);
+
   // The Lessons unlock chain always looks at every lesson song, regardless
   // of the app's globally selected difficulty tab — lesson charts only ever
   // carry an Expert drum track, so filtering by difficulty here would hide
   // the whole curriculum whenever the tab isn't set to Expert.
   const lessonProgress = useLessons(songList);
+  const practiceCandidates = useMemo<PracticeCandidate[]>(() => {
+    const lessonState = new Map(
+      lessonProgress.entries.map((entry, index) => [
+        entry.song.id,
+        { entry, index },
+      ]),
+    );
+    const finalLessonIndex = Math.max(1, lessonProgress.entries.length - 1);
+
+    return songList.flatMap<PracticeCandidate>((song) => {
+      const targetDifficulty = candidateDifficulty(song, difficulty);
+
+      if (!targetDifficulty) {
+        return [];
+      }
+
+      const lesson = lessonState.get(song.id);
+
+      if (lesson) {
+        return [
+          {
+            id: song.id,
+            title: lesson.entry.lesson.title,
+            kind: 'lesson' as const,
+            difficulty: targetDifficulty,
+            available: true,
+            unlocked: lesson.entry.unlocked,
+            sequence: lesson.index,
+            skills: lesson.entry.lesson.skills,
+            curriculumId: lesson.entry.lesson.id,
+            prerequisiteIds: lesson.entry.lesson.prerequisiteIds,
+            targetLanes: lesson.entry.lesson.targetLanes,
+            bpmStart: lesson.entry.lesson.bpmStart,
+            bpmTarget: lesson.entry.lesson.bpmTarget,
+            doseRule: lesson.entry.lesson.doseRule,
+            masteryRule: lesson.entry.lesson.masteryRule,
+            cue: lesson.entry.lesson.cue,
+            assessmentBoundary: lesson.entry.lesson.assessmentBoundary,
+            challengeLevel: 0.12 + (lesson.index / finalLessonIndex) * 0.76,
+            mastered: lesson.entry.cleared,
+            availableDifficulties: song.drumDifficulties,
+            chartTotalNotes: song.scoreData?.[targetDifficulty]?.totalNotes,
+          },
+        ];
+      }
+
+      return [
+        {
+          id: song.id,
+          title: song.name,
+          kind: 'song' as const,
+          difficulty: targetDifficulty,
+          available: true,
+          liked: song.liked,
+          skills: [
+            ...new Set(
+              (gamification.runsBySong?.[song.id] ?? []).flatMap((run) =>
+                (run.coachEvidence ?? []).map((finding) => finding.skillTag),
+              ),
+            ),
+          ],
+          targetSpeed: 1,
+          availableDifficulties: song.drumDifficulties,
+          chartTotalNotes: song.scoreData?.[targetDifficulty]?.totalNotes,
+        },
+      ];
+    });
+  }, [difficulty, gamification.runsBySong, lessonProgress.entries, songList]);
+  const practiceHistory = useMemo<PracticeHistoryEntry[]>(
+    () =>
+      Object.entries(gamification.runsBySong ?? {}).flatMap(
+        ([candidateId, runs]) =>
+          runs.map((summary) => ({ candidateId, summary })),
+      ),
+    [gamification.runsBySong],
+  );
+  const activeGoal = useMemo<SongGoal | undefined>(
+    () =>
+      activeGoalRecord
+        ? {
+            song_id: activeGoalRecord.songId,
+            preferred: true,
+            goal_kind: 'full_song',
+          }
+        : undefined,
+    [activeGoalRecord],
+  );
+  const activeGoalPayoffCandidate = useMemo(
+    () =>
+      activeGoal
+        ? practiceCandidates.find(
+            (candidate) =>
+              candidate.id === activeGoal.song_id && candidate.kind === 'song',
+          )
+        : undefined,
+    [activeGoal, practiceCandidates],
+  );
+  const atomicStateReplay = useMemo(
+    () =>
+      replayAtomicSkillState(
+        practiceHistory.flatMap(
+          ({ summary }) => summary.atomicSkillEvidence ?? [],
+        ),
+        { manifests: CURRICULUM_ITEM_MANIFESTS },
+      ),
+    [practiceHistory],
+  );
+  const atomicStates = atomicStateReplay.states;
+  const atomicReviews = useMemo(
+    () => dueReviews(atomicStates, new Date(recommendationNowMs).toISOString()),
+    [atomicStates, recommendationNowMs],
+  );
+  const learningProfile = useMemo(
+    () =>
+      buildDrumLearningProfile(practiceHistory.map(({ summary }) => summary)),
+    [practiceHistory],
+  );
+  const persistedCoachEvidence = useMemo(
+    () => practiceHistory.flatMap(({ summary }) => summary.coachEvidence ?? []),
+    [practiceHistory],
+  );
+  const nextPractice = useMemo(
+    () =>
+      recommendNextPractice({
+        candidates: practiceCandidates,
+        history: practiceHistory,
+        coachEvidence: persistedCoachEvidence,
+        weakLanes: gamification.laneAccuracy,
+        nowMs: recommendationNowMs,
+        goalDate: activeGoalRecord?.targetDate,
+        learningProfile,
+        pedagogy: {
+          atomicStates,
+          itemManifests: CURRICULUM_ITEM_MANIFESTS,
+          ...(activeGoal ? { activeGoal } : {}),
+          dueReviews: atomicReviews,
+        },
+        limit: 12,
+      }),
+    [
+      activeGoal,
+      activeGoalRecord?.targetDate,
+      atomicReviews,
+      atomicStates,
+      gamification.laneAccuracy,
+      learningProfile,
+      practiceCandidates,
+      practiceHistory,
+      persistedCoachEvidence,
+      recommendationNowMs,
+    ],
+  );
+  const practiceWave = useMemo(
+    () =>
+      buildPracticeWave({
+        ranking: nextPractice.ranking,
+        history: practiceHistory,
+      }),
+    [nextPractice.ranking, practiceHistory],
+  );
+  const [practiceRhythm, setPracticeRhythm] = usePersisted<PracticeRhythm>(
+    'practice.rhythm',
+    'weekly',
+  );
+  const [practiceSetRotation, setPracticeSetRotation] = usePersisted<
+    Partial<Record<PracticeCardKind, number>>
+  >('practice.weeklySetRotation', {});
+  const profileHomeSession = useMemo(
+    () =>
+      composeHomeSession({
+        intent: 'learning',
+        size: 'full',
+        ranking: nextPractice.ranking,
+        pedagogyRanking: nextPractice.pedagogyRanking,
+        practiceWave,
+        activeGoal,
+        goalPayoffCandidate: activeGoalPayoffCandidate,
+        goalTargetDate: activeGoalRecord?.targetDate,
+        deadlinePacing: nextPractice.deadlinePacing,
+        atomicStates,
+        now: new Date(recommendationNowMs).toISOString(),
+      }),
+    [
+      activeGoal,
+      activeGoalPayoffCandidate,
+      activeGoalRecord?.targetDate,
+      atomicStates,
+      nextPractice.deadlinePacing,
+      nextPractice.pedagogyRanking,
+      nextPractice.ranking,
+      practiceWave,
+      recommendationNowMs,
+    ],
+  );
+  const practiceCards = useMemo(() => {
+    const composed = composePracticeCards({
+      plan: profileHomeSession?.plan,
+      ranking: nextPractice.pedagogyRanking ?? [],
+      due_reviews: atomicReviews,
+      ...(profileHomeSession?.goalPath
+        ? { goal_path: profileHomeSession.goalPath }
+        : {}),
+    });
+    const playable = composed.cards.flatMap((card) => {
+      const options = card.options.filter((option) =>
+        nextPractice.ranking.some(
+          (ranked) => ranked.candidate.id === option.candidate_id,
+        ),
+      );
+
+      return options.length > 0 ? [{ ...card, options }] : [];
+    });
+
+    return {
+      cards: playable,
+      evidence_signature: composed.evidence_signature,
+    };
+  }, [
+    atomicReviews,
+    nextPractice.pedagogyRanking,
+    nextPractice.ranking,
+    profileHomeSession,
+  ]);
+  const weeklyPracticeSet = useMemo(
+    () =>
+      selectWeeklyPracticeSet({
+        cards: practiceCards,
+        rhythm: practiceRhythm,
+        rotation: practiceSetRotation,
+      }),
+    [practiceCards, practiceRhythm, practiceSetRotation],
+  );
+  const weeklyRhythm = useMemo(
+    () =>
+      buildWeeklyRhythm({
+        days: gamification.days,
+        rhythm: practiceRhythm,
+        now: new Date(recommendationNowMs),
+      }),
+    [gamification.days, practiceRhythm, recommendationNowMs],
+  );
+  const weeklyRecap = useMemo(
+    () =>
+      buildWeeklyMusicalRecap({
+        runs: practiceHistory.map(({ summary }) => summary),
+        states: atomicStates,
+        recommendation: nextPractice.recommendation,
+        now: new Date(recommendationNowMs),
+      }),
+    [
+      atomicStates,
+      nextPractice.recommendation,
+      practiceHistory,
+      recommendationNowMs,
+    ],
+  );
+  const bestAudition = useMemo(
+    () =>
+      bestSongSectionAudition(
+        practiceHistory.map(({ summary }) => summary),
+        activeGoal?.song_id,
+      ),
+    [activeGoal?.song_id, practiceHistory],
+  );
+  const [activePracticeWave, setActivePracticeWave] = useState<{
+    result: PracticeWaveResult;
+    index: number;
+  }>();
   const rescanLibrary = useCallback(() => {
     window.electron.ipcRenderer.sendMessage('rescan-songs', false);
   }, []);
 
   useLessonAutoRescan({
     songList,
-    isLessonsTabActive: view === 'lessons',
+    isLessonsTabActive: !songOpen && view === 'journey',
     totalLessons: lessonProgress.totalLessons,
     isScanning: scanProgress !== undefined,
     rescan: rescanLibrary,
@@ -129,12 +635,78 @@ export function SongListView() {
   const songsWithProgress = librarySongs.filter(
     (song) => song.scoreData?.[difficulty] !== undefined,
   ).length;
+  const { loadAchievements } = gamification;
+
+  // Home and My Wave expose saved lane analytics on their first paint. The
+  // request is intentionally scoped to those surfaces: the detailed Songs
+  // library remains as light as it was before the cockpit existed.
+  useEffect(() => {
+    if (view === 'home' || view === 'wave') {
+      loadAchievements();
+    }
+  }, [loadAchievements, view]);
+
   const handleSongImported = useCallback(
     (song: Song) => {
       addSong(song);
       setLibraryMode('local');
     },
     [addSong, setLibraryMode],
+  );
+
+  useEffect(() => {
+    return window.electron.ipcRenderer.on<
+      IpcResult<IpcResolveLibraryCandidatesResponse>
+    >('resolve-library-candidates', (response) => {
+      if (isIpcError(response)) {
+        setResolvingCandidateIds(new Set());
+
+        return;
+      }
+
+      setCandidateResolutions((previous) => ({
+        ...previous,
+        ...Object.fromEntries(
+          response.results.map((result) => [result.trackId, result]),
+        ),
+      }));
+      setResolvingCandidateIds((previous) => {
+        const next = new Set(previous);
+
+        for (const result of response.results) {
+          next.delete(result.trackId);
+        }
+
+        return next;
+      });
+    });
+  }, []);
+
+  const resolveCandidate = useCallback(
+    (track: YandexPlaylistCandidate) => {
+      if (!candidateSource) {
+        return;
+      }
+
+      setResolvingCandidateIds((previous) => new Set(previous).add(track.id));
+      window.electron.ipcRenderer.sendMessage('resolve-library-candidates', {
+        sources: [candidateProvenance(candidateSource, track)],
+      });
+    },
+    [candidateSource],
+  );
+  const autoChartCandidate = useCallback(
+    (track: YandexPlaylistCandidate) => {
+      if (!candidateSource || track.durationSeconds === null) {
+        return;
+      }
+
+      window.electron.ipcRenderer.sendMessage('create-auto-chart', {
+        localFile: true,
+        sourceProvenance: candidateProvenance(candidateSource, track),
+      });
+    },
+    [candidateSource],
   );
 
   if (
@@ -177,14 +749,34 @@ export function SongListView() {
     setFocusedSortIndex(sortIndexForKey(sort.key));
     setIsSortOpen(true);
   };
+  const openManualPractice = (id: string) => {
+    const recommendation = recommendNextPractice({
+      candidates: practiceCandidates.filter((candidate) => candidate.id === id),
+      history: practiceHistory,
+      coachEvidence: persistedCoachEvidence,
+      weakLanes: gamification.laneAccuracy,
+      nowMs: Date.now(),
+      limit: 1,
+    }).recommendation;
+    const params = new URLSearchParams({ gameMode: 'practice' });
+
+    if (recommendation) {
+      params.set('practiceSpeed', recommendation.suggestedSpeed.toFixed(1));
+    }
+
+    navigate(`/${id}?${params.toString()}`);
+  };
   const play = async (id: string) => {
     if (gameModeSelector.isOpen) {
       return;
     }
 
-    const gameMode = await gameModeSelector.open();
+    const song = songList.find((s) => s.id === id);
+    const gameMode = await gameModeSelector.open(song?.drumDifficulties);
 
-    if (gameMode) {
+    if (gameMode === 'practice') {
+      openManualPractice(id);
+    } else if (gameMode) {
       navigate(`/${id}?gameMode=${gameMode}`);
     }
   };
@@ -199,267 +791,712 @@ export function SongListView() {
       setDifficulty(targetDifficulty);
     }
 
-    play(entry.song.id);
+    // A lesson is already an instructional choice. Showing the general
+    // song-mode picker here makes a seated player walk back to the laptop
+    // just to repeat that choice. Lessons therefore always enter their own
+    // chart directly in Practice; SongView remains responsible for its
+    // deliberate ready cue and count-in, so this does not start audio early.
+    const authoredStartSpeed =
+      entry.lesson.bpmStart && entry.lesson.bpmTarget
+        ? entry.lesson.bpmStart / entry.lesson.bpmTarget
+        : 0.8;
+    const practiceSpeed = Math.min(1, Math.max(0.7, authoredStartSpeed));
+    const params = new URLSearchParams({
+      gameMode: 'practice',
+      practiceSpeed: practiceSpeed.toFixed(1),
+    });
+
+    navigate(`/${entry.song.id}?${params.toString()}`);
   };
+  const startRecommendedPractice = useCallback(
+    (completedRun?: PracticeHistoryEntry) => {
+      const history = appendCompletedRun(practiceHistory, completedRun);
+      const activeCurrentId =
+        activePracticeWave?.result.stops[activePracticeWave.index]
+          ?.recommendation.candidate.id;
+      const activeNextStop =
+        completedRun &&
+        activePracticeWave &&
+        activeCurrentId === completedRun.candidateId
+          ? activePracticeWave.result.stops[activePracticeWave.index + 1]
+          : undefined;
+      let wave = activePracticeWave?.result;
+      let waveIndex = activePracticeWave?.index ?? 0;
 
-  useInputControls(
-    controlMapping,
-    isSortOpen
-      ? {
-          up: () => moveSortFocus(-1),
-          down: () => moveSortFocus(1),
-          confirm: toggleFocusedSortDirection,
-          back: () => setIsSortOpen(false),
-        }
-      : {
-          up: () =>
-            setFocusedSongIndex((index) =>
-              nextSongIndex(index, filteredSongList.length, -1),
-            ),
-          down: () =>
-            setFocusedSongIndex((index) =>
-              nextSongIndex(index, filteredSongList.length, 1),
-            ),
-          confirm: () => {
-            if (focusedSongIndex === undefined) {
-              return;
-            }
+      if (activeNextStop) {
+        waveIndex += 1;
+      } else {
+        const result = recommendNextPractice({
+          candidates: practiceCandidates,
+          history,
+          coachEvidence: [
+            ...persistedCoachEvidence,
+            ...(completedRun?.summary.coachEvidence ?? []),
+          ],
+          nowMs: Date.now(),
+          limit: 12,
+        });
 
-            const song = filteredSongList[focusedSongIndex];
+        wave = buildPracticeWave({ ranking: result.ranking, history });
+        waveIndex = 0;
+      }
 
-            if (!song) {
-              return;
-            }
+      const recommendation =
+        activeNextStop?.recommendation ??
+        wave?.stops[waveIndex]?.recommendation;
 
-            if (libraryMode === 'local') {
-              play(song.id);
-            } else if (
-              libraryMode === 'online' &&
-              !songList.find(({ id }) => song.id === id)
-            ) {
-              handleDownload(song.id);
-            }
-          },
-          sort: openSort,
-          library: () =>
-            setLibraryMode(libraryMode === 'online' ? 'local' : 'online'),
-          difficulty: () => setDifficulty(nextDifficulty(difficulty)),
-        },
-    !songOpen && !gameModeSelector.isOpen && view === 'songs',
+      if (!recommendation) {
+        setActivePracticeWave(undefined);
+        setView('songs');
+
+        return;
+      }
+
+      if (wave) {
+        setActivePracticeWave({ result: wave, index: waveIndex });
+      }
+
+      if (recommendation.candidate.difficulty !== difficulty) {
+        setDifficulty(recommendation.candidate.difficulty);
+      }
+
+      const params = new URLSearchParams({
+        gameMode: 'practice',
+        autoStart: '1',
+        practiceSpeed: recommendation.suggestedSpeed.toFixed(1),
+      });
+
+      navigate(`/${recommendation.candidate.id}?${params.toString()}`);
+    },
+    [
+      activePracticeWave,
+      difficulty,
+      navigate,
+      persistedCoachEvidence,
+      practiceCandidates,
+      practiceHistory,
+      setDifficulty,
+    ],
   );
+  const launchPractice = useCallback(
+    (
+      recommendation: RankedPracticeCandidate,
+      practiceSpeed: number,
+      context?: PracticeLaunchContext,
+    ) => {
+      const waveIndex = practiceWave.stops.findIndex(
+        ({ recommendation: waveRecommendation }) =>
+          waveRecommendation.candidate.id === recommendation.candidate.id,
+      );
+      const wave =
+        waveIndex === -1
+          ? buildPracticeWave({
+              ranking: [recommendation],
+              history: practiceHistory,
+            })
+          : practiceWave;
 
+      setActivePracticeWave({
+        result: wave,
+        index: Math.max(0, waveIndex),
+      });
+
+      if (recommendation.candidate.difficulty !== difficulty) {
+        setDifficulty(recommendation.candidate.difficulty);
+      }
+
+      const params = new URLSearchParams({
+        gameMode: 'practice',
+        practiceSpeed: practiceSpeed.toFixed(1),
+      });
+
+      if (!context?.audition) {
+        params.set('autoStart', '1');
+      }
+
+      if (context?.card) {
+        params.set('practiceCardKind', context.card.kind);
+        params.set('practiceCardCandidate', context.card.candidate_id);
+        params.set('practiceCardSource', context.card.source_label);
+      }
+
+      if (context?.audition) {
+        params.set('audition', '1');
+        params.set('auditionStart', String(context.audition.start_bar));
+        params.set('auditionEnd', String(context.audition.end_bar));
+        params.set('auditionLabel', context.audition.section_label);
+        params.set('auditionTest', context.audition.test_label);
+        params.set('auditionSkill', context.audition.required_skill_id);
+      }
+
+      navigate(`/${recommendation.candidate.id}?${params.toString()}`);
+    },
+    [difficulty, navigate, practiceHistory, practiceWave, setDifficulty],
+  );
+  const startComposedSession = useCallback(
+    (session: OneKickHomeSession) =>
+      launchPractice(session.launch, session.launchSpeed),
+    [launchPractice],
+  );
+  const startTargetedPractice = useCallback(() => {
+    if (nextPractice.recommendation) {
+      launchPractice(
+        nextPractice.recommendation,
+        nextPractice.recommendation.suggestedSpeed,
+      );
+    }
+  }, [launchPractice, nextPractice.recommendation]);
+  const startPracticeCard = useCallback(
+    (option: PracticeCardOption) => {
+      const recommendation = nextPractice.ranking.find(
+        (ranked) => ranked.candidate.id === option.candidate_id,
+      );
+
+      if (recommendation) {
+        launchPractice(recommendation, option.speed, {
+          card: option,
+          ...(option.audition ? { audition: option.audition } : {}),
+        });
+      }
+    },
+    [launchPractice, nextPractice.ranking],
+  );
+  const startSectionAudition = useCallback(() => {
+    const audition = profileHomeSession?.goalPath?.next_song_probe;
+    const recommendation = audition
+      ? nextPractice.ranking.find(
+          (ranked) => ranked.candidate.id === audition.song_id,
+        )
+      : undefined;
+
+    if (audition && recommendation) {
+      launchPractice(recommendation, audition.speed, { audition });
+    }
+  }, [launchPractice, nextPractice.ranking, profileHomeSession?.goalPath]);
+  const refreshPracticeSet = useCallback(() => {
+    setPracticeSetRotation(
+      (current) =>
+        Object.fromEntries(
+          ['review', 'build', 'apply'].map((kind) => [
+            kind,
+            (current[kind as PracticeCardKind] ?? 0) + 1,
+          ]),
+        ) as Partial<Record<PracticeCardKind, number>>,
+    );
+  }, [setPracticeSetRotation]);
+
+  useEffect(() => {
+    const lessonId = searchParams.get('coachLesson');
+
+    if (!lessonId) {
+      return;
+    }
+
+    const entry = lessonProgress.groups
+      .flatMap((group) => group.entries)
+      .find((candidate) => candidate.lesson.id === lessonId);
+
+    if (!entry) {
+      return;
+    }
+
+    const targetDifficulty = highestAvailableDifficulty(entry.song);
+
+    if (targetDifficulty && targetDifficulty !== difficulty) {
+      setDifficulty(targetDifficulty);
+    }
+
+    const authoredStartSpeed =
+      entry.lesson.bpmStart && entry.lesson.bpmTarget
+        ? entry.lesson.bpmStart / entry.lesson.bpmTarget
+        : 0.8;
+    const practiceSpeed = Math.min(1, Math.max(0.7, authoredStartSpeed));
+    const params = new URLSearchParams({
+      gameMode: 'practice',
+      practiceSpeed: practiceSpeed.toFixed(1),
+    });
+
+    navigate(`/${entry.song.id}?${params.toString()}`, { replace: true });
+  }, [difficulty, lessonProgress, navigate, searchParams, setDifficulty]);
+
+  const libraryInputHandlers: InputControlHandlers = isSortOpen
+    ? {
+        up: () => moveSortFocus(-1),
+        down: () => moveSortFocus(1),
+        confirm: toggleFocusedSortDirection,
+        back: () => setIsSortOpen(false),
+      }
+    : {
+        up: () =>
+          setFocusedSongIndex((index) =>
+            nextSongIndex(index, filteredSongList.length, -1),
+          ),
+        down: () =>
+          setFocusedSongIndex((index) =>
+            nextSongIndex(index, filteredSongList.length, 1),
+          ),
+        confirm: () => {
+          if (focusedSongIndex === undefined) {
+            return;
+          }
+
+          const song = filteredSongList[focusedSongIndex];
+
+          if (!song) {
+            return;
+          }
+
+          if (libraryMode === 'local') {
+            if (libraryControls.kitActions.includes('confirm')) {
+              openManualPractice(song.id);
+            } else {
+              play(song.id);
+            }
+          } else if (
+            libraryMode === 'online' &&
+            !songList.find(({ id }) => song.id === id)
+          ) {
+            handleDownload(song.id);
+          }
+        },
+        back: () => setView('home'),
+        sort: () => {
+          if (sortAvailable) {
+            openSort();
+          }
+        },
+        library: () => {
+          if (!libraryControls.kitActions.includes('library')) {
+            if (onlineDownloadsAvailable) {
+              setLibraryMode(libraryMode === 'online' ? 'local' : 'online');
+            }
+
+            return;
+          }
+
+          const modes: LibraryMode[] = onlineDownloadsAvailable
+            ? ['local', 'drums', 'favorites', 'online']
+            : ['local', 'drums', 'favorites'];
+          const currentIndex = modes.indexOf(libraryMode);
+
+          setLibraryMode(modes[(Math.max(0, currentIndex) + 1) % modes.length]);
+        },
+        difficulty: () => setDifficulty(nextDifficulty(difficulty)),
+      };
   return (
     <StemToolsProvider value={stemTools}>
       {gameModeSelector.element}
 
-      <div className="h-screen flex flex-col bg-bg">
-        <header
-          className="border-b border-divider px-5 py-4 z-10 flex flex-col gap-4"
-          style={{ background: 'var(--gradient-header)' }}
-        >
-          <div className="mx-auto flex w-full max-w-360 items-center justify-between gap-6">
-            <div className="min-w-0">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
-                Practice space
-              </div>
-              <h1 className="font-display text-3xl font-semibold leading-tight tracking-[-0.02em] text-text">
-                Your drum library
-              </h1>
-              <p className="mt-1 text-sm text-text-muted">
-                {librarySongs.length}{' '}
-                {librarySongs.length === 1 ? 'song' : 'songs'} ·{' '}
-                {songsWithProgress} with progress on {difficulty}
-              </p>
-            </div>
+      {!songOpen && !gameModeSelector.isOpen && view === 'songs' && (
+        <LibraryInputControls
+          mapping={libraryControls.mapping}
+          handlers={libraryInputHandlers}
+        />
+      )}
 
-            {view === 'songs' &&
-              libraryMode === 'local' &&
-              continuedSong &&
-              continuedScore && (
-                <section
-                  className="flex min-w-0 max-w-xl grow items-center gap-3 rounded-2xl border border-accent-soft-border bg-accent-soft-bg p-2.5 shadow-accent-soft"
-                  data-testid="continue-practicing"
-                  aria-labelledby="continue-practicing-title"
-                >
-                  <img
-                    src={continuedSong.albumCover ?? appIcon}
-                    alt=""
-                    className="size-16 shrink-0 rounded-xl object-cover outline outline-1 -outline-offset-1 outline-white/10"
-                    onError={(event) => {
-                      event.currentTarget.src = appIcon;
-                    }}
-                  />
-                  <div className="min-w-0 grow">
-                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-accent-text">
-                      Continue practicing
-                    </div>
-                    <h2
-                      id="continue-practicing-title"
-                      className="truncate font-display text-xl font-semibold leading-tight text-text-body"
-                      title={continuedSong.name}
-                    >
-                      {continuedSong.name}
-                    </h2>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-text-muted">
-                      <Stars
-                        rating={getStarRating(continuedScore)}
-                        perfect={continuedAccuracy === 1}
-                        size="xs"
-                        className="gap-1"
-                      />
-                      <span className="tabular-nums">
-                        {Math.round((continuedAccuracy ?? 0) * 100)}% best
-                      </span>
-                    </div>
-                  </div>
-                  <Button
-                    type="primary"
-                    size="large"
-                    className="min-h-11 shrink-0"
-                    icon={<FontAwesomeIcon icon={faPlay} />}
-                    aria-label={`Play ${continuedSong.name}`}
-                    onClick={() => play(continuedSong.id)}
-                  >
-                    Play
-                  </Button>
-                </section>
-              )}
-          </div>
-
-          <div
-            className="mx-auto flex w-full max-w-360 flex-col gap-3"
-            data-testid="library-toolbar"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div
-                className="flex shrink-0 items-center gap-1 rounded-xl border border-border-soft bg-surface p-1"
-                role="tablist"
-                aria-label="Library view"
-              >
-                <Button
-                  type={view === 'songs' ? 'primary' : 'default'}
-                  data-testid="view-songs"
-                  role="tab"
-                  aria-selected={view === 'songs'}
-                  onClick={() => setView('songs')}
-                >
-                  Songs
-                </Button>
-                <Button
-                  type={view === 'lessons' ? 'primary' : 'default'}
-                  data-testid="view-lessons"
-                  role="tab"
-                  aria-selected={view === 'lessons'}
-                  icon={<FontAwesomeIcon icon={faGraduationCap} />}
-                  onClick={() => setView('lessons')}
-                >
-                  Lessons
-                  {lessonProgress.totalLessons > 0 &&
-                    ` · ${lessonProgress.unlockedCount}/${lessonProgress.totalLessons}`}
-                </Button>
-              </div>
-              <SettingsButton page="song-list" scanPercent={scanPercent} />
-            </div>
-
-            {view === 'songs' && (
-              <div
-                className="flex min-w-0 flex-wrap items-center gap-3"
-                data-testid="library-song-controls"
-              >
-                <SongFilter
-                  className="w-full"
-                  nameFilter={nameFilter}
-                  onChangeFilter={setNameFilter}
-                  difficulty={difficulty}
-                  setDifficulty={setDifficulty}
-                  filteredSongsCount={
-                    libraryMode === 'online' && onlineTotal !== undefined
-                      ? onlineTotal
-                      : filteredSongList.length
-                  }
-                  libraryMode={libraryMode}
-                  onChangeLibraryMode={setLibraryMode}
-                />
-                <div
-                  className="flex min-w-fit shrink-0 flex-wrap items-center gap-2 rounded-2xl bg-fill p-1.5 *:shrink-0"
-                  data-testid="add-music-actions"
-                  aria-label="Add music"
-                >
-                  <span className="px-2 text-xs font-semibold uppercase tracking-[0.12em] text-text-faint">
-                    Add music
-                  </span>
-                  <SongSearch disabled={currentPath === null} />
-                  <SongImport
-                    disabled={currentPath === null}
-                    onImported={handleSongImported}
-                  />
-                  <Tooltip
-                    title={
-                      currentPath === null
-                        ? 'Select a library folder first'
-                        : 'Add songs from your YouTube Music Liked playlist'
-                    }
-                  >
-                    <Button
-                      icon={<FontAwesomeIcon icon={faMusic} />}
-                      size="large"
-                      data-testid="my-music-trigger"
-                      disabled={currentPath === null}
-                      onClick={() => setMyMusicOpen(true)}
-                    >
-                      My Music
-                    </Button>
-                  </Tooltip>
-                  <AutoChart
-                    disabled={currentPath === null}
-                    onImported={handleSongImported}
-                  />
-                </div>
-                <SortButton
-                  sort={sort}
-                  disabled={!sortAvailable}
-                  onSortChange={setSort}
-                  isOpen={isSortOpen}
-                  onOpenChange={setIsSortOpen}
-                  focusedIndex={isSortOpen ? focusedSortIndex : undefined}
-                />
-              </div>
-            )}
-          </div>
-          <SplittingQueue
-            splittingIds={splittingIds}
-            splitProgress={splitProgress}
+      <AppShell
+        view={view}
+        onViewChange={setView}
+        statusSlot={
+          <GamificationHeaderStrip
+            isLoaded={gamification.isLoaded}
+            streak={gamification.streak}
+            todayXp={gamification.todayXp}
+            goalXp={gamification.goalXp}
+            goalOption={gamification.goalOption}
+            onChangeGoal={gamification.setGoalOption}
+            weekActivity={gamification.weekActivity}
+            totalStars={gamification.totalStars}
+            practiceRhythm={practiceRhythm}
+            onOpenStats={() => {
+              gamification.loadAchievements();
+              setIsStatsOpen(true);
+            }}
+          />
+        }
+        settingsSlot={
+          <SettingsButton
+            page="song-list"
+            scanPercent={scanPercent}
+            hoverPreviewEnabled={hoverPreviewEnabled}
+            onHoverPreviewEnabledChange={setHoverPreviewEnabled}
+          />
+        }
+        onOpenProfile={() => {
+          gamification.loadAchievements();
+          setView('insights');
+        }}
+      >
+        {!songOpen && view === 'home' && (
+          <HomeCockpit
             songList={songList}
+            gamification={gamification}
+            recommendation={nextPractice.recommendation}
+            practiceRanking={nextPractice.ranking}
+            pedagogyRanking={nextPractice.pedagogyRanking}
+            practiceWave={practiceWave}
+            activeGoal={activeGoal}
+            goalPayoffCandidate={activeGoalPayoffCandidate}
+            goalTargetDate={activeGoalRecord?.targetDate}
+            deadlinePacing={nextPractice.deadlinePacing}
+            atomicStates={atomicStates}
+            dueReviews={atomicReviews}
+            onStartRecommended={() => startRecommendedPractice()}
+            onStartSession={startComposedSession}
+            onStartPracticeCard={startPracticeCard}
+            onOpenSongs={() => setView('songs')}
+            onOpenProfile={() => {
+              gamification.loadAchievements();
+              setView('insights');
+            }}
           />
-        </header>
+        )}
 
-        <Modal
-          open={myMusicOpen}
-          onCancel={() => setMyMusicOpen(false)}
-          footer={null}
-          width={640}
-        >
-          <MyMusic
-            librarySongs={librarySongs}
-            disabled={currentPath === null}
+        {!songOpen && view === 'wave' && (
+          <MyWave
+            session={profileHomeSession}
+            onStart={startComposedSession}
+            onOpenSongs={() => setView('songs')}
+            onOpenJourney={() => setView('journey')}
           />
-        </Modal>
+        )}
 
-        <main
-          id="library-content"
-          className="relative grow overflow-hidden w-full flex"
-        >
-          {view === 'lessons' ? (
-            <LessonsView
-              progress={lessonProgress}
-              onPlay={playLesson}
-              scanPercent={scanPercent}
-              onRescan={rescanLibrary}
-            />
-          ) : (
-            <div className="relative mx-auto flex w-full max-w-360 grow flex-col overflow-hidden bg-bg">
-              {filteredSongList.length > 0 ||
-              (libraryMode === 'online' && onlineLoading) ? (
+        {!songOpen && view === 'insights' && (
+          <ProfileView
+            songList={librarySongs}
+            goals={goals.goals}
+            isGoalsLoaded={goals.isLoaded}
+            onSaveGoal={goals.saveGoal}
+            onSetPrimaryGoal={goals.setPrimaryGoal}
+            gamification={gamification}
+            insights={{
+              recommendation: nextPractice.recommendation,
+              atomicStates,
+              dueReviews: atomicReviews,
+              deadlinePacing: nextPractice.deadlinePacing,
+              rejectedAtomicEvidenceCount:
+                atomicStateReplay.rejected_events.length,
+              latestRun: gamification.latestRun?.summary,
+              practiceCards,
+              weeklySet: weeklyPracticeSet,
+              weeklyRhythm,
+              weeklyRecap,
+              bestAudition,
+              auditionAvailable: Boolean(
+                profileHomeSession?.goalPath?.next_song_probe &&
+                  nextPractice.ranking.some(
+                    (ranked) =>
+                      ranked.candidate.id ===
+                      profileHomeSession.goalPath?.next_song_probe?.song_id,
+                  ),
+              ),
+            }}
+            onStartTargetedPractice={startTargetedPractice}
+            onStartPracticeCard={startPracticeCard}
+            onPracticeRhythmChange={setPracticeRhythm}
+            onRefreshPracticeSet={refreshPracticeSet}
+            onStartAudition={startSectionAudition}
+          />
+        )}
+
+        {!songOpen && view === 'journey' && (
+          <LessonsView
+            progress={lessonProgress}
+            onPlay={playLesson}
+            scanPercent={scanPercent}
+            onRescan={rescanLibrary}
+            onBack={() => setView('home')}
+          />
+        )}
+
+        {!songOpen && view === 'songs' && (
+          <section
+            className="flex h-full min-h-0 flex-col"
+            id="library-content"
+          >
+            <header className="border-b border-divider bg-surface-raised/76 px-5 py-5">
+              <div className="mx-auto flex w-full max-w-360 flex-col gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
+                      Practice library
+                    </div>
+                    <h1 className="font-display text-3xl font-semibold leading-tight tracking-[-0.02em] text-text">
+                      Your drum library
+                    </h1>
+                    <p className="mt-1 text-sm text-text-muted">
+                      {isYandexMode
+                        ? `${
+                            candidateSource?.tracks.length ?? 0
+                          } source rows · ${linkedCandidateIds.size} playable`
+                        : `${librarySongs.length} ${
+                            librarySongs.length === 1 ? 'song' : 'songs'
+                          } · ${songsWithProgress} with progress on ${difficulty}`}
+                    </p>
+                  </div>
+
+                  {libraryMode === 'local' &&
+                    continuedSong &&
+                    continuedScore && (
+                      <section
+                        className="flex min-w-0 max-w-xl items-center gap-3 rounded-2xl border border-accent-soft-border bg-accent-soft-bg p-2.5 shadow-accent-soft"
+                        data-testid="continue-practicing"
+                        aria-labelledby="continue-practicing-title"
+                      >
+                        <img
+                          src={continuedSong.albumCover ?? appIcon}
+                          alt=""
+                          className="size-16 shrink-0 rounded-xl object-cover outline outline-1 -outline-offset-1 outline-white/10"
+                          onError={(event) => {
+                            event.currentTarget.src = appIcon;
+                          }}
+                        />
+                        <div className="min-w-0 grow">
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-accent-text">
+                            Continue practicing
+                          </div>
+                          <h2
+                            id="continue-practicing-title"
+                            className="truncate font-display text-xl font-semibold leading-tight text-text-body"
+                            title={continuedSong.name}
+                          >
+                            {continuedSong.name}
+                          </h2>
+                          <div className="mt-1 flex items-center gap-2 text-xs text-text-muted">
+                            <Stars
+                              rating={getStarRating(continuedScore)}
+                              perfect={continuedAccuracy === 1}
+                              size="xs"
+                              className="gap-1"
+                            />
+                            <span className="tabular-nums">
+                              {Math.round((continuedAccuracy ?? 0) * 100)}% best
+                            </span>
+                          </div>
+                        </div>
+                        <Button
+                          type="primary"
+                          size="large"
+                          className="min-h-11 shrink-0"
+                          icon={<FontAwesomeIcon icon={faPlay} />}
+                          aria-label={`Play ${continuedSong.name}`}
+                          onClick={() => play(continuedSong.id)}
+                        >
+                          Play
+                        </Button>
+                      </section>
+                    )}
+                </div>
+
+                <div
+                  className="flex flex-col gap-3"
+                  data-testid="library-toolbar"
+                >
+                  <div
+                    className="flex min-w-0 flex-wrap items-center gap-3"
+                    data-testid="library-song-controls"
+                  >
+                    <SongFilter
+                      className="w-full"
+                      nameFilter={nameFilter}
+                      onChangeFilter={setNameFilter}
+                      difficulty={difficulty}
+                      setDifficulty={setDifficulty}
+                      filteredSongsCount={
+                        isYandexMode
+                          ? filteredLibraryCandidates.length
+                          : libraryMode === 'online' &&
+                              onlineTotal !== undefined
+                            ? onlineTotal
+                            : filteredSongList.length
+                      }
+                      libraryMode={libraryMode}
+                      onlineDownloadsAvailable={onlineDownloadsAvailable}
+                      onChangeLibraryMode={setLibraryMode}
+                    />
+                    {hasAddMusicAction && (
+                      <div
+                        className="flex min-w-fit shrink-0 flex-wrap items-center gap-2 rounded-2xl bg-fill p-1.5 *:shrink-0"
+                        data-testid="add-music-actions"
+                        aria-label="Add music"
+                      >
+                        <span className="px-2 text-xs font-semibold uppercase tracking-[0.12em] text-text-faint">
+                          Add music
+                        </span>
+                        {youtubeImportAvailable && (
+                          <SongSearch disabled={currentPath === null} />
+                        )}
+                        {localFolderImportAvailable && (
+                          <SongImport
+                            disabled={currentPath === null}
+                            onImported={handleSongImported}
+                          />
+                        )}
+                        {myMusicAvailable && (
+                          <Tooltip
+                            title={
+                              currentPath === null
+                                ? 'Select a library folder first'
+                                : 'Add songs from your YouTube Music Liked playlist'
+                            }
+                          >
+                            <Button
+                              icon={<FontAwesomeIcon icon={faMusic} />}
+                              size="large"
+                              data-testid="my-music-trigger"
+                              disabled={currentPath === null}
+                              onClick={() => setMyMusicOpen(true)}
+                            >
+                              My Music
+                            </Button>
+                          </Tooltip>
+                        )}
+                        {youtubeImportAvailable && (
+                          <AutoChart
+                            disabled={currentPath === null}
+                            onImported={handleSongImported}
+                          />
+                        )}
+                      </div>
+                    )}
+                    <SortButton
+                      sort={sort}
+                      disabled={!sortAvailable}
+                      onSortChange={setSort}
+                      isOpen={isSortOpen}
+                      onOpenChange={setIsSortOpen}
+                      focusedIndex={isSortOpen ? focusedSortIndex : undefined}
+                    />
+                  </div>
+                  <div
+                    className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted"
+                    role="status"
+                    aria-live="polite"
+                    data-testid="library-control-legend"
+                    data-control-source={libraryControls.source}
+                  >
+                    <span className="font-semibold text-text-body">
+                      {libraryControls.source === 'kit-lanes'
+                        ? 'Kit navigation'
+                        : libraryControls.source === 'mixed'
+                          ? 'Mixed navigation'
+                          : libraryControls.source === 'explicit'
+                            ? 'Mapped navigation'
+                            : 'Navigation unavailable'}
+                    </span>
+                    {(libraryControls.source === 'kit-lanes' ||
+                      libraryControls.source === 'mixed') && (
+                      <div
+                        className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
+                        data-testid="library-kit-control-commands"
+                      >
+                        {libraryMoveSteps.length > 0 && (
+                          <KitCommandPrompt
+                            compact
+                            model={{
+                              label: 'Move',
+                              steps: libraryMoveSteps,
+                              relationship: 'alternatives',
+                              stepHints: libraryMoveHints,
+                            }}
+                          />
+                        )}
+                        {libraryControls.kitActions.includes('confirm') && (
+                          <KitCommandPrompt
+                            compact
+                            model={{ label: 'Choose', steps: ['snare'] }}
+                          />
+                        )}
+                        {libraryControls.kitActions.includes('difficulty') && (
+                          <KitCommandPrompt
+                            compact
+                            model={{ label: 'Difficulty', steps: ['hihat'] }}
+                          />
+                        )}
+                        {libraryControls.kitActions.includes('library') && (
+                          <KitCommandPrompt
+                            compact
+                            model={{ label: 'Source', steps: ['ride'] }}
+                          />
+                        )}
+                        {libraryControls.kitActions.includes('sort') && (
+                          <KitCommandPrompt
+                            compact
+                            model={{ label: 'Sort', steps: ['tom3'] }}
+                          />
+                        )}
+                        {libraryControls.kitActions.includes('back') && (
+                          <KitCommandPrompt
+                            compact
+                            model={{ label: 'Back', steps: ['crash'] }}
+                          />
+                        )}
+                      </div>
+                    )}
+                    <span
+                      className={
+                        libraryControls.source === 'kit-lanes' ||
+                        libraryControls.source === 'mixed'
+                          ? 'sr-only'
+                          : undefined
+                      }
+                    >
+                      {libraryControls.legend}
+                    </span>
+                    {libraryControls.kitActions.includes('confirm') &&
+                      libraryMode === 'local' && (
+                        <span>Local choices open directly in Practice.</span>
+                      )}
+                  </div>
+                </div>
+                <SplittingQueue
+                  splittingIds={splittingIds}
+                  splitProgress={splitProgress}
+                  songList={songList}
+                />
+              </div>
+            </header>
+
+            <div className="relative mx-auto flex min-h-0 w-full max-w-360 grow flex-col overflow-hidden bg-bg">
+              {isYandexMode ? (
+                !libraryCandidates.isLoaded ? (
+                  <div
+                    className="m-auto flex min-h-40 items-center justify-center"
+                    data-testid="playlist-candidate-loading"
+                  >
+                    <Spin size="large" />
+                  </div>
+                ) : libraryCandidates.error ? (
+                  <div
+                    className="m-auto max-w-lg px-6 text-center text-sm text-red"
+                    role="alert"
+                    data-testid="playlist-candidate-error"
+                  >
+                    The playlist source could not be loaded:{' '}
+                    {libraryCandidates.error}
+                  </div>
+                ) : candidateSource ? (
+                  <LibraryCandidateList
+                    source={candidateSource}
+                    tracks={filteredLibraryCandidates}
+                    query={nameFilter}
+                    linkedTrackIds={linkedCandidateIds}
+                    resolutions={candidateResolutions}
+                    resolvingTrackIds={resolvingCandidateIds}
+                    canUseLocalAudio={currentPath !== null}
+                    onResolve={resolveCandidate}
+                    onUseLocalAudio={autoChartCandidate}
+                  />
+                ) : (
+                  <div
+                    className="m-auto max-w-lg px-6 text-center text-sm text-red"
+                    role="alert"
+                  >
+                    The playlist source returned no collection.
+                  </div>
+                )
+              ) : filteredSongList.length > 0 ||
+                (libraryMode === 'online' && onlineLoading) ? (
                 <>
                   {libraryMode === 'online' &&
                     nameFilter.trim() &&
@@ -480,6 +1517,7 @@ export function SongListView() {
                     downloadingIds={downloadingIds}
                     downloadingDisabled={currentPath === null}
                     difficulty={difficulty}
+                    previewEnabled={hoverPreviewEnabled}
                     onClickSong={(id) => {
                       if (libraryMode === 'local') {
                         play(id);
@@ -492,6 +1530,10 @@ export function SongListView() {
                     }
                     splittingIds={splittingIds}
                     onSplit={handleSplit}
+                    onSetGoal={(song) => {
+                      setGoalModalSongId(song.id);
+                      setIsSetGoalOpen(true);
+                    }}
                     onDownload={handleDownload}
                     onLikeChange={handleLikeChange}
                     onLoadMore={libraryMode === 'online' ? loadMore : undefined}
@@ -504,23 +1546,72 @@ export function SongListView() {
                   hasFolder={currentPath !== null}
                   hasSongs={librarySongs.length > 0}
                   query={nameFilter}
+                  onlineDownloadsAvailable={onlineDownloadsAvailable}
                   onClearFilter={() => setNameFilter('')}
                   onBrowseOnline={() => setLibraryMode('online')}
                 />
               )}
-            </div>
-          )}
 
-          {view === 'songs' && libraryMode === 'online' && onlineLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/10 pointer-events-none z-10">
-              <Spin size="large" />
+              {libraryMode === 'online' && onlineLoading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/10 pointer-events-none">
+                  <Spin size="large" />
+                </div>
+              )}
             </div>
-          )}
-        </main>
+          </section>
+        )}
+      </AppShell>
 
-        <div className="fixed inset-0 pointer-events-none z-100">
-          <Outlet />
-        </div>
+      <Modal
+        open={myMusicOpen}
+        onCancel={() => setMyMusicOpen(false)}
+        footer={null}
+        width={640}
+      >
+        <MyMusic librarySongs={librarySongs} disabled={currentPath === null} />
+      </Modal>
+
+      <Drawer
+        title="Your practice stats"
+        open={isStatsOpen}
+        onClose={() => setIsStatsOpen(false)}
+        destroyOnHidden
+      >
+        <StatsPanel
+          streak={gamification.streak}
+          weeklyXp={weeklyXp}
+          goalXp={gamification.goalXp}
+          totalStars={gamification.totalStars}
+          laneAccuracy={gamification.laneAccuracy ?? []}
+          achievements={gamification.achievements}
+          practiceRhythm={practiceRhythm}
+        />
+      </Drawer>
+
+      <SetGoalModal
+        open={isSetGoalOpen}
+        onClose={() => setIsSetGoalOpen(false)}
+        songList={librarySongs}
+        initialSongId={goalModalSongId}
+        isFirstGoal={goals.goals.length === 0}
+        onSave={(input: SaveGoalInput) => goals.saveGoal(input)}
+      />
+
+      <div className="fixed inset-0 pointer-events-none z-100">
+        <Outlet
+          context={
+            {
+              gamification,
+              recommendation:
+                activePracticeWave?.result.stops[activePracticeWave.index]
+                  ?.recommendation ?? nextPractice.recommendation,
+              recommendationReason:
+                activePracticeWave?.result.stops[activePracticeWave.index]
+                  ?.reason ?? nextPractice.recommendation?.reason,
+              continuePractice: startRecommendedPractice,
+            } satisfies PracticeOutletContext
+          }
+        />
       </div>
     </StemToolsProvider>
   );

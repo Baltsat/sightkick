@@ -1,5 +1,9 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFolder, faHandScissors } from '@fortawesome/free-solid-svg-icons';
+import {
+  faBullseye,
+  faFolder,
+  faHandScissors,
+} from '@fortawesome/free-solid-svg-icons';
 import { Divider } from 'antd';
 
 interface Props {
@@ -7,6 +11,10 @@ interface Props {
   splitting: boolean;
   onOpenDirectory: () => void;
   onSplit: () => void;
+  /** Omitted entirely when the caller has no goal-setting flow wired up —
+   * keeps this menu usable standalone (e.g. Storybook) without a Goals
+   * dependency. */
+  onSetGoal?: () => void;
 }
 
 export function SongMenuContent({
@@ -14,6 +22,7 @@ export function SongMenuContent({
   splitting,
   onOpenDirectory,
   onSplit,
+  onSetGoal,
 }: Props) {
   return (
     <>
@@ -24,6 +33,17 @@ export function SongMenuContent({
         <FontAwesomeIcon icon={faFolder} className="w-4" />
         Open song directory
       </button>
+
+      {onSetGoal && (
+        <button
+          className="flex items-center gap-3 px-4 py-2 text-text-muted hover:text-text cursor-pointer bg-transparent border-0 whitespace-nowrap w-full text-left"
+          data-testid="song-menu-set-goal"
+          onClick={onSetGoal}
+        >
+          <FontAwesomeIcon icon={faBullseye} className="w-4" />
+          Set a goal
+        </button>
+      )}
 
       {showSplit && (
         <>

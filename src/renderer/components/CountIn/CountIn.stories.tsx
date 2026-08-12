@@ -4,7 +4,7 @@ import { CountIn } from './CountIn';
 const meta: Meta<typeof CountIn> = {
   title: 'Song View/Count In',
   component: CountIn,
-  args: { count: 3, beatMs: 800, animated: false },
+  args: { count: 3, total: 4, beatMs: 800, animated: false },
   argTypes: {
     count: { control: { type: 'number' } },
     beatMs: { control: { type: 'number' } },
@@ -12,7 +12,7 @@ const meta: Meta<typeof CountIn> = {
   },
   decorators: [
     (Story) => (
-      <div style={{ position: 'relative', height: 480, background: '#0d0d0f' }}>
+      <div style={{ position: 'relative', height: 480, background: '#f1eadc' }}>
         <Story />
       </div>
     ),

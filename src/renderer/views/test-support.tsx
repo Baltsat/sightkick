@@ -1,11 +1,25 @@
 import { ReactNode } from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import {
+  MemoryRouter,
+  NavigateFunction,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from 'react-router-dom';
 import { App as AntdApp, ConfigProvider } from 'antd';
 import { vi } from 'vitest';
-import { IpcLoadSongResponse, Song, SongLessonInfo } from '../../types';
+import {
+  IpcLibraryCandidatesResponse,
+  IpcLoadSongResponse,
+  Song,
+  SongLessonInfo,
+} from '../../types';
 import { antdTheme } from '../antdTheme';
-import { AppProvider } from '../context/AppContext';
+import { AppProvider, useApp } from '../context/AppContext';
 import { InputProvider } from '../context/InputContext';
 import { SongViewSettingsProvider } from '../context/SongViewSettingsContext';
 import {
@@ -22,6 +36,7 @@ import {
 import { SongView } from './SongView';
 import { SongListView } from './SongListView';
 import App from '../App';
+import { PracticeHistoryEntry } from '../services/next-practice';
 
 export const DRUM_CHART = `[Song]
 {
@@ -120,6 +135,8 @@ export interface SongViewOptions {
   route?: string;
   settings?: Record<string, unknown>;
   keyboard?: KeyboardSeed;
+  onContinuePractice?: (completedRun?: PracticeHistoryEntry) => void;
+  recommendationReason?: string;
 }
 
 export interface SongViewHarness {
@@ -127,6 +144,7 @@ export interface SongViewHarness {
   audio: FakeAudioContext;
   loadSong(song?: Song, chartText?: string): Promise<void>;
   clickPlay(): void;
+  navigate(path: string): void;
   pressKey(code: string): Promise<void>;
   openSettings(): void;
   openMoreSettings(): void;
@@ -175,6 +193,8 @@ export function setupSongView({
   route = '/song-1',
   settings,
   keyboard,
+  onContinuePractice,
+  recommendationReason,
 }: SongViewOptions = {}): SongViewHarness {
   shimSvgBBox();
   installLocalStorage();
@@ -192,6 +212,30 @@ export function setupSongView({
     seedKeyboardDevice(keyboard);
   }
 
+  let routeNavigate: NavigateFunction | undefined;
+
+  function NavigationBridge() {
+    routeNavigate = useNavigate();
+
+    return null;
+  }
+
+  function SongRouteParent() {
+    return (
+      <Outlet
+        context={
+          onContinuePractice || recommendationReason
+            ? {
+                gamification: undefined,
+                recommendationReason,
+                continuePractice: onContinuePractice ?? (() => {}),
+              }
+            : undefined
+        }
+      />
+    );
+  }
+
   function wrapper({ children }: { children: ReactNode }) {
     return (
       <ConfigProvider theme={antdTheme}>
@@ -200,12 +244,15 @@ export function setupSongView({
             <InputProvider>
               <SongViewSettingsProvider>
                 <MemoryRouter initialEntries={[route]}>
+                  <NavigationBridge />
                   <Routes>
-                    <Route
-                      path="/"
-                      element={<div data-testid="song-list-stub" />}
-                    />
-                    <Route path=":id" element={children} />
+                    <Route element={<SongRouteParent />}>
+                      <Route
+                        path="/"
+                        element={<div data-testid="song-list-stub" />}
+                      />
+                      <Route path=":id" element={children} />
+                    </Route>
                   </Routes>
                 </MemoryRouter>
               </SongViewSettingsProvider>
@@ -239,6 +286,10 @@ export function setupSongView({
       fireEvent.click(screen.getByTestId('play-toggle'));
     },
 
+    navigate(path: string) {
+      act(() => routeNavigate?.(path));
+    },
+
     async pressKey(code: string) {
       await act(async () => {
         fireEvent.keyDown(window, { code });
@@ -258,6 +309,19 @@ export function setupSongView({
     },
 
     clickTestId(testId: string) {
+      if (
+        !screen.queryByTestId(testId) &&
+        [
+          'loop-toggle',
+          'notation-flow-toggle',
+          'notation-classic-toggle',
+          'ai-coach-button',
+          'practice-stats-button',
+        ].includes(testId)
+      ) {
+        fireEvent.click(screen.getByTestId('settings-trigger'));
+      }
+
       fireEvent.click(screen.getByTestId(testId));
     },
 
@@ -462,18 +526,20 @@ export interface SongListOptions {
   route?: string;
   settings?: Record<string, unknown>;
   online?: EnchorChart[];
+  freshProfile?: boolean;
 }
 
 export interface SongListHarness {
   ipc: IpcMock;
   loadSongs(songs?: Song[], lastOpenedPath?: string | null): void;
+  loadLibraryCandidates(candidates: IpcLibraryCandidatesResponse): void;
   rescanProgress(current: number, total: number): void;
   rescanDone(songs: Song[], lastOpenedPath?: string | null): void;
   emit(channel: string, ...args: unknown[]): void;
   setStemTools(status: 'ready' | 'download' | 'unsupported'): void;
   setOnline(charts: EnchorChart[]): void;
   search(text: string): void;
-  selectMode(mode: 'local' | 'online'): void;
+  selectMode(mode: 'local' | 'drums' | 'favorites' | 'online'): void;
   openSettings(): void;
   selectDifficulty(difficulty: string): void;
   openSort(): void;
@@ -499,6 +565,7 @@ export function setupSongListView({
   route = '/',
   settings,
   online = [],
+  freshProfile = false,
 }: SongListOptions = {}): SongListHarness {
   shimSvgBBox();
   installLocalStorage();
@@ -508,17 +575,33 @@ export function setupSongListView({
 
   installOnlineFetch(() => onlineResults);
 
-  seedSettings({
-    selectedDevice: { id: 'keyboard', name: 'Keyboard', sourceId: 'keyboard' },
-    controlMappings: { keyboard: navControlMappings() },
-    ...settings,
-  });
+  seedSettings(
+    freshProfile
+      ? settings ?? {}
+      : {
+          selectedDevice: {
+            id: 'keyboard',
+            name: 'Keyboard',
+            sourceId: 'keyboard',
+          },
+          controlMappings: { keyboard: navControlMappings() },
+          ...settings,
+        },
+  );
 
   function SongViewStub() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const { id } = useParams();
+    const { difficulty } = useApp();
 
     return (
-      <div data-testid="song-view-stub">
+      <div
+        data-testid="song-view-stub"
+        data-song-id={id}
+        data-search={location.search}
+        data-difficulty={difficulty}
+      >
         <button
           type="button"
           data-testid="song-view-back"
@@ -569,6 +652,10 @@ export function setupSongListView({
 
     loadSongs(songs = [], lastOpenedPath = '/music') {
       emit('load-song-list', { songs, lastOpenedPath });
+    },
+
+    loadLibraryCandidates(candidates) {
+      emit('load-library-candidates', candidates);
     },
 
     rescanProgress(current: number, total: number) {

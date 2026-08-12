@@ -19,7 +19,7 @@ import {
   Flow,
 } from 'vexflow';
 import { ChartParser } from './parser';
-import { Measure, RenderData, TempoMark } from './types';
+import { Measure, Note, RenderData, TempoMark } from './types';
 import { KEY_TO_ELEMENT } from './constants';
 
 export interface SheetMusicColors {
@@ -29,8 +29,25 @@ export interface SheetMusicColors {
 
 export const TARGET_ROW_WIDTH = 1200;
 
+/**
+ * Classic notation uses short, readable systems. Flow deliberately keeps all
+ * measures on one horizontal system so the live playhead can travel through
+ * the chart without changing rows. It is still the exact same VexFlow score
+ * and RenderData contract — only the layout geometry changes.
+ */
+export type SheetMusicLayout = 'classic' | 'flow';
+
 const MAX_MEASURES_PER_ROW = 2;
 const MIN_MEASURE_WIDTH = 300;
+
+// A Flow bar has to be readable from behind the kit, not merely fit the
+// formatter's minimum. Classic normally gives an ordinary 4/4 bar about
+// 600 px (two bars across TARGET_ROW_WIDTH); keeping Flow close to that
+// density makes the beat grid and individual drum lanes legible while the
+// camera, rather than a compressed score, owns navigation.
+export const FLOW_MIN_MEASURE_WIDTH = 540;
+
+const FLOW_MEASURE_WIDTH_SCALE = 1.12;
 const MEASURE_TRAILING_PAD = 20;
 // Auto-charted songs carry a tempo map with per-measure micro-fluctuations
 // (83.03 / 83.71 / 83.5 ...), which would otherwise print a new label on
@@ -52,6 +69,7 @@ export function renderMusic(
   showBarNumbers: boolean = true,
   enableColors: boolean = false,
   showTempo: boolean = true,
+  layout: SheetMusicLayout = 'classic',
 ): RenderData[] {
   if (!container) {
     return [];
@@ -59,19 +77,31 @@ export function renderMusic(
 
   container.replaceChildren();
 
-  const lineHeight = showBarNumbers ? 180 : 130;
+  const isFlow = layout === 'flow';
+  const lineHeight = isFlow ? 190 : showBarNumbers ? 180 : 130;
   const renderData: RenderData[] = [];
   const tempoLabels = dedupedTempoLabels(song.measures, showTempo);
-  const widths = song.measures.map((measure, index) =>
+  const requiredWidths = song.measures.map((measure, index) =>
     requiredMeasureWidth(measure, tempoLabels[index]),
   );
-  const rows = packRows(widths);
+  const widths = isFlow
+    ? requiredWidths.map((width) =>
+        Math.max(FLOW_MIN_MEASURE_WIDTH, width * FLOW_MEASURE_WIDTH_SCALE),
+      )
+    : requiredWidths;
+  // Flow is intentionally a *single* system. Do not make this a visual
+  // approximation with translated rows: GameRenderer receives the VexFlow
+  // staves in this exact geometry, so hit/miss/wrong-hit and cursor math keep
+  // using their established DOM references.
+  const rows = isFlow
+    ? [song.measures.map((_, index) => index)]
+    : packRows(widths);
 
   rows.forEach((rowIndices, rowNum) => {
     const yOffset = rowNum * lineHeight;
     const rowMin = rowIndices.reduce((sum, index) => sum + widths[index], 0);
-    const rowWidth = Math.max(TARGET_ROW_WIDTH, rowMin);
-    const scale = rowMin > 0 ? rowWidth / rowMin : 1;
+    const rowWidth = isFlow ? rowMin : Math.max(TARGET_ROW_WIDTH, rowMin);
+    const scale = !isFlow && rowMin > 0 ? rowWidth / rowMin : 1;
     const rowEl = document.createElement('div');
 
     rowEl.style.position = 'relative';
@@ -362,6 +392,54 @@ function applyNoteClasses(staveNotes: StaveNote[], enableColors: boolean) {
   });
 }
 
+function notationKinds(note: Note): string[] {
+  const kinds = [note.isRest ? 'rest' : 'colored-head'];
+
+  if (note.dots > 0) {
+    kinds.push('dot');
+  }
+
+  if (note.duration === '32') {
+    kinds.push('triple-beam');
+  } else if (note.duration === '8' || note.duration === '16') {
+    kinds.push('beam');
+  }
+
+  if (note.tupletId !== undefined) {
+    kinds.push('tuplet');
+  }
+
+  if (note.graceNotes?.length) {
+    kinds.push('grace');
+  }
+
+  if (note.ghosts?.length) {
+    kinds.push('ghost');
+  }
+
+  return kinds;
+}
+
+function annotateNotation(staveNotes: StaveNote[], measure: Measure) {
+  staveNotes.forEach((staveNote, index) => {
+    const note = measure.notes[index];
+    const kinds = notationKinds(note);
+
+    staveNote
+      .getSVGElement()
+      ?.setAttribute('data-notation-kinds', kinds.join(' '));
+    staveNote.noteHeads.forEach(
+      (head) =>
+        head
+          ?.getSVGElement()
+          ?.setAttribute(
+            'data-notation-kind',
+            note.isRest ? 'rest' : 'colored-head',
+          ),
+    );
+  });
+}
+
 function drawAccentGlyph(
   context: RenderContext,
   x: number,
@@ -379,6 +457,7 @@ function drawAccentGlyph(
   const group = context.openGroup('accent') as SVGGElement;
 
   group.classList.add(accentClass);
+  group.setAttribute('data-notation-kind', 'accent');
   context.setFillStyle(noteColor);
   context.setStrokeStyle(noteColor);
   glyph.render(context, x, y);
@@ -517,6 +596,7 @@ function renderMeasure(
   });
 
   applyNoteClasses(staveNotes, enableColors);
+  annotateNotation(staveNotes, measure);
   drawAccents(context, stave, measure, staveNotes, enableColors, colors.note);
 
   const renderedNotes = staveNotes.map((staveNote, i) => ({

@@ -166,7 +166,12 @@ async function flush() {
 }
 
 async function setup(
-  options: Partial<{ trackData: TrackConfig[]; isDev: boolean }> = {},
+  options: Partial<{
+    trackData: TrackConfig[];
+    isDev: boolean;
+    onLoopRestart: () => void;
+    onSeekStart: () => void;
+  }> = {},
   context: Partial<TransportContext> = {},
 ) {
   const onEnded = vi.fn();
@@ -263,6 +268,50 @@ describe('Transport', () => {
     expect(engine.getSnapshot().isStarted).toBe(true);
   });
 
+  it('can force a musical count-in for a recovery even when initial count-in is disabled', async () => {
+    const { engine } = await setup({}, { countInEnabled: false });
+
+    engine.playFromTick(1920, 'force');
+
+    expect(engine.getSnapshot()).toMatchObject({
+      state: 'counting-in',
+      countInBeat: 1,
+      countInBeats: 4,
+    });
+  });
+
+  it('keeps a forced compound-meter recovery count-in on dotted beats', async () => {
+    const compoundMeasures = [
+      {
+        startTick: 0,
+        endTick: 1440,
+        timeSig: [6, 8],
+        isCompound: true,
+      },
+    ] as unknown as Measure[];
+    const { engine } = await setup(
+      {},
+      { countInEnabled: false, measures: compoundMeasures },
+    );
+
+    engine.playFromTick(0, 'force');
+
+    expect(engine.getSnapshot()).toMatchObject({
+      state: 'counting-in',
+      countInBeat: 1,
+      countInBeats: 2,
+    });
+  });
+
+  it('can explicitly skip count-in without changing the saved preference', async () => {
+    const { engine } = await setup({}, { countInEnabled: true });
+
+    engine.playFromTick(1920, 'skip');
+
+    expect(engine.getSnapshot().state).toBe('playing');
+    expect(engine.getSnapshot().countInBeat).toBeUndefined();
+  });
+
   it('pins the cursor and schedules a future start during the count-in', async () => {
     const { engine, player } = await setup({}, { countInEnabled: true });
 
@@ -270,6 +319,7 @@ describe('Transport', () => {
 
     expect(engine.getSnapshot().state).toBe('counting-in');
     expect(engine.getSnapshot().countInBeat).toBe(1);
+    expect(engine.getSnapshot().countInBeats).toBe(4);
     expect(engine.timeStore.get()).toBeCloseTo(2);
     expect(player.start).toHaveBeenCalledTimes(1);
     expect(player.start).toHaveBeenLastCalledWith(
@@ -416,6 +466,24 @@ describe('Transport', () => {
 
     expect(player.start).toHaveBeenLastCalledWith(3);
     expect(engine.getSnapshot().isPlaying).toBe(true);
+  });
+
+  it('announces a seek before TimeStore moves so silence recovery can ignore it', async () => {
+    const observedPositions: number[] = [];
+    const engineRef: { current?: Transport } = {};
+    const setupResult = await setup({
+      onSeekStart: () =>
+        observedPositions.push(engineRef.current?.timeStore.get() ?? -1),
+    });
+    const engine = setupResult.engine;
+
+    engineRef.current = engine;
+    engine.playFromTick(0);
+    observedPositions.length = 0;
+    engine.seekSeconds(3);
+
+    expect(observedPositions).toEqual([0]);
+    expect(engine.timeStore.get()).toBe(3);
   });
 
   it('repositions without starting playback when seeking while not playing', async () => {
@@ -732,6 +800,76 @@ describe('Transport', () => {
       flushFrame();
 
       expect(player.start).toHaveBeenCalledTimes(2);
+    });
+
+    it('reports only natural loop wraps, never a scrub to the loop end', async () => {
+      const onLoopRestart = vi.fn();
+      const { engine, player } = await setup({ onLoopRestart });
+
+      engine.setLoopRegion({ startTick: 0, endTick: 1920 });
+      engine.playFromTick(0);
+      engine.seekSeconds(3);
+      player.currentTime = 3;
+      flushFrame();
+
+      expect(onLoopRestart).not.toHaveBeenCalled();
+
+      player.currentTime = 1;
+      flushFrame();
+      player.currentTime = 3;
+      flushFrame();
+
+      expect(onLoopRestart).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not carry scrub suppression across a pause and fresh loop start', async () => {
+      const onLoopRestart = vi.fn();
+      const { engine, player } = await setup({ onLoopRestart });
+
+      engine.setLoopRegion({ startTick: 0, endTick: 1920 });
+      engine.playFromTick(0);
+      engine.seekSeconds(3);
+      engine.pause();
+      engine.play();
+
+      player.currentTime = 3;
+      flushFrame();
+
+      expect(onLoopRestart).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears the natural-wrap guard when the player pauses and starts again', async () => {
+      const onLoopRestart = vi.fn();
+      const { engine, player } = await setup({ onLoopRestart });
+
+      engine.setLoopRegion({ startTick: 0, endTick: 1920 });
+      engine.playFromTick(0);
+      player.currentTime = 3;
+      flushFrame();
+
+      expect(onLoopRestart).toHaveBeenCalledTimes(1);
+
+      engine.pause();
+      engine.play();
+      player.currentTime = 3;
+      flushFrame();
+
+      expect(onLoopRestart).toHaveBeenCalledTimes(2);
+    });
+
+    it('clears scrub suppression when a different loop region takes ownership', async () => {
+      const onLoopRestart = vi.fn();
+      const { engine, player } = await setup({ onLoopRestart });
+
+      engine.setLoopRegion({ startTick: 0, endTick: 1920 });
+      engine.playFromTick(0);
+      engine.seekSeconds(3);
+      engine.setLoopRegion({ startTick: 0, endTick: 3840 });
+
+      player.currentTime = 5;
+      flushFrame();
+
+      expect(onLoopRestart).toHaveBeenCalledTimes(1);
     });
   });
 

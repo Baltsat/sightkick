@@ -16,13 +16,25 @@ type Props = {
   name: string;
   artist: string;
   charter: string;
+  chartSource?: 'chorus-encore';
+  reviewed?: boolean;
 };
 
 export async function downloadSong(
   event: Electron.IpcMainEvent,
-  { url, md5, name, artist, charter }: Props,
+  { url, md5, name, artist, charter, chartSource, reviewed }: Props,
 ) {
   try {
+    if (chartSource !== 'chorus-encore' || reviewed !== true) {
+      throw new Error(
+        'Only quality-reviewed Chorus Encore drum charts can be downloaded',
+      );
+    }
+
+    if (new URL(url).hostname !== 'files.enchor.us') {
+      throw new Error('Download URL is not an approved Chorus Encore package');
+    }
+
     const lastOpenedPath = appState.store.get('lastOpenedPath') as
       | string
       | undefined;
@@ -128,6 +140,10 @@ export async function downloadSong(
 
     if (!songData) {
       throw new Error('Failed to parse downloaded song');
+    }
+
+    if (!songData.drumDifficulties?.length) {
+      throw new Error('Downloaded chart has no playable drum part');
     }
 
     appState.store.set(`songs.${md5}`, songData);

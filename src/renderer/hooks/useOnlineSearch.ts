@@ -43,11 +43,13 @@ function cacheSet(
   }
 }
 
-function mapSongs(data: Record<string, unknown>[]): OnlineSong[] {
+export function mapSongs(data: Record<string, unknown>[]): OnlineSong[] {
   return uniqBy(
     data.map(
       (chart): OnlineSong => ({
         source: 'online',
+        chartSource: 'chorus-encore',
+        reviewed: chart.drumsReviewed === true,
         id: String(chart.md5),
         downloadUrl: `https://files.enchor.us/${chart.md5}.sng`,
         albumCover: chart.albumArtMd5
@@ -58,6 +60,12 @@ function mapSongs(data: Record<string, unknown>[]): OnlineSong[] {
         charter: String(chart.charter ?? ''),
         drumDifficulty:
           typeof chart.diff_drums === 'number' ? chart.diff_drums : 0,
+        durationSeconds:
+          typeof chart.song_length === 'number'
+            ? chart.song_length > 10_000
+              ? chart.song_length / 1000
+              : chart.song_length
+            : undefined,
       }),
     ),
     (song) => song.id,
@@ -83,7 +91,7 @@ async function fetchEnchorePage(
       drumType: 'fourLanePro',
       difficulty,
       source: 'website',
-      drumsReviewed: false,
+      drumsReviewed: true,
     }),
     method: 'POST',
     signal,

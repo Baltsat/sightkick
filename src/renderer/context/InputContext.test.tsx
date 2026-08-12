@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { act, renderHook, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { App as AntdApp, ConfigProvider } from 'antd';
 import {
   installIpcMock,
@@ -9,7 +9,14 @@ import {
 } from '../hooks/test-support';
 import { antdTheme } from '../antdTheme';
 import { InputDevice } from '../input';
-import { InputProvider, useInput } from './InputContext';
+import {
+  InputProvider,
+  MIDI_AUTO_CONNECT_OPT_OUT_KEY,
+  MIDI_HEALTH_CHECK_DELAY_MS,
+  MIDI_RECONNECT_DELAY_MS,
+  midiReconnectDelayMs,
+  useInput,
+} from './InputContext';
 
 let ipc: IpcMock;
 
@@ -33,6 +40,10 @@ function stopCount() {
   return ipc.sent.filter((s) => s.channel === 'stop-listen-midi').length;
 }
 
+function acknowledgeMidi(port: number) {
+  act(() => ipc.emit('midi-ready', { port }));
+}
+
 // inputBus.listDevices() chains through InputBus -> MidiSource's IPC
 // round-trip -> InputContext's own .then(); a single microtask tick isn't
 // enough to drain it, and a real device list only ever arrives async, so
@@ -46,6 +57,18 @@ async function respondWithMidiDevices(
     await new Promise((resolve) => {
       setTimeout(resolve, 0);
     });
+  });
+}
+
+async function flushMidiResponse(devices: { name: string; port: number }[]) {
+  await act(async () => {
+    ipc.emit('midi-device-list', devices);
+
+    // InputBus -> MidiSource -> InputContext is a short promise chain. Keep
+    // this helper timer-free so reconnect tests can use fake clocks.
+    for (let i = 0; i < 8; i += 1) {
+      await Promise.resolve();
+    }
   });
 }
 
@@ -66,6 +89,12 @@ const DEVICE_B: InputDevice = {
   sourceId: 'midi',
   port: 5,
 };
+const DTX_DEVICE: InputDevice = {
+  id: 'midi:Yamaha DTX402',
+  name: 'Yamaha DTX402',
+  sourceId: 'midi',
+  port: 4,
+};
 
 describe('InputContext midi stream ownership', () => {
   it('does not listen when no device is selected', () => {
@@ -74,37 +103,62 @@ describe('InputContext midi stream ownership', () => {
     expect(listenPorts()).toEqual([]);
   });
 
-  it('starts listening when a device is selected', () => {
+  it('starts listening only after the selected device is present', async () => {
     const { result } = renderHook(() => useInput(), { wrapper });
 
     act(() => result.current.setSelectedDevice(DEVICE_A));
+    expect(listenPorts()).toEqual([]);
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
 
     expect(listenPorts()).toEqual([2]);
   });
 
-  it('restarts on the new port when the device changes', () => {
+  it('restarts on the new port when the device changes', async () => {
     const { result } = renderHook(() => useInput(), { wrapper });
 
     act(() => result.current.setSelectedDevice(DEVICE_A));
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
     act(() => result.current.setSelectedDevice(DEVICE_B));
+    await respondWithMidiDevices([{ name: 'Pad B', port: 5 }]);
 
     expect(listenPorts()).toEqual([2, 5]);
     expect(stopCount()).toBe(1);
   });
 
-  it('stops listening when the device is cleared', () => {
+  it('reopens a same-port kit after a silent physical reconnect', async () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(DTX_DEVICE));
+    await respondWithMidiDevices([{ name: 'Yamaha DTX402', port: 4 }]);
+    acknowledgeMidi(4);
+
+    act(() => result.current.reconnectMidi());
+    await respondWithMidiDevices([{ name: 'Yamaha DTX402', port: 4 }]);
+
+    expect(result.current.inputReadiness).toBe('reconnecting');
+    expect(listenPorts()).toEqual([4, 4]);
+    expect(stopCount()).toBe(1);
+
+    acknowledgeMidi(4);
+
+    expect(result.current.inputReadiness).toBe('connected');
+  });
+
+  it('stops listening when the device is cleared', async () => {
     const { result } = renderHook(() => useInput(), { wrapper });
 
     act(() => result.current.setSelectedDevice(DEVICE_A));
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
     act(() => result.current.setSelectedDevice(null));
 
     expect(stopCount()).toBe(1);
   });
 
-  it('stops listening on unmount', () => {
+  it('stops listening on unmount', async () => {
     const { result, unmount } = renderHook(() => useInput(), { wrapper });
 
     act(() => result.current.setSelectedDevice(DEVICE_A));
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
     unmount();
 
     expect(stopCount()).toBe(1);
@@ -114,6 +168,7 @@ describe('InputContext midi stream ownership', () => {
     const { result } = renderHook(() => useInput(), { wrapper });
 
     act(() => result.current.setSelectedDevice(DEVICE_A));
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
     act(() => ipc.emit('midi-error', { error: 'device unavailable' }));
 
     expect(
@@ -121,10 +176,11 @@ describe('InputContext midi stream ownership', () => {
     ).toBeInTheDocument();
   });
 
-  it('stops listening for connect errors once the device is cleared', () => {
+  it('stops listening for connect errors once the device is cleared', async () => {
     const { result } = renderHook(() => useInput(), { wrapper });
 
     act(() => result.current.setSelectedDevice(DEVICE_A));
+    await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
 
     expect(ipc.onCount('midi-error')).toBe(1);
 
@@ -467,12 +523,61 @@ describe('InputContext input latency', () => {
 });
 
 describe('InputContext MIDI auto-select', () => {
+  it('keeps enumerating and auto-connects a kit plugged into a fresh profile later', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { result } = renderHook(() => useInput(), { wrapper });
+
+      await flushMidiResponse([]);
+
+      expect(result.current.selectedDevice).toBeNull();
+      expect(result.current.inputReadiness).toBe('waiting');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(MIDI_RECONNECT_DELAY_MS);
+      });
+      await flushMidiResponse([{ name: 'Yamaha DTX402', port: 7 }]);
+
+      expect(result.current.selectedDevice).toEqual({
+        id: 'midi:Yamaha DTX402',
+        name: 'Yamaha DTX402',
+        sourceId: 'midi',
+        port: 7,
+      });
+      expect(result.current.inputReadiness).toBe('reconnecting');
+      expect(listenPorts()).toEqual([7]);
+
+      acknowledgeMidi(7);
+
+      expect(result.current.inputReadiness).toBe('connected');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('auto-selects the sole MIDI device found on a fresh profile', async () => {
     const { result } = renderHook(() => useInput(), { wrapper });
 
     await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
 
     expect(result.current.selectedDevice).toEqual(DEVICE_A);
+  });
+
+  it('prefers an unambiguous DTX kit over unrelated MIDI ports on a fresh profile', async () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    await respondWithMidiDevices([
+      { name: 'IAC Driver Bus 1', port: 0 },
+      { name: 'Yamaha DTX402', port: 4 },
+    ]);
+
+    expect(result.current.selectedDevice).toEqual({
+      id: 'midi:Yamaha DTX402',
+      name: 'Yamaha DTX402',
+      sourceId: 'midi',
+      port: 4,
+    });
   });
 
   it('does not auto-select when more than one MIDI device is found', async () => {
@@ -496,26 +601,222 @@ describe('InputContext MIDI auto-select', () => {
     expect(result.current.selectedDevice).toBeNull();
   });
 
-  it('respects a previously stored explicit "- None -" choice instead of auto-selecting', async () => {
-    // Simulate a returning profile that has already recorded a choice —
-    // even though it currently reads back as null, it must not be treated
-    // as "never chosen".
+  it('migrates a legacy stored null profile to safe automatic selection', async () => {
+    // Older usePersisted versions wrote the null fallback even when nobody
+    // opened input settings. Without a separate opt-out marker, this is a
+    // legacy default and must not suppress plug-and-play MIDI.
     localStorage.setItem('settings.selectedDevice', 'null');
 
     const { result } = renderHook(() => useInput(), { wrapper });
 
     await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
 
-    expect(result.current.selectedDevice).toBeNull();
+    expect(result.current.selectedDevice).toEqual(DEVICE_A);
+    expect(localStorage.getItem(MIDI_AUTO_CONNECT_OPT_OUT_KEY)).toBe('false');
   });
 
-  it('does not override an already-selected device that is still present', async () => {
-    const { result } = renderHook(() => useInput(), { wrapper });
+  it('persists an intentional "- None -" choice and preserves it after restart', async () => {
+    const firstRun = renderHook(() => useInput(), { wrapper });
 
-    act(() => result.current.setSelectedDevice(DEVICE_A));
+    await respondWithMidiDevices([]);
+    act(() => firstRun.result.current.setSelectedDevice(null));
+
+    expect(localStorage.getItem(MIDI_AUTO_CONNECT_OPT_OUT_KEY)).toBe('true');
+
+    firstRun.unmount();
+
+    const secondRun = renderHook(() => useInput(), { wrapper });
+
     await respondWithMidiDevices([{ name: 'Pad A', port: 2 }]);
 
+    expect(secondRun.result.current.selectedDevice).toBeNull();
+    expect(secondRun.result.current.inputReadiness).toBe('waiting');
+    expect(listenPorts()).toEqual([]);
+  });
+
+  it('does not override an actively connected remembered kit with a higher-priority newcomer', async () => {
+    localStorage.setItem('settings.selectedDevice', JSON.stringify(DEVICE_A));
+
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    await respondWithMidiDevices([
+      { name: 'Pad A', port: 2 },
+      { name: 'Yamaha DTX402', port: 4 },
+    ]);
+    acknowledgeMidi(2);
+
     expect(result.current.selectedDevice).toEqual(DEVICE_A);
+    expect(result.current.inputReadiness).toBe('connected');
+    expect(listenPorts()).toEqual([2]);
+  });
+
+  it('reconnects a remembered DTX kit on its new port without manual input', async () => {
+    vi.useFakeTimers();
+    localStorage.setItem('settings.selectedDevice', JSON.stringify(DTX_DEVICE));
+
+    try {
+      const { result } = renderHook(() => useInput(), { wrapper });
+
+      expect(result.current.inputReadiness).toBe('reconnecting');
+      await flushMidiResponse([]);
+
+      // The preference and its DTX/GM mappings survive an unplugged launch;
+      // there is no stale-port listener while the device is absent.
+      expect(result.current.selectedDevice).toEqual(DTX_DEVICE);
+      expect(result.current.inputReadiness).toBe('reconnecting');
+      expect(listenPorts()).toEqual([]);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(MIDI_RECONNECT_DELAY_MS);
+      });
+      await flushMidiResponse([{ name: 'Yamaha DTX402', port: 7 }]);
+      acknowledgeMidi(7);
+
+      expect(result.current.selectedDevice).toEqual({ ...DTX_DEVICE, port: 7 });
+      expect(result.current.inputReadiness).toBe('connected');
+      expect(listenPorts()).toEqual([7]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps looking beyond the old three-attempt window and reconnects without manual input', async () => {
+    vi.useFakeTimers();
+    localStorage.setItem('settings.selectedDevice', JSON.stringify(DEVICE_A));
+
+    try {
+      const { result } = renderHook(() => useInput(), { wrapper });
+
+      await flushMidiResponse([]);
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(midiReconnectDelayMs(attempt));
+        });
+        await flushMidiResponse([]);
+      }
+
+      expect(result.current.inputReadiness).toBe('reconnecting');
+      expect(result.current.selectedDevice).toEqual(DEVICE_A);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(midiReconnectDelayMs(5));
+      });
+      await flushMidiResponse([{ name: 'Pad A', port: 11 }]);
+      acknowledgeMidi(11);
+
+      expect(result.current.selectedDevice).toEqual({ ...DEVICE_A, port: 11 });
+      expect(result.current.inputReadiness).toBe('connected');
+      expect(listenPorts()).toEqual([11]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('matches a remembered kit by name when macOS changes its port order', async () => {
+    localStorage.setItem('settings.selectedDevice', JSON.stringify(DEVICE_A));
+
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    await respondWithMidiDevices([{ name: 'Pad A', port: 9 }]);
+    acknowledgeMidi(9);
+
+    expect(result.current.selectedDevice).toEqual({ ...DEVICE_A, port: 9 });
+    expect(result.current.inputReadiness).toBe('connected');
+    expect(listenPorts()).toEqual([9]);
+  });
+
+  it('detects a later physical disconnect during its background health check', async () => {
+    vi.useFakeTimers();
+    localStorage.setItem('settings.selectedDevice', JSON.stringify(DEVICE_A));
+
+    try {
+      const { result } = renderHook(() => useInput(), { wrapper });
+
+      await flushMidiResponse([{ name: 'Pad A', port: 2 }]);
+      acknowledgeMidi(2);
+      expect(result.current.inputReadiness).toBe('connected');
+      expect(listenPorts()).toEqual([2]);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(MIDI_HEALTH_CHECK_DELAY_MS);
+      });
+      await flushMidiResponse([]);
+
+      expect(result.current.selectedDevice).toEqual(DEVICE_A);
+      expect(result.current.inputReadiness).toBe('reconnecting');
+      expect(stopCount()).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('re-enumerates and resumes the same kit after a MIDI error without duplicating its listener', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { result, unmount } = renderHook(() => useInput(), { wrapper });
+
+      act(() => result.current.setSelectedDevice(DEVICE_A));
+      await flushMidiResponse([{ name: 'Pad A', port: 2 }]);
+      acknowledgeMidi(2);
+      expect(listenPorts()).toEqual([2]);
+      expect(ipc.onCount('midi-error')).toBe(1);
+
+      act(() => ipc.emit('midi-error', { error: 'device unavailable' }));
+      await flushMidiResponse([]);
+
+      expect(result.current.selectedDevice).toEqual(DEVICE_A);
+      expect(result.current.inputReadiness).toBe('reconnecting');
+      expect(stopCount()).toBe(1);
+      expect(ipc.onCount('midi-error')).toBe(0);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(MIDI_RECONNECT_DELAY_MS);
+      });
+      await flushMidiResponse([{ name: 'Pad A', port: 6 }]);
+      acknowledgeMidi(6);
+
+      expect(result.current.selectedDevice).toEqual({ ...DEVICE_A, port: 6 });
+      expect(result.current.inputReadiness).toBe('connected');
+      expect(listenPorts()).toEqual([2, 6]);
+      expect(ipc.onCount('midi-error')).toBe(1);
+
+      unmount();
+      expect(stopCount()).toBe(2);
+      expect(ipc.onCount('midi-error')).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never reports Ready for an enumerable but locked port and backs off until open acknowledgement', async () => {
+    vi.useFakeTimers();
+    localStorage.setItem('settings.selectedDevice', JSON.stringify(DEVICE_A));
+
+    try {
+      const { result } = renderHook(() => useInput(), { wrapper });
+
+      await flushMidiResponse([{ name: 'Pad A', port: 2 }]);
+      expect(result.current.inputReadiness).toBe('reconnecting');
+      expect(listenPorts()).toEqual([2]);
+
+      act(() => ipc.emit('midi-error', { error: 'port is already in use' }));
+      expect(result.current.inputReadiness).toBe('reconnecting');
+      expect(stopCount()).toBe(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(midiReconnectDelayMs(0));
+      });
+      await flushMidiResponse([{ name: 'Pad A', port: 2 }]);
+      expect(listenPorts()).toEqual([2, 2]);
+      expect(result.current.inputReadiness).toBe('reconnecting');
+
+      acknowledgeMidi(2);
+      expect(result.current.inputReadiness).toBe('connected');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

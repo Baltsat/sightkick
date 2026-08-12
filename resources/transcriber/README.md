@@ -57,7 +57,7 @@ always emitted first).
 | File                                    | Notes                                                                                                                                                                                                                                                                                                                                                     |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `notes.mid`                             | Single `PART DRUMS` track, type-1 MIDI, PPQ 480, real tempo map (`set_tempo` events) + `time_signature` event. Carries all four difficulties (Easy 60-64, Medium 72-76, Hard 84-88, Expert 96-100, each kick/snare/yellow/blue/green); tom-vs-cymbal via Rock Band tom markers 110/111/112 (difficulty-independent). Per-hit velocity encoded on note-on. |
-| `song.ini`                              | `[song]` with `name`, `artist`, `album`, `year`, `genre`, `charter` (empty), `auto_chart_tool = SightKick Transcriber`, `auto_chart = True`, `diff_drums` (0-6 estimate), `pro_drums = True`, `song_length` (ms), `delay = 0`.                                                                                                                            |
+| `song.ini`                              | `[song]` with `name`, `artist`, `album`, `year`, `genre`, `charter` (empty), `auto_chart_tool = Drumroll Transcriber`, `auto_chart = True`, `diff_drums` (0-6 estimate), `pro_drums = True`, `song_length` (ms), `delay = 0`.                                                                                                                             |
 | `song.ogg`                              | Full mix, Ogg Vorbis.                                                                                                                                                                                                                                                                                                                                     |
 | `drums.ogg`                             | Isolated drums stem, Ogg Vorbis.                                                                                                                                                                                                                                                                                                                          |
 | `bass.ogg` / `vocals.ogg` / `other.ogg` | The remaining demucs stems, Ogg Vorbis.                                                                                                                                                                                                                                                                                                                   |
@@ -229,7 +229,7 @@ librosa fallback (used only if Beat This!/torch is unavailable) assumes
 `notes.mid` carries all four Clone Hero difficulties in one `PART DRUMS`
 track. Easy/Medium/Hard are not the Expert transcription copy-pasted at a
 lower note offset — each is a musical reduction (`sk_transcriber/difficulty.py`),
-because an accurate chart that nobody can physically play ("не игрально")
+because an accurate chart that nobody can physically play
 is not a usable chart:
 
 | Difficulty | Lanes                               | Quantize grid | How it's built                                                                                                                                                                                                                              |
@@ -269,6 +269,21 @@ Electron caller supplies `SK_FFMPEG` for its packaged ffmpeg binary; direct
 CLI callers may instead put ffmpeg on `PATH`. ffprobe is optional: the Python
 wrapper uses a sibling/system ffprobe when present and otherwise reads duration
 and best-effort local tags from `ffmpeg -i` output.
+
+### YouTube auth wall (`SK_YTDLP_COOKIES`)
+
+YouTube's bot-check ("Sign in to confirm you're not a bot") can block the
+`--url` download stage entirely, independent of which video or player
+client yt-dlp uses — this has been observed to affect _every_ video from
+a given network/IP uniformly, not specific videos. There is no cookie-free
+workaround; yt-dlp itself asks for `--cookies`/`--cookies-from-browser`.
+
+Set `SK_YTDLP_COOKIES` to the path of a Netscape-format `cookies.txt` (e.g.
+exported from a logged-in browser session via a cookies-export extension)
+and the download stage will pass it to yt-dlp as `--cookies`. Unset by
+default — no cookies are read or sent unless you opt in explicitly. This
+is the caller's responsibility to supply; the transcriber never sources
+cookies from a browser or app profile on its own.
 
 ## Measured accuracy (step 4 of VERIFY, extended in an accuracy sprint)
 
@@ -433,3 +448,8 @@ few minutes, network-dependent) on top of the cold-cache number above.
 - `--audio` runs never write `album.jpg` (no source thumbnail exists).
 - `--difficulty` is accepted but ignored (all four difficulties are always
   written) — see "Contract" above.
+- The `--url` download stage has no built-in retry or bypass for YouTube's
+  bot-check wall ("Sign in to confirm you're not a bot"); when a network/IP
+  hits it, every video fails identically regardless of player client or
+  yt-dlp version. The only way through is `SK_YTDLP_COOKIES` (see "Venv
+  bootstrap" above) — there is no cookie-free fix.

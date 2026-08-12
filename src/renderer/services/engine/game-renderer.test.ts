@@ -7,6 +7,7 @@ import {
   RenderedNote,
 } from '../../../chart-parser/types';
 import { GameRenderer } from './game-renderer';
+import '../../styles/sheet-music.css';
 
 const CHART = {
   resolution: 480,
@@ -33,11 +34,13 @@ function staveNote(
 
     return { getSVGElement: () => el };
   });
+  const group = svgEl();
 
   return {
     isRest: () => isRest,
     getKeys: () => keys,
     getAbsoluteX: () => 0,
+    getSVGElement: () => group,
     noteHeads,
   } as unknown as StaveNote;
 }
@@ -85,9 +88,25 @@ function uncolored(note: StaveNote, head = 0): boolean {
   );
 }
 
+function expectVisible(note: StaveNote): void {
+  const elements = [
+    note.getSVGElement?.(),
+    ...note.noteHeads.map((head) => head.getSVGElement()),
+  ].filter((element): element is SVGElement => Boolean(element));
+
+  elements.forEach((el) => {
+    expect(el.classList).not.toContain('vf-note-hidden');
+    expect(el.hasAttribute('hidden')).toBe(false);
+    expect(el.style.display).toBe('');
+    expect(el.style.visibility).toBe('');
+    expect(el.style.opacity).toBe('');
+  });
+}
+
 interface SetupOptions {
   playheadStyle?: 'Cursor' | 'Measure';
   isHit?: (tick: number, prefix: string) => boolean;
+  isMissed?: (tick: number, prefix: string) => boolean;
   cursorEl?: HTMLElement;
   highlightEls?: (HTMLElement | undefined)[];
   overlayEl?: HTMLElement;
@@ -100,11 +119,12 @@ function setup(
   const {
     playheadStyle = 'Cursor',
     isHit = () => false,
+    isMissed = (tick, prefix) => !isHit(tick, prefix),
     cursorEl,
     highlightEls = [],
     overlayEl,
   } = options;
-  const view = new GameRenderer(isHit);
+  const view = new GameRenderer(isHit, isMissed);
 
   view.setContext({ chart: CHART, renderData });
   view.setSettings(playheadStyle);
@@ -199,6 +219,39 @@ describe('GameRenderer', () => {
     expect(hasClass(n0, 'vf-note-miss')).toBe(false);
 
     view.render(0, 480);
+    expect(hasClass(n0, 'vf-note-miss')).toBe(true);
+  });
+
+  it('waits for Judge to resolve a miss before showing miss feedback', () => {
+    const n0 = staveNote(['c/5']);
+    const n1 = staveNote(['d/5']);
+    let resolved = false;
+    const view = setup(
+      [measureData(0, 1920, [rendered(0, n0), rendered(480, n1)])],
+      { isMissed: (tick) => resolved && tick === 0 },
+    );
+
+    view.render(0, 0);
+    view.render(0, 480);
+    expect(hasClass(n0, 'vf-note-miss')).toBe(false);
+    expect(uncolored(n0)).toBe(true);
+
+    resolved = true;
+    view.render(0, 480, true);
+    expect(hasClass(n0, 'vf-note-missed')).toBe(true);
+  });
+
+  it('renders resolved misses without a separate callback', () => {
+    const n0 = staveNote(['c/5']);
+    const n1 = staveNote(['d/5']);
+    const view = setup([
+      measureData(0, 1920, [rendered(0, n0), rendered(480, n1)]),
+    ]);
+
+    expect(() => {
+      view.render(0, 0);
+      view.render(0, 480);
+    }).not.toThrow();
     expect(hasClass(n0, 'vf-note-miss')).toBe(true);
   });
 
@@ -306,7 +359,90 @@ describe('GameRenderer', () => {
   });
 });
 
-describe('GameRenderer whole-note vanish on hit', () => {
+describe('GameRenderer completed-note visibility', () => {
+  it('has no visual state that makes a completed or legacy-hidden notehead transparent', () => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const noteHead = svgEl();
+
+    noteHead.classList.add('vf-note-hit', 'vf-note-hidden');
+    svg.append(noteHead);
+    document.body.append(svg);
+
+    const style = getComputedStyle(noteHead);
+
+    expect(style.display).not.toBe('none');
+    expect(style.visibility).toBe('visible');
+    expect(style.opacity).toBe('1');
+    svg.remove();
+  });
+
+  it('keeps every notehead visible through hits, misses, a row crossing, seek recovery, and reset', () => {
+    const notes = Array.from({ length: 6 }, (_, index) =>
+      staveNote([index % 2 === 0 ? 'c/5' : 'g/5']),
+    );
+
+    // Reproduce stale state left by the pre-fix renderer. Initial context
+    // setup must recover it before playback moves at all.
+    notes.forEach((note) => {
+      [
+        note.getSVGElement?.(),
+        ...note.noteHeads.map((head) => head.getSVGElement()),
+      ].forEach((el) => {
+        if (!el) {
+          return;
+        }
+
+        el.classList.add('vf-note-hidden');
+        el.setAttribute('hidden', '');
+        el.style.display = 'none';
+        el.style.visibility = 'hidden';
+        el.style.opacity = '0';
+      });
+    });
+
+    const hitTicks = new Set([0, 2160]);
+    const renderData = [
+      measureData(0, 1920, [rendered(0, notes[0]), rendered(480, notes[1])]),
+      {
+        ...measureData(1920, 3840, [
+          rendered(1920, notes[2]),
+          rendered(2160, notes[3]),
+        ]),
+        // A different system/row in Classic notation.
+        yOffset: 180,
+      },
+      {
+        ...measureData(3840, 5760, [
+          rendered(3840, notes[4]),
+          rendered(4320, notes[5]),
+        ]),
+        yOffset: 360,
+      },
+    ];
+    const view = setup(renderData, {
+      isHit: (tick) => hitTicks.has(tick),
+      isMissed: (tick) => !hitTicks.has(tick),
+    });
+
+    notes.forEach(expectVisible);
+
+    view.paintHit({ measureIdx: 0, noteIdx: 0 }, ['c/5']);
+    view.render(1, 2400);
+    notes.forEach(expectVisible);
+    expect(hasClass(notes[0], 'vf-note-hit')).toBe(true);
+    expect(hasClass(notes[1], 'vf-note-missed')).toBe(true);
+
+    // Focused recovery rewinds into the first row and replays renderer state.
+    view.render(0.25, 240, true);
+    notes.forEach(expectVisible);
+
+    // Resolve the chart end, then reset for the next recovery attempt.
+    view.render(6, 5760, true);
+    notes.forEach(expectVisible);
+    view.reset();
+    notes.forEach(expectVisible);
+  });
+
   it('keeps the notehead visible while the pop-flash animation is still playing', () => {
     const note = staveNote(['c/5']);
     const isHit = (tick: number, prefix: string) =>
@@ -321,7 +457,7 @@ describe('GameRenderer whole-note vanish on hit', () => {
     expect(hasClass(note, 'vf-note-hidden', 0)).toBe(false);
   });
 
-  it('vanishes the whole note once the pop-flash animation finishes, given the note is fully resolved', () => {
+  it('keeps the whole note visible after the pop-flash animation finishes', () => {
     const note = staveNote(['c/5']);
     const isHit = (tick: number, prefix: string) =>
       tick === 0 && prefix === 'c/5';
@@ -332,10 +468,10 @@ describe('GameRenderer whole-note vanish on hit', () => {
     view.paintHit({ measureIdx: 0, noteIdx: 0 }, ['c/5']);
     note.noteHeads[0].getSVGElement()!.dispatchEvent(new Event('animationend'));
 
-    expect(hasClass(note, 'vf-note-hidden', 0)).toBe(true);
+    expect(hasClass(note, 'vf-note-hidden', 0)).toBe(false);
   });
 
-  it('does not vanish a chord until every one of its notes has been hit', () => {
+  it('keeps a partially completed chord visible', () => {
     const note = staveNote(['c/5', 'g/5']);
     const isHit = (tick: number, prefix: string) =>
       tick === 0 && prefix === 'c/5';
@@ -349,7 +485,7 @@ describe('GameRenderer whole-note vanish on hit', () => {
     expect(hasClass(note, 'vf-note-hidden', 0)).toBe(false);
   });
 
-  it('keeps a note vanished across a small backward seek while it is still recorded as hit', () => {
+  it('keeps a completed note readable across a small backward seek', () => {
     const n0 = staveNote(['c/5']);
     const n1 = staveNote(['d/5']);
     const n2 = staveNote(['e/5']);
@@ -367,13 +503,13 @@ describe('GameRenderer whole-note vanish on hit', () => {
     );
 
     view.render(0, 480);
-    expect(hasClass(n0, 'vf-note-hidden')).toBe(true);
+    expect(hasClass(n0, 'vf-note-hidden')).toBe(false);
 
     view.render(0, 240);
-    expect(hasClass(n0, 'vf-note-hidden')).toBe(true);
+    expect(hasClass(n0, 'vf-note-hidden')).toBe(false);
   });
 
-  it('restores a vanished note on backward seek once the Judge no longer reports it as hit', () => {
+  it('clears hit treatment on rewind once Judge no longer reports it', () => {
     const n0 = staveNote(['c/5']);
     const n1 = staveNote(['d/5']);
     const n2 = staveNote(['e/5']);
@@ -392,14 +528,16 @@ describe('GameRenderer whole-note vanish on hit', () => {
     );
 
     view.render(0, 480);
-    expect(hasClass(n0, 'vf-note-hidden')).toBe(true);
+    expect(hasClass(n0, 'vf-note-hit')).toBe(true);
+    expect(hasClass(n0, 'vf-note-hidden')).toBe(false);
 
     hit = false;
     view.render(0, 240);
+    expect(hasClass(n0, 'vf-note-hit')).toBe(false);
     expect(hasClass(n0, 'vf-note-hidden')).toBe(false);
   });
 
-  it('restores a vanished note on a backward seek that lands on the same active note', () => {
+  it('reconciles hit treatment on a seek that lands on the same active note', () => {
     // Unlike the test above, the active note itself (n2) stays the same
     // NotePos across both render calls — only an earlier, already-walked
     // note's hit state changes. Without the `isSeek` flag forcing
@@ -425,15 +563,17 @@ describe('GameRenderer whole-note vanish on hit', () => {
     );
 
     view.render(0, 700);
-    expect(hasClass(n1, 'vf-note-hidden')).toBe(true);
+    expect(hasClass(n1, 'vf-note-hit')).toBe(true);
+    expect(hasClass(n1, 'vf-note-hidden')).toBe(false);
 
     n1Hit = false;
     view.render(0, 500, true);
 
+    expect(hasClass(n1, 'vf-note-hit')).toBe(false);
     expect(hasClass(n1, 'vf-note-hidden')).toBe(false);
   });
 
-  it('clears all vanish state on reset so it does not leak across songs', () => {
+  it('never creates hidden-note state during reset', () => {
     const note = staveNote(['c/5']);
     const isHit = () => true;
     const view = setup([measureData(0, 1920, [rendered(0, note)])], {

@@ -1,11 +1,56 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { Song } from '../../../types';
+import { UseGamificationResult } from '../../hooks/useGamification';
+import { summarizeRun } from '../../services/practice-stats';
 import { ScoreSummary } from './ScoreSummary';
 
 const songData = {
   name: 'Master of Puppets',
   artist: 'Metallica',
 } as Song;
+
+function kickRun(hits: number, misses: number, completedAt: string) {
+  return summarizeRun(
+    [
+      ...Array.from({ length: hits }, () => ({
+        tick: 0,
+        timeSeconds: 0,
+        deltaMs: -12,
+        element: 'kick' as const,
+        verdict: 'hit' as const,
+      })),
+      ...Array.from({ length: misses }, () => ({
+        tick: 0,
+        timeSeconds: 0,
+        deltaMs: 0,
+        element: 'kick' as const,
+        verdict: 'miss' as const,
+      })),
+    ],
+    completedAt,
+  );
+}
+
+const previousRun = kickRun(6, 4, '2026-08-10T12:00:00.000Z');
+const receiptRun = kickRun(8, 2, '2026-08-11T12:00:00.000Z');
+const gamification: UseGamificationResult = {
+  isLoaded: true,
+  days: {},
+  streak: { current: 5, longest: 9 },
+  todayXp: 42,
+  goalXp: 50,
+  goalOption: 'regular',
+  setGoalOption: () => {},
+  goalCrossedToday: false,
+  weekActivity: [true, true, false, true, true, false, false],
+  totalStars: 37,
+  achievements: [],
+  laneAccuracy: [],
+  recentLaneSignals: [],
+  latestRun: undefined,
+  loadAchievements: () => {},
+  recordRun: () => {},
+};
 const meta: Meta<typeof ScoreSummary> = {
   title: 'Song View/Score Summary',
   component: ScoreSummary,
@@ -37,4 +82,71 @@ export const NoStars: Story = {
 
 export const FullStars: Story = {
   args: { scoreData: { hitNotes: 96, totalNotes: 100, falseHits: 2 } },
+};
+
+export const MusicalReceipt: Story = {
+  args: {
+    scoreData: { hitNotes: 8, totalNotes: 10, falseHits: 0 },
+    practiceSummary: receiptRun,
+    previousPracticeSummary: previousRun,
+    gamification,
+    runResult: {
+      xpEarned: 12,
+      goalCrossed: false,
+      streakCurrent: 5,
+      newlyUnlocked: [
+        {
+          id: 'first-blood',
+          title: 'Retained skill',
+          description: 'A delayed skill check held after the first pass.',
+          hint: 'Save a retained skill check after its first acquisition.',
+          evidenceEvent: 'saved retention evidence',
+          proofRank: 1,
+        },
+      ],
+    },
+  },
+};
+
+export const ContinueMyWave: Story = {
+  args: {
+    scoreData: { hitNotes: 8, totalNotes: 10, falseHits: 0 },
+    nextLabel: 'Continue My Wave',
+    continuationLabelLocked: true,
+  },
+};
+
+export const NoMusicalInput: Story = {
+  args: {
+    scoreData: { hitNotes: 0, totalNotes: 10, falseHits: 0 },
+    noMusicalInput: true,
+    persistenceState: 'no-evidence',
+    nextLabel: 'Continue My Wave',
+    continuationLabelLocked: true,
+  },
+};
+
+export const SectionAudition: Story = {
+  args: {
+    scoreData: undefined,
+    practiceSummary: {
+      ...receiptRun,
+      mode: 'practice',
+      playbackSpeed: 0.7,
+      practiceCard: {
+        kind: 'apply',
+        candidate_id: 'song:favourite',
+        source_label: 'Eligible goal path · Eighth-note pulse in this section',
+      },
+      audition: {
+        song_id: 'song:favourite',
+        start_bar: 5,
+        end_bar: 8,
+        speed: 0.7,
+        section_label: 'Bars 5–8',
+        test_label: 'Eighth-note pulse in this section',
+        required_skill_id: 'pulse.eighth',
+      },
+    },
+  },
 };

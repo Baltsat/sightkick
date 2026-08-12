@@ -1,12 +1,15 @@
 import { ReactNode } from 'react';
 import { Button, Collapse, Divider, InputNumber, Switch } from 'antd';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFilePdf, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
+import {
+  faDrum,
+  faFilePdf,
+  faInfoCircle,
+} from '@fortawesome/free-solid-svg-icons';
 import { GameMode, PLAYHEAD_STYLES } from '../../types';
 import { useSongViewSettings } from '../../context/SongViewSettingsContext';
 import { SettingLabel } from './SettingLabel';
 import { Tooltip } from '../Tooltip';
-import { SupportButton } from '../SupportButton/SupportButton';
 import { useApp } from '../../context/AppContext';
 import themedark from '../../theme';
 
@@ -17,6 +20,10 @@ interface Props {
   volumeSliders?: ReactNode[];
   clickControls?: ReactNode;
   masterVolumeControl?: ReactNode;
+  tutorControls?: ReactNode;
+  performanceControls?: ReactNode;
+  onSetupInput?: () => void;
+  currentInputName?: string;
 }
 
 export function SongViewSettings({
@@ -26,6 +33,10 @@ export function SongViewSettings({
   gameMode,
   clickControls,
   masterVolumeControl,
+  tutorControls,
+  performanceControls,
+  onSetupInput,
+  currentInputName,
 }: Props) {
   const {
     playheadStyle,
@@ -47,6 +58,24 @@ export function SongViewSettings({
 
   return (
     <>
+      {performanceControls ? (
+        <>
+          {performanceControls}
+          {onSetupInput ? (
+            <Button
+              data-testid="setup-input"
+              icon={<FontAwesomeIcon icon={faDrum} />}
+              onClick={onSetupInput}
+            >
+              {currentInputName
+                ? `Configure ${currentInputName}`
+                : 'Configure input'}
+            </Button>
+          ) : null}
+          <Divider />
+        </>
+      ) : null}
+
       {onExportPdf && (
         <Tooltip
           title="Save the sheet music as a PDF you can print or share"
@@ -64,6 +93,13 @@ export function SongViewSettings({
       )}
 
       <Divider />
+
+      {gameMode === 'practice' && tutorControls ? (
+        <>
+          {tutorControls}
+          <Divider />
+        </>
+      ) : null}
 
       {gameMode !== 'practice' && (
         <>
@@ -246,8 +282,6 @@ export function SongViewSettings({
       ) : null}
 
       {clickControls}
-
-      <SupportButton />
     </>
   );
 }

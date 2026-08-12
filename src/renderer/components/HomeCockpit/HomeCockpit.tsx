@@ -1,0 +1,511 @@
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { Song } from '../../../types';
+import { useInput } from '../../context/InputContext';
+import { inputBus } from '../../input';
+import { UseGamificationResult } from '../../hooks/useGamification';
+import {
+  composeHomeSession,
+  DeadlinePacingSummary,
+  OneKickHomeSession,
+  PracticeCandidate,
+  PracticeWaveResult,
+  RankedPracticeCandidate,
+} from '../../services/next-practice';
+import type {
+  AtomicSkillState,
+  PracticeCardOption,
+  SessionEnergy,
+  SkillReview,
+  SongGoal,
+  ZpdRankedCandidate,
+} from '../../services/pedagogy/types';
+import { composePracticeCards } from '../../services/pedagogy';
+import { KitElement } from '../../services/practice-stats';
+import {
+  useKitColorMaturity,
+  type KitColorLane,
+} from '../../services/kit-color-maturity';
+import { EvidencePracticeCards } from '../PracticeCards';
+import { playKitPreview } from '../../services/kit-preview-audio';
+import homeKitStudio from '../../assets/daybreak/home-kit-studio.png';
+import drumstickCursor from '../../assets/daybreak/drumstick-cursor-reversed.png';
+import { fitKitZone, HOME_KIT_ZONE_MAP } from './kit-zone-map';
+import './KitHome.css';
+
+interface HomeCockpitProps {
+  songList: Song[];
+  gamification: UseGamificationResult;
+  recommendation?: RankedPracticeCandidate;
+  practiceRanking?: readonly RankedPracticeCandidate[];
+  pedagogyRanking?: readonly ZpdRankedCandidate[];
+  practiceWave?: PracticeWaveResult;
+  activeGoal?: SongGoal;
+  goalPayoffCandidate?: PracticeCandidate;
+  goalTargetDate?: string;
+  deadlinePacing?: DeadlinePacingSummary;
+  atomicStates?: readonly AtomicSkillState[];
+  dueReviews?: readonly SkillReview[];
+  sessionEnergy?: SessionEnergy;
+  recentEarlyExits?: number;
+  onStartRecommended: () => void;
+  onStartSession?: (session: OneKickHomeSession) => void;
+  onStartPracticeCard?: (option: PracticeCardOption) => void;
+  onOpenSongs: () => void;
+  onOpenProfile: () => void;
+}
+
+interface KitHotspot {
+  element: KitElement;
+  label: string;
+}
+
+const KIT_COLOR_LANE: Record<KitElement, KitColorLane> = {
+  kick: 'orange',
+  snare: 'red',
+  hihat: 'yellow',
+  tom1: 'yellow',
+  ride: 'blue',
+  tom2: 'blue',
+  crash: 'green',
+  tom3: 'green',
+};
+const KIT_HOTSPOTS: KitHotspot[] = [
+  { element: 'hihat', label: 'Hi-hat' },
+  { element: 'crash', label: 'Crash' },
+  { element: 'tom1', label: 'Tom 1' },
+  { element: 'tom2', label: 'Tom 2' },
+  { element: 'ride', label: 'Ride' },
+  { element: 'snare', label: 'Snare' },
+  { element: 'tom3', label: 'Floor tom' },
+  { element: 'kick', label: 'Kick' },
+];
+
+export function HomeCockpit({
+  songList,
+  gamification,
+  recommendation,
+  practiceRanking,
+  pedagogyRanking,
+  practiceWave,
+  activeGoal,
+  goalPayoffCandidate,
+  goalTargetDate,
+  deadlinePacing,
+  atomicStates,
+  dueReviews,
+  sessionEnergy,
+  recentEarlyExits,
+  onStartRecommended,
+  onStartSession,
+  onStartPracticeCard,
+  onOpenSongs,
+  onOpenProfile,
+}: HomeCockpitProps) {
+  const { inputMapping, inputReadiness, selectedDevice } = useInput();
+  const [activeLane, setActiveLane] = useState<KitElement>();
+  const [pointerStrikeLane, setPointerStrikeLane] = useState<KitElement>();
+  const [sessionState, setSessionState] = useState<'armed' | 'count-in'>(
+    'armed',
+  );
+  const [studioSize, setStudioSize] = useState({ width: 0, height: 0 });
+  const clearPulseRef = useRef<number | undefined>(undefined);
+  const clearPointerStrikeRef = useRef<number | undefined>(undefined);
+  const studioRef = useRef<HTMLElement>(null);
+  const homeRanking = useMemo(() => {
+    const ranked: RankedPracticeCandidate[] = [];
+    const seen = new Set<string>();
+
+    [
+      ...(practiceRanking ?? []),
+      ...(practiceWave?.stops.map(
+        ({ recommendation: candidate }) => candidate,
+      ) ?? []),
+      ...(recommendation ? [recommendation] : []),
+    ].forEach((candidate) => {
+      if (!seen.has(candidate.candidate.id)) {
+        seen.add(candidate.candidate.id);
+        ranked.push(candidate);
+      }
+    });
+
+    return ranked;
+  }, [practiceRanking, practiceWave, recommendation]);
+  const homeSession = useMemo(
+    () =>
+      composeHomeSession({
+        intent: 'learning',
+        ranking: homeRanking,
+        pedagogyRanking,
+        practiceWave,
+        activeGoal,
+        goalPayoffCandidate,
+        goalTargetDate,
+        deadlinePacing,
+        atomicStates,
+        size: 'full',
+        energy: sessionEnergy,
+        recentEarlyExits,
+      }),
+    [
+      activeGoal,
+      atomicStates,
+      deadlinePacing,
+      goalPayoffCandidate,
+      goalTargetDate,
+      homeRanking,
+      pedagogyRanking,
+      practiceWave,
+      recentEarlyExits,
+      sessionEnergy,
+    ],
+  );
+  const targetRecommendation = homeSession?.launch ?? recommendation;
+  const homePracticeCards = useMemo(
+    () =>
+      composePracticeCards({
+        plan: homeSession?.plan,
+        ranking: pedagogyRanking ?? [],
+        due_reviews: dueReviews ?? [],
+        ...(homeSession?.goalPath ? { goal_path: homeSession.goalPath } : {}),
+      }),
+    [dueReviews, homeSession, pedagogyRanking],
+  );
+  const sessionDetails = useMemo(
+    () =>
+      [
+        { label: 'Warm up', stop: homeSession?.focus },
+        { label: 'Build', stop: homeSession?.build },
+        { label: 'Play', stop: homeSession?.payoff },
+      ].filter(
+        ({ stop }, index, stops) =>
+          stop &&
+          stops.findIndex(
+            (candidate) => candidate.stop?.title === stop.title,
+          ) === index,
+      ),
+    [homeSession],
+  );
+  const sessionSummary =
+    homeSession?.payoff ?? homeSession?.build ?? homeSession?.focus;
+  const recommendedSong = songList.find(
+    (song) => song.id === targetRecommendation?.candidate.id,
+  );
+  const practiceTarget = targetRecommendation ? recommendedSong : undefined;
+  const hasPracticeTarget = Boolean(practiceTarget && targetRecommendation);
+  const kitColorRuns = useMemo(
+    () => Object.values(gamification.runsBySong ?? {}).flat(),
+    [gamification.runsBySong],
+  );
+  const kitColors = useKitColorMaturity(kitColorRuns);
+
+  useLayoutEffect(() => {
+    const studio = studioRef.current;
+
+    if (!studio) {
+      return undefined;
+    }
+
+    const measure = () => {
+      const { width, height } = studio.getBoundingClientRect();
+
+      setStudioSize((current) =>
+        current.width === width && current.height === height
+          ? current
+          : { width, height },
+      );
+    };
+
+    measure();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return undefined;
+    }
+
+    const observer = new ResizeObserver(measure);
+
+    observer.observe(studio);
+
+    return () => observer.disconnect();
+  }, []);
+
+  const elementByControlId = useMemo(() => {
+    const map = new Map<string, KitElement>();
+
+    (Object.entries(inputMapping) as Array<[KitElement, string[]]>).forEach(
+      ([element, controlIds]) => {
+        controlIds.forEach((controlId) => map.set(controlId, element));
+      },
+    );
+
+    return map;
+  }, [inputMapping]);
+  const pulseLane = useCallback((element: KitElement) => {
+    window.clearTimeout(clearPulseRef.current);
+    setActiveLane(element);
+    clearPulseRef.current = window.setTimeout(() => {
+      setActiveLane(undefined);
+    }, 120);
+  }, []);
+  const startCurrentPractice = useCallback(
+    (element: KitElement) => {
+      pulseLane(element);
+      setSessionState('count-in');
+
+      if (homeSession && onStartSession) {
+        onStartSession(homeSession);
+
+        return;
+      }
+
+      onStartRecommended();
+    },
+    [homeSession, onStartRecommended, onStartSession, pulseLane],
+  );
+  const handlePointerStrike = useCallback(
+    (element: KitElement) => {
+      playKitPreview(element);
+      window.clearTimeout(clearPointerStrikeRef.current);
+      setPointerStrikeLane(element);
+      clearPointerStrikeRef.current = window.setTimeout(() => {
+        setPointerStrikeLane(undefined);
+      }, 120);
+
+      if (hasPracticeTarget) {
+        startCurrentPractice(element);
+      } else {
+        pulseLane(element);
+      }
+    },
+    [hasPracticeTarget, pulseLane, startCurrentPractice],
+  );
+  const handlePadClick = useCallback(
+    (element: KitElement) => {
+      handlePointerStrike(element);
+
+      if (!hasPracticeTarget) {
+        onOpenSongs();
+      }
+    },
+    [handlePointerStrike, hasPracticeTarget, onOpenSongs],
+  );
+
+  useEffect(() => {
+    const unsubscribe = inputBus.subscribe((event) => {
+      const element = elementByControlId.get(event.controlId);
+
+      if (element && event.value > 0) {
+        if (hasPracticeTarget) {
+          startCurrentPractice(element);
+        } else {
+          pulseLane(element);
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      window.clearTimeout(clearPulseRef.current);
+      window.clearTimeout(clearPointerStrikeRef.current);
+    };
+  }, [elementByControlId, hasPracticeTarget, pulseLane, startCurrentPractice]);
+  const rootStyle = {
+    '--drumstick-cursor': `url(${drumstickCursor}) 6 6`,
+    ...kitColors.properties,
+  } as CSSProperties;
+
+  return (
+    <section
+      className="kit-home"
+      style={rootStyle}
+      data-testid="home-cockpit"
+      data-session-state={sessionState}
+      data-kit-color-mode={kitColors.override}
+      data-kit-color-maturity={kitColors.presentation.maturity.toFixed(3)}
+      aria-labelledby="home-cockpit-title"
+    >
+      <aside className="kit-home__context" aria-label="Current practice">
+        <div
+          className="kit-home__manifest"
+          data-testid="home-session-manifest"
+          data-state={sessionState}
+        >
+          <h1 id="home-cockpit-title">
+            {practiceTarget?.name ?? 'Choose a song'}
+          </h1>
+          <button
+            type="button"
+            className="kit-home__primary-action"
+            data-testid={
+              hasPracticeTarget ? 'home-start-practice' : 'home-choose-song'
+            }
+            onClick={() =>
+              hasPracticeTarget ? startCurrentPractice('kick') : onOpenSongs()
+            }
+          >
+            {hasPracticeTarget ? 'Start practice' : 'Choose a song'}
+          </button>
+        </div>
+
+        <section
+          className="kit-home__profile-snapshot"
+          data-testid="home-profile-snapshot"
+          aria-label="Your practice profile"
+        >
+          <p>Your practice</p>
+          <strong>
+            {gamification.streak.current === 0
+              ? 'No active streak'
+              : `${gamification.streak.current}-day streak`}
+          </strong>
+          <span>
+            {gamification.todayXp >= gamification.goalXp
+              ? `Set complete · ${gamification.todayXp.toLocaleString('en-US')} XP`
+              : `Today · ${gamification.todayXp.toLocaleString('en-US')} / ${gamification.goalXp.toLocaleString('en-US')} XP`}
+          </span>
+          <button
+            type="button"
+            data-testid="home-open-profile"
+            onClick={onOpenProfile}
+          >
+            View profile
+          </button>
+        </section>
+
+        <section
+          className="kit-home__session-summary"
+          aria-label="Today’s practice"
+          data-testid="home-session-summary"
+        >
+          <strong>{sessionSummary?.title ?? 'Choose a song to begin'}</strong>
+          <span>
+            {sessionSummary?.detail ??
+              'Pick a song, then strike a highlighted drum to start.'}
+          </span>
+          <details>
+            <summary>Session details</summary>
+            <div className="kit-home__session-details">
+              {sessionDetails.map(({ label, stop }) =>
+                stop ? (
+                  <p key={stop.title}>
+                    <strong>{label}</strong>
+                    <span>{stop.title}</span>
+                  </p>
+                ) : null,
+              )}
+              <EvidencePracticeCards
+                compact
+                cards={homePracticeCards.cards}
+                onStart={onStartPracticeCard}
+                testId="home-practice-card"
+              />
+            </div>
+          </details>
+        </section>
+      </aside>
+
+      <section
+        ref={studioRef}
+        className="kit-home__studio"
+        data-testid="home-kit-stage"
+      >
+        <img
+          className="kit-home__photo"
+          src={homeKitStudio}
+          alt="A pearl drum kit in a sunlit studio"
+        />
+        <div className="kit-home__wash" aria-hidden="true" />
+
+        <p
+          className="sr-only"
+          data-testid="home-input-readiness"
+          data-state={inputReadiness}
+        >
+          {inputReadiness === 'connected'
+            ? `${selectedDevice?.name ?? 'MIDI kit'} mapped · ready`
+            : inputReadiness === 'reconnecting'
+              ? 'Kit reconnecting · your target stays armed'
+              : 'Mouse works now · connect MIDI when ready'}
+        </p>
+
+        <div className="kit-home__pads" role="group" aria-label="Practice kit">
+          {KIT_HOTSPOTS.map((hotspot) => {
+            const isActive = activeLane === hotspot.element;
+            const isPointerStrike = pointerStrikeLane === hotspot.element;
+            const targetLabel =
+              practiceTarget?.name ?? 'the selected practice target';
+
+            return (
+              <button
+                key={hotspot.element}
+                type="button"
+                data-testid={`kit-hotspot-${hotspot.element}`}
+                className="kit-home__pad"
+                data-active={isActive}
+                data-color-lane={KIT_COLOR_LANE[hotspot.element]}
+                style={
+                  fitKitZone(
+                    HOME_KIT_ZONE_MAP.zones[hotspot.element],
+                    HOME_KIT_ZONE_MAP.image,
+                    studioSize,
+                  ) as CSSProperties
+                }
+                aria-label={
+                  hasPracticeTarget
+                    ? `${hotspot.label}. Start ${targetLabel}.`
+                    : `${hotspot.label}. Choose a song to arm practice.`
+                }
+                onClick={() => handlePadClick(hotspot.element)}
+              >
+                <span className="kit-home__pad-head" aria-hidden="true" />
+                <span className="kit-home__pad-impact" aria-hidden="true" />
+                <img
+                  className="kit-home__pad-stick"
+                  data-active={isPointerStrike}
+                  src={drumstickCursor}
+                  alt=""
+                  aria-hidden="true"
+                />
+                <span className="kit-home__pad-label">{hotspot.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <p
+          className="kit-home__hit-feedback sr-only"
+          data-testid="home-hit-feedback"
+        >
+          {activeLane
+            ? `${
+                KIT_HOTSPOTS.find((item) => item.element === activeLane)?.label
+              } hit`
+            : ''}
+        </p>
+      </section>
+
+      <p
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        data-testid="home-session-status"
+      >
+        {sessionState === 'count-in'
+          ? `Count-in for ${practiceTarget?.name ?? 'your selected target'}.`
+          : hasPracticeTarget && targetRecommendation
+            ? `${practiceTarget?.name} is armed at ${(
+                homeSession?.launchSpeed ?? targetRecommendation.suggestedSpeed
+              ).toFixed(1)} times speed. Any mapped pad starts it.`
+            : 'Choose a song to arm a practice target. Any mapped drum then starts it.'}
+      </p>
+    </section>
+  );
+}

@@ -3,10 +3,36 @@ import fs from 'fs';
 import ini from 'ini';
 import { randomUUID } from 'crypto';
 import { Difficulty, parseChartFile } from 'scan-chart';
-import { AudioData, Song, SongData, SongLessonInfo } from '../types';
+import {
+  AudioData,
+  LessonTargetLane,
+  LibrarySourceTrackProvenance,
+  PlayabilityEvidence,
+  Song,
+  SongData,
+  SongLessonInfo,
+} from '../types';
 import { ALL_DIFFICULTIES } from '../constants';
+import { isPlayableEvidence } from '../library-sources/playability';
 
 export const SONG_ID_FILE = '.sightkick';
+
+const LESSON_ID_PATTERN = /^\d{2}\.\d{2}$/;
+
+/**
+ * Lesson charts are product content, not user imports. Their IDs therefore
+ * need to be deterministic across desktop installs and the web manifest so
+ * saved runs, coaching evidence, and deep links all refer to the same lesson.
+ */
+export function stableLessonSongId(
+  lessonId: string | undefined,
+): string | undefined {
+  const normalized = lessonId?.trim();
+
+  return normalized && LESSON_ID_PATTERN.test(normalized)
+    ? `lesson:${normalized}`
+    : undefined;
+}
 
 export function writeSongIdFile(dir: string, id: string): void {
   fs.writeFileSync(path.join(dir, SONG_ID_FILE), JSON.stringify({ id }));
@@ -36,6 +62,41 @@ export function parseLessonInfo(stored: SongData): SongLessonInfo | undefined {
   }
 
   const starsToUnlock = parseInt(stored.sk_stars_to_unlock ?? '', 10);
+  const skills = (stored.sk_skills ?? '')
+    .split(',')
+    .map((skill) => skill.trim())
+    .filter(Boolean);
+  const prerequisiteIds = (stored.sk_prerequisite_ids ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => LESSON_ID_PATTERN.test(id));
+  const targetLanes = (stored.sk_target_lanes ?? '')
+    .split(',')
+    .flatMap((raw): LessonTargetLane[] => {
+      const [element, rawWeight] = raw.trim().split(':');
+      const weight = Number(rawWeight);
+      const laneElements: LessonTargetLane['element'][] = [
+        'kick',
+        'snare',
+        'hihat',
+        'ride',
+        'crash',
+        'tom1',
+        'tom2',
+        'tom3',
+      ];
+
+      return laneElements.includes(element as LessonTargetLane['element']) &&
+        Number.isFinite(weight) &&
+        weight > 0
+        ? [{ element: element as LessonTargetLane['element'], weight }]
+        : [];
+    });
+  const parsePositiveInteger = (value: string | undefined) => {
+    const parsed = Number(value);
+
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+  };
 
   return {
     id: stored.sk_lesson_id,
@@ -43,7 +104,91 @@ export function parseLessonInfo(stored: SongData): SongLessonInfo | undefined {
     next: stored.sk_next || undefined,
     unit: stored.sk_unit ?? '',
     title: stored.sk_lesson_title ?? '',
+    ...(skills.length > 0 ? { skills } : {}),
+    ...(prerequisiteIds.length > 0 ? { prerequisiteIds } : {}),
+    ...(targetLanes.length > 0 ? { targetLanes } : {}),
+    ...(parsePositiveInteger(stored.sk_bpm_start) !== undefined
+      ? { bpmStart: parsePositiveInteger(stored.sk_bpm_start) }
+      : {}),
+    ...(parsePositiveInteger(stored.sk_bpm_target) !== undefined
+      ? { bpmTarget: parsePositiveInteger(stored.sk_bpm_target) }
+      : {}),
+    ...(stored.sk_dose_rule ? { doseRule: stored.sk_dose_rule } : {}),
+    ...(stored.sk_mastery_rule ? { masteryRule: stored.sk_mastery_rule } : {}),
+    ...(stored.sk_cue ? { cue: stored.sk_cue } : {}),
+    ...(stored.sk_assessment_boundary
+      ? { assessmentBoundary: stored.sk_assessment_boundary }
+      : {}),
   };
+}
+
+/**
+ * Reads a reviewed discovery row from schema-compatible `sk_*` song.ini
+ * fields. Malformed or partial metadata never creates a false source link.
+ */
+export function parseLibrarySourceProvenance(
+  stored: SongData,
+): LibrarySourceTrackProvenance | undefined {
+  if (stored.sk_source_provider !== 'yandex-music') {
+    return undefined;
+  }
+
+  const collectionId = stored.sk_source_collection_id?.trim();
+  const collectionName = stored.sk_source_collection_name?.trim();
+  const trackId = stored.sk_source_track_id?.trim();
+  const title = stored.sk_source_title?.trim();
+  let artists: unknown;
+
+  try {
+    artists = JSON.parse(stored.sk_source_artists ?? '');
+  } catch {
+    return undefined;
+  }
+
+  if (
+    !collectionId ||
+    !collectionName ||
+    !trackId ||
+    !title ||
+    !Array.isArray(artists) ||
+    artists.some((artist) => typeof artist !== 'string' || !artist.trim())
+  ) {
+    return undefined;
+  }
+
+  const sourceUrl = stored.sk_source_url?.trim();
+  const durationSeconds = Number(stored.sk_source_duration);
+
+  return {
+    provider: 'yandex-music',
+    collectionId,
+    collectionName,
+    trackId,
+    title,
+    artists: [...artists],
+    ...(Number.isFinite(durationSeconds) && durationSeconds > 0
+      ? { durationSeconds }
+      : {}),
+    ...(sourceUrl ? { sourceUrl } : {}),
+  };
+}
+
+function parsePlayabilityEvidence(
+  value: unknown,
+): PlayabilityEvidence | undefined {
+  if (typeof value !== 'string' || !value) {
+    return undefined;
+  }
+
+  try {
+    const evidence = JSON.parse(
+      Buffer.from(value, 'base64url').toString('utf8'),
+    ) as PlayabilityEvidence;
+
+    return isPlayableEvidence(evidence) ? evidence : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function toSong(stored: SongData): Song {
@@ -72,6 +217,11 @@ export function toSong(stored: SongData): Song {
     liked: stored.liked,
     updatedAt: stored.updatedAt,
     scoreData: stored.scoreData,
+    sourceProvenance: parseLibrarySourceProvenance(stored),
+    sourceLinked:
+      stored.sk_source_provider !== undefined ||
+      stored.sk_source_track_id !== undefined,
+    playability: stored.playability,
     lesson: parseLessonInfo(stored),
   };
 }
@@ -146,11 +296,12 @@ export function isUnderDirectory(songDir: string, rootDir: string): boolean {
 
 export function resolveAssetFilePath(
   url: string,
-  rootDir: string | undefined,
+  rootDir: string | readonly (string | undefined)[] | undefined,
 ): string | undefined {
   const filePath = assetUrlToFilePath(url);
+  const roots = Array.isArray(rootDir) ? rootDir : [rootDir];
 
-  if (!rootDir || !isUnderDirectory(filePath, rootDir)) {
+  if (!roots.some((root) => root && isUnderDirectory(filePath, root))) {
     return undefined;
   }
 
@@ -190,6 +341,7 @@ export function buildSongFromDir(
 
   const format: 'mid' | 'chart' = hasMid ? 'mid' : 'chart';
   const meta = info.song ?? info.Song ?? info;
+  const playability = parsePlayabilityEvidence(meta.sk_playability);
   const drumDifficulties =
     existing?.drumDifficulties && existing.drumDifficulties.length > 0
       ? existing.drumDifficulties
@@ -213,12 +365,17 @@ export function buildSongFromDir(
 
   return {
     ...meta,
-    id: existing?.id ?? readSongIdFile(dir) ?? randomUUID(),
+    id:
+      stableLessonSongId(meta.sk_lesson_id) ??
+      existing?.id ??
+      readSongIdFile(dir) ??
+      randomUUID(),
     dir,
     albumCover: albumCoverPath ? toAssetUrl(albumCoverPath) : null,
     format,
     audio,
     drumDifficulties,
+    ...(playability ? { playability } : {}),
     ...(existing?.liked !== undefined ? { liked: existing.liked } : {}),
     ...(existing?.scoreData !== undefined
       ? { scoreData: existing.scoreData }

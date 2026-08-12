@@ -12,8 +12,19 @@ export interface InputEvent {
   value: number;
 }
 
+export interface RawMidiInputEvent {
+  controlId: string;
+  type: number;
+  note: number;
+  velocity: number;
+  receivedAt: number;
+}
+
 export interface InputSource {
   readonly id: SourceId;
-  start(emit: (event: InputEvent) => void): () => void;
+  start(
+    emit: (event: InputEvent) => void,
+    emitRawMidi?: (event: RawMidiInputEvent) => void,
+  ): () => void;
   listDevices(): Promise<InputDevice[]>;
 }

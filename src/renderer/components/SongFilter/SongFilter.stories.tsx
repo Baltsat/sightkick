@@ -14,7 +14,10 @@ const meta: Meta<typeof SongFilter> = {
     setDifficulty: () => {},
   },
   argTypes: {
-    libraryMode: { control: 'radio', options: ['local', 'online'] },
+    libraryMode: {
+      control: 'radio',
+      options: ['local', 'drums', 'favorites', 'online'],
+    },
     difficulty: {
       control: 'radio',
       options: ['easy', 'medium', 'hard', 'expert'],
@@ -38,6 +41,14 @@ export const Local: Story = {};
 
 export const Online: Story = {
   args: { libraryMode: 'online', filteredSongsCount: 1280 },
+};
+
+export const Drums: Story = {
+  args: { libraryMode: 'drums', filteredSongsCount: 13 },
+};
+
+export const Favorites: Story = {
+  args: { libraryMode: 'favorites', filteredSongsCount: 230 },
 };
 
 export const WithQuery: Story = {

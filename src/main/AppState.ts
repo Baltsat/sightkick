@@ -10,9 +10,11 @@ import {
   powerSaveBlocker,
 } from 'electron';
 import Store from 'electron-store';
+import { StorageSchema } from '../types';
 import MenuBuilder from './menu';
 import { ASSET_PROTOCOL, resolveAssetFilePath, resolveHtmlPath } from './util';
 import { AppUpdater } from './AppUpdater';
+import { PracticePresenceController } from './practicePresence';
 import { loadSong } from './ipc/loadSong';
 import { loadSongList } from './ipc/loadSongList';
 import { downloadSong } from './ipc/downloadSong';
@@ -41,14 +43,48 @@ import {
 } from './ipc/remoteAutoChart';
 import { searchYoutube } from './ipc/searchYoutube';
 import { fetchMyMusic } from './ipc/myMusic';
-import { savePracticeRun, loadPracticeRuns } from './ipc/practiceStats';
+import { loadLibraryCandidates } from './ipc/loadLibraryCandidates';
+import { resolveLibraryCandidates } from './ipc/resolveLibraryCandidates';
+import { bootstrapLessonLibrary } from './lessonLibrary';
+import { applyLessonProfileMigration } from './lessonIdentityMigration';
+import {
+  finalizePracticeAttemptCheckpoint,
+  loadPracticeAttemptCheckpoints,
+  loadPracticeRuns,
+  savePracticeAttemptCheckpoint,
+  savePracticeRun,
+} from './ipc/practiceStats';
+import {
+  configureCoachStore,
+  getCoachingNotes,
+  getCoachSettings,
+  saveCoachSettings,
+} from './ipc/coach';
+import {
+  loadAllPracticeRuns,
+  loadPracticeDays,
+  recordPracticeDay,
+} from './ipc/gamification';
+import {
+  deleteGoal,
+  loadGoalsIpc,
+  saveGoal,
+  setPrimaryGoal,
+} from './ipc/goals';
+import { loadRetiredLessons } from './ipc/retiredLessons';
+import { MAIN_WINDOW_SIZE } from './windowConfig';
 
 class AppState {
   private static instance: AppState;
   private mainWindow: BrowserWindow | null = null;
   private powerSaveBlockerId: number = -1;
   readonly store = new Store();
+  readonly practicePresence = new PracticePresenceController({
+    store: this.store,
+    openPractice: () => this.openPracticeWindow(),
+  });
   private libraryRoot = this.store.get('lastOpenedPath') as string | undefined;
+  private lessonLibraryRoot: string | undefined;
 
   static getInstance(): AppState {
     if (!AppState.instance) {
@@ -61,6 +97,13 @@ class AppState {
   setLibraryRoot(root: string): void {
     this.libraryRoot = root;
     this.store.set('lastOpenedPath', root);
+  }
+
+  getLibraryRoots(): string[] {
+    return [this.libraryRoot, this.lessonLibraryRoot].filter(
+      (root, index, roots): root is string =>
+        Boolean(root) && roots.indexOf(root) === index,
+    );
   }
 
   start(): void {
@@ -84,13 +127,18 @@ class AppState {
       }
     });
     app.on('before-quit', () => {
+      this.practicePresence.dispose();
       this.cleanup();
     });
     app
       .whenReady()
       .then(() => {
+        this.bootstrapBundledLessons();
         protocol.handle(ASSET_PROTOCOL, (request) => {
-          const filePath = resolveAssetFilePath(request.url, this.libraryRoot);
+          const filePath = resolveAssetFilePath(
+            request.url,
+            this.getLibraryRoots(),
+          );
 
           if (!filePath) {
             return new Response('Forbidden', { status: 403 });
@@ -100,6 +148,7 @@ class AppState {
         });
         this.setupIpc();
         this.createWindow();
+        this.practicePresence.initialize();
         app.on('activate', () => {
           if (!this.mainWindow) {
             this.createWindow();
@@ -115,6 +164,7 @@ class AppState {
       process.env.DEBUG_PROD === 'true';
 
     configureRemoteAutoChartStore(this.store);
+    configureCoachStore(this.store);
 
     ipcMain.on('load-song', loadSong);
     ipcMain.on('load-song-list', loadSongList);
@@ -132,6 +182,10 @@ class AppState {
     ipcMain.on('save-test-auto-chart-remote', saveAndTestRemoteAutoChart);
     ipcMain.on('search-youtube', searchYoutube);
     ipcMain.on('my-music-fetch', fetchMyMusic);
+    ipcMain.on('load-library-candidates', (event) => {
+      loadLibraryCandidates(event, this.librarySourcesDirectory());
+    });
+    ipcMain.on('resolve-library-candidates', resolveLibraryCandidates);
 
     ipcMain.on('check-stem-tools', checkStemTools);
     ipcMain.on('check-stem-tools-update', checkStemToolsUpdate);
@@ -145,7 +199,48 @@ class AppState {
     ipcMain.on('update-song', updateSong);
     ipcMain.on('save-practice-run', savePracticeRun);
     ipcMain.on('load-practice-runs', loadPracticeRuns);
+    ipcMain.on(
+      'save-practice-attempt-checkpoint',
+      savePracticeAttemptCheckpoint,
+    );
+    ipcMain.on(
+      'load-practice-attempt-checkpoints',
+      loadPracticeAttemptCheckpoints,
+    );
+    ipcMain.on(
+      'finalize-practice-attempt-checkpoint',
+      finalizePracticeAttemptCheckpoint,
+    );
+    ipcMain.on('get-coach-settings', getCoachSettings);
+    ipcMain.on('save-coach-settings', saveCoachSettings);
+    ipcMain.on('get-coaching-notes', getCoachingNotes);
+    ipcMain.on('record-practice-day', recordPracticeDay);
+    ipcMain.on('load-practice-days', loadPracticeDays);
+    ipcMain.on('load-all-practice-runs', loadAllPracticeRuns);
+    ipcMain.on('load-retired-lessons', loadRetiredLessons);
+    ipcMain.on('save-goal', saveGoal);
+    ipcMain.on('load-goals', loadGoalsIpc);
+    ipcMain.on('delete-goal', deleteGoal);
+    ipcMain.on('set-primary-goal', setPrimaryGoal);
     ipcMain.on('export-pdf', exportPdf);
+    ipcMain.on('get-practice-presence-settings', (event) => {
+      event.reply(
+        'practice-presence-settings',
+        this.practicePresence.getSnapshot(),
+      );
+    });
+    ipcMain.on('save-practice-presence-settings', (event, settings) => {
+      try {
+        event.reply(
+          'practice-presence-settings-saved',
+          this.practicePresence.saveSettings(settings),
+        );
+      } catch (error) {
+        event.reply('practice-presence-settings-saved', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
     ipcMain.on('midi-device-list', loadMidiDeviceList);
     ipcMain.on('listen-midi', listenMidi);
     ipcMain.on('stop-listen-midi', stopListenMidi);
@@ -163,6 +258,46 @@ class AppState {
     ipcMain.on('resume-sleep', () => this.resumeSleep());
   }
 
+  private bundledLessonDirectory(): string {
+    return app.isPackaged
+      ? path.join(process.resourcesPath, 'lesson-library')
+      : path.resolve(__dirname, '../../web/public/library');
+  }
+
+  private librarySourcesDirectory(): string {
+    return app.isPackaged
+      ? path.join(process.resourcesPath, 'library-sources')
+      : path.resolve(__dirname, '../../resources/library-sources');
+  }
+
+  private bootstrapBundledLessons(): void {
+    try {
+      const existingLibraryRoot = this.store.get('lastOpenedPath') as
+        | string
+        | undefined;
+      const existingSongs =
+        (this.store.get('songs') as StorageSchema['songs'] | undefined) ?? {};
+      const result = bootstrapLessonLibrary({
+        bundledRoot: this.bundledLessonDirectory(),
+        userDataRoot: app.getPath('userData'),
+        existingLibraryRoot,
+        existingSongs,
+      });
+
+      if (result.libraryRoot) {
+        this.lessonLibraryRoot = result.libraryRoot;
+      }
+
+      applyLessonProfileMigration(this.store, result);
+
+      if (!existingLibraryRoot && result.libraryRoot) {
+        this.setLibraryRoot(result.libraryRoot);
+      }
+    } catch (error) {
+      console.warn('Could not install bundled lesson library:', error);
+    }
+  }
+
   async createWindow(): Promise<void> {
     const RESOURCES_PATH = app.isPackaged
       ? path.join(process.resourcesPath, 'assets')
@@ -175,13 +310,14 @@ class AppState {
       show: false,
       x: 0,
       y: 0,
-      width: 1366,
-      height: 768,
+      ...MAIN_WINDOW_SIZE,
       icon:
         process.platform === 'win32'
           ? getAssetPath('icon.ico')
           : process.platform === 'linux'
           ? getAssetPath('icons', '512x512.png')
+          : process.platform === 'darwin'
+          ? getAssetPath('icon.icns')
           : getAssetPath('icon.png'),
       webPreferences: {
         preload: path.join(__dirname, '../preload/index.js'),
@@ -214,6 +350,21 @@ class AppState {
       return { action: 'deny' };
     });
     AppUpdater.attach(this.mainWindow);
+  }
+
+  private openPracticeWindow(): void {
+    if (!this.mainWindow) {
+      void this.createWindow();
+
+      return;
+    }
+
+    if (this.mainWindow.isMinimized()) {
+      this.mainWindow.restore();
+    }
+
+    this.mainWindow.show();
+    this.mainWindow.focus();
   }
 
   preventSleep(): void {

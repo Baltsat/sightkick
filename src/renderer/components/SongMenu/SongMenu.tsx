@@ -11,9 +11,16 @@ interface Props {
   canSplit: boolean;
   splitting: boolean;
   onSplit: () => void;
+  onSetGoal?: () => void;
 }
 
-export function SongMenu({ dir, canSplit, splitting, onSplit }: Props) {
+export function SongMenu({
+  dir,
+  canSplit,
+  splitting,
+  onSplit,
+  onSetGoal,
+}: Props) {
   const { stemToolsStatus } = useStemToolsContext();
   const [isOpen, setIsOpen] = useState(false);
   const showSplit = stemToolsStatus === 'ready' && canSplit;
@@ -45,6 +52,13 @@ export function SongMenu({ dir, canSplit, splitting, onSplit }: Props) {
               onSplit();
               close();
             }}
+            onSetGoal={
+              onSetGoal &&
+              (() => {
+                onSetGoal();
+                close();
+              })
+            }
           />
         </div>
       }

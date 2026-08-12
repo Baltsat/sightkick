@@ -3,7 +3,11 @@ import { Measure, Note, ParsedChart } from '../../../chart-parser/types';
 import { InputEvent } from '../../input/types';
 import { ticksToSeconds } from '../../../chart-parser/timing';
 import { Judge } from './judge';
-import { JudgeContext, JudgeHitHandler } from './types';
+import {
+  JudgeContext,
+  JudgeHitHandler,
+  ResolvedJudgementHandler,
+} from './types';
 
 const CHART = {
   resolution: 480,
@@ -76,6 +80,98 @@ describe('Judge', () => {
       element: 'snare',
       velocity: 100,
     });
+  });
+
+  it('emits an authoritative hit judgement when a mapped note is accepted', () => {
+    const onJudgement = vi.fn<ResolvedJudgementHandler>();
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 480)])] },
+      { tick: 480 },
+    );
+
+    engine.onJudgement(onJudgement);
+    engine.handleInput(hit('midi:38'));
+
+    expect(onJudgement).toHaveBeenCalledWith({
+      id: 'note:480:c/5',
+      verdict: 'hit',
+      expectedTick: 480,
+      actualTick: 480,
+      expectedElement: 'snare',
+      actualElement: 'snare',
+      measureIndex: 0,
+      deltaMs: 0,
+      velocity: 100,
+      scoreable: true,
+    });
+  });
+
+  it('resolves a miss only after the late-hit tolerance window closes', () => {
+    const onJudgement = vi.fn<ResolvedJudgementHandler>();
+    const { engine } = setup({
+      measures: [
+        measure([note(['c/5'], 480)], { startTick: 0, endTick: 1920 }),
+      ],
+    });
+
+    engine.onJudgement(onJudgement);
+    engine.resolveThrough(575);
+    expect(onJudgement).not.toHaveBeenCalled();
+
+    engine.resolveThrough(577);
+    expect(onJudgement).toHaveBeenCalledTimes(1);
+    expect(onJudgement).toHaveBeenCalledWith({
+      id: 'note:480:c/5',
+      verdict: 'miss',
+      expectedTick: 480,
+      expectedElement: 'snare',
+      measureIndex: 0,
+      scoreable: true,
+    });
+
+    engine.resolveThrough(900);
+    expect(onJudgement).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves every unjudged chart head when a run ends inside the tail tolerance', () => {
+    const onJudgement = vi.fn<ResolvedJudgementHandler>();
+    const { engine } = setup({
+      measures: [
+        measure([note(['c/5'], 480), note(['f/4'], 960)], {
+          startTick: 0,
+          endTick: 1920,
+        }),
+      ],
+    });
+
+    engine.onJudgement(onJudgement);
+    engine.resolveThrough(500);
+    engine.resolveAll();
+
+    expect(onJudgement).toHaveBeenCalledTimes(2);
+    expect(onJudgement).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        id: 'note:960:f/4',
+        verdict: 'miss',
+        expectedElement: 'kick',
+      }),
+    );
+  });
+
+  it('re-arms resolved judgements when practice rewinds across a note', () => {
+    const onJudgement = vi.fn<ResolvedJudgementHandler>();
+    const { engine } = setup({
+      measures: [
+        measure([note(['c/5'], 480)], { startTick: 0, endTick: 1920 }),
+      ],
+    });
+
+    engine.onJudgement(onJudgement);
+    engine.resolveThrough(600);
+    engine.rewindTo(0);
+    engine.resolveThrough(600);
+
+    expect(onJudgement).toHaveBeenCalledTimes(2);
   });
 
   it('registers a hit using the remapped control after a remap', () => {
@@ -317,6 +413,137 @@ describe('Judge', () => {
 
     expect(engine.isHit(490, 'c/5')).toBe(true);
     expect(engine.isHit(530, 'c/5')).toBe(false);
+  });
+
+  it('matches an early Practice strike to the nearest unhit repeated head', () => {
+    const onJudgement = vi.fn<ResolvedJudgementHandler>();
+    const { engine } = setup(
+      {
+        measures: [
+          measure(
+            [note(['c/5'], 480), note(['c/5'], 600), note(['c/5'], 720)],
+            { startTick: 0, endTick: 1920 },
+          ),
+        ],
+        hitToleranceSeconds: 0.16,
+        preferUnhitNotes: true,
+      },
+      { tick: 480 },
+    );
+
+    engine.onJudgement(onJudgement);
+    engine.handleInput(hit('midi:38'));
+    // A DTX-style early second strike: 60 ticks (62.5 ms) from both heads.
+    // Stable tie-breaking would choose the already-hit 480 head unless
+    // Practice excludes consumed heads while finding its nearest candidate.
+    engine.setTick(540);
+    engine.handleInput(hit('midi:38'));
+    engine.setTick(659);
+    engine.handleInput(hit('midi:38'));
+
+    expect(engine.hitCount).toBe(3);
+    expect(engine.falseHitCount).toBe(0);
+    expect(engine.isHit(480, 'c/5')).toBe(true);
+    expect(engine.isHit(600, 'c/5')).toBe(true);
+    expect(engine.isHit(720, 'c/5')).toBe(true);
+    expect(onJudgement.mock.calls.map(([judgement]) => judgement.id)).toEqual([
+      'note:480:c/5',
+      'note:600:c/5',
+      'note:720:c/5',
+    ]);
+
+    engine.resolveAll();
+
+    expect(onJudgement).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([
+    { strikeTick: 566, accepted: true },
+    { strikeTick: 565, accepted: false },
+  ])(
+    'keeps the Practice repeat window boundary at tick $strikeTick',
+    ({ strikeTick, accepted }) => {
+      const { engine } = setup(
+        {
+          measures: [measure([note(['c/5'], 480), note(['c/5'], 720)])],
+          hitToleranceSeconds: 0.16,
+          preferUnhitNotes: true,
+        },
+        { tick: 480 },
+      );
+
+      engine.handleInput(hit('midi:38'));
+      engine.setTick(strikeTick);
+      engine.handleInput(hit('midi:38'));
+
+      expect(engine.isHit(720, 'c/5')).toBe(accepted);
+      expect(engine.hitCount).toBe(accepted ? 2 : 1);
+      expect(engine.falseHitCount).toBe(accepted ? 0 : 1);
+    },
+  );
+
+  it('keeps Perform nearest-note duplicate semantics for dense repeats', () => {
+    const { engine } = setup(
+      {
+        measures: [measure([note(['c/5'], 480), note(['c/5'], 600)])],
+      },
+      { tick: 480 },
+    );
+
+    engine.handleInput(hit('midi:38'));
+    engine.setTick(539);
+    engine.handleInput(hit('midi:38'));
+
+    expect(engine.hitCount).toBe(1);
+    expect(engine.falseHitCount).toBe(1);
+    expect(engine.isHit(600, 'c/5')).toBe(false);
+  });
+
+  it('records a true Practice duplicate when no unhit same-lane head is in range', () => {
+    const onJudgement = vi.fn<ResolvedJudgementHandler>();
+    const { engine } = setup(
+      {
+        measures: [measure([note(['c/5'], 480)])],
+        hitToleranceSeconds: 0.16,
+        preferUnhitNotes: true,
+      },
+      { tick: 480 },
+    );
+
+    engine.onJudgement(onJudgement);
+    engine.handleInput(hit('midi:38'));
+    engine.handleInput(hit('midi:38'));
+
+    expect(engine.hitCount).toBe(1);
+    expect(engine.falseHitCount).toBe(1);
+    expect(onJudgement.mock.calls.map(([judgement]) => judgement.id)).toEqual([
+      'note:480:c/5',
+      'wrong:1',
+    ]);
+
+    engine.resolveAll();
+
+    expect(onJudgement).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a wrong-lane Practice strike wrong beside an unhit dense repeat', () => {
+    const { engine } = setup(
+      {
+        measures: [measure([note(['c/5'], 480), note(['c/5'], 600)])],
+        mapping: { snare: ['midi:38'], tom1: ['midi:48'] },
+        hitToleranceSeconds: 0.16,
+        preferUnhitNotes: true,
+      },
+      { tick: 480 },
+    );
+
+    engine.handleInput(hit('midi:38'));
+    engine.setTick(539);
+    engine.handleInput(hit('midi:48'));
+
+    expect(engine.hitCount).toBe(1);
+    expect(engine.falseHitCount).toBe(1);
+    expect(engine.isHit(600, 'c/5')).toBe(false);
   });
 
   it('skips rest notes when matching', () => {
@@ -606,6 +833,10 @@ describe('Judge', () => {
       controlId: 'midi:38',
       element: 'snare',
       timeSeconds: expect.any(Number),
+      expectedTick: 480,
+      actualTick: 480,
+      expectedElement: 'kick',
+      actualElement: 'snare',
     });
   });
 

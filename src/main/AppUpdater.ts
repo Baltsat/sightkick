@@ -8,7 +8,11 @@ import log from 'electron-log';
 import { BrowserWindow, ipcMain, IpcMainEvent } from 'electron';
 import { IpcUpdateAvailable, IpcUpdateStatus } from '../types';
 
-const RELEASES_URL = 'https://github.com/Baltsat/sightkick/releases/latest';
+const RELEASES_BASE_URL = 'https://github.com/Baltsat/sightkick/releases/tag';
+
+function releaseUrl(version: string): string {
+  return `${RELEASES_BASE_URL}/v${version}`;
+}
 
 function normalizeReleaseNotes(
   releaseNotes: UpdateInfo['releaseNotes'],
@@ -82,7 +86,7 @@ export class AppUpdater {
     this.updateInfo = {
       phase: 'available',
       version: info.version,
-      releaseUrl: RELEASES_URL,
+      releaseUrl: releaseUrl(info.version),
       releaseNotes: normalizeReleaseNotes(info.releaseNotes),
     };
 

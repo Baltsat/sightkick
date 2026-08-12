@@ -22,7 +22,7 @@ printf '%s\n' \
     'artist = Тестовый артист' \
     'album = E2E' \
     'auto_chart = True' \
-    'auto_chart_tool = SightKick Transcriber' \
+    'auto_chart_tool = Drumroll Transcriber' \
     'charter = ' \
     'pro_drums = True' \
     'five_lane_drums = False' \

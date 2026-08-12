@@ -1,0 +1,243 @@
+.drumroll-practice-shell {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  background: var(--color-paper-light);
+}
+
+.drumroll-notation-stage {
+  position: relative;
+  transition: background-color 180ms ease;
+}
+
+.drumroll-practice-shell[data-session-phase='ready']
+  .drumroll-notation-stage
+  [class*='vf-note-'],
+.drumroll-practice-shell[data-session-phase='ready']
+  .drumroll-notation-stage
+  [class*='vf-note-']
+  *,
+.drumroll-practice-shell[data-session-phase='ready']
+  .drumroll-notation-stage
+  [class*='vf-accent-'],
+.drumroll-practice-shell[data-session-phase='ready']
+  .drumroll-notation-stage
+  [class*='vf-accent-']
+  * {
+  fill: var(--color-text-muted) !important;
+  stroke: color-mix(in srgb, var(--color-text-muted) 82%, white) !important;
+}
+
+.drumroll-practice-shell[data-session-phase='ready']
+  .drumroll-notation-stage
+  .vf-note-active,
+.drumroll-practice-shell[data-session-phase='ready']
+  .drumroll-notation-stage
+  .vf-note-active
+  * {
+  fill: var(--color-coral) !important;
+  stroke: color-mix(in srgb, var(--color-coral) 70%, white) !important;
+}
+
+.drumroll-practice-shell[data-session-phase='ready']
+  .drumroll-flow-meter__bar[data-flow-current='true'] {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-coral) 14%, transparent),
+    transparent 72%
+  );
+}
+
+.drumroll-practice-shell[data-session-phase='ready']
+  .drumroll-flow-meter__bar[data-flow-current='true']
+  .drumroll-flow-meter__bar-label,
+.drumroll-practice-shell[data-session-phase='ready']
+  .drumroll-flow-meter__beat[data-flow-current='true']
+  > span {
+  color: var(--color-coral);
+  font-weight: 700;
+}
+
+.drumroll-practice-shell[data-session-phase='ready']
+  .drumroll-flow-meter__beat[data-flow-current='true'] {
+  width: 2px;
+  border-left: 0;
+  background: var(--color-coral);
+  box-shadow: 0 0 0 3px rgb(255 104 79 / 12%);
+}
+
+.drumroll-classic-viewport {
+  padding: 1rem 1rem 10rem;
+  scrollbar-width: none;
+}
+
+.drumroll-classic-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.drumroll-practice-toolbar {
+  position: relative;
+  z-index: 24;
+  border-bottom: 1px solid rgb(17 23 34 / 10%);
+  background: var(--color-paper-light);
+}
+
+.drumroll-practice-toolbar > .ant-btn {
+  border-color: transparent;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.drumroll-practice-toolbar > .ant-btn-primary {
+  border-color: transparent;
+  color: white;
+  background: var(--color-coral);
+  box-shadow: none;
+}
+
+.drumroll-practice-input-readiness {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.32rem;
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 680;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.drumroll-practice-input-readiness > span {
+  width: 0.4rem;
+  height: 0.4rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-green);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-green) 16%, transparent);
+}
+
+.drumroll-practice-input-readiness[data-state='reconnecting'] > span {
+  background: var(--color-amber);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-amber) 18%, transparent);
+}
+
+.drumroll-practice-input-readiness[data-state='waiting'] > span {
+  background: var(--color-text-faint);
+  box-shadow: 0 0 0 3px rgb(17 23 34 / 8%);
+}
+
+.drumroll-practice-input-telemetry {
+  color: color-mix(in srgb, var(--color-cyan) 76%, var(--color-text-muted));
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+}
+
+.drumroll-practice-toolbar__identity {
+  flex: 0 1 16rem;
+}
+
+.drumroll-practice-toolbar__session-state {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.42rem;
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 720;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.drumroll-practice-toolbar__session-state
+  > span:not(.drumroll-practice-input-readiness)
+  + span:not(.drumroll-practice-input-readiness)::before {
+  margin-right: 0.42rem;
+  color: rgb(17 23 34 / 24%);
+  content: '·';
+}
+
+.drumroll-practice-toolbar__session-state[data-looping='true'] {
+  color: color-mix(in srgb, var(--color-coral) 72%, var(--color-text-muted));
+}
+
+.drumroll-performance-inspector {
+  max-width: calc(100vw - 1.5rem);
+}
+
+.drumroll-performance-inspector .ant-popover-content {
+  max-width: min(28rem, calc(100vw - 1.5rem));
+  max-height: calc(100vh - 5rem);
+  overflow: auto;
+}
+
+.drumroll-performance-inspector__body {
+  display: flex;
+  width: min(26rem, calc(100vw - 2rem));
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.drumroll-performance-inspector__body .grid,
+.drumroll-performance-inspector__body .grid > * {
+  min-width: 0;
+}
+
+/* Keep motivational feedback in the quiet left rail. The prior centered
+ * overlay occupied the same coordinates as Flow's title/location HUD. */
+.drumroll-practice-streak {
+  inset-inline: 1rem auto !important;
+  top: 1rem;
+  width: max-content;
+  justify-content: flex-start;
+}
+
+.drumroll-perform-kit-prompt {
+  position: absolute;
+  right: clamp(1rem, 2.4vw, 2.25rem);
+  bottom: clamp(1rem, 2.1vw, 1.75rem);
+  z-index: 16;
+  max-width: min(44rem, calc(100vw - 2rem));
+  padding: 0.85rem 1rem;
+  border: 1px solid rgb(17 23 34 / 10%);
+  border-radius: 16px;
+  background: rgb(255 252 246 / 94%);
+  box-shadow: 0 22px 42px -28px rgb(17 23 34 / 42%);
+  backdrop-filter: blur(16px);
+  pointer-events: none;
+}
+
+@media (max-width: 1100px) {
+  .drumroll-practice-toolbar {
+    gap: 0.65rem;
+    padding-inline: 0.75rem;
+  }
+
+  .drumroll-practice-toolbar__identity {
+    width: 11rem;
+    min-width: 11rem;
+    max-width: 11rem;
+    flex-basis: 12rem;
+  }
+
+  .drumroll-practice-toolbar__session-state > span:nth-child(3),
+  .drumroll-practice-toolbar__session-state > span:nth-child(4) {
+    display: none;
+  }
+
+  .drumroll-practice-streak {
+    top: 5.4rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drumroll-notation-stage {
+    transition: none;
+  }
+}

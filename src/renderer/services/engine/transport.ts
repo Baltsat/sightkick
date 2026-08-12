@@ -16,6 +16,7 @@ import {
 import { Beat, getBeatGrid, getCountInInfo } from '../beat-grid';
 import {
   LoopRegion,
+  CountInPolicy,
   PlaybackSnapshot,
   PlaybackState,
   TransportContext,
@@ -34,6 +35,8 @@ export class Transport {
   private onEndedCb: () => void;
   private onErrorCb: () => void;
   private onSeekCb: (tick: number) => void;
+  private onSeekStartCb: () => void;
+  private onLoopRestartCb: () => void;
   private chart: ParsedChart | undefined;
   private measures: Measure[] = [];
   private delaySeconds = 0;
@@ -56,6 +59,7 @@ export class Transport {
   private raf: number | undefined;
   private loopRegion: LoopRegion | undefined;
   private loopRestarting = false;
+  private suppressNextLoopCompletion = false;
   private playGeneration = 0;
   private pendingSpeed: number | undefined;
   private disposed = false;
@@ -68,6 +72,8 @@ export class Transport {
     this.onEndedCb = options.onEnded;
     this.onErrorCb = options.onError;
     this.onSeekCb = options.onSeek ?? (() => {});
+    this.onSeekStartCb = options.onSeekStart ?? (() => {});
+    this.onLoopRestartCb = options.onLoopRestart ?? (() => {});
     this.snapshot = this.buildSnapshot();
 
     if (options.trackData.length > 0) {
@@ -150,15 +156,21 @@ export class Transport {
 
   setLoopRegion(region: LoopRegion | undefined): void {
     const previous = this.loopRegion;
+    const unchanged = Boolean(
+      region &&
+        previous &&
+        previous.startTick === region.startTick &&
+        previous.endTick === region.endTick,
+    );
 
     this.loopRegion = region;
 
-    if (
-      !region ||
-      (previous &&
-        previous.startTick === region.startTick &&
-        previous.endTick === region.endTick)
-    ) {
+    if (!unchanged) {
+      this.suppressNextLoopCompletion = false;
+      this.loopRestarting = false;
+    }
+
+    if (!region || unchanged) {
       return;
     }
 
@@ -211,9 +223,21 @@ export class Transport {
     this.playFromTick(measure?.startTick ?? 0);
   }
 
-  playFromTick(tick: number): void {
+  playFromTick(
+    tick: number,
+    countInPolicy: CountInPolicy = 'inherit',
+    preserveLoopRestarting = false,
+  ): void {
     if (!this.chart || !this.audioPlayer) {
       return;
+    }
+
+    // A fresh explicit start supersedes any pending suppression from a prior
+    // scrub-to-end. Natural restarts clear the flag before arriving here.
+    this.suppressNextLoopCompletion = false;
+
+    if (!preserveLoopRestarting) {
+      this.loopRestarting = false;
     }
 
     this.playGeneration += 1;
@@ -222,6 +246,7 @@ export class Transport {
 
     this.clearScheduling();
     this.audioPlayer.stop();
+    this.onSeekStartCb();
 
     const startTime = this.tickToTime(tick);
 
@@ -229,7 +254,7 @@ export class Transport {
     this.onSeekCb(tick);
     this.nextBeatIndex = this.firstBeatIndexAtOrAfter(startTime);
 
-    void this.beginPlayback(tick, startTime, generation);
+    void this.beginPlayback(tick, startTime, generation, countInPolicy);
   }
 
   private get playbackSpeed(): number {
@@ -244,6 +269,7 @@ export class Transport {
     tick: number,
     startTime: number,
     generation: number,
+    countInPolicy: CountInPolicy,
   ): Promise<void> {
     if (!this.chart || !this.audioPlayer || !this.clickTrack) {
       return;
@@ -259,7 +285,11 @@ export class Transport {
       return;
     }
 
-    if (!this.countInEnabled) {
+    const shouldCountIn =
+      countInPolicy === 'force' ||
+      (countInPolicy === 'inherit' && this.countInEnabled);
+
+    if (!shouldCountIn) {
       this.songStartCtx = ctx.currentTime;
       this.clickTrack.cancelGain();
       this.clickTrack.setGain(this.clickVolume);
@@ -337,8 +367,14 @@ export class Transport {
     const wasActive = this.state === 'playing' || this.state === 'counting-in';
 
     this.clearScheduling();
+    this.onSeekStartCb();
     this.setPosition(seconds);
     this.nextBeatIndex = this.firstBeatIndexAtOrAfter(seconds);
+    this.suppressNextLoopCompletion = Boolean(
+      wasActive &&
+        this.loopRegion &&
+        seconds >= this.tickToTime(this.loopRegion.endTick),
+    );
 
     if (this.chart) {
       this.onSeekCb(
@@ -488,7 +524,13 @@ export class Transport {
     }
 
     this.loopRestarting = true;
-    this.playFromTick(this.loopRegion.startTick);
+
+    if (!this.suppressNextLoopCompletion) {
+      this.onLoopRestartCb();
+    }
+
+    this.suppressNextLoopCompletion = false;
+    this.playFromTick(this.loopRegion.startTick, 'inherit', true);
   }
 
   private scheduleClicks(): void {
@@ -572,6 +614,7 @@ export class Transport {
       isStarted: this.isStarted,
       isEnded: this.state === 'ended',
       countInBeat: this.countIn?.beat,
+      countInBeats: this.countIn?.totalBeats,
       countInBeatMs: this.countIn?.beatMs,
       isReady: this.audioPlayer !== undefined,
       duration: this.audioPlayer?.duration ?? 0,

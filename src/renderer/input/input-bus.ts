@@ -1,7 +1,14 @@
-import { InputDevice, InputEvent, InputSource } from './types';
+import {
+  InputDevice,
+  InputEvent,
+  InputSource,
+  RawMidiInputEvent,
+} from './types';
 
 export class InputBus {
+  private priorityListeners = new Set<(event: InputEvent) => void>();
   private listeners = new Set<(event: InputEvent) => void>();
+  private rawMidiListeners = new Set<(event: RawMidiInputEvent) => void>();
   private stops: (() => void)[] = [];
   private captureListener?: (event: InputEvent) => void;
 
@@ -19,10 +26,17 @@ export class InputBus {
         return;
       }
 
+      // Gesture candidates observe first so Engine can open a short evidence
+      // transaction before the same physical strike reaches Judge. Normal
+      // listeners still receive the exact event synchronously afterward.
+      this.priorityListeners.forEach((listener) => listener(event));
       this.listeners.forEach((listener) => listener(event));
     };
+    const emitRawMidi = (event: RawMidiInputEvent) => {
+      this.rawMidiListeners.forEach((listener) => listener(event));
+    };
 
-    this.stops = this.sources.map((source) => source.start(emit));
+    this.stops = this.sources.map((source) => source.start(emit, emitRawMidi));
   }
 
   stop(): void {
@@ -35,6 +49,24 @@ export class InputBus {
 
     return () => {
       this.listeners.delete(listener);
+    };
+  };
+
+  subscribePriority = (listener: (event: InputEvent) => void): (() => void) => {
+    this.priorityListeners.add(listener);
+
+    return () => {
+      this.priorityListeners.delete(listener);
+    };
+  };
+
+  subscribeRawMidi = (
+    listener: (event: RawMidiInputEvent) => void,
+  ): (() => void) => {
+    this.rawMidiListeners.add(listener);
+
+    return () => {
+      this.rawMidiListeners.delete(listener);
     };
   };
 

@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { Stave } from 'vexflow';
 import {
   dedupedTempoLabels,
+  FLOW_MIN_MEASURE_WIDTH,
   packRows,
   renderMusic,
   TARGET_ROW_WIDTH,
@@ -63,6 +64,7 @@ function render(
   showBarNumbers?: boolean,
   enableColors?: boolean,
   showTempo?: boolean,
+  layout?: 'classic' | 'flow',
 ) {
   return renderMusic(
     target.current ?? undefined,
@@ -71,6 +73,7 @@ function render(
     showBarNumbers,
     enableColors,
     showTempo,
+    layout,
   );
 }
 
@@ -191,6 +194,62 @@ describe('renderMusic', () => {
     expect(data[2].stave.getX()).toBe(0);
   });
 
+  it('lays every measure on one continuous system in Flow layout', () => {
+    const div = container();
+    const measures = Array.from({ length: 4 }, (_, index) =>
+      measure(quarters, { hasClef: index === 0, sigChange: index === 0 }),
+    );
+    const data = render(ref(div), song(measures), true, true, true, 'flow');
+
+    expect(data.map(({ yOffset }) => yOffset)).toEqual([0, 0, 0, 0]);
+    expect(data[0].stave.getX()).toBe(0);
+    expect(data[3].stave.getX()).toBeGreaterThan(data[2].stave.getX());
+    expect(div.children).toHaveLength(1);
+  });
+
+  it('keeps every Flow bar at kit-distance reading density', () => {
+    const div = container();
+    const measures = Array.from({ length: 4 }, (_, index) =>
+      measure(quarters, { hasClef: index === 0, sigChange: index === 0 }),
+    );
+    const data = render(ref(div), song(measures), true, true, true, 'flow');
+
+    data.forEach(({ stave }) => {
+      expect(stave.getWidth()).toBeGreaterThanOrEqual(FLOW_MIN_MEASURE_WIDTH);
+    });
+    expect(data[1].stave.getX() - data[0].stave.getX()).toBeGreaterThanOrEqual(
+      FLOW_MIN_MEASURE_WIDTH,
+    );
+  });
+
+  it('keeps every notehead attached when Classic wraps to later systems', () => {
+    const div = container();
+    const measures = Array.from({ length: 5 }, (_, index) =>
+      measure(quarters, {
+        startTick: index * 768,
+        endTick: (index + 1) * 768,
+        hasClef: index === 0,
+        sigChange: index === 0,
+      }),
+    );
+    const data = render(ref(div), song(measures), true, true, true, 'classic');
+    const renderedHeads = data.flatMap(({ renderedNotes }) =>
+      renderedNotes.flatMap(({ note: renderedNote }) =>
+        renderedNote.noteHeads
+          .map((head) => head.getSVGElement())
+          .filter((element): element is SVGElement => Boolean(element)),
+      ),
+    );
+
+    expect(new Set(data.map(({ yOffset }) => yOffset)).size).toBeGreaterThan(1);
+    expect(renderedHeads).toHaveLength(measures.length * quarters.length);
+    renderedHeads.forEach((head) => {
+      expect(head.isConnected).toBe(true);
+      expect(head.classList).not.toContain('vf-note-hidden');
+      expect(head.hasAttribute('hidden')).toBe(false);
+    });
+  });
+
   it('colours note heads with the per-drum colour when enabled', () => {
     const div = container();
 
@@ -269,6 +328,37 @@ describe('renderMusic', () => {
 
     expect(plain.querySelectorAll('.vf-accent')).toHaveLength(0);
     expect(accented.querySelectorAll('.vf-accent')).toHaveLength(1);
+  });
+
+  it('marks notation glyphs for the delayed score glossary', () => {
+    const div = container();
+
+    render(
+      ref(div),
+      song([
+        measure([
+          note({
+            notes: ['c/5'],
+            duration: '32',
+            dots: 1,
+            accents: ['c/5'],
+          }),
+        ]),
+      ]),
+      true,
+      true,
+    );
+
+    expect(div.querySelector('[data-notation-kinds~="dot"]')).not.toBeNull();
+    expect(
+      div.querySelector('[data-notation-kinds~="triple-beam"]'),
+    ).not.toBeNull();
+    expect(
+      div.querySelector('[data-notation-kind="colored-head"]'),
+    ).not.toBeNull();
+    expect(
+      div.querySelector('.vf-accent[data-notation-kind="accent"]'),
+    ).not.toBeNull();
   });
 
   it('puts the accent of a lone note above the staff', () => {

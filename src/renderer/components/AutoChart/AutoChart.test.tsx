@@ -128,7 +128,7 @@ describe('AutoChart', () => {
       'Downloading audio',
     );
     expect(screen.getByTestId('auto-chart-progress')).toHaveTextContent(
-      'SightKick',
+      'Drumroll',
     );
     expect(screen.getByTestId('auto-chart-steps')).toHaveTextContent(
       'Download audio',
@@ -400,7 +400,7 @@ describe('AutoChart', () => {
       attempt: 1,
       stage: 'queued',
       backend: 'sightkick',
-      message: 'Chart queued for SightKick processing',
+      message: 'Chart queued for Drumroll processing',
       sourceName: 'Queued song 1',
       youtubeUrl: 'https://www.youtube.com/watch?v=queuedqueue1',
     };
@@ -409,7 +409,7 @@ describe('AutoChart', () => {
       attempt: 1,
       stage: 'queued',
       backend: 'sightkick',
-      message: 'Chart queued for SightKick processing',
+      message: 'Chart queued for Drumroll processing',
       sourceName: 'Queued song 2',
       youtubeUrl: 'https://www.youtube.com/watch?v=queuedqueue2',
     };
@@ -482,7 +482,7 @@ describe('AutoChart', () => {
       attempt: 1,
       stage: 'queued',
       backend: 'sightkick',
-      message: 'Chart queued for SightKick processing',
+      message: 'Chart queued for Drumroll processing',
       sourceName: 'Other song',
     };
 

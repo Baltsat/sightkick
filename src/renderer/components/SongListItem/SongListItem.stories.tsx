@@ -72,6 +72,15 @@ export const AutoCharted: Story = {
 
 export const Focused: Story = { args: { focused: true } };
 
+export const Previewing: Story = {
+  args: {
+    preview: {
+      songId: 'song-1',
+      label: 'Drum peak · bars 13–18',
+    },
+  },
+};
+
 export const Online: Story = { args: { songData: onlineSongData } };
 
 export const Downloading: Story = {

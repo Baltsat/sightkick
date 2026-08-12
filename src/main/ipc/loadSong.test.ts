@@ -95,4 +95,33 @@ describe('loadSong', () => {
 
     expect(payload.error).toContain('ENOENT');
   });
+
+  it('blocks a source-linked chart without the complete playable certificate', () => {
+    fs.writeFileSync(path.join(dir, 'notes.mid'), 'MIDI-BYTES');
+    storeHolder.current = makeStore({
+      songs: {
+        abc: {
+          id: 'abc',
+          dir,
+          format: 'mid',
+          sk_source_provider: 'yandex-music',
+          sk_source_collection_id: 'drums',
+          sk_source_collection_name: 'Drums',
+          sk_source_track_id: 'yandex:drums:3',
+          sk_source_title: 'Loyal',
+          sk_source_artists: '["ODESZA"]',
+          sk_source_duration: '208',
+        },
+      },
+    });
+
+    const event = makeEvent();
+
+    loadSong(event as never, 'abc');
+
+    expect(lastReply(event, 'load-song')!.args[0]).toEqual({
+      error:
+        'Song is not playable until identity, lawful audio, chart review, scan-chart, and launch proof are complete',
+    });
+  });
 });

@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { appState } from '../AppState';
 import { toSong } from '../util';
+import { validateSourceSongForLaunch } from '../playability';
 
 export function loadSong(event: Electron.IpcMainEvent, id: string) {
   try {
@@ -13,6 +14,8 @@ export function loadSong(event: Electron.IpcMainEvent, id: string) {
     if (!songData) {
       throw new Error(`Song "${id}" not found`);
     }
+
+    validateSourceSongForLaunch(songData);
 
     const notesFile = path.join(
       songData.dir,

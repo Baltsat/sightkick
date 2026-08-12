@@ -147,6 +147,7 @@ private deriveMisses(): HitRecord[] {
    other behavior changes.
 
 3. **`engine/engine.ts`**:
+
    - `import { HitRecord, summarizeRun } from '../practice-stats';` and
      `import { KEY_TO_ELEMENT } from './constants';`
    - add `private runRecords: HitRecord[] = [];`
@@ -204,3 +205,28 @@ last run as `summary` and `computeRunsTrend(runs)` as `trend`, render
 `<PracticeStats variant="panel" summary={summary} trend={trend} />`. Which
 menu/route triggers it is a UI-ownership decision for whoever owns
 `SongMenu`/`SongListItem`, not specified further here.
+
+## Interrupted-attempt recovery (local only)
+
+`practiceAttemptCheckpoints` is deliberately **not** part of the completed
+`practiceRuns` history. It holds at most three latest, compact in-progress
+attempts per song so a crash, power loss, or an unplanned break does not
+silently discard already-scored MIDI evidence. A checkpoint has
+`state: 'in-progress'`, a stable `sessionId`, chart revision, current tick,
+and compact observed `HitRecord`s — never a synthesized `RunSummary`.
+
+`src/renderer/hooks/usePracticeAttemptCheckpoint.ts` owns the bounded
+autosave contract. Once a run has real start intent, wire it with a seed that
+reads the current session identity and position, plus `engine` as its evidence
+source. It writes immediately, every four seconds, and again on
+`visibilitychange`, `pagehide`, and unmount. This is deliberately a snapshot
+write rather than a MIDI-event write, keeping persistence cheap during dense
+patterns.
+
+For a natural completion, prefer the atomic path: include
+`finalizeAttemptSessionId: sessionId` in the ordinary `save-practice-run`
+payload. The main process commits the completed summary and removes only that
+draft in one store snapshot. `checkpoint.finalize()` remains an idempotent
+fallback for an already-acknowledged legacy completion path. If the completion
+save fails, do not finalize — the recovery draft remains available and is still
+not counted as a completed performance.

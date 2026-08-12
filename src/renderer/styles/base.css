@@ -14,11 +14,33 @@
   }
 }
 
+/* Daily-goal-crossed celebration - a single calm pulse, not a loop.
+   Neutralized automatically by the prefers-reduced-motion rule below. */
+@keyframes sk-goal-celebrate {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.18);
+  }
+  60% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.sk-goal-celebrate {
+  animation: sk-goal-celebrate 0.6s ease-out 1;
+}
+
 body {
   height: 100vh;
   padding: 0;
   margin: 0;
-  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-family:
+    'Instrument Sans Variable', 'Instrument Sans', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -50,14 +72,14 @@ button,
 }
 
 ::-webkit-scrollbar-track {
-  background: #141517;
-  border: 1px solid #232428;
+  background: var(--color-paper);
+  border: 1px solid var(--color-border-soft);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgb(17 23 34 / 18%);
   border-radius: 999px;
-  border: 2px solid #16140f;
+  border: 2px solid var(--color-paper);
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -65,7 +87,7 @@ button,
 }
 
 ::-webkit-scrollbar-corner {
-  background: #141517;
+  background: var(--color-paper);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -76,5 +98,577 @@ button,
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* === StreakMeter (in-play streak/rage HUD) ==============================
+   Escalating "fire ramp" (amber -> orange -> red -> white-hot) driven by
+   `data-tier` on `.sk-streak-meter` (see StreakMeter.tsx / the streak
+   stage ladder in services/streak/constants.ts). tier -1 is the baseline
+   before the first stage threshold - just a plain counter, no glow.
+
+   Every animation-duration here already collapses to 0.01ms under the
+   global prefers-reduced-motion rule above, which is enough on its own
+   for the pulse/flicker/announce/shatter keyframes (they become
+   effectively instant colour/text changes). The particle layer gets an
+   explicit `display: none` on top of that: an instant flash of moving
+   dots is still motion, not the "static colour/name changes only" this
+   feature promises reduced-motion users. */
+
+@keyframes sk-streak-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes sk-streak-flicker {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  45% {
+    filter: brightness(1.25);
+  }
+  55% {
+    filter: brightness(0.92);
+  }
+  70% {
+    filter: brightness(1.12);
+  }
+}
+
+@keyframes sk-streak-announce {
+  0% {
+    transform: translateY(-3px) scale(0.82);
+    opacity: 0;
+  }
+  16% {
+    transform: translateY(0) scale(1.08);
+    opacity: 1;
+  }
+  28% {
+    transform: scale(1);
+  }
+  76% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-4px) scale(0.92);
+    opacity: 0;
+  }
+}
+
+@keyframes sk-streak-shatter {
+  0% {
+    transform: scale(1);
+    filter: brightness(1.7) saturate(1.3);
+  }
+  35% {
+    transform: scale(0.86) rotate(-1.5deg);
+    filter: brightness(0.55) saturate(0.7);
+  }
+  65% {
+    transform: scale(1.02) rotate(0.5deg);
+    filter: brightness(1);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1);
+  }
+}
+
+@keyframes sk-streak-particle {
+  0% {
+    transform: translate(0, 0) scale(0.7);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(var(--sk-particle-x, 0), var(--sk-particle-y, -18px))
+      scale(0);
+    opacity: 0;
+  }
+}
+
+.sk-streak-meter {
+  --sk-streak-glow: transparent;
+  --sk-streak-glow-size: 0px;
+  --sk-streak-ink: var(--color-text-faint);
+  --sk-streak-pulse-duration: 2.4s;
+  color: var(--sk-streak-ink);
+  background: var(--color-surface-raised);
+  box-shadow: 0 0 var(--sk-streak-glow-size) var(--sk-streak-glow);
+  transition:
+    color 0.25s ease-out,
+    box-shadow 0.25s ease-out,
+    background 0.25s ease-out;
+}
+
+.sk-streak-meter.sk-streak-pulse {
+  animation: sk-streak-pulse var(--sk-streak-pulse-duration) ease-in-out 1;
+}
+
+.sk-streak-meter.sk-streak-shatter {
+  animation: sk-streak-shatter 0.42s ease-out 1;
+}
+
+.sk-streak-meter[data-tier='0'] {
+  --sk-streak-glow: color-mix(in srgb, var(--color-yellow) 55%, transparent);
+  --sk-streak-glow-size: 6px;
+  --sk-streak-ink: var(--color-yellow);
+  --sk-streak-pulse-duration: 2.6s;
+}
+
+.sk-streak-meter[data-tier='1'] {
+  --sk-streak-glow: color-mix(in srgb, var(--color-yellow) 65%, transparent);
+  --sk-streak-glow-size: 9px;
+  --sk-streak-ink: var(--color-yellow);
+  --sk-streak-pulse-duration: 2.3s;
+}
+
+.sk-streak-meter[data-tier='2'] {
+  --sk-streak-glow: color-mix(in srgb, var(--color-orange) 65%, transparent);
+  --sk-streak-glow-size: 12px;
+  --sk-streak-ink: var(--color-orange);
+  --sk-streak-pulse-duration: 2s;
+}
+
+.sk-streak-meter[data-tier='3'] {
+  --sk-streak-glow: color-mix(in srgb, var(--color-orange) 78%, transparent);
+  --sk-streak-glow-size: 16px;
+  --sk-streak-ink: var(--color-orange);
+  --sk-streak-pulse-duration: 1.7s;
+}
+
+.sk-streak-meter[data-tier='4'] {
+  --sk-streak-glow: color-mix(
+    in srgb,
+    var(--color-accent-bright) 78%,
+    transparent
+  );
+  --sk-streak-glow-size: 20px;
+  --sk-streak-ink: var(--color-accent-bright);
+  --sk-streak-pulse-duration: 1.5s;
+}
+
+.sk-streak-meter[data-tier='5'] {
+  --sk-streak-glow: color-mix(in srgb, var(--color-red) 80%, transparent);
+  --sk-streak-glow-size: 26px;
+  --sk-streak-ink: #ffd9c4;
+  --sk-streak-pulse-duration: 1.3s;
+}
+
+.sk-streak-meter[data-tier='6'] {
+  --sk-streak-glow: color-mix(in srgb, var(--color-red) 88%, transparent);
+  --sk-streak-glow-size: 32px;
+  --sk-streak-ink: #fff4e8;
+  --sk-streak-pulse-duration: 1.1s;
+}
+
+.sk-streak-meter[data-tier='6'].sk-streak-pulse {
+  animation-name: sk-streak-pulse, sk-streak-flicker;
+  animation-duration: var(--sk-streak-pulse-duration), 1.4s;
+  animation-timing-function: ease-in-out, ease-in-out;
+  animation-iteration-count: 1, 1;
+}
+
+.sk-streak-meter[data-tier='7'] {
+  --sk-streak-glow: color-mix(in srgb, #ffffff 55%, var(--color-red) 45%);
+  --sk-streak-glow-size: 38px;
+  --sk-streak-ink: #ffffff;
+  --sk-streak-pulse-duration: 0.95s;
+}
+
+.sk-streak-meter[data-tier='7'].sk-streak-pulse,
+.sk-streak-meter[data-tier='8'].sk-streak-pulse,
+.sk-streak-meter[data-tier='9'].sk-streak-pulse {
+  animation-name: sk-streak-pulse, sk-streak-flicker;
+  animation-duration: var(--sk-streak-pulse-duration), 1.1s;
+  animation-timing-function: ease-in-out, ease-in-out;
+  animation-iteration-count: 1, 1;
+}
+
+.sk-streak-meter[data-tier='8'] {
+  --sk-streak-glow: color-mix(
+    in srgb,
+    #ffffff 70%,
+    var(--color-accent-bright) 30%
+  );
+  --sk-streak-glow-size: 46px;
+  --sk-streak-ink: #ffffff;
+  --sk-streak-pulse-duration: 0.8s;
+}
+
+.sk-streak-meter[data-tier='9'] {
+  --sk-streak-glow: #ffffff;
+  --sk-streak-glow-size: 56px;
+  --sk-streak-ink: #ffffff;
+  --sk-streak-pulse-duration: 0.65s;
+  background: color-mix(
+    in srgb,
+    var(--color-red) 22%,
+    var(--color-surface-raised)
+  );
+}
+
+.sk-streak-particles {
+  position: relative;
+  display: inline-flex;
+  width: 0;
+  height: 0;
+}
+
+.sk-streak-particle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--sk-streak-ink, #fff);
+  animation: sk-streak-particle 1.1s ease-out 1;
+}
+
+.sk-streak-particle:nth-child(1) {
+  --sk-particle-x: 16px;
+  --sk-particle-y: -14px;
+  animation-delay: 0ms;
+}
+.sk-streak-particle:nth-child(2) {
+  --sk-particle-x: -18px;
+  --sk-particle-y: -10px;
+  animation-delay: 130ms;
+}
+.sk-streak-particle:nth-child(3) {
+  --sk-particle-x: 10px;
+  --sk-particle-y: 18px;
+  animation-delay: 260ms;
+}
+.sk-streak-particle:nth-child(4) {
+  --sk-particle-x: -12px;
+  --sk-particle-y: 16px;
+  animation-delay: 390ms;
+}
+.sk-streak-particle:nth-child(5) {
+  --sk-particle-x: 22px;
+  --sk-particle-y: 4px;
+  animation-delay: 520ms;
+}
+.sk-streak-particle:nth-child(6) {
+  --sk-particle-x: -22px;
+  --sk-particle-y: -4px;
+  animation-delay: 650ms;
+}
+
+.sk-streak-announce-text {
+  font-family: var(--font-display);
+  /* Deliberately sized to read as a big, unmistakable flash while still
+     fitting within the pill's own footprint once centered over it (see
+     StreakMeter.tsx) - it must never grow large enough to reach the sheet
+     music below. */
+  font-size: 1.85rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: var(--sk-streak-ink, #fff);
+  text-shadow:
+    0 0 12px var(--sk-streak-glow, transparent),
+    0 0 32px var(--sk-streak-glow, transparent);
+  opacity: 0;
+}
+
+.sk-streak-announce-text[data-tier='0'],
+.sk-streak-announce-text[data-tier='1'] {
+  --sk-streak-ink: var(--color-yellow);
+  --sk-streak-glow: color-mix(in srgb, var(--color-yellow) 60%, transparent);
+}
+.sk-streak-announce-text[data-tier='2'],
+.sk-streak-announce-text[data-tier='3'] {
+  --sk-streak-ink: var(--color-orange);
+  --sk-streak-glow: color-mix(in srgb, var(--color-orange) 70%, transparent);
+}
+.sk-streak-announce-text[data-tier='4'],
+.sk-streak-announce-text[data-tier='5'] {
+  --sk-streak-ink: #ffd9c4;
+  --sk-streak-glow: color-mix(in srgb, var(--color-red) 75%, transparent);
+}
+.sk-streak-announce-text[data-tier='6'],
+.sk-streak-announce-text[data-tier='7'] {
+  --sk-streak-ink: #fff4e8;
+  --sk-streak-glow: color-mix(in srgb, var(--color-red) 85%, transparent);
+}
+.sk-streak-announce-text[data-tier='8'],
+.sk-streak-announce-text[data-tier='9'] {
+  --sk-streak-ink: #ffffff;
+  --sk-streak-glow: #ffffff;
+}
+
+.sk-streak-announce-text.sk-streak-announce {
+  animation: sk-streak-announce 0.75s cubic-bezier(0.2, 0.8, 0.2, 1) 1;
+  animation-fill-mode: forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-streak-particles {
+    display: none;
+  }
+}
+
+/* Borderless in-play streak VFX. The title is the reward; the smaller count
+   follows as proof. No pill, panel, or field wash competes with notation. */
+@keyframes sk-streak-title-first {
+  from {
+    transform: translateY(0.35rem) scale(0.92);
+    filter: blur(6px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+    opacity: 1;
+  }
+}
+
+@keyframes sk-streak-proof-follow {
+  from {
+    transform: translateY(0.25rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes sk-streak-hit-proof {
+  0% {
+    transform: scale(0.96);
+    filter: brightness(1.7);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes sk-streak-energy-strike {
+  0% {
+    transform: translate(-50%, -50%) scaleX(0.12) scaleY(0.6);
+    opacity: 0;
+  }
+  35% {
+    transform: translate(-50%, -50%) scaleX(1.12) scaleY(1.06);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-50%, -50%) scaleX(0.8) scaleY(0.8);
+    opacity: 0.28;
+  }
+}
+
+.sk-streak-meter {
+  position: relative;
+  display: grid;
+  min-width: clamp(13rem, 24vw, 21rem);
+  min-height: 4.4rem;
+  place-items: center;
+  align-content: center;
+  padding: 0.15rem 2.2rem;
+  border: 0 !important;
+  color: var(--sk-streak-ink);
+  background: transparent !important;
+  box-shadow: none !important;
+  isolation: isolate;
+}
+
+.sk-streak-meter::before,
+.sk-streak-meter::after,
+.sk-streak-energy {
+  position: absolute;
+  z-index: -1;
+  content: '';
+  pointer-events: none;
+}
+
+.sk-streak-meter::before {
+  top: 52%;
+  left: 50%;
+  width: calc(7rem + var(--sk-streak-glow-size));
+  height: 0.12rem;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--sk-streak-ink),
+    transparent
+  );
+  filter: blur(1px);
+  opacity: 0.34;
+}
+
+.sk-streak-meter::after {
+  top: 50%;
+  left: 50%;
+  width: calc(4.5rem + var(--sk-streak-glow-size));
+  aspect-ratio: 2.4;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, var(--sk-streak-glow), transparent 70%);
+  filter: blur(8px);
+  opacity: 0.52;
+}
+
+.sk-streak-energy {
+  top: 50%;
+  left: 50%;
+  width: calc(8rem + var(--sk-streak-glow-size));
+  height: calc(2.6rem + var(--sk-streak-glow-size));
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: conic-gradient(
+    from 88deg,
+    transparent 0 20%,
+    var(--sk-streak-glow) 32%,
+    transparent 45% 62%,
+    color-mix(in srgb, var(--sk-streak-ink) 52%, transparent) 73%,
+    transparent 86%
+  );
+  filter: blur(8px);
+  opacity: 0.28;
+}
+
+.sk-streak-title {
+  max-width: 16ch;
+  color: var(--sk-streak-ink);
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2.25vw, 2rem);
+  font-weight: 720;
+  line-height: 0.9;
+  letter-spacing: -0.035em;
+  text-align: center;
+  text-shadow:
+    0 2px 8px rgb(17 23 34 / 18%),
+    0 0 var(--sk-streak-glow-size) var(--sk-streak-glow);
+}
+
+.sk-streak-proof,
+.sk-streak-best {
+  color: color-mix(in srgb, var(--sk-streak-ink) 76%, var(--color-ink));
+  font-family: var(--font-ui);
+  font-size: 0.65rem;
+  font-weight: 760;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sk-streak-proof {
+  margin-top: 0.35rem;
+  animation: sk-streak-hit-proof 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sk-streak-proof b {
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.sk-streak-best {
+  margin-top: 0.22rem;
+  color: var(--color-text-faint);
+  font-size: 0.55rem;
+}
+
+.sk-streak-meter.sk-streak-pulse,
+.sk-streak-meter[data-tier].sk-streak-pulse {
+  animation: none;
+}
+
+.sk-streak-meter.sk-streak-tier-up .sk-streak-title {
+  animation: sk-streak-title-first 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sk-streak-meter.sk-streak-tier-up .sk-streak-proof {
+  animation: sk-streak-proof-follow 360ms 120ms cubic-bezier(0.16, 1, 0.3, 1)
+    both;
+}
+
+.sk-streak-meter.sk-streak-tier-up .sk-streak-energy {
+  animation: sk-streak-energy-strike 780ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sk-streak-meter[data-tier='-1'] {
+  --sk-streak-ink: var(--color-ink-soft);
+}
+
+.sk-streak-meter[data-tier='-1']::after,
+.sk-streak-meter[data-tier='-1'] .sk-streak-energy {
+  display: none;
+}
+
+/* The notation surface is warm and light, so late tiers stay dark enough to
+   read while their surrounding energy becomes brighter and more chromatic. */
+.sk-streak-meter[data-tier='5'] {
+  --sk-streak-ink: #a83a2e;
+}
+
+.sk-streak-meter[data-tier='6'] {
+  --sk-streak-ink: #972f4b;
+}
+
+.sk-streak-meter[data-tier='7'] {
+  --sk-streak-ink: #782d62;
+}
+
+.sk-streak-meter[data-tier='8'] {
+  --sk-streak-ink: #572b70;
+}
+
+.sk-streak-meter[data-tier='9'] {
+  --sk-streak-ink: #302154;
+}
+
+.sk-streak-meter[data-tier='7'] .sk-streak-energy,
+.sk-streak-meter[data-tier='8'] .sk-streak-energy,
+.sk-streak-meter[data-tier='9'] .sk-streak-energy {
+  filter: blur(6px) saturate(1.4);
+  opacity: 0.82;
+}
+
+.sk-streak-meter[data-tier='9']::before {
+  height: 0.22rem;
+  box-shadow:
+    0 -0.5rem 1.2rem #63d5ff,
+    0 0.5rem 1.2rem #ff4ca2;
+}
+
+.sk-streak-return {
+  max-width: min(25rem, calc(100vw - 2rem));
+  padding: 0.38rem 0.72rem;
+  border: 1px solid
+    color-mix(in srgb, var(--signal-ember) 32%, var(--line-soft));
+  border-radius: 999px;
+  color: var(--ink-muted);
+  background: color-mix(in srgb, var(--surface-raised) 90%, transparent);
+  box-shadow: 0 8px 18px -16px rgb(17 23 34 / 45%);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 720;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-streak-meter.sk-streak-tier-up .sk-streak-title,
+  .sk-streak-meter.sk-streak-tier-up .sk-streak-proof,
+  .sk-streak-meter.sk-streak-tier-up .sk-streak-energy,
+  .sk-streak-proof {
+    animation: none;
   }
 }

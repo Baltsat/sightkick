@@ -107,16 +107,19 @@ async function runRescan(event: IpcMainEvent, newDir: boolean) {
     },
     {} as StorageSchema['songs'],
   );
+  const mergedSongs = { ...otherSongs, ...rescannedSongs };
 
-  appState.store.set('songs', { ...otherSongs, ...rescannedSongs });
+  appState.store.set('songs', mergedSongs);
 
   event.reply('rescan-songs', {
-    songs: Object.values(rescannedSongs).map((s) =>
-      toSong({
-        ...s,
-        updatedAt: fs.statSync(s.dir).mtime.toISOString(),
-      }),
-    ),
+    songs: Object.values(mergedSongs)
+      .filter((song) => fs.existsSync(song.dir))
+      .map((song) =>
+        toSong({
+          ...song,
+          updatedAt: fs.statSync(song.dir).mtime.toISOString(),
+        }),
+      ),
     lastOpenedPath: selectedPath,
   });
 }

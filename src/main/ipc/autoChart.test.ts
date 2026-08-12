@@ -1,7 +1,25 @@
 import fs from 'fs';
+import ini from 'ini';
 import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// None of the existing tests below exercise real app.*/dialog.* (every
+// path that would is overridden through the AutoChartQueue's injected
+// dependencies); nativeImage is the only part of 'electron' actually
+// invoked at runtime here, via applyOfficialMetadata -> ingestSongCover
+// for the iTunes-cover integration test below. Mirrors songCover.test.ts's
+// mock shape.
+vi.mock('electron', () => ({
+  nativeImage: {
+    createFromBuffer: vi.fn(() => ({
+      isEmpty: () => false,
+      toJPEG: () => Buffer.from('jpeg'),
+      toDataURL: () => 'data:image/jpeg;base64,cHJldmlldw==',
+    })),
+  },
+}));
+
 import {
   AutoChartQueue,
   AutoChartRunner,
@@ -11,6 +29,7 @@ import {
   applyOfficialMetadata,
   canonicalizeYoutubeUrl,
   createSkEventReader,
+  drumrollFfmpegRuntimeCandidates,
   fetchOfficialYoutubeMetadata,
   parseSkEventLine,
   parseWorkerLine,
@@ -66,6 +85,11 @@ function latestJob(event: ReturnType<typeof makeEvent>) {
     error?: string;
     preview?: { sourceDir: string };
     youtubeUrl?: string;
+    sourceProvenance?: {
+      provider: string;
+      collectionId: string;
+      trackId: string;
+    };
     jobs?: { id: string; stage: string; youtubeUrl?: string }[];
   };
 }
@@ -152,6 +176,7 @@ function createHarness(options: HarnessOptions = {}) {
       return { kill: run.kill, done };
     },
   };
+  const applyMetadata = vi.fn(async () => {});
   const queue = new AutoChartQueue({
     selectAudio: async () => {
       selectAudioCalls += 1;
@@ -174,7 +199,7 @@ function createHarness(options: HarnessOptions = {}) {
     preflightSightkick: () => {
       if (!backends.sightkick) {
         throw new Error(
-          'The bundled SightKick transcriber is missing; reinstall SightKick or switch to the OCTAVE backend',
+          'The bundled Drumroll transcriber is missing; reinstall Drumroll or switch to the OCTAVE backend',
         );
       }
 
@@ -198,7 +223,7 @@ function createHarness(options: HarnessOptions = {}) {
         await fs.promises.rm(tempDir, { recursive: true, force: true });
       }
     },
-    applyMetadata: async () => {},
+    applyMetadata,
     makeId: () => `job-${++jobIndex}`,
   } as never);
   const completeOctave = async (run: OctaveRun) => {
@@ -226,6 +251,7 @@ function createHarness(options: HarnessOptions = {}) {
     remoteRuns,
     queue,
     importSong,
+    applyMetadata,
     completeOctave,
     get selectAudioCalls() {
       return selectAudioCalls;
@@ -354,6 +380,105 @@ describe('auto-chart source and worker protocol', () => {
     );
   });
 
+  it('persists reviewed source provenance in schema-compatible song metadata', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auto-chart-source-'));
+
+    cleanup.push(root);
+    fs.writeFileSync(
+      path.join(root, 'song.ini'),
+      '[song]\nname = generated filename\nartist = Unknown Artist\n',
+    );
+
+    await applyOfficialMetadata(root, undefined, {
+      provider: 'yandex-music',
+      collectionId: 'drums-playlist',
+      collectionName: 'drums',
+      trackId: 'yandex:drums-playlist:2',
+      title: 'Natural Villain',
+      artists: ['Mokita'],
+      sourceUrl: 'https://music.yandex.ru/album/123/track/456',
+    });
+
+    const stored = ini.parse(
+      fs.readFileSync(path.join(root, 'song.ini'), 'utf8'),
+    ).song;
+
+    expect(stored).toMatchObject({
+      name: 'generated filename',
+      artist: 'Unknown Artist',
+      sk_source_provider: 'yandex-music',
+      sk_source_collection_id: 'drums-playlist',
+      sk_source_collection_name: 'drums',
+      sk_source_track_id: 'yandex:drums-playlist:2',
+      sk_source_title: 'Natural Villain',
+      sk_source_artists: '["Mokita"]',
+      sk_source_url: 'https://music.yandex.ru/album/123/track/456',
+    });
+  });
+
+  it('prefers a confident iTunes album cover over the YouTube thumbnail when importing', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auto-chart-cover-'));
+
+    cleanup.push(root);
+    fs.writeFileSync(
+      path.join(root, 'song.ini'),
+      '[song]\nname = generated filename\nartist = Unknown Artist\n',
+    );
+
+    const requestedUrls: string[] = [];
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL) => {
+        const url = input.toString();
+
+        requestedUrls.push(url);
+
+        if (url.startsWith('https://itunes.apple.com/search')) {
+          return {
+            ok: true,
+            status: 200,
+            url,
+            json: async () => ({
+              results: [
+                {
+                  artistName: 'Kygo feat. Kodaline',
+                  trackName: 'Raging',
+                  artworkUrl100:
+                    'https://is1-ssl.mzstatic.com/xx/100x100bb.jpg',
+                },
+              ],
+            }),
+          };
+        }
+
+        return {
+          ok: true,
+          status: 200,
+          url,
+          headers: new Headers({ 'content-type': 'image/jpeg' }),
+          arrayBuffer: async () => Uint8Array.from([9, 9, 9]).buffer,
+        };
+      }),
+    );
+
+    await applyOfficialMetadata(root, {
+      title: 'Kygo - Raging ft. Kodaline (Official Lyric Video)',
+      authorName: 'KygoOfficialVEVO',
+      songName: 'Raging',
+      artistName: 'Kygo feat. Kodaline',
+      thumbnailUrl: 'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg',
+    });
+
+    expect(fs.readFileSync(path.join(root, 'album.jpg'), 'utf-8')).toBe('jpeg');
+    expect(
+      requestedUrls.some((url) => url.startsWith('https://itunes.apple.com')),
+    ).toBe(true);
+    expect(requestedUrls.some((url) => url.includes('i.ytimg.com'))).toBe(
+      false,
+    );
+  });
+
   it('rejects symlinked and unsupported local input', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auto-chart-input-'));
 
@@ -399,7 +524,7 @@ describe('auto-chart source and worker protocol', () => {
         uvPath,
         dataDir: root,
       }),
-    ).toThrow('ffmpeg runtime is missing');
+    ).toThrow('FFmpeg runtime is unavailable');
     expect(() =>
       validateSightkickRuntime({ runnerPath, ffmpegPath, dataDir: root }),
     ).toThrow('uv or Python 3.12+');
@@ -411,6 +536,40 @@ describe('auto-chart source and worker protocol', () => {
         dataDir: root,
       }),
     ).toMatchObject({ runnerPath, ffmpegPath, uvPath, dataDir: root });
+  });
+
+  it('resolves only the packaged or cached Apple Silicon LGPL runtime', () => {
+    expect(
+      drumrollFfmpegRuntimeCandidates({
+        isPackaged: true,
+        resourcesPath: '/Applications/Drumroll.app/Contents/Resources',
+        appPath: '/Applications/Drumroll.app/Contents/Resources/app.asar',
+        platform: 'darwin',
+        architecture: 'arm64',
+      }),
+    ).toEqual([
+      '/Applications/Drumroll.app/Contents/Resources/ffmpeg-runtime/bin/ffmpeg',
+    ]);
+    expect(
+      drumrollFfmpegRuntimeCandidates({
+        isPackaged: false,
+        resourcesPath: '/repo/resources',
+        appPath: '/repo',
+        platform: 'darwin',
+        architecture: 'arm64',
+      }),
+    ).toEqual([
+      '/repo/node_modules/.cache/drumroll-ffmpeg/macos-arm64/bin/ffmpeg',
+    ]);
+    expect(
+      drumrollFfmpegRuntimeCandidates({
+        isPackaged: true,
+        resourcesPath: 'C:\\resources',
+        appPath: 'C:\\app',
+        platform: 'win32',
+        architecture: 'x64',
+      }),
+    ).toEqual([]);
   });
 
   it('parses only structured OCTAVE worker events', () => {
@@ -758,6 +917,88 @@ describe('auto-chart queue — sightkick backend', () => {
       'https://www.youtube.com/watch?v=abcdefghijk',
     );
     expect(latestJob(event)).toMatchObject({ stage: 'downloading' });
+  });
+
+  it('carries reviewed source provenance through the chart preparation boundary', async () => {
+    const sourceRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'auto-chart-audio-'),
+    );
+    const audioPath = writeAudio(sourceRoot, 'local.mp3');
+    const harness = createHarness({
+      audioPaths: [audioPath],
+      backends: { sightkick: true, octave: false },
+    });
+
+    cleanup.push(sourceRoot, harness.root);
+
+    const event = makeEvent();
+    const sourceProvenance = {
+      provider: 'yandex-music' as const,
+      collectionId: 'drums-playlist',
+      collectionName: 'drums',
+      trackId: 'yandex:drums-playlist:2',
+      title: 'Natural Villain',
+      artists: ['Mokita'],
+      durationSeconds: 199,
+      sourceUrl: 'https://music.yandex.ru/album/123/track/456',
+    };
+
+    await harness.queue.create(event as never, {
+      localFile: true,
+      sourceProvenance,
+    });
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+    expect(harness.skRuns[0].input.audioPath).toBe(fs.realpathSync(audioPath));
+
+    const songDir = path.join(harness.skRuns[0].input.tempDir, 'prepared');
+
+    fs.mkdirSync(songDir, { recursive: true });
+    harness.skRuns[0].emit({ kind: 'complete', success: true, songDir });
+
+    await vi.waitFor(() =>
+      expect(latestJob(event)).toMatchObject({
+        stage: 'preview-ready',
+        sourceProvenance,
+      }),
+    );
+    expect(harness.applyMetadata).toHaveBeenCalledOnce();
+    expect(harness.applyMetadata).toHaveBeenCalledWith(
+      fs.realpathSync(songDir),
+      undefined,
+      sourceProvenance,
+    );
+
+    harness.skRuns[0].finish();
+  });
+
+  it('rejects source-linked YouTube requests before any download or audio prompt', async () => {
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+      sourceProvenance: {
+        provider: 'yandex-music',
+        collectionId: 'drums-playlist',
+        collectionName: 'drums',
+        trackId: 'yandex:drums-playlist:2',
+        title: 'Natural Villain',
+        artists: ['Mokita'],
+        durationSeconds: 199,
+      },
+    });
+
+    expect(harness.skRuns).toHaveLength(0);
+    expect(harness.selectAudioCalls).toBe(0);
+    expect(latestJob(event)).toMatchObject({
+      stage: 'failed',
+      error: expect.stringContaining('lawful local audio'),
+    });
   });
 
   it('downloads audio automatically from a pasted YouTube URL without prompting for a local file', async () => {

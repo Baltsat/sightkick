@@ -42,6 +42,7 @@ export async function listenMidi(event: Electron.IpcMainEvent, port: number) {
 
   try {
     input.openPort(port);
+    event.reply('midi-ready', { port });
   } catch (error) {
     input.removeAllListeners('message');
     input.closePort();

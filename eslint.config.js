@@ -73,7 +73,22 @@ module.exports = [
       '**/.eslintcache',
       '**/node_modules',
       '**/.DS_Store',
+      '.claude',
+      '.claude/**',
+      '.codex',
+      '.codex/**',
+      '.entire',
+      '.entire/**',
+      '**/.wrangler/**',
+      '.*-shot.cjs',
+      '.ui-v2-proof.cjs',
+      // Local audit captures and generated bundles are evidence, not source.
+      'scratchpad/**',
+      'tmp/**',
+      'index.js',
       '**/out',
+      'web/dist',
+      'web/public/library',
       '**/storybook-static',
       // Python sidecar project (its own uv-managed venv, vendored JS deps
       // and lockfile) — not part of this Node/Electron workspace's lint.

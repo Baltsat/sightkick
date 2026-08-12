@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 2,
+  "source": "yandex-music",
+  "playlist": {
+    "id": "f37c90e8-ddab-5270-9379-4a72d66e0cac",
+    "name": "Drums",
+    "url": "https://music.yandex.ru/playlists/f37c90e8-ddab-5270-9379-4a72d66e0cac",
+    "capturedOn": "2026-08-10",
+    "capturedAt": "2026-08-09T16:51:54Z",
+    "captureMethod": "authenticated-visible-dom",
+    "captureSurface": "Yandex Music playlist track rows",
+    "metadataScope": "visible title, artist, duration, and stable track link only",
+    "rightsScope": "metadata-only"
+  },
+  "completeness": {
+    "declaredTrackCount": 13,
+    "renderedTrackCount": 13,
+    "stableSourceTrackUrlCount": 11,
+    "noVisibleStableSourceTrackUrlOrdinals": [6, 9],
+    "privateOnlyOrdinals": []
+  },
+  "integrity": {
+    "canonicalization": "canonical-json-v1 (UTF-8; recursively sorted object keys; omit integrity.canonicalSha256)",
+    "canonicalSha256": "90df6466df67ecf3f3351fcfb26a7d797fd7e883a1d541a5abc57953a910a184"
+  },
+  "tracks": [
+    {
+      "ordinal": 1,
+      "title": "Pendant que les champs brûlent",
+      "artists": ["Niagara"],
+      "durationSeconds": 231,
+      "sourceTrackUrl": "https://music.yandex.ru/album/2282/track/26939",
+      "sourceAvailability": "available",
+      "sourceReferenceStatus": "stable-link",
+      "localStatus": "candidate"
+    },
+    {
+      "ordinal": 2,
+      "title": "Natural Villain",
+      "artists": ["The Man Who"],
+      "durationSeconds": 199,
+      "sourceTrackUrl": "https://music.yandex.ru/album/9216633/track/53997819",
+      "sourceAvailability": "available",
+      "sourceReferenceStatus": "stable-link",
+      "localStatus": "candidate"
+    },
+    {
+      "ordinal": 3,
+      "title": "Loyal",
+      "artists": ["ODESZA"],
+      "durationSeconds": 208,
+      "sourceTrackUrl": "https://music.yandex.ru/album/6144560/track/45734852",
+      "sourceAvailability": "available",
+      "sourceReferenceStatus": "stable-link",
+      "localStatus": "candidate"
+    },
+    {
+      "ordinal": 4,
+      "title": "Made To Love",
+      "artists": ["TobyMac"],
+      "durationSeconds": 232,
+      "sourceTrackUrl": "https://music.yandex.ru/album/36571/track/361513",
+      "sourceAvailability": "available",
+      "sourceReferenceStatus": "stable-link",
+      "localStatus": "candidate"
+    },
+    {
+      "ordinal": 5,
+      "title": "Help Is On The Way (Maybe Midnight)",
+      "artists": ["TobyMac"],
+      "durationSeconds": 182,
+      "sourceTrackUrl": "https://music.yandex.ru/album/18520552/track/78012053",
+      "sourceAvailability": "available",
+      "sourceReferenceStatus": "stable-link",
+      "localStatus": "candidate"
+    },
+    {
+      "ordinal": 6,
+      "title": "Heat Waves",
+      "artists": ["Living In Fiction"],
+      "durationSeconds": null,
+      "sourceTrackUrl": null,
+      "sourceAvailability": "unavailable",
+      "sourceReferenceStatus": "not-visible",
+      "localStatus": "reference"
+    },
+    {
+      "ordinal": 7,
+      "title": "What I Like About You",
+      "artists": ["Jonas Blue", "Theresa Rex"],
+      "durationSeconds": 220,
+      "sourceTrackUrl": "https://music.yandex.ru/album/7132272/track/51241736",
+      "sourceAvailability": "available",
+      "sourceReferenceStatus": "stable-link",
+      "localStatus": "candidate"
+    },
+    {
+      "ordinal": 8,
+      "title": "Sanctuary",
+      "artists": ["Welshly Arms"],
+      "durationSeconds": 228,
+      "sourceTrackUrl": "https://music.yandex.ru/album/5408664/track/39859154",
+      "sourceAvailability": "available",
+      "sourceReferenceStatus": "stable-link",
+      "localStatus": "candidate"
+    },
+    {
+      "ordinal": 9,
+      "title": "Wantchya",
+      "artists": ["Ballpoint"],
+      "durationSeconds": null,
+      "sourceTrackUrl": null,
+      "sourceAvailability": "unavailable",
+      "sourceReferenceStatus": "not-visible",
+      "localStatus": "reference"
+    },
+    {
+      "ordinal": 10,
+      "title": "Can’t Use Me",
+      "artists": ["Morray"],
+      "durationSeconds": 170,
+      "sourceTrackUrl": "https://music.yandex.ru/album/15076134/track/81449614",
+      "sourceAvailability": "available",
+      "sourceReferenceStatus": "stable-link",
+      "localStatus": "candidate"
+    },
+    {
+      "ordinal": 11,
+      "title": "UNSTOPPABLE Cover",
+      "artists": ["Sukiwat"],
+      "durationSeconds": 227,
+      "sourceTrackUrl": "https://music.yandex.ru/album/39316110/track/26790968",
+      "sourceAvailability": "available",
+      "sourceReferenceStatus": "stable-link",
+      "localStatus": "candidate"
+    },
+    {
+      "ordinal": 12,
+      "title": "Niten Doraku",
+      "artists": ["Sprnova"],
+      "durationSeconds": 158,
+      "sourceTrackUrl": "https://music.yandex.ru/album/20888392/track/99827756",
+      "sourceAvailability": "available",
+      "sourceReferenceStatus": "stable-link",
+      "localStatus": "candidate"
+    },
+    {
+      "ordinal": 13,
+      "title": "Low",
+      "artists": ["Lenny Kravitz"],
+      "durationSeconds": 319,
+      "sourceTrackUrl": "https://music.yandex.ru/album/5719819/track/41165861",
+      "sourceAvailability": "available",
+      "sourceReferenceStatus": "stable-link",
+      "localStatus": "candidate"
+    }
+  ]
+}

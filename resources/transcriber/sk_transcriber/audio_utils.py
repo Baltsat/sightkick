@@ -43,20 +43,32 @@ def run_ffmpeg(args: list[str], desc: str) -> None:
 def to_ogg(src: Path, dst: Path, quality: str = "5") -> None:
     """Encode any input audio to Ogg Vorbis."""
     dst.parent.mkdir(parents=True, exist_ok=True)
-    args = ["-i", str(src), "-vn", "-map_metadata", "-1", "-ac", "2"]
-    try:
-        run_ffmpeg(
-            args + ["-c:a", "libvorbis", "-q:a", quality, str(dst)],
-            f"encode {dst.name}",
-        )
-    except RuntimeError as exc:
-        if "Unknown encoder 'libvorbis'" not in str(exc):
-            raise
-        run_ffmpeg(
-            args
-            + ["-c:a", "vorbis", "-strict", "experimental", "-q:a", quality, str(dst)],
-            f"encode {dst.name}",
-        )
+    args = [
+        "-i",
+        str(src),
+        "-vn",
+        "-map_metadata",
+        "-1",
+        "-fflags",
+        "+bitexact",
+        "-ac",
+        "2",
+    ]
+    run_ffmpeg(
+        args
+        + [
+            "-c:a",
+            "vorbis",
+            "-flags:a",
+            "+bitexact",
+            "-strict",
+            "experimental",
+            "-q:a",
+            quality,
+            str(dst),
+        ],
+        f"encode {dst.name}",
+    )
 
 
 def to_wav(src: Path, dst: Path, sr: int | None = None, mono: bool = False) -> None:

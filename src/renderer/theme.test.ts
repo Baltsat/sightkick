@@ -105,13 +105,13 @@ describe('themedark accent derivation', () => {
   const accent = themedark.color.accent;
 
   it('keeps the accent base as the configured value', () => {
-    expect(accent).toBe('#d54b30');
+    expect(accent).toBe('#f73586');
   });
 
   it('derives the hover, deep and text shades from the accent base', () => {
-    expect(themedark.color.accentHover).toBe(lighten(accent, 0.14));
-    expect(themedark.color.accentDeep).toBe(darken(accent, 0.16));
-    expect(themedark.color.accentText).toBe(lighten(accent, 0.15));
+    expect(themedark.color.accentHover).toBe(lighten(accent, 0.12));
+    expect(themedark.color.accentDeep).toBe(darken(accent, 0.22));
+    expect(themedark.color.accentText).toBe(darken(accent, 0.25));
   });
 
   it('derives soft fills and borders as alpha tints of the accent', () => {

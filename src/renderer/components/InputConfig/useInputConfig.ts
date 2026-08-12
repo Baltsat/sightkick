@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useInput } from '../../context/InputContext';
 import { InputElement } from '../../../types';
 import {
@@ -13,6 +13,7 @@ export function useInputConfig(isOpen: boolean) {
   const {
     setSelectedDevice,
     selectedDevice,
+    inputReadiness,
     inputMapping,
     controlMapping,
     assignControl,
@@ -23,7 +24,6 @@ export function useInputConfig(isOpen: boolean) {
   const [devices, setDevices] = useState<InputDevice[]>([]);
   const [listeningTo, setListeningTo] = useState<InputElement>();
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
-  const listeningToRef = useRef(listeningTo);
 
   if (isOpen !== prevIsOpen) {
     setPrevIsOpen(isOpen);
@@ -33,19 +33,11 @@ export function useInputConfig(isOpen: boolean) {
     }
   }
 
-  useEffect(() => {
-    listeningToRef.current = listeningTo;
-  }, [listeningTo]);
-
   const refreshDevices = useCallback(() => {
     inputBus.listDevices().then((list) => {
       setDevices(list);
-
-      if (selectedDevice && !list.some((d) => d.id === selectedDevice.id)) {
-        setSelectedDevice(null);
-      }
     });
-  }, [selectedDevice, setSelectedDevice]);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) {
@@ -56,23 +48,20 @@ export function useInputConfig(isOpen: boolean) {
   }, [isOpen, refreshDevices]);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen || listeningTo === undefined) {
       return undefined;
     }
 
     return inputBus.capture(({ controlId }) => {
-      const listening = listeningToRef.current;
-
       if (
-        listening &&
         selectedDevice &&
         controlSource(controlId) === selectedDevice.sourceId
       ) {
-        assignControl(listening, controlId);
+        assignControl(listeningTo, controlId);
         setListeningTo(undefined);
       }
     });
-  }, [assignControl, selectedDevice, isOpen]);
+  }, [assignControl, selectedDevice, isOpen, listeningTo]);
 
   useEffect(() => {
     if (listeningTo === undefined) {
@@ -115,6 +104,7 @@ export function useInputConfig(isOpen: boolean) {
     devices,
     selectedDeviceId: selectedDevice?.id,
     selectedDeviceName: selectedDevice?.name,
+    inputReadiness,
     onSelectDevice: (id: string | undefined) => {
       setSelectedDevice(devices.find((device) => device.id === id) ?? null);
     },

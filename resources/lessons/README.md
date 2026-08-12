@@ -1,20 +1,20 @@
-# SightKick Method — Lesson Library Generator
+# Drumroll Method — Lesson Library Generator
 
-A deterministic pipeline that turns `curriculum.yaml` (118 drumset exercises,
-hand-authored in this repo) into playable SightKick song folders: a chart
+A deterministic pipeline that turns `curriculum.yaml` (170 drumset exercises,
+hand-authored in this repo) into playable Drumroll song folders: a chart
 (`notes.mid`), a click track (`song.ogg`), an audible drum-pattern demo
 rendered from real (CC0) drum samples (`drums.ogg`), and metadata
 (`song.ini`).
 
 ## Inspiration and copyright
 
-The unit/lesson progression is inspired by the lesson order of a well-known
-beginner Hal Leonard drumset method book (grip/stroke basics → reading →
-coordination → 8th notes → toms → ties/rests/accents → strokes → fills →
-musical form → 16th notes → new rhythms → 16th-note fills → triplets → jazz
-→ shuffle → new meters → capstone tunes). Rudiments (single strokes,
-paradiddles) and standard beat vocabulary (rock backbeat, shuffle, jazz
-ride, waltz, 12/8) are traditional material, not the book's IP.
+The unit/lesson progression uses the broad topic order observed in a beginner
+drumset-method reference supplied for curriculum gap analysis (stroke basics →
+reading → coordination → eighth notes → toms → ties/rests/accents → fills →
+musical form → sixteenth notes → triplets → jazz/shuffle → new meters →
+capstone work). Rudiments (single strokes, paradiddles) and standard beat
+vocabulary (rock backbeat, shuffle, jazz ride, waltz, 12/8) are traditional
+material, not the reference's IP.
 
 No prose, engravings, or images from the book are reproduced anywhere in
 this directory. Every exercise title, coaching cue, and the specific note
@@ -25,23 +25,159 @@ jazz ride pattern" or "the shuffle"), that's because the underlying rhythm
 is public-domain musical vocabulary any method book would teach, taught
 here in different words with a different note pattern.
 
+The exact source identity, SHA-256, 90-page section map, 118-exercise base
+coverage, 52-exercise original extension, and disclosed representation limits
+are recorded in `docs/curriculum-source-coverage.md`.
+
+The three "Rudiment Gym" units (see below) draw their rudiment names and
+stickings from the Percussive Arts Society's PAS International Drum
+Rudiments list — a standardized, public-domain naming system maintained by
+a nonprofit educational body, not any one publisher's proprietary content.
+Every exercise's specific note pattern, tempo ladder, and coaching cue in
+those units is original work written for this project, same as the rest of
+the curriculum.
+
 ## Curriculum shape
 
-7 units → 18 lessons (17 map 1:1 to the book's Lesson 1–17; the 18th,
-"Encore Repertoire", stands in for the book's two capstone song charts) →
-118 exercises.
+10 units → 25 lessons → 170 exercises. The original 7 units / 18 lessons /
+118 exercises (17 lessons map 1:1 to the book's Lesson 1–17; the 18th,
+"Encore Repertoire", stands in for the book's two capstone song charts) are
+the retained base. The three-tom repair intentionally re-authors 07.02–07.08
+and reinforces the T2 lane in 10.05, 18.01, and 18.02; all other pre-existing
+exercise content remains retained. Three new "Rudiment Gym" units (the
+Fundamentals/rudiments wing, see below) are interleaved between them, which
+is why the unit letters below aren't a plain A–J run and why lesson/exercise
+numbers shifted for everything at or after Lesson 3 (`04.01` is still the
+same "Single Paradiddle Drill" exercise it always was — it just lives at a
+higher lesson number now, since two Rudiment Gym I lessons were inserted
+ahead of it. `stars_to_unlock`/`next` were fully recomputed, so the unlock
+chain itself is unaffected).
 
-| Unit | Name                             | Exercises |
-| ---- | -------------------------------- | --------- |
-| A    | Foundations                      | 6         |
-| B    | First Grooves                    | 12        |
-| C    | Toms, Dynamics & Fills I         | 30        |
-| D    | Groove Vocabulary & Musical Form | 10        |
-| E    | 16th-Note Mastery                | 22        |
-| F    | Triplets, Jazz & Shuffle         | 28        |
-| G    | New Meters & Capstones           | 10        |
+| Unit | Name                                   | Exercises |
+| ---- | -------------------------------------- | --------- |
+| A    | Foundations                            | 6         |
+| RG1  | Rudiment Gym I: Sticking Foundations   | 17        |
+| B    | First Grooves                          | 12        |
+| C    | Toms, Dynamics & Fills I               | 30        |
+| D    | Groove Vocabulary & Musical Form       | 10        |
+| RG2  | Rudiment Gym II: The Paradiddle Family | 19        |
+| E    | 16th-Note Mastery                      | 22        |
+| F    | Triplets, Jazz & Shuffle               | 28        |
+| RG3  | Rudiment Gym III: Measured Rolls       | 16        |
+| G    | New Meters & Capstones                 | 10        |
 
 Full lesson-by-lesson breakdown is in `curriculum.yaml` (`units[].lessons[]`).
+
+### Curriculum contract validation
+
+Run the checked-in curriculum validator after changing lesson content:
+
+```sh
+resources/lessons/.venv/bin/python3 resources/lessons/validate_curriculum.py
+```
+
+It renders every chart's `notes.mid` payload in memory and parses the emitted
+tom marker notes; it does not accept YAML lane text as proof that a generated
+chart contains a tom. In addition to the stable 170-exercise unlock chain, it
+enforces the three-tom gates in `docs/requirement-ledger.md` E4.04–E4.05:
+T2 appears in at least eight exercises (four in Lesson 7 and two later
+reinforcements), each tom has at least three isolated drills, both directions
+of the T1↔T2 and T2↔T3 moves are present, at least two full sweeps exist, and
+at least two all-three-tom groove contexts and two fill contexts remain.
+
+### Rudiment Gym (the Fundamentals wing)
+
+The owner's brief for this wing: grasp the rudiments and elements
+thoroughly, then apply them in real playing. That's the shape of all three
+Rudiment Gym units — every rudiment gets a **tempo ladder** (3–5 exercises
+of the identical pattern at rising `bpm_target`, e.g. 60→80→100→120) plus
+one **application exercise** that places the same sticking inside a groove
+or fill, usually naming where that vocabulary shows up in real music.
+
+**Placement.** Three seasons, interleaved by difficulty rather than bolted
+on as one block at the end, so the player meets rudimentary technique right
+before the unit that would otherwise ask them to invent it from scratch:
+
+- **Rudiment Gym I: Sticking Foundations** — after Unit A, before Unit B
+  "First Grooves". Unit A's own Lesson 1 already touches alternating
+  singles and paired doubles informally (`01.01`/`01.02`); RG1 turns that
+  into disciplined single/double/triple-stroke rolls and two accent
+  studies _before_ Unit B asks the player to build grooves out of that
+  vocabulary.
+- **Rudiment Gym II: The Paradiddle Family** — after Unit D "Groove
+  Vocabulary & Musical Form", before Unit E "16th-Note Mastery". All four
+  paradiddle-family rudiments (single/double/triple/paradiddle-diddle) plus
+  hand-to-foot substitution are natural 16th-note coordination drills — RG2
+  is the on-ramp into the dedicated 16th-note unit that follows it, not a
+  detour from it. (Single Paradiddle already exists as a groove exercise at
+  `04.01`; RG2's ladder is the same rudiment at full continuous 16th-note
+  density and cross-references `04.01` by name in its cue rather than
+  duplicating it.)
+- **Rudiment Gym III: Measured Rolls** — after Unit F "Triplets, Jazz &
+  Shuffle", before Unit G "New Meters & Capstones". The five/six/seven/
+  nine-stroke rolls are the fastest, most demanding material in this wing;
+  they're placed last, once 16th-note fluency (Unit E) and a wider musical
+  vocabulary (Unit F) are already in hand, immediately before the
+  capstone-adjacent Unit G.
+
+All three units use **16th-note (16-step) grid resolution exclusively** —
+deliberately, not by accident. An early draft considered packing the
+paradiddle family's 6-note groupings (double paradiddle, paradiddle-diddle)
+into 12-step/triplet-resolution bars, which would have made those two
+rudiments the first thing in the curriculum to demand triplet reading,
+three lessons before Unit F actually teaches it. Instead every 6-note and
+8-note rudiment group is notated as plain 16th notes with a trailing rest
+where the group doesn't fill the bar evenly (see `SIX_GROUP_BAR` in the
+authoring notes) — no triplet subdivision appears anywhere in this wing.
+
+**Rudiment catalog — PAS-40 coverage.**
+
+| Included (13 items, 52 exercises)          | Grid representation                                         |
+| ------------------------------------------ | ----------------------------------------------------------- |
+| Single stroke roll                         | continuous unaccented 16ths                                 |
+| Double stroke roll                         | continuous unaccented 16ths (see notation caveat)           |
+| Triple stroke roll                         | continuous unaccented 16ths (see notation caveat)           |
+| Single paradiddle                          | accent on notes 1 & 5 of an 8-note group                    |
+| Double paradiddle                          | accent on note 1 of two 6-note groups                       |
+| Triple paradiddle                          | accent on note 1 of two 8-note groups                       |
+| Paradiddle-diddle                          | accent on note 1 of two 6-note groups (see notation caveat) |
+| Five stroke roll                           | 4 unaccented + accent on note 5, in an 8-step cell          |
+| Six stroke roll                            | accent on notes 1 & 6, doubles between, 8-step cell         |
+| Seven stroke roll                          | 6 unaccented + accent on note 7, 8-step cell                |
+| Nine stroke roll                           | 8 unaccented + accent on note 9, 16-step cell               |
+| Accent studies (every-4th, every-3rd note) | rotating accent over a continuous 16th stream               |
+| Hand-to-foot combinations                  | every Nth stroke of a stream substituted onto the kick      |
+
+| Excluded                                                                                                                                                                                  | Why                                                                                                                                                                                                               |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| All 11 flam rudiments (flam, flam accent, flam tap, flamacue, flam paradiddle, single flammed mill, flam paradiddle-diddle, pataflafla, swiss army triplet, inverted flam tap, flam drag) | a flam's grace note lands under ~30ms before its primary note; the grid has no sub-step timing offset (same gap the README already documents for flams generally)                                                 |
+| All 10 drag/ratamacue rudiments (drag, single/double drag tap, Lesson 25, single dragadiddle, drag paradiddle #1/#2, single/double/triple ratamacue)                                      | drags are grace-note ornaments — same sub-step timing gap as flams                                                                                                                                                |
+| Multiple bounce roll (buzz roll)                                                                                                                                                          | a sustained, uncontrolled-bounce roll has no discrete-hit representation in a grid where every step is one fixed-duration attack — the same category of gap as the README's existing fermata caveat               |
+| Ten/eleven/thirteen/fifteen/seventeen-stroke rolls                                                                                                                                        | same measured-roll technique as the five/six/seven/nine-stroke rolls that _are_ included; left out only to keep this wing's exercise count inside the requested +40–60 budget, not for any notation-format reason |
+
+**Notation caveat specific to this wing**: the grid has no lane concept of
+"which hand" — a single `S`-lane hit sounds and reads identically no matter
+which hand plays it. Two honest consequences follow: (1) the single/
+double/triple stroke rolls render as the same continuous, unaccented
+16th-note stream — the only place the distinction lives is the cue text's
+sticking notation (`RLRL...` vs. `RRLL...` vs. `RRRLLL...`), not the chart
+or the audio; (2) double paradiddle and paradiddle-diddle share an accent
+skeleton (accent, then five unaccented notes, twice a bar) and are
+genuinely indistinguishable in the generated chart/audio — again, only the
+cue's sticking spells out the difference. Both exercises say this
+explicitly in their own cue text rather than leaving it for the player to
+notice.
+
+**Bridges to real music.** Where a bridge is defensibly true it names a
+specific, well-known reference (single-stroke tom rolls → "Wipe Out";
+single-stroke accent fills → "In the Air Tonight"; the paradiddle-as-groove
+voicing → Steve Gadd's "50 Ways to Leave Your Lover"); everywhere else it
+names a genre/technique vocabulary rather than inventing a specific bar
+number in a specific recording (gospel-chops fills, drumline cadence
+vocabulary, blues-rock turnaround fills, modern "chops"-style ostinatos).
+
+**Skills tags.** Every exercise (all 170, not just the new 52) now carries
+a `skills` list — see "Gamification data" below.
 
 ### What got consolidated
 
@@ -90,19 +226,20 @@ exercises instead of every permutation:
   (repeat-to-sign, first/second endings, coda jumps) has no representation
   in the flat, linear `mode: loop` chart format used here — that's a
   format limitation, not a content cut, and is out of scope until a
-  future chart format supports section jumps. 07.04 (now "Groove with a
-  Turnaround Tag", formerly "Second-Ending Turnaround") had the same gap:
-  its original cue promised a first/second-ending song-form move the
-  format can't render. The title and cue were corrected to describe what
-  the chart actually plays — one consistent turnaround tag every pass —
-  instead of overpromising navigation the loop format doesn't support.
+  future chart format supports section jumps. Lesson 07's former isolated
+  tom examples were subsequently replaced by a three-tom progression that
+  explicitly identifies T1/T2/T3, teaches both movement directions, then
+  transfers those moves into grooves and fills. The checked-in MIDI validator
+  above guards that coverage instead of relying on title text alone.
 
-118 exercises is the result — comfortably inside the "expect 50–120"
-target while still touching every lesson, every meter (4/4, 3/4, 6/8,
-12/8, 2/2 cut time), every subdivision (8th, 16th, triplet, shuffle), and
-every technique (dynamics, ghost notes, cross-stick, tom fills, open
-hi-hat) the book introduces. A few notation gaps are worth calling out
-explicitly, all format/vocabulary limitations rather than content cuts:
+The original book-inspired wing contains 118 exercises — comfortably
+inside the initial "expect 50–120" target while still touching every
+lesson, every meter (4/4, 3/4, 6/8, 12/8, 2/2 cut time), every subdivision
+(8th, 16th, triplet, shuffle), and every technique (dynamics, ghost notes,
+cross-stick, tom fills, open hi-hat) the book introduces. The later
+Rudiment Gym addition brings the connected curriculum to 170 exercises;
+its validation is recorded below. A few notation gaps are worth calling
+out explicitly, all format/vocabulary limitations rather than content cuts:
 
 - **Flams** (a grace note landing almost simultaneously with its primary
   note) are not currently representable — the notation grid has no
@@ -151,9 +288,9 @@ version). Summary:
   `2`=p, `3`=mp, `4`=mf, `5`=f, `6`=ff; velocities 30/45/60/80/100/115)
   layered on top of the original binary `x`/`X`/`g` notation. Used only on
   the handful of exercises where the book gives a genuine multi-step
-  dynamic arc rather than a binary loud/soft contrast: 05.01, 05.05,
-  05.06, 09.04, 10.02 (the Lesson 10 capstone), and 18.01/18.02 (the two
-  Encore etudes). Every other exercise keeps the original binary
+  dynamic arc rather than a binary loud/soft contrast: 07.01, 11.04,
+  12.02 (the Lesson 10 capstone), and 25.01/25.02 (the two Encore etudes).
+  Every other exercise keeps the original binary
   dynamics. `f`/`ff` (100/115) clear the judge's
   `ACCENT_VALUE_THRESHOLD` (90) the same way `X` (115) always has, and
   `pp`/`p` (30/45) clear `GHOST_VALUE_THRESHOLD` (50) the same way `g`
@@ -190,7 +327,10 @@ Useful flags:
 - `--dry-run` — print what would be written without touching disk.
 
 `ffmpeg` must be on `PATH` (used to transcode both the generated click WAV
-and the generated drums WAV into small mono OGG files). The 10 one-shot
+and the generated drums WAV into compact stereo OGG files). The macOS release
+pipeline builds the pinned native-Vorbis runtime with
+`scripts/prepare-ffmpeg-runtime.sh`; direct callers may instead provide a
+compatible system FFmpeg. The 10 one-shot
 drum samples `drums.ogg` is rendered from are already vendored in
 `samples/` (see `samples/ATTRIBUTION.md`) — no network access is needed to
 run `generate.py` itself, only if you re-run `samples/_vendor_pipeline.py`
@@ -215,8 +355,8 @@ independent runs of the same exercise set — identical SHA-1s.
 `song.ogg`'s _audio content_ (its exact sample data, hence its duration)
 is equally deterministic — the click WAV is synthesized sample-by-sample
 from the same tick timeline as the MIDI. The final compressed `.ogg`
-container bytes can vary a few bytes run to run because libvorbis embeds
-a random Ogg stream serial number by default; this has no audible or
+container bytes can vary a few bytes run to run because the native Vorbis
+encoder embeds a random Ogg stream serial number by default; this has no audible or
 functional effect and doesn't change the file's duration.
 
 `drums.ogg` is deterministic the same way: no randomness or dithering
@@ -304,7 +444,11 @@ pro-drums format has no distinct open-hat signal to target. The `o`
 symbol's audible distinction lives only in `drums.ogg` (a different
 sample), not in `notes.mid`.
 
-## Validation performed
+## Validation history
+
+The 117/118 figures below are retained as evidence from the original
+book-inspired curriculum milestones. The current 170-exercise end state is
+covered by the Rudiment Gym validation entry later in this section.
 
 - **Independent MIDI re-parse** (hand-written parser, not `generate.py`'s
   own writer) on 5 sample folders: confirms `PART DRUMS` track name,
@@ -363,6 +507,52 @@ sample), not in `notes.mid`.
     one-shots, and `_sample_key_for("H", "o")` now returns `"hihat_open"`
     (previously `"hihat_closed"`, same as a plain `x`) — verified directly
     against the regenerated 16.07/16.08 `drums.ogg`.
+- **Rudiment Gym / Fundamentals wing addition (2026-08-09)**: spliced 3 new
+  units (52 exercises) into the curriculum and programmatically renumbered
+  the whole sk\_ chain (lesson ids, exercise ids, `stars_to_unlock`, `next`)
+  across all 170 exercises. The splice/renumber pass was a full
+  `yaml.safe_load` → rebuild → `yaml.safe_dump` round-trip (not a hand
+  edit), so it was verified in layers:
+  - **Round-trip field preservation at splice time**: every one of the
+    pre-existing 118 exercises' unchanged fields (`title`, `cue`,
+    `time_signature`, `bpm_slow`, `bpm_target`, `diff_drums`, `mode`,
+    `bars`) was deep-compared against the pre-splice file in original
+    document order — **118/118 byte-for-byte identical**; only `id`,
+    `lesson`, `stars_to_unlock`, `next`, and the new `skills` field changed.
+    The later, deliberate E4.04 three-tom repair is documented in the
+    Curriculum contract validation section above.
+  - Stale exercise-id cross-references embedded in `meta` prose (the
+    `graded_dynamics`, `symbols.g`, and `symbols.o` blurbs, which name
+    specific exercises like "09.04" or "18.01/18.02" by their old numbers)
+    were mechanically remapped to the new ids as part of the same pass, not
+    left stale.
+  - Every one of the 170 exercises' `bars` was validated through
+    `generate.py`'s own `build_timeline()`/`_validate_bar()` (step-count
+    parity, valid symbols, same-step pad conflicts) before anything was
+    written to disk.
+  - `parseChartFile` (independent parser, not `generate.py`'s own writer):
+    **170/170 pass**, each with a non-empty `drums`/`expert` track.
+  - `scanChartFolder` (the app's own library-scan function): **170/170**
+    `playable: true`, zero folder issues besides the pre-existing, expected
+    `noAlbumArt`.
+  - Determinism: two independent full-pipeline `generate.py` runs of all
+    170 exercises produced byte-identical `notes.mid` SHA-1s
+    (**170/170**), and identical decoded-PCM SHA-1s for `song.ogg` and
+    `drums.ogg` on an 18-folder spread sample (**36/36**, including the
+    first exercise, the last exercise, and a Rudiment Gym exercise).
+  - `ffprobe` duration spot-check across the same 18-folder sample: worst
+    `song.ogg`-vs-`song.ini` difference **0.43ms**, worst `song.ogg`-vs-
+    `drums.ogg` difference **0.02ms** (targets 200ms/50ms).
+  - Chain connectivity: the dedicated walk-script confirms `id → next`
+    visits all 170 ids exactly once, in document order, with
+    `stars_to_unlock` equal to each exercise's 0-based position throughout
+    — one single connected path, no branches, no orphans.
+  - Live-library regeneration: all 118 stale `SightKick Method - Lesson *`
+    folders from the pre-splice numbering were removed from
+    `~/Music/SightKick` (folders outside that prefix — the user's real
+    songs — were left untouched) before regenerating fresh, so the live
+    library never carried duplicate/orphaned lesson folders under both the
+    old and new numbering at once.
 
 ## Gamification data (no UI here — this feeds a future Lessons screen)
 
@@ -375,19 +565,34 @@ Every exercise carries:
   that (e.g. unlock a whole lesson at once, or let a player skip ahead
   once they've banked enough stars from _any_ mix of earlier exercises).
 - `next`: the id of the next exercise in recommended order (`null` for
-  the very last one, `18.02`).
+  the very last one, `25.02`).
+- `skills`: a list of tags from a controlled vocabulary (documented in
+  `curriculum.yaml` under `meta.skills_legend` — e.g. `paradiddle`,
+  `kick-independence`, `sixteenth-notes`, `dynamics`, `single-stroke-roll`).
+  Added across the whole curriculum, not just the new Rudiment Gym
+  exercises: the 52 new exercises carry hand-authored tags, and the
+  pre-existing 118 carry tags derived mechanically from each exercise's own
+  notation (lanes used, step resolution, meter, dynamics/accent/ghost
+  symbols present, lesson name) rather than guessed by hand — see
+  `derive_skills()` in the authoring notes below. This is for a future
+  AI-coach lane to consume for lesson-linking (mapping a song's fills/
+  grooves back to the rudiment lessons that teach them); it's not read by
+  the Lessons journey UI itself.
 
-These two fields are also written into every generated `song.ini` as
-custom fields, so a Lessons UI can read the unlock chain without
+These fields are also written into every generated `song.ini` as custom
+fields, so a Lessons UI (or the AI-coach lane) can read them without
 re-parsing `curriculum.yaml`: `sk_lesson_id`, `sk_stars_to_unlock`,
-`sk_next` (empty string for the last exercise), `sk_unit`, and
-`sk_lesson_title`. Unknown `.ini` fields are ignored by the app's own
-parser, so this is additive and safe. These five field names are a
-contract with that UI — don't rename them without updating both sides.
+`sk_next` (empty string for the last exercise), `sk_unit`, `sk_lesson_title`,
+and `sk_skills` (comma-joined tag list). `sk_lesson_title` is the unique
+exercise title shown on the journey node, not the parent lesson heading;
+otherwise sibling exercises would appear with duplicate names. Unknown
+`.ini` fields are ignored by the app's own parser, so this is additive and
+safe. These six field names are a contract with their respective consumers
+— don't rename them without updating all sides.
 
 ### Suggested progression UX
 
-- **Unlock chain**: render the 118 exercises as one path (or a
+- **Unlock chain**: render the 170 exercises as one path (or a
   per-lesson row within a per-unit map). A locked exercise shows the
   `stars_to_unlock` threshold; once the player's total star count meets
   it, unlock and highlight it as "next" using the `next` pointer chain.

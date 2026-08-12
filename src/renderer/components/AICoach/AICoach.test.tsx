@@ -1,0 +1,267 @@
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { App as AntdApp } from 'antd';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { installIpcMock, IpcMock } from '../../hooks/test-support';
+import { CoachFindings } from '../../services/coach';
+import { AICoach } from './AICoach';
+import { CoachSettings } from './CoachSettings';
+
+vi.mock('./MiniNotation', () => ({
+  MiniNotation: () => <div data-testid="coach-notation" />,
+}));
+
+const result: CoachFindings = {
+  analyzedRuns: 3,
+  findings: [
+    {
+      id: 'trouble-4-5',
+      kind: 'trouble-bars',
+      severity: 'high',
+      title: 'Bars 4–5 need a loop',
+      summary: '52% across 20 scored notes.',
+      skillTag: 'fills',
+      evidence: {
+        barStart: 4,
+        barEnd: 5,
+        accuracy: 0.52,
+        sampleCount: 20,
+      },
+    },
+  ],
+};
+let ipc: IpcMock;
+
+beforeEach(() => {
+  ipc = installIpcMock();
+});
+
+describe('AICoach', () => {
+  it('renders evidence and launches targeted practice or its mapped lesson', () => {
+    const onPracticeBars = vi.fn();
+    const onTrainSkill = vi.fn();
+
+    render(
+      <AntdApp>
+        <AICoach
+          result={result}
+          song={{ name: 'Song', artist: 'Artist', difficulty: 'expert' }}
+          measures={[]}
+          records={[]}
+          onPracticeBars={onPracticeBars}
+          onTrainSkill={onTrainSkill}
+        />
+      </AntdApp>,
+    );
+
+    expect(screen.getByText('3 detailed runs checked.')).toBeInTheDocument();
+    expect(screen.getByTestId('coach-notation')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('coach-practice-bars'));
+    fireEvent.click(screen.getByTestId('coach-train-skill'));
+
+    expect(onPracticeBars).toHaveBeenCalledWith(4, 5, 0.7);
+    expect(onTrainSkill).toHaveBeenCalledWith('18.03');
+  });
+
+  it('requests and renders optional Claude notes', async () => {
+    render(
+      <AntdApp>
+        <AICoach
+          result={result}
+          song={{ name: 'Song', artist: 'Artist', difficulty: 'expert' }}
+          measures={[]}
+          records={[]}
+          onPracticeBars={vi.fn()}
+          onTrainSkill={vi.fn()}
+        />
+      </AntdApp>,
+    );
+
+    fireEvent.click(screen.getByText('Get coaching notes'));
+
+    expect(ipc.sent).toContainEqual({
+      channel: 'get-coaching-notes',
+      args: [
+        expect.objectContaining({
+          song: expect.objectContaining({ name: 'Song' }),
+        }),
+      ],
+    });
+
+    act(() => {
+      ipc.emit('coaching-notes', { notes: 'Loop bars 4–5 at 0.7x.' });
+    });
+
+    expect(await screen.findByTestId('coaching-notes')).toHaveTextContent(
+      'Loop bars 4–5 at 0.7x.',
+    );
+  });
+
+  it('uses a latest summary-only run honestly without inventing bars or a loop', () => {
+    render(
+      <AntdApp>
+        <AICoach
+          song={{ name: 'Song', artist: 'Artist', difficulty: 'expert' }}
+          measures={[]}
+          records={[]}
+          summaryRuns={[
+            {
+              completedAt: '2026-08-08T14:00:00.000Z',
+              totalHits: 8,
+              totalMisses: 2,
+              totalWrong: 3,
+              overallAccuracy: 0.8,
+              laneAccuracy: [
+                { element: 'snare', hits: 5, misses: 2, accuracy: 0.71 },
+                { element: 'kick', hits: 3, misses: 0, accuracy: 1 },
+              ],
+              laneBias: [],
+              timingBias: {
+                meanMs: -12,
+                medianMs: -10,
+                spreadMs: 7,
+                earlyCount: 5,
+                lateCount: 1,
+                onTimeCount: 0,
+                sampleCount: 6,
+              },
+              wrongHitCounts: [{ element: 'kick', count: 3 }],
+              playbackSpeed: 0.8,
+              bestStreak: 6,
+            },
+          ]}
+          fullRuns={[]}
+          onPracticeBars={vi.fn()}
+          onTrainSkill={vi.fn()}
+        />
+      </AntdApp>,
+    );
+
+    const card = screen.getByTestId('coach-summary-only');
+
+    expect(card).toHaveTextContent('2026-08-08');
+    expect(card).toHaveTextContent('80% accuracy at 0.8x');
+    expect(card).toHaveTextContent('12 ms early');
+    expect(card).toHaveTextContent('Weakest lane: Snare at 71%');
+    expect(card).toHaveTextContent('Wrong hits: 3');
+    expect(card).toHaveTextContent(
+      'has no note-by-note detail. Play it again for help with specific bars.',
+    );
+    expect(
+      within(card).queryByTestId('coach-practice-bars'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(card).queryByTestId('coach-notation'),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('CoachSettings', () => {
+  it('defaults to Codex with no credential fields shown', () => {
+    render(
+      <AntdApp>
+        <CoachSettings />
+      </AntdApp>,
+    );
+
+    act(() => {
+      ipc.emit('coach-settings', {
+        provider: 'codex',
+        apiKeyConfigured: false,
+        huggingFaceTokenConfigured: false,
+        huggingFaceModel: 'meta-llama/Llama-3.3-70B-Instruct',
+      });
+    });
+
+    expect(screen.getByTestId('coach-codex-hint')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Anthropic API key')).toBeNull();
+    expect(screen.queryByLabelText('Hugging Face token')).toBeNull();
+  });
+
+  it('switching to Anthropic uses a masked API-key input and exposes only configured state', () => {
+    render(
+      <AntdApp>
+        <CoachSettings />
+      </AntdApp>,
+    );
+
+    act(() => {
+      ipc.emit('coach-settings', {
+        provider: 'codex',
+        apiKeyConfigured: false,
+        huggingFaceTokenConfigured: false,
+        huggingFaceModel: 'meta-llama/Llama-3.3-70B-Instruct',
+      });
+    });
+
+    fireEvent.click(screen.getByText('Anthropic'));
+
+    expect(ipc.sent).toContainEqual({
+      channel: 'save-coach-settings',
+      args: [{ provider: 'anthropic' }],
+    });
+
+    const input = screen.getByLabelText('Anthropic API key');
+
+    expect(input).toHaveAttribute('type', 'password');
+    act(() => {
+      ipc.emit('coach-settings-saved', {
+        ok: true,
+        provider: 'anthropic',
+        apiKeyConfigured: true,
+        huggingFaceTokenConfigured: false,
+        huggingFaceModel: 'meta-llama/Llama-3.3-70B-Instruct',
+      });
+    });
+    expect(input).toHaveAttribute('placeholder', 'API key saved');
+  });
+
+  it('switching to Hugging Face shows a masked token field and a visible model field', () => {
+    render(
+      <AntdApp>
+        <CoachSettings />
+      </AntdApp>,
+    );
+
+    act(() => {
+      ipc.emit('coach-settings', {
+        provider: 'codex',
+        apiKeyConfigured: false,
+        huggingFaceTokenConfigured: false,
+        huggingFaceModel: 'meta-llama/Llama-3.3-70B-Instruct',
+      });
+    });
+
+    fireEvent.click(screen.getByText('Hugging Face'));
+
+    const token = screen.getByLabelText('Hugging Face token');
+    const model = screen.getByLabelText('Hugging Face model');
+
+    expect(token).toHaveAttribute('type', 'password');
+    expect(model).toHaveValue('meta-llama/Llama-3.3-70B-Instruct');
+
+    fireEvent.change(token, { target: { value: 'hf_secret' } });
+    fireEvent.click(screen.getByText('Save token'));
+
+    expect(ipc.sent).toContainEqual({
+      channel: 'save-coach-settings',
+      args: [{ huggingFaceToken: 'hf_secret' }],
+    });
+    expect(JSON.stringify(ipc.sent)).toContain('hf_secret');
+
+    act(() => {
+      ipc.emit('coach-settings-saved', {
+        ok: true,
+        provider: 'huggingface',
+        apiKeyConfigured: false,
+        huggingFaceTokenConfigured: true,
+        huggingFaceModel: 'meta-llama/Llama-3.3-70B-Instruct',
+      });
+    });
+
+    expect(screen.getByLabelText('Hugging Face token')).toHaveAttribute(
+      'placeholder',
+      'Token saved',
+    );
+  });
+});

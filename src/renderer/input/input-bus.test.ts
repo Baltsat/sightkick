@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { InputBus } from './input-bus';
-import { InputDevice, InputEvent, InputSource } from './types';
+import {
+  InputDevice,
+  InputEvent,
+  InputSource,
+  RawMidiInputEvent,
+} from './types';
 
 function makeSource(
   id: InputSource['id'],
@@ -8,17 +13,20 @@ function makeSource(
 ): {
   source: InputSource;
   emit: (event: InputEvent) => void;
+  emitRawMidi: (event: RawMidiInputEvent) => void;
   stop: ReturnType<typeof vi.fn>;
   startCalls: number;
 } {
   let emit: (event: InputEvent) => void = () => {};
+  let emitRawMidi: (event: RawMidiInputEvent) => void = () => {};
   const stop = vi.fn();
   let startCalls = 0;
   const source: InputSource = {
     id,
-    start(fn) {
+    start(fn, rawFn) {
       startCalls += 1;
       emit = fn;
+      emitRawMidi = rawFn ?? (() => {});
 
       return stop;
     },
@@ -30,6 +38,7 @@ function makeSource(
   return {
     source,
     emit: (event) => emit(event),
+    emitRawMidi: (event) => emitRawMidi(event),
     stop,
     get startCalls() {
       return startCalls;
@@ -57,6 +66,19 @@ describe('InputBus', () => {
       { controlId: 'keyboard:KeyJ', value: 127 },
     ]);
     expect(second).toEqual(first);
+  });
+
+  it('notifies priority gesture observers before ordinary scoring listeners', () => {
+    const a = makeSource('midi', []);
+    const bus = new InputBus([a.source]);
+    const order: string[] = [];
+
+    bus.subscribe(() => order.push('engine'));
+    bus.subscribePriority(() => order.push('gesture'));
+    bus.start();
+    a.emit({ controlId: 'midi:36', value: 100 });
+
+    expect(order).toEqual(['gesture', 'engine']);
   });
 
   it('does not deliver events to a listener after it unsubscribes', () => {
@@ -118,6 +140,38 @@ describe('InputBus', () => {
     a.emit({ controlId: 'midi:40', value: 1 });
 
     expect(subscriber).toEqual([{ controlId: 'midi:40', value: 1 }]);
+  });
+
+  it('keeps raw MIDI observability live while capture owns scored input', () => {
+    const a = makeSource('midi', []);
+    const bus = new InputBus([a.source]);
+    const raw: RawMidiInputEvent[] = [];
+    const scored: InputEvent[] = [];
+
+    bus.subscribeRawMidi((event) => raw.push(event));
+    bus.subscribe((event) => scored.push(event));
+    bus.start();
+    bus.capture(() => {});
+
+    a.emitRawMidi({
+      controlId: 'midi:38',
+      type: 144,
+      note: 38,
+      velocity: 100,
+      receivedAt: 1_000,
+    });
+    a.emit({ controlId: 'midi:38', value: 100 });
+
+    expect(raw).toEqual([
+      {
+        controlId: 'midi:38',
+        type: 144,
+        note: 38,
+        velocity: 100,
+        receivedAt: 1_000,
+      },
+    ]);
+    expect(scored).toEqual([]);
   });
 
   it('only releases capture when the active listener releases it', () => {

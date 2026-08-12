@@ -44,6 +44,8 @@ export function SortButton({
         size="large"
         disabled={disabled}
         data-testid="sort-trigger"
+        aria-label="Sort songs"
+        aria-expanded={isOpen}
       />
     </Popover>
   );

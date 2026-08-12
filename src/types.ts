@@ -65,6 +65,32 @@ export interface SongData {
   sk_next?: string;
   sk_unit?: string;
   sk_lesson_title?: string;
+  sk_skills?: string;
+  /** Comma-separated authored lesson IDs which must be mastered first. */
+  sk_prerequisite_ids?: string;
+  /** Comma-separated, weighted kit-lane targets (`kick:0.5,snare:0.5`). */
+  sk_target_lanes?: string;
+  /** Authored BPM floor and destination for a lesson tempo ladder. */
+  sk_bpm_start?: string;
+  sk_bpm_target?: string;
+  /** Short, displayable practice dose and completion contract. */
+  sk_dose_rule?: string;
+  sk_mastery_rule?: string;
+  /** The authored musical/sticking cue — guidance, never sensor output. */
+  sk_cue?: string;
+  /** Explicit capability boundary paired with authored technique cues. */
+  sk_assessment_boundary?: string;
+  /** Schema-compatible source-to-chart provenance written by reviewed imports. */
+  sk_source_provider?: string;
+  sk_source_collection_id?: string;
+  sk_source_collection_name?: string;
+  sk_source_track_id?: string;
+  sk_source_title?: string;
+  sk_source_artists?: string;
+  sk_source_duration?: string;
+  sk_source_url?: string;
+  sk_playability?: string;
+  playability?: PlayabilityEvidence;
 }
 
 export interface Song {
@@ -88,6 +114,10 @@ export interface Song {
   liked?: boolean;
   updatedAt?: string;
   scoreData?: Partial<Record<Difficulty, ScoreData>>;
+  /** Discovery metadata linked to this playable local chart, when available. */
+  sourceProvenance?: LibrarySourceTrackProvenance;
+  sourceLinked?: boolean;
+  playability?: PlayabilityEvidence;
   // Present only for SightKick Method lesson songs.
   lesson?: SongLessonInfo;
 }
@@ -105,6 +135,37 @@ export interface SongLessonInfo {
   next?: string;
   unit: string;
   title: string;
+  /** Curriculum tags used to match coaching findings to focused practice. */
+  skills?: string[];
+  /** Authored IDs that must be mastered before this lesson is reachable. */
+  prerequisiteIds?: string[];
+  /** The kit lanes this exercise intentionally trains, with normalized demand. */
+  targetLanes?: LessonTargetLane[];
+  /** Tempo ladder endpoints from the authored curriculum, in BPM. */
+  bpmStart?: number;
+  bpmTarget?: number;
+  /** A concrete dose the player can follow before judging the result. */
+  doseRule?: string;
+  /** The authored rule that marks the lesson complete. */
+  masteryRule?: string;
+  /** A short authored cue. This is instruction, not observed technique. */
+  cue?: string;
+  /** Always states exactly what the MIDI system can and cannot assess. */
+  assessmentBoundary?: string;
+}
+
+export interface LessonTargetLane {
+  element:
+    | 'kick'
+    | 'snare'
+    | 'hihat'
+    | 'ride'
+    | 'crash'
+    | 'tom1'
+    | 'tom2'
+    | 'tom3';
+  /** Relative hit demand; values are normalized at generation time. */
+  weight: number;
 }
 
 export interface ScoreData {
@@ -182,6 +243,10 @@ export interface MidiDevice {
   name: string;
 }
 
+export interface MidiReadyResponse {
+  port: number;
+}
+
 export enum MidiMessageType {
   NoteOn = 144,
   NoteOff = 128,
@@ -229,6 +294,40 @@ export type IpcUpdateSongPayload = Pick<SongData, 'id'> &
 
 export interface IpcErrorResponse {
   error: string;
+}
+
+export type CoachProvider = 'codex' | 'huggingface' | 'anthropic';
+
+export const DEFAULT_COACH_PROVIDER: CoachProvider = 'codex';
+
+export const DEFAULT_HUGGING_FACE_MODEL = 'meta-llama/Llama-3.3-70B-Instruct';
+
+export interface IpcCoachSettings {
+  provider: CoachProvider;
+  apiKeyConfigured: boolean;
+  huggingFaceTokenConfigured: boolean;
+  huggingFaceModel: string;
+}
+
+export interface IpcSaveCoachSettingsRequest {
+  provider?: CoachProvider;
+  apiKey?: string;
+  huggingFaceToken?: string;
+  huggingFaceModel?: string;
+}
+
+export interface IpcCoachSettingsSaved {
+  ok: boolean;
+  provider: CoachProvider;
+  apiKeyConfigured: boolean;
+  huggingFaceTokenConfigured: boolean;
+  huggingFaceModel: string;
+}
+
+export interface IpcCoachingNotesResponse {
+  notes?: string;
+  error?: string;
+  apiKeyMissing?: boolean;
 }
 
 export type IpcResult<T> = T | IpcErrorResponse;
@@ -279,6 +378,7 @@ export interface IpcSelectImportSongResponse {
 export interface IpcImportSongRequest {
   sourceDir: string;
   artworkUrl?: string;
+  playability?: PlayabilityEvidence;
 }
 
 export interface IpcImportSongResponse {
@@ -304,6 +404,7 @@ export interface IpcCreateAutoChartRequest {
   youtubeUrl?: string;
   localFile?: boolean;
   backend?: AutoChartBackend;
+  sourceProvenance?: LibrarySourceTrackProvenance;
 }
 
 export interface IpcAutoChartBackendsResponse {
@@ -354,6 +455,8 @@ export interface IpcAutoChartJob {
   // can recognize its own in-flight jobs by watch URL without a separate
   // lookup channel.
   youtubeUrl?: string;
+  /** Reviewed discovery row that this generated chart will resolve. */
+  sourceProvenance?: LibrarySourceTrackProvenance;
   // A snapshot of every currently non-terminal job the queue knows about —
   // not just this one — attached to every 'auto-chart-update' event so any
   // listener can render the full pending/active queue and cancel any job by
@@ -412,6 +515,192 @@ export interface IpcMyMusicError {
 }
 
 export type IpcMyMusicReply = IpcMyMusicResponse | IpcMyMusicError;
+
+/**
+ * A source-list row is discovery metadata only. It is never an audio stream,
+ * a chart, or a claim that the track can be practised in Drumroll.
+ */
+export type LibrarySourceAvailability = 'available' | 'unavailable' | 'private';
+
+export type LibraryCandidateLocalStatus = 'candidate' | 'reference';
+
+export type LibrarySourceReferenceStatus =
+  | 'stable-link'
+  | 'not-visible'
+  | 'private-only';
+
+export type LibraryCandidatePracticeStatus =
+  | 'needs-local-chart'
+  | 'unavailable';
+
+export interface YandexPlaylistSource {
+  id: string;
+  name: string;
+  url: string;
+  capturedOn: string;
+  capturedAt: string;
+  captureMethod: 'authenticated-visible-dom';
+  captureSurface: 'Yandex Music playlist track rows';
+  metadataScope: string;
+  rightsScope: 'metadata-only';
+}
+
+export interface YandexPlaylistCompleteness {
+  declaredTrackCount: number;
+  renderedTrackCount: number;
+  stableSourceTrackUrlCount: number;
+  noVisibleStableSourceTrackUrlOrdinals: number[];
+  privateOnlyOrdinals: number[];
+}
+
+export interface YandexPlaylistIntegrity {
+  canonicalization: string;
+  canonicalSha256: string;
+}
+
+export interface YandexPlaylistCandidate {
+  /** Stable source ID; intentionally not a Song ID and never playable. */
+  id: string;
+  ordinal: number;
+  title: string;
+  artists: string[];
+  durationSeconds: number | null;
+  sourceTrackUrl: string | null;
+  sourceAvailability: LibrarySourceAvailability;
+  sourceReferenceStatus: LibrarySourceReferenceStatus;
+  localStatus: LibraryCandidateLocalStatus;
+  practiceStatus: LibraryCandidatePracticeStatus;
+}
+
+/**
+ * Immutable discovery identity carried into a generated local chart. This is
+ * metadata only: it never grants download, streaming, or playback rights.
+ */
+export interface LibrarySourceTrackProvenance {
+  provider: 'yandex-music';
+  collectionId: string;
+  collectionName: string;
+  trackId: string;
+  title: string;
+  artists: string[];
+  durationSeconds?: number;
+  sourceUrl?: string;
+}
+
+export type PlayabilityAudioSource =
+  | 'local-user-attested'
+  | 'public-chart-package';
+
+export type PlayabilityChartSource =
+  | 'local-auto-chart'
+  | 'chorus-encore'
+  | 'rhythmverse';
+
+export interface PlayabilityEvidence {
+  identity: {
+    title: string;
+    artists: string[];
+    durationSeconds: number;
+  };
+  audio: {
+    source: PlayabilityAudioSource;
+    sha256: string;
+  };
+  chart: {
+    source: PlayabilityChartSource;
+    id: string;
+    sha256: string;
+    reviewed: true;
+  };
+  scan: {
+    passed: true;
+    format: 'mid' | 'chart';
+    drumDifficulties: Difficulty[];
+  };
+  launch: {
+    passed: true;
+    mode: 'headless-load';
+    verifiedAt: string;
+  };
+}
+
+export type PlayabilityBlocker =
+  | 'identity'
+  | 'lawful-audio'
+  | 'chart-provenance'
+  | 'scan-chart'
+  | 'launch-proof';
+
+export interface PublicDrumChartCandidate {
+  source: Exclude<PlayabilityChartSource, 'local-auto-chart'>;
+  id: string;
+  title: string;
+  artists: string[];
+  durationSeconds?: number;
+  hasDrums: boolean;
+  reviewed: boolean;
+  sourceUrl: string;
+  downloadUrl?: string;
+}
+
+export interface ChartMatchRejection {
+  candidate: PublicDrumChartCandidate;
+  reason: 'title' | 'artist' | 'duration' | 'no-drums' | 'unreviewed';
+}
+
+export interface LibraryCandidateResolution {
+  trackId: string;
+  status:
+    | 'exact-reviewed-chart'
+    | 'no-exact-reviewed-chart'
+    | 'identity-incomplete';
+  match?: PublicDrumChartCandidate;
+  rejected: ChartMatchRejection[];
+  blockers: string[];
+}
+
+export interface IpcResolveLibraryCandidatesRequest {
+  sources: LibrarySourceTrackProvenance[];
+}
+
+export interface IpcResolveLibraryCandidatesResponse {
+  results: LibraryCandidateResolution[];
+}
+
+export interface YandexPlaylistCandidateCollection {
+  schemaVersion: 2;
+  source: 'yandex-music';
+  playlist: YandexPlaylistSource;
+  completeness: YandexPlaylistCompleteness;
+  integrity: YandexPlaylistIntegrity;
+  tracks: YandexPlaylistCandidate[];
+}
+
+export interface YandexLibraryCandidateSources {
+  drums: YandexPlaylistCandidateCollection;
+  favorites: YandexPlaylistCandidateCollection;
+}
+
+export interface IpcLibraryCandidatesResponse {
+  yandex: YandexLibraryCandidateSources;
+}
+
+/** User-readable evidence retained when an authored lesson is superseded. */
+export interface RetiredLessonEvidence {
+  /** Every historical song/storage ID which can still own saved evidence. */
+  legacySongIds: string[];
+  lessonId?: string;
+  name: string;
+  bestStars: number;
+  recentRunCount: number;
+  fullRunCount: number;
+  archivedRunCount: number;
+  goalCount: number;
+}
+
+export interface IpcRetiredLessonsResponse {
+  lessons: RetiredLessonEvidence[];
+}
 
 export interface StorageSchema {
   songs: {

@@ -12,10 +12,16 @@ import { Measure, ParsedChart, RenderData } from '../../chart-parser/types';
 import { InputMapping, ScoreData } from '../../types';
 import { PlayheadStyle } from '../types';
 import { PlayerMode } from '../services/audio-player';
-import { Engine, PlaybackSnapshot, PlaybackState } from '../services/engine';
+import {
+  CountInPolicy,
+  Engine,
+  PlaybackSnapshot,
+  PlaybackState,
+} from '../services/engine';
 import { inputBus } from '../input';
 import { useInput } from '../context/InputContext';
-import { RunSummary } from '../services/practice-stats';
+import { HitRecord, RunSummary } from '../services/practice-stats';
+import { HIT_TOLERANCE_SECONDS } from '../services/engine/constants';
 
 interface UseEngineParams {
   trackData: TrackConfig[];
@@ -28,8 +34,14 @@ interface UseEngineParams {
   countInEnabled: boolean;
   playheadStyle: PlayheadStyle;
   mapping: InputMapping;
+  hitToleranceSeconds?: number;
+  preferUnhitNotes?: boolean;
   player: PlayerMode;
-  onEnded: (score: ScoreData, practiceSummary: RunSummary) => void;
+  onEnded: (
+    score: ScoreData,
+    practiceSummary: RunSummary,
+    records: HitRecord[],
+  ) => void;
 }
 
 interface UseEngineResult {
@@ -42,10 +54,11 @@ interface UseEngineResult {
   isStarted: boolean;
   isEnded: boolean;
   countInBeat: number | undefined;
+  countInBeats: number | undefined;
   countInBeatMs: number | undefined;
   duration: number;
   play: () => void;
-  playFromTick: (tick: number) => void;
+  playFromTick: (tick: number, countInPolicy?: CountInPolicy) => void;
   pause: () => void;
   cancel: () => void;
   seekSeconds: (seconds: number) => void;
@@ -61,6 +74,7 @@ const IDLE_SNAPSHOT: PlaybackSnapshot = {
   isStarted: false,
   isEnded: false,
   countInBeat: undefined,
+  countInBeats: undefined,
   countInBeatMs: undefined,
   isReady: false,
   duration: 0,
@@ -77,6 +91,8 @@ export function useEngine({
   countInEnabled,
   playheadStyle,
   mapping,
+  hitToleranceSeconds = HIT_TOLERANCE_SECONDS,
+  preferUnhitNotes = false,
   player,
   onEnded,
 }: UseEngineParams): UseEngineResult {
@@ -84,17 +100,12 @@ export function useEngine({
   const { inputLatencyMs } = useInput();
   const onEndedRef = useRef(onEnded);
   const isDevRef = useRef(isDev);
-  const playerRef = useRef(player);
   const [fallbackTimeStore] = useState(() => new TimeStore());
   const [engine, setEngine] = useState<Engine | undefined>(undefined);
 
   useEffect(() => {
     onEndedRef.current = onEnded;
   }, [onEnded]);
-
-  useEffect(() => {
-    playerRef.current = player;
-  }, [player]);
 
   useEffect(() => {
     isDevRef.current = isDev;
@@ -105,10 +116,10 @@ export function useEngine({
     const instance = new Engine({
       trackData,
       isDev: isDevRef.current,
-      player: playerRef.current,
+      player,
       subscribeInput: inputBus.subscribe,
-      onEnded: (score, practiceSummary) =>
-        onEndedRef.current(score, practiceSummary),
+      onEnded: (score, practiceSummary, records) =>
+        onEndedRef.current(score, practiceSummary, records),
       onError: () =>
         notification.error({
           title: 'Audio failed to load',
@@ -124,7 +135,7 @@ export function useEngine({
       instance.dispose();
       setEngine(undefined);
     };
-  }, [trackData, notification]);
+  }, [trackData, notification, player]);
 
   useEffect(() => {
     engine?.setContext({
@@ -135,6 +146,8 @@ export function useEngine({
       countInEnabled,
       minDurationSeconds,
       mapping,
+      hitToleranceSeconds,
+      preferUnhitNotes,
     });
   }, [
     engine,
@@ -145,6 +158,8 @@ export function useEngine({
     minDurationSeconds,
     countInEnabled,
     mapping,
+    hitToleranceSeconds,
+    preferUnhitNotes,
   ]);
 
   useEffect(() => {
@@ -166,7 +181,8 @@ export function useEngine({
   const snapshot = useSyncExternalStore(subscribe, getSnapshot);
   const play = useCallback(() => engine?.play(), [engine]);
   const playFromTick = useCallback(
-    (tick: number) => engine?.playFromTick(tick),
+    (tick: number, countInPolicy: CountInPolicy = 'inherit') =>
+      engine?.playFromTick(tick, countInPolicy),
     [engine],
   );
   const pause = useCallback(() => engine?.pause(), [engine]);
@@ -198,6 +214,7 @@ export function useEngine({
     isStarted: snapshot.isStarted,
     isEnded: snapshot.isEnded,
     countInBeat: snapshot.countInBeat,
+    countInBeats: snapshot.countInBeats,
     countInBeatMs: snapshot.countInBeatMs,
     duration: snapshot.duration,
     play,

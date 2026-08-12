@@ -1,0 +1,652 @@
+{
+  "source": "current Electron production build plus Storybook component fixtures",
+  "supportedViewports": [
+    {
+      "name": "1224x768",
+      "width": 1224,
+      "height": 768
+    },
+    {
+      "name": "1024x700",
+      "width": 1024,
+      "height": 700
+    }
+  ],
+  "electron": {
+    "favourite": {
+      "id": "fda258aa-1d9f-41a4-a3ea-89800969ff36",
+      "name": "Blood // Water"
+    },
+    "proofs": [
+      {
+        "label": "home-full-1224x768",
+        "viewport": {
+          "width": 1224,
+          "height": 768
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 666,
+          "scrollHeight": 666,
+          "ownScroll": false
+        }
+      },
+      {
+        "label": "home-short-1224x768",
+        "viewport": {
+          "width": 1224,
+          "height": 768
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 666,
+          "scrollHeight": 666,
+          "ownScroll": false
+        }
+      },
+      {
+        "label": "home-short-1024x700",
+        "viewport": {
+          "width": 1024,
+          "height": 700
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 598,
+          "scrollHeight": 599,
+          "ownScroll": false
+        }
+      },
+      {
+        "label": "profile-runway-1224x768",
+        "viewport": {
+          "width": 1224,
+          "height": 768
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 666,
+          "scrollHeight": 1800,
+          "ownScroll": true
+        }
+      },
+      {
+        "label": "profile-runway-1024x700",
+        "viewport": {
+          "width": 1024,
+          "height": 700
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 598,
+          "scrollHeight": 1987,
+          "ownScroll": true
+        }
+      }
+    ],
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  "storybook": {
+    "proofs": [
+      {
+        "label": "score-musical-receipt-1224x768",
+        "viewport": {
+          "width": 1224,
+          "height": 768
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 768,
+          "scrollHeight": 1256,
+          "ownScroll": true
+        }
+      },
+      {
+        "label": "score-musical-receipt-1024x700",
+        "viewport": {
+          "width": 1024,
+          "height": 700
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 700,
+          "scrollHeight": 1256,
+          "ownScroll": true
+        }
+      },
+      {
+        "label": "score-supporting-proof-1224x768",
+        "viewport": {
+          "width": 1224,
+          "height": 768
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 768,
+          "scrollHeight": 1256,
+          "ownScroll": true
+        }
+      },
+      {
+        "label": "score-supporting-proof-1024x700",
+        "viewport": {
+          "width": 1024,
+          "height": 700
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 700,
+          "scrollHeight": 1256,
+          "ownScroll": true
+        }
+      },
+      {
+        "label": "profile-story-runway-1224x768",
+        "viewport": {
+          "width": 1224,
+          "height": 768
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 768,
+          "scrollHeight": 1932,
+          "ownScroll": true
+        }
+      },
+      {
+        "label": "profile-story-runway-1024x700",
+        "viewport": {
+          "width": 1024,
+          "height": 700
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 700,
+          "scrollHeight": 1967,
+          "ownScroll": true
+        }
+      },
+      {
+        "label": "achievement-proof-order-1224x768",
+        "viewport": {
+          "width": 1224,
+          "height": 768
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 902,
+          "scrollHeight": 902,
+          "ownScroll": false
+        }
+      },
+      {
+        "label": "achievement-proof-order-1024x700",
+        "viewport": {
+          "width": 1024,
+          "height": 700
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 902,
+          "scrollHeight": 902,
+          "ownScroll": false
+        }
+      },
+      {
+        "label": "p1-home-evidence-cards-1224x768",
+        "viewport": {
+          "width": 1224,
+          "height": 768
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 768,
+          "scrollHeight": 768,
+          "ownScroll": false
+        }
+      },
+      {
+        "label": "p1-home-evidence-cards-1024x700",
+        "viewport": {
+          "width": 1024,
+          "height": 700
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 700,
+          "scrollHeight": 700,
+          "ownScroll": false
+        }
+      },
+      {
+        "label": "p1-profile-weekly-rhythm-1224x768",
+        "viewport": {
+          "width": 1224,
+          "height": 768
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 768,
+          "scrollHeight": 1932,
+          "ownScroll": true
+        }
+      },
+      {
+        "label": "p1-profile-weekly-rhythm-1024x700",
+        "viewport": {
+          "width": 1024,
+          "height": 700
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 700,
+          "scrollHeight": 1967,
+          "ownScroll": true
+        }
+      },
+      {
+        "label": "p1-weekly-musical-recap-1224x768",
+        "viewport": {
+          "width": 1224,
+          "height": 768
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 768,
+          "scrollHeight": 1932,
+          "ownScroll": true
+        }
+      },
+      {
+        "label": "p1-weekly-musical-recap-1024x700",
+        "viewport": {
+          "width": 1024,
+          "height": 700
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 700,
+          "scrollHeight": 1967,
+          "ownScroll": true
+        }
+      },
+      {
+        "label": "p1-section-audition-1224x768",
+        "viewport": {
+          "width": 1224,
+          "height": 768
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 768,
+          "scrollHeight": 1185,
+          "ownScroll": true
+        }
+      },
+      {
+        "label": "p1-section-audition-1024x700",
+        "viewport": {
+          "width": 1024,
+          "height": 700
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 700,
+          "scrollHeight": 1185,
+          "ownScroll": true
+        }
+      },
+      {
+        "label": "p1-audition-ready-1224x768",
+        "viewport": {
+          "width": 1224,
+          "height": 768
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 50,
+          "scrollHeight": 50,
+          "ownScroll": false
+        }
+      },
+      {
+        "label": "p1-audition-ready-1024x700",
+        "viewport": {
+          "width": 1024,
+          "height": 700
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 50,
+          "scrollHeight": 50,
+          "ownScroll": false
+        }
+      },
+      {
+        "label": "p1-phrase-tier-1224x768",
+        "viewport": {
+          "width": 1224,
+          "height": 768
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 70,
+          "scrollHeight": 70,
+          "ownScroll": false
+        }
+      },
+      {
+        "label": "p1-phrase-tier-1024x700",
+        "viewport": {
+          "width": 1024,
+          "height": 700
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 70,
+          "scrollHeight": 70,
+          "ownScroll": false
+        }
+      },
+      {
+        "label": "p1-phrase-return-1224x768",
+        "viewport": {
+          "width": 1224,
+          "height": 768
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 29,
+          "scrollHeight": 29,
+          "ownScroll": false
+        }
+      },
+      {
+        "label": "p1-phrase-return-1024x700",
+        "viewport": {
+          "width": 1024,
+          "height": 700
+        },
+        "outerScroll": {
+          "document": {
+            "horizontal": false,
+            "vertical": false
+          },
+          "body": {
+            "horizontal": false,
+            "vertical": false
+          }
+        },
+        "target": {
+          "visible": true,
+          "clientHeight": 29,
+          "scrollHeight": 29,
+          "ownScroll": false
+        }
+      }
+    ],
+    "consoleErrors": [],
+    "pageErrors": []
+  }
+}

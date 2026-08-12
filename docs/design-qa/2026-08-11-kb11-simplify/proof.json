@@ -1,0 +1,78 @@
+{
+  "source": "local Storybook component fixtures",
+  "viewport": {
+    "width": 1224,
+    "height": 768
+  },
+  "home": {
+    "zones": [
+      {
+        "color": "yellow",
+        "label": "Hi-hat. Preview this drum.",
+        "opacity": "0.82",
+        "background": "radial-gradient(circle, color(srgb 0.760784 0.478431 0.0627451 / 0.38), color(srgb 0.760784 0.478431 0.0627451 / 0.1) 68%, rgba(0, 0, 0, 0) 72%)",
+        "border": "color(srgb 0.813412 0.593176 0.268941)"
+      },
+      {
+        "color": "green",
+        "label": "Crash. Open Profile.",
+        "opacity": "0.82",
+        "background": "radial-gradient(circle, color(srgb 0.0862745 0.533333 0.356863 / 0.38), color(srgb 0.0862745 0.533333 0.356863 / 0.1) 68%, rgba(0, 0, 0, 0) 72%)",
+        "border": "color(srgb 0.287294 0.636 0.498353)"
+      },
+      {
+        "color": "yellow",
+        "label": "Tom 1. Open Journey.",
+        "opacity": "0.82",
+        "background": "radial-gradient(circle, color(srgb 0.760784 0.478431 0.0627451 / 0.38), color(srgb 0.760784 0.478431 0.0627451 / 0.1) 68%, rgba(0, 0, 0, 0) 72%)",
+        "border": "color(srgb 0.813412 0.593176 0.268941)"
+      },
+      {
+        "color": "blue",
+        "label": "Tom 2. Preview this drum.",
+        "opacity": "0.82",
+        "background": "radial-gradient(circle, color(srgb 0.141176 0.494118 0.682353 / 0.38), color(srgb 0.141176 0.494118 0.682353 / 0.1) 68%, rgba(0, 0, 0, 0) 72%)",
+        "border": "color(srgb 0.330118 0.605412 0.752235)"
+      },
+      {
+        "color": "blue",
+        "label": "Ride. Open Coach.",
+        "opacity": "0.82",
+        "background": "radial-gradient(circle, color(srgb 0.141176 0.494118 0.682353 / 0.38), color(srgb 0.141176 0.494118 0.682353 / 0.1) 68%, rgba(0, 0, 0, 0) 72%)",
+        "border": "color(srgb 0.330118 0.605412 0.752235)"
+      },
+      {
+        "color": "red",
+        "label": "Snare. Open Songs.",
+        "opacity": "0.82",
+        "background": "radial-gradient(circle, color(srgb 0.807843 0.247059 0.329412 / 0.38), color(srgb 0.807843 0.247059 0.329412 / 0.1) 68%, rgba(0, 0, 0, 0) 72%)",
+        "border": "color(srgb 0.850118 0.412706 0.476941)"
+      },
+      {
+        "color": "green",
+        "label": "Floor tom. Preview this drum.",
+        "opacity": "0.82",
+        "background": "radial-gradient(circle, color(srgb 0.0862745 0.533333 0.356863 / 0.38), color(srgb 0.0862745 0.533333 0.356863 / 0.1) 68%, rgba(0, 0, 0, 0) 72%)",
+        "border": "color(srgb 0.287294 0.636 0.498353)"
+      },
+      {
+        "color": "orange",
+        "label": "Kick. Preview this drum.",
+        "opacity": "0.82",
+        "background": "radial-gradient(circle, color(srgb 0.913725 0.364706 0.215686 / 0.38), color(srgb 0.913725 0.364706 0.215686 / 0.1) 68%, rgba(0, 0, 0, 0) 72%)",
+        "border": "color(srgb 0.932706 0.504471 0.388235)"
+      }
+    ],
+    "snareHover": {
+      "opacity": "1",
+      "transform": "matrix(1.05, 0, 0, 1.05, 0, 0)",
+      "boxShadow": "color(srgb 0.807843 0.247059 0.329412 / 0.24) 0px 0px 0px 4.8px, color(srgb 0.807843 0.247059 0.329412 / 0.58) 0px 0px 33.6px 0px, color(srgb 0.807843 0.247059 0.329412 / 0.36) 0px 0px 20.8px 0px inset"
+    }
+  },
+  "profile": {
+    "open": false,
+    "summary": "Practice plan"
+  },
+  "consoleErrors": [],
+  "pageErrors": []
+}

@@ -2,7 +2,7 @@
 transcription via musical reduction, each gated by an explicit playability
 cap.
 
-A chart can be onset-accurate and still be unplayable ("не игрально") — a
+A chart can be onset-accurate and still be physically unplayable — a
 1:1 dump of every detected hit onto a lower difficulty is not a real Easy
 chart. Each level below Expert is built by literal musical reduction
 (dropping lanes, thinning fills, downsampling hi-hats to a steady pulse),

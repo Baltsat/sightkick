@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@source '.';
 @import './styles/fonts.css';
 @import './styles/theme.css';
 @import './styles/sheet-music.css';

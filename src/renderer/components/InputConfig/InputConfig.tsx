@@ -23,6 +23,8 @@ interface Props {
   onClose: () => void;
   devices: InputDevice[];
   selectedDeviceId: string | undefined;
+  selectedDeviceName?: string;
+  inputReadiness?: 'connected' | 'reconnecting' | 'waiting';
   onSelectDevice: (id: string | undefined) => void;
   mapping: ElementMapping;
   listeningTo: InputElement | undefined;
@@ -39,6 +41,8 @@ export function InputConfig({
   onClose,
   devices,
   selectedDeviceId,
+  selectedDeviceName,
+  inputReadiness,
   onSelectDevice,
   mapping,
   listeningTo,
@@ -49,6 +53,10 @@ export function InputConfig({
   inputLatencyMs,
   onInputLatencyChange,
 }: Props) {
+  const rememberedDeviceIsMissing =
+    inputReadiness === 'reconnecting' &&
+    selectedDeviceId !== undefined &&
+    !devices.some((device) => device.id === selectedDeviceId);
   const renderElement = (element: MappingElement) => (
     <div
       key={element.value}
@@ -156,6 +164,16 @@ export function InputConfig({
               onChange={(value) => onSelectDevice(value)}
               options={[
                 { value: undefined, label: '- None -' },
+                ...(rememberedDeviceIsMissing
+                  ? [
+                      {
+                        value: selectedDeviceId,
+                        label: `${
+                          selectedDeviceName ?? 'MIDI device'
+                        } (reconnecting)`,
+                      },
+                    ]
+                  : []),
                 ...devices.map(({ id, name }) => ({ value: id, label: name })),
               ]}
             />
@@ -168,6 +186,18 @@ export function InputConfig({
               />
             </Tooltip>
           </div>
+          {inputReadiness === 'reconnecting' && (
+            <div className="text-text-muted text-xs">
+              Reconnecting to your remembered MIDI device. Keep it connected;
+              its mappings will be restored when it returns.
+            </div>
+          )}
+          {inputReadiness === 'waiting' && (
+            <div className="text-text-muted text-xs">
+              Choose an input when you are ready. Keyboard input remains
+              available without a MIDI device.
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-1 shrink-0">

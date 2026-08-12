@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { App } from 'antd';
@@ -14,6 +15,7 @@ import {
   InputElement,
   InputMapping,
   IpcErrorResponse,
+  MidiReadyResponse,
 } from '../../types';
 import {
   controlLabel,
@@ -34,6 +36,15 @@ import {
 interface InputContextValue {
   selectedDevice: InputDevice | null;
   setSelectedDevice: (d: InputDevice | null) => void;
+  reconnectMidi: () => void;
+  /**
+   * MIDI is only "connected" after the remembered device is present in a
+   * fresh enumeration and its current port has been opened. A remembered kit
+   * that is unplugged remains selected, but reports "reconnecting" rather
+   * than pretending that the keyboard was chosen instead.
+   */
+  inputReadiness: InputReadiness;
+  midiPortEpoch: number;
   inputMapping: InputMapping;
   controlMapping: ControlMapping;
   kitControlIds: Set<string>;
@@ -42,6 +53,8 @@ interface InputContextValue {
   inputLatencyMs: number;
   setInputLatencyMs: (ms: number) => void;
 }
+
+export type InputReadiness = 'connected' | 'reconnecting' | 'waiting';
 
 const EMPTY_INPUT_MAPPING: Record<keyof InputMapping, string[]> = {
   hihat: [],
@@ -136,22 +149,76 @@ function assignControlInto(
 const InputContext = createContext<InputContextValue | null>(null);
 const SELECTED_DEVICE_KEY = 'settings.selectedDevice';
 
+export const MIDI_AUTO_CONNECT_OPT_OUT_KEY = 'settings.midiAutoConnectOptOut';
+
+export const MIDI_RECONNECT_DELAY_MS = 1_000;
+
+// A missing kit is expected to stay missing while the player plugs in USB,
+// turns on the module, or returns from a break. Keep probing for the whole
+// session, but back off so an unplugged kit does not create a hot IPC loop.
+export const MAX_MIDI_RECONNECT_DELAY_MS = 15_000;
+
+export function midiReconnectDelayMs(attempt: number): number {
+  return Math.min(
+    MIDI_RECONNECT_DELAY_MS * 2 ** Math.min(Math.max(0, attempt), 4),
+    MAX_MIDI_RECONNECT_DELAY_MS,
+  );
+}
+
+// A fresh profile can encounter always-on virtual buses alongside the drum
+// module. Prefer one unmistakable Yamaha DTX port, otherwise only accept a
+// single unambiguous MIDI input. Two plausible kits still require a deliberate
+// choice; silently binding the wrong controller would be worse than waiting.
+const DTX_DEVICE_NAME = /\bdtx[\w-]*\b/i;
+
+export function autoSelectableMidiDevice(
+  devices: InputDevice[],
+): InputDevice | undefined {
+  const dtxDevices = devices.filter((device) =>
+    DTX_DEVICE_NAME.test(device.name),
+  );
+
+  if (dtxDevices.length === 1) {
+    return dtxDevices[0];
+  }
+
+  return devices.length === 1 ? devices[0] : undefined;
+}
+
+// A low-frequency probe catches physical USB disconnects that the native MIDI
+// driver does not always surface as an error event. It is deliberately a
+// single timeout, not an accumulating interval, and every query itself has a
+// timeout in MidiSource.
+export const MIDI_HEALTH_CHECK_DELAY_MS = 5_000;
+
+export const MIDI_OPEN_ACK_TIMEOUT_MS = 2_500;
+
 export function InputProvider({ children }: { children: ReactNode }) {
-  // Captured once, synchronously, during the first render — before
-  // `usePersisted`'s own write-back effect below has a chance to run and
-  // persist its default. This is the only reliable way to tell "this
-  // profile has never recorded a device preference" apart from "the
-  // preference is currently null" (a stored explicit "- None -" choice, or
-  // a previously-selected device that later disappeared, both also read
-  // back as null). Only a genuinely never-stored profile is eligible for
-  // auto-selecting a lone MIDI device below.
-  const [hadStoredDevice] = useState(
-    () => localStorage.getItem(SELECTED_DEVICE_KEY) !== null,
+  const [selectedDevice, setPersistedSelectedDevice] =
+    usePersisted<InputDevice | null>(SELECTED_DEVICE_KEY, null);
+  const [midiAutoConnectOptOut, setMidiAutoConnectOptOut] =
+    usePersisted<boolean>(MIDI_AUTO_CONNECT_OPT_OUT_KEY, false);
+  // Older releases wrote the fallback null device into every profile, so a
+  // stored null cannot mean that the player deliberately chose "- None -".
+  // The separate opt-out marker preserves new explicit choices while legacy
+  // null profiles migrate back to safe, unambiguous hardware auto-connect.
+  const [canAutoSelectMidi, setCanAutoSelectMidi] = useState(
+    () => selectedDevice === null && !midiAutoConnectOptOut,
   );
-  const [selectedDevice, setSelectedDevice] = usePersisted<InputDevice | null>(
-    SELECTED_DEVICE_KEY,
-    null,
-  );
+  const [inputReadiness, setInputReadiness] = useState<InputReadiness>(() => {
+    if (!selectedDevice) {
+      return 'waiting';
+    }
+
+    return selectedDevice.sourceId === 'midi' ? 'reconnecting' : 'connected';
+  });
+  const [midiReconnectEpoch, setMidiReconnectEpoch] = useState(0);
+  const [midiOpenEpoch, setMidiOpenEpoch] = useState(0);
+  const [confirmedMidiPort, setConfirmedMidiPort] = useState<
+    number | undefined
+  >(undefined);
+  const reconnectAttempts = useRef(0);
+  const midiRetryTimer = useRef<number | undefined>(undefined);
   const [inputMappings, setInputMappings] = usePersisted<
     Record<string, InputMapping>
   >('settings.inputMappings', {});
@@ -163,6 +230,60 @@ export function InputProvider({ children }: { children: ReactNode }) {
     0,
   );
   const { notification } = App.useApp();
+  const clearMidiRetry = useCallback(() => {
+    if (midiRetryTimer.current !== undefined) {
+      window.clearTimeout(midiRetryTimer.current);
+      midiRetryTimer.current = undefined;
+    }
+  }, []);
+  const scheduleMidiRetry = useCallback(() => {
+    if (midiRetryTimer.current !== undefined) {
+      return;
+    }
+
+    const delay = midiReconnectDelayMs(reconnectAttempts.current);
+
+    reconnectAttempts.current += 1;
+    midiRetryTimer.current = window.setTimeout(() => {
+      midiRetryTimer.current = undefined;
+      setMidiOpenEpoch((epoch) => epoch + 1);
+    }, delay);
+  }, []);
+  const setSelectedDevice = useCallback(
+    (device: InputDevice | null) => {
+      // Persist a conscious "- None -" separately from the legacy null
+      // fallback. Choosing any real input clears that opt-out again.
+      setMidiAutoConnectOptOut(device === null);
+      setCanAutoSelectMidi(false);
+      clearMidiRetry();
+      reconnectAttempts.current = 0;
+      setConfirmedMidiPort(undefined);
+      setPersistedSelectedDevice(device);
+
+      let readiness: InputReadiness = 'waiting';
+
+      if (device) {
+        readiness = device.sourceId === 'midi' ? 'reconnecting' : 'connected';
+      }
+
+      setInputReadiness(readiness);
+      setMidiReconnectEpoch((epoch) => epoch + 1);
+      setMidiOpenEpoch((epoch) => epoch + 1);
+    },
+    [clearMidiRetry, setMidiAutoConnectOptOut, setPersistedSelectedDevice],
+  );
+  const reconnectMidi = useCallback(() => {
+    if (selectedDevice?.sourceId !== 'midi') {
+      return;
+    }
+
+    clearMidiRetry();
+    reconnectAttempts.current = 0;
+    setConfirmedMidiPort(undefined);
+    setInputReadiness('reconnecting');
+    setMidiReconnectEpoch((epoch) => epoch + 1);
+    setMidiOpenEpoch((epoch) => epoch + 1);
+  }, [clearMidiRetry, selectedDevice]);
   const inputMapping = useMemo(() => {
     const stored = selectedDevice
       ? inputMappings[selectedDevice.id]
@@ -264,54 +385,192 @@ export function InputProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     inputBus.start();
 
-    return () => inputBus.stop();
-  }, []);
+    return () => {
+      clearMidiRetry();
+      inputBus.stop();
+    };
+  }, [clearMidiRetry]);
 
   useEffect(() => {
+    let cancelled = false;
+    let healthCheckTimer: number | undefined;
+    const scheduleHealthCheck = () => {
+      healthCheckTimer = window.setTimeout(() => {
+        setMidiReconnectEpoch((epoch) => epoch + 1);
+      }, MIDI_HEALTH_CHECK_DELAY_MS);
+    };
+
     inputBus.listDevices().then((list) => {
-      setSelectedDevice((prev: InputDevice | null) => {
-        if (prev) {
-          return list.some((d) => d.id === prev.id) ? prev : null;
+      if (cancelled) {
+        return;
+      }
+
+      const midiDevices = list.filter((d) => d.sourceId === 'midi');
+
+      if (!selectedDevice) {
+        setConfirmedMidiPort(undefined);
+        // Keyboard is synthetic and must not turn an empty hardware setup
+        // into a false positive. Profiles without a deliberate MIDI opt-out
+        // may accept the sole safe real MIDI input.
+
+        const autoSelectedDevice = canAutoSelectMidi
+          ? autoSelectableMidiDevice(midiDevices)
+          : undefined;
+
+        if (autoSelectedDevice) {
+          clearMidiRetry();
+          reconnectAttempts.current = 0;
+          setCanAutoSelectMidi(false);
+          setConfirmedMidiPort(autoSelectedDevice.port);
+          setPersistedSelectedDevice(autoSelectedDevice);
+          setInputReadiness('reconnecting');
+        } else {
+          setInputReadiness('waiting');
+
+          // On a never-configured profile, an empty or ambiguous device list
+          // is not terminal: the player may simply not have plugged the USB
+          // cable in yet. Keep the same bounded background probe used for a
+          // remembered disconnected kit, without requiring Settings.
+          if (canAutoSelectMidi) {
+            scheduleMidiRetry();
+          }
         }
 
-        // Nothing selected yet. Auto-pick a sole MIDI device, but only for
-        // a profile with no recorded preference at all — an explicit
-        // "- None -" choice (or the aftermath of a device disconnecting)
-        // must stay respected even though it also reads back as null.
-        if (hadStoredDevice) {
-          return null;
+        return;
+      }
+
+      if (selectedDevice.sourceId !== 'midi') {
+        setConfirmedMidiPort(undefined);
+        setInputReadiness('connected');
+
+        return;
+      }
+
+      // The port index is intentionally treated as ephemeral. Device IDs are
+      // name-based, so a Yamaha DTX or generic GM kit returns to the same
+      // mapping even when macOS reorders its ports after a reconnect.
+      const liveDevice = midiDevices.find(
+        (device) => device.id === selectedDevice.id,
+      );
+
+      if (liveDevice) {
+        setConfirmedMidiPort(liveDevice.port);
+
+        const portChanged =
+          liveDevice.port !== selectedDevice.port ||
+          liveDevice.name !== selectedDevice.name;
+
+        if (portChanged) {
+          clearMidiRetry();
+          setPersistedSelectedDevice(liveDevice);
+          setInputReadiness('reconnecting');
+          setMidiOpenEpoch((epoch) => epoch + 1);
         }
 
-        const midiDevices = list.filter((d) => d.sourceId === 'midi');
+        scheduleHealthCheck();
 
-        return midiDevices.length === 1 ? midiDevices[0] : null;
-      });
+        return;
+      }
+
+      // Keep the persisted identity and all of its mappings while the kit is
+      // unplugged. Retrying stays background-only for the whole session and
+      // uses a bounded backoff, so the player never has to reopen settings
+      // merely because the module appeared after launch.
+      setConfirmedMidiPort(undefined);
+      setInputReadiness('reconnecting');
+      scheduleMidiRetry();
     });
-  }, [setSelectedDevice, hadStoredDevice]);
+
+    return () => {
+      cancelled = true;
+
+      if (healthCheckTimer !== undefined) {
+        window.clearTimeout(healthCheckTimer);
+      }
+    };
+  }, [
+    selectedDevice,
+    canAutoSelectMidi,
+    clearMidiRetry,
+    midiOpenEpoch,
+    midiReconnectEpoch,
+    scheduleMidiRetry,
+    setPersistedSelectedDevice,
+  ]);
 
   useEffect(() => {
-    if (selectedDevice?.sourceId !== 'midi') {
+    if (
+      selectedDevice?.sourceId !== 'midi' ||
+      confirmedMidiPort !== selectedDevice.port
+    ) {
       return undefined;
     }
 
-    const unsubscribe = window.electron.ipcRenderer.on<IpcErrorResponse>(
-      'midi-error',
-      () => {
-        notification.error({
-          title: "Couldn't connect to your MIDI device",
-          description: `"${selectedDevice.name}" isn't responding. Reconnect it, close any other app using it, or pick another device in settings.`,
-          placement: 'bottomRight',
-        });
+    let failureHandled = false;
+    const settleFailure = (description: string) => {
+      if (failureHandled) {
+        return;
+      }
+
+      failureHandled = true;
+      setConfirmedMidiPort(undefined);
+      setInputReadiness('reconnecting');
+      scheduleMidiRetry();
+
+      notification.error({
+        key: 'drumroll-midi-reconnect',
+        title: "Couldn't connect to your MIDI device",
+        description,
+        placement: 'bottomRight',
+      });
+    };
+    const unsubscribeReady = window.electron.ipcRenderer.on<MidiReadyResponse>(
+      'midi-ready',
+      ({ port }) => {
+        if (port !== selectedDevice.port || failureHandled) {
+          return;
+        }
+
+        if (acknowledgementTimer !== undefined) {
+          window.clearTimeout(acknowledgementTimer);
+        }
+
+        clearMidiRetry();
+        reconnectAttempts.current = 0;
+        setInputReadiness('connected');
       },
+    );
+    const unsubscribeError = window.electron.ipcRenderer.on<IpcErrorResponse>(
+      'midi-error',
+      () =>
+        settleFailure(
+          `"${selectedDevice.name}" isn't responding. Reconnect it, close any other app using it, or pick another device in settings.`,
+        ),
+    );
+    const acknowledgementTimer = window.setTimeout(
+      () =>
+        settleFailure(
+          `"${selectedDevice.name}" did not confirm a MIDI connection. Drumroll will keep trying in the background.`,
+        ),
+      MIDI_OPEN_ACK_TIMEOUT_MS,
     );
 
     window.electron.ipcRenderer.sendMessage('listen-midi', selectedDevice.port);
 
     return () => {
-      unsubscribe();
+      window.clearTimeout(acknowledgementTimer);
+      unsubscribeReady();
+      unsubscribeError();
       window.electron.ipcRenderer.sendMessage('stop-listen-midi');
     };
-  }, [selectedDevice, notification]);
+  }, [
+    clearMidiRetry,
+    confirmedMidiPort,
+    midiOpenEpoch,
+    notification,
+    scheduleMidiRetry,
+    selectedDevice,
+  ]);
 
   useEffect(() => {
     if (selectedDevice?.sourceId !== 'keyboard') {
@@ -353,6 +612,9 @@ export function InputProvider({ children }: { children: ReactNode }) {
     () => ({
       selectedDevice,
       setSelectedDevice,
+      reconnectMidi,
+      inputReadiness,
+      midiPortEpoch: midiOpenEpoch,
       inputMapping,
       controlMapping,
       kitControlIds,
@@ -364,6 +626,9 @@ export function InputProvider({ children }: { children: ReactNode }) {
     [
       selectedDevice,
       setSelectedDevice,
+      reconnectMidi,
+      inputReadiness,
+      midiOpenEpoch,
       inputMapping,
       controlMapping,
       kitControlIds,

@@ -12,10 +12,14 @@ import {
   IpcAutoChartMetadata,
   IpcCreateAutoChartRequest,
   IpcImportSongPreview,
+  LibrarySourceTrackProvenance,
+  PlayabilityEvidence,
   Song,
 } from '../../types';
 import { caCertEnv, getBinaryPath } from '../stemTools';
 import { ingestSongCover } from '../songCover';
+import { normalizeLibrarySourceProvenance } from '../../library-sources/provenance';
+import { createLocalAutoChartEvidence } from '../playability';
 import { importPreparedSong, previewPreparedSong } from './importSong';
 import {
   createRemoteAutoChartRunner,
@@ -107,6 +111,14 @@ export interface SightkickRuntime {
   pythonPath?: string;
 }
 
+export interface FfmpegRuntimeCandidateOptions {
+  isPackaged: boolean;
+  resourcesPath: string;
+  appPath: string;
+  platform?: NodeJS.Platform;
+  architecture?: string;
+}
+
 export interface AutoChartRunner {
   run: (
     payloadPath: string,
@@ -139,11 +151,16 @@ interface AutoChartDependencies {
     sourceDir: string,
     thumbnailUrl?: string,
   ) => Promise<IpcImportSongPreview>;
-  importSong: (sourceDir: string, artworkUrl?: string) => Promise<Song>;
+  importSong: (
+    sourceDir: string,
+    artworkUrl?: string,
+    playability?: PlayabilityEvidence,
+  ) => Promise<Song>;
   cleanup: (tempDir?: string) => Promise<void>;
   applyMetadata: (
     sourceDir: string,
     metadata?: IpcAutoChartMetadata,
+    sourceProvenance?: LibrarySourceTrackProvenance,
   ) => Promise<void>;
   makeId: () => string;
 }
@@ -200,7 +217,7 @@ function backendLabel(backend: AutoChartBackend): string {
     return 'local OCTAVE';
   }
 
-  return backend === 'remote' ? 'remote SightKick' : 'SightKick';
+  return backend === 'remote' ? 'remote Drumroll' : 'Drumroll';
 }
 
 export function canonicalizeYoutubeUrl(value: string): string {
@@ -457,6 +474,13 @@ function resolveOctaveRuntime(): OctaveRuntime {
   }
 
   const canonicalCacheDir = fs.realpathSync(cacheDir);
+  const ffmpegPath = resolveDrumrollFfmpegPath();
+
+  if (!ffmpegPath) {
+    throw new Error(
+      'OCTAVE charting requires Drumroll FFmpeg, SK_FFMPEG, or ffmpeg on PATH',
+    );
+  }
 
   return {
     pythonPath: path.join(
@@ -472,7 +496,7 @@ function resolveOctaveRuntime(): OctaveRuntime {
     workerPath: path.join(resources, 'resources', 'strum', 'strum_worker.py'),
     cacheDir: canonicalCacheDir,
     sourceDir: path.join(canonicalCacheDir, 'strum-source'),
-    ffmpegDir: path.join(resources, 'node_modules', 'ffmpeg-static'),
+    ffmpegDir: path.dirname(ffmpegPath),
   };
 }
 
@@ -673,6 +697,48 @@ function executableOnPath(name: string): string | undefined {
   return undefined;
 }
 
+export function drumrollFfmpegRuntimeCandidates({
+  isPackaged,
+  resourcesPath,
+  appPath,
+  platform = process.platform,
+  architecture = process.arch,
+}: FfmpegRuntimeCandidateOptions): string[] {
+  if (platform !== 'darwin' || architecture !== 'arm64') {
+    return [];
+  }
+
+  if (isPackaged) {
+    return [path.join(resourcesPath, 'ffmpeg-runtime', 'bin', 'ffmpeg')];
+  }
+
+  return [
+    path.join(
+      appPath,
+      'node_modules',
+      '.cache',
+      'drumroll-ffmpeg',
+      'macos-arm64',
+      'bin',
+      'ffmpeg',
+    ),
+  ];
+}
+
+function resolveDrumrollFfmpegPath(): string | undefined {
+  const ffmpegName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+
+  return [
+    process.env.SK_FFMPEG,
+    ...drumrollFfmpegRuntimeCandidates({
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      appPath: app.getAppPath(),
+    }),
+    executableOnPath(ffmpegName),
+  ].find(executableFile);
+}
+
 export function validateSightkickRuntime(
   runtime: Partial<SightkickRuntime>,
 ): SightkickRuntime {
@@ -680,7 +746,7 @@ export function validateSightkickRuntime(
 
   if (!runnerPath) {
     throw new Error(
-      'The bundled SightKick transcriber is missing or is not executable; reinstall SightKick or switch to the OCTAVE backend',
+      'The bundled Drumroll transcriber is missing or is not executable; reinstall Drumroll or switch to the OCTAVE backend',
     );
   }
 
@@ -688,7 +754,7 @@ export function validateSightkickRuntime(
 
   if (!ffmpegPath) {
     throw new Error(
-      'The SightKick ffmpeg runtime is missing; reinstall SightKick before creating a chart',
+      'The Drumroll FFmpeg runtime is unavailable; reinstall Drumroll, set SK_FFMPEG, or add ffmpeg to PATH before creating a chart',
     );
   }
 
@@ -697,12 +763,12 @@ export function validateSightkickRuntime(
 
   if (!uvPath && !pythonPath) {
     throw new Error(
-      'SightKick auto-chart requires bundled uv or Python 3.12+; reinstall SightKick or install Python 3.12',
+      'Drumroll auto-chart requires bundled uv or Python 3.12+; reinstall Drumroll or install Python 3.12',
     );
   }
 
   if (!runtime.dataDir) {
-    throw new Error('SightKick transcriber data directory is unavailable');
+    throw new Error('Drumroll transcriber data directory is unavailable');
   }
 
   return {
@@ -715,34 +781,7 @@ export function validateSightkickRuntime(
 }
 
 function preflightSightkickRuntime(): SightkickRuntime {
-  const ffmpegName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
-  const packagedFfmpeg = [
-    path.join(process.resourcesPath, 'ffmpeg-static', ffmpegName),
-    path.join(
-      process.resourcesPath,
-      'node_modules',
-      'ffmpeg-static',
-      ffmpegName,
-    ),
-    path.join(
-      process.resourcesPath,
-      'app.asar.unpacked',
-      'node_modules',
-      'ffmpeg-static',
-      ffmpegName,
-    ),
-  ];
-  const developmentFfmpeg = path.join(
-    app.getAppPath(),
-    'node_modules',
-    'ffmpeg-static',
-    ffmpegName,
-  );
-  const ffmpegPath = [
-    process.env.SK_FFMPEG,
-    ...(app.isPackaged ? packagedFfmpeg : [developmentFfmpeg]),
-    executableOnPath(ffmpegName),
-  ].find(executableFile);
+  const ffmpegPath = resolveDrumrollFfmpegPath();
   const uvPath = executableFile(process.env.SK_UV) ?? executableOnPath('uv');
   const pythonName = process.platform === 'win32' ? 'python.exe' : 'python3';
   const pythonPath = executableOnPath(pythonName);
@@ -775,7 +814,7 @@ function sightkickArgs(input: SightkickRunInput): string[] {
     args.push('--url', input.youtubeUrl);
   } else {
     throw new Error(
-      'SightKick auto-chart requires a YouTube URL or local audio file',
+      'Drumroll auto-chart requires a YouTube URL or local audio file',
     );
   }
 
@@ -908,7 +947,17 @@ function cleanIniValue(value: string): string {
 
 function upsertIniField(
   source: string,
-  field: 'name' | 'artist',
+  field:
+    | 'name'
+    | 'artist'
+    | 'sk_source_provider'
+    | 'sk_source_collection_id'
+    | 'sk_source_collection_name'
+    | 'sk_source_track_id'
+    | 'sk_source_title'
+    | 'sk_source_artists'
+    | 'sk_source_duration'
+    | 'sk_source_url',
   value: string,
 ): string {
   const cleanValue = cleanIniValue(value);
@@ -936,28 +985,69 @@ function upsertIniField(
 export async function applyOfficialMetadata(
   sourceDir: string,
   metadata?: IpcAutoChartMetadata,
+  sourceProvenance?: LibrarySourceTrackProvenance,
 ): Promise<void> {
-  if (!metadata) {
+  if (!metadata && !sourceProvenance) {
     return;
   }
 
   const iniPath = path.join(sourceDir, 'song.ini');
   const source = await fs.promises.readFile(iniPath, 'utf8');
-  const updated = upsertIniField(
-    upsertIniField(source, 'name', metadata.songName ?? metadata.title),
-    'artist',
-    metadata.artistName ?? metadata.authorName,
-  );
+  let updated = source;
+
+  if (metadata) {
+    updated = upsertIniField(
+      upsertIniField(updated, 'name', metadata.songName ?? metadata.title),
+      'artist',
+      metadata.artistName ?? metadata.authorName,
+    );
+  }
+
+  if (sourceProvenance) {
+    const fields = [
+      ['sk_source_provider', sourceProvenance.provider],
+      ['sk_source_collection_id', sourceProvenance.collectionId],
+      ['sk_source_collection_name', sourceProvenance.collectionName],
+      ['sk_source_track_id', sourceProvenance.trackId],
+      ['sk_source_title', sourceProvenance.title],
+      ['sk_source_artists', JSON.stringify(sourceProvenance.artists)],
+      ...(sourceProvenance.durationSeconds
+        ? ([
+            ['sk_source_duration', String(sourceProvenance.durationSeconds)],
+          ] as const)
+        : []),
+      ...(sourceProvenance.sourceUrl
+        ? ([['sk_source_url', sourceProvenance.sourceUrl]] as const)
+        : []),
+    ] as const;
+
+    for (const [field, value] of fields) {
+      updated = upsertIniField(updated, field, value);
+    }
+  }
 
   if (updated !== source) {
     await fs.promises.writeFile(iniPath, updated, 'utf8');
   }
 
-  if (metadata.thumbnailUrl) {
+  // The inferred songName/artistName (never the raw oEmbed title/authorName,
+  // which still carries "Official Video"/"ft. X" cruft) is what lets
+  // ingestSongCover try a real iTunes cover before falling back to the
+  // YouTube thumbnail. Only build an identity when *both* are present —
+  // fetchOfficialYoutubeMetadata always sets them together via
+  // inferTrackIdentity, so this is really just a defensive narrowing.
+  const identity =
+    metadata?.songName && metadata.artistName
+      ? { artist: metadata.artistName, title: metadata.songName }
+      : undefined;
+
+  if (metadata?.thumbnailUrl || identity) {
     try {
-      await ingestSongCover(sourceDir, metadata.thumbnailUrl);
+      await ingestSongCover(sourceDir, metadata?.thumbnailUrl, identity);
     } catch {
-      metadata.thumbnailUrl = undefined;
+      if (metadata) {
+        metadata.thumbnailUrl = undefined;
+      }
     }
   }
 }
@@ -1017,8 +1107,8 @@ function defaultDependencies(): AutoChartDependencies {
     remoteRunner: createRemoteAutoChartRunner(),
     preview: (sourceDir, thumbnailUrl) =>
       previewPreparedSong(sourceDir, { thumbnailUrl }),
-    importSong: (sourceDir, artworkUrl) =>
-      importPreparedSong({ sourceDir, artworkUrl }),
+    importSong: (sourceDir, artworkUrl, playability) =>
+      importPreparedSong({ sourceDir, artworkUrl, playability }),
     cleanup: cleanupTempDir,
     applyMetadata: applyOfficialMetadata,
     makeId: randomUUID,
@@ -1049,6 +1139,22 @@ export class AutoChartQueue {
     };
 
     try {
+      job.sourceProvenance = normalizeLibrarySourceProvenance(
+        request?.sourceProvenance,
+      );
+
+      if (job.sourceProvenance && !request?.localFile) {
+        throw new Error(
+          'Source-linked charts require lawful local audio; YouTube search cannot establish that proof',
+        );
+      }
+
+      if (job.sourceProvenance && !job.sourceProvenance.durationSeconds) {
+        throw new Error(
+          'Source-linked charts require a known duration before auto-charting',
+        );
+      }
+
       job.backend = this.resolveBackend(
         request?.backend,
         await this.dependencies.detectBackends(),
@@ -1160,6 +1266,12 @@ export class AutoChartQueue {
       youtubeUrl: previous.youtubeUrl,
       sourceName: previous.sourceName,
       metadata: previous.metadata,
+      sourceProvenance: previous.sourceProvenance
+        ? {
+            ...previous.sourceProvenance,
+            artists: [...previous.sourceProvenance.artists],
+          }
+        : undefined,
       backend: previous.backend,
       cancelled: false,
     };
@@ -1205,10 +1317,23 @@ export class AutoChartQueue {
     );
 
     try {
-      const song = await this.dependencies.importSong(
-        job.preparedDir,
-        job.metadata?.thumbnailUrl,
-      );
+      const playability = job.sourceProvenance
+        ? createLocalAutoChartEvidence(
+            job.preparedDir,
+            job.sourceProvenance,
+            job.id,
+          )
+        : undefined;
+      const song = playability
+        ? await this.dependencies.importSong(
+            job.preparedDir,
+            job.metadata?.thumbnailUrl,
+            playability,
+          )
+        : await this.dependencies.importSong(
+            job.preparedDir,
+            job.metadata?.thumbnailUrl,
+          );
 
       job.preview = undefined;
       job.song = song;
@@ -1270,7 +1395,7 @@ export class AutoChartQueue {
     }
 
     throw new Error(
-      'No auto-chart backend is available. Bundle the SightKick transcriber (resources/transcriber) or install OCTAVE.app',
+      'No auto-chart backend is available. Bundle the Drumroll transcriber (resources/transcriber) or install OCTAVE.app',
     );
   }
 
@@ -1319,7 +1444,7 @@ export class AutoChartQueue {
           job.audioPath = this.dependencies.validateAudio(job.audioPath);
         } else if (!job.youtubeUrl) {
           throw new Error(
-            'SightKick auto-chart requires a YouTube URL or local audio file',
+            'Drumroll auto-chart requires a YouTube URL or local audio file',
           );
         }
 
@@ -1418,7 +1543,7 @@ export class AutoChartQueue {
       downloading ? 'downloading' : 'processing',
       downloading
         ? 'Downloading audio from YouTube'
-        : 'SightKick is preparing a drum chart',
+        : 'Drumroll is preparing a drum chart',
       0,
     );
 
@@ -1582,7 +1707,11 @@ export class AutoChartQueue {
     job: AutoChartJob,
     preparedDir: string,
   ): Promise<void> {
-    await this.dependencies.applyMetadata(preparedDir, job.metadata);
+    await this.dependencies.applyMetadata(
+      preparedDir,
+      job.metadata,
+      job.sourceProvenance,
+    );
     job.preparedDir = preparedDir;
     job.preview = await this.dependencies.preview(
       preparedDir,
@@ -1627,7 +1756,7 @@ export class AutoChartQueue {
   ): string {
     if (!job.tempDir) {
       throw new Error(
-        'SightKick returned an unexpected prepared-chart location',
+        'Drumroll returned an unexpected prepared-chart location',
       );
     }
 
@@ -1640,7 +1769,7 @@ export class AutoChartQueue {
       !stat.isDirectory() ||
       !isInside(tempDir, preparedDir)
     ) {
-      throw new Error('SightKick returned an unsafe prepared-chart location');
+      throw new Error('Drumroll returned an unsafe prepared-chart location');
     }
 
     return preparedDir;
