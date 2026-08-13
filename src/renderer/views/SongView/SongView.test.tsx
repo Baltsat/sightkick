@@ -1570,7 +1570,7 @@ describe('the score summary', () => {
         'Coach loop armed',
       );
       expect(screen.getByTestId('coach-speed-change')).toHaveTextContent(
-        'Coach set 0.7× to rehearse this loop.',
+        'Try this loop at 0.7×; keep your own speed if it feels right.',
       );
       expect(screen.getByTestId('keep-learner-speed')).toHaveTextContent(
         'Keep my 1.0×',

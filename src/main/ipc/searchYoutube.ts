@@ -550,7 +550,7 @@ async function runSearch(
       return;
     }
 
-    if (code !== 0 && results.length === 0) {
+    if (code !== 0) {
       finish({
         error: stderr.trim()
           ? `YouTube search failed: ${firstLine(stderr)}`

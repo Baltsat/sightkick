@@ -397,7 +397,7 @@ describe('searchYoutube', () => {
     }
   });
 
-  it('replies with an honest error when the process exits non-zero with no results', async () => {
+  it('replies with an honest error when the process exits non-zero after partial result output', async () => {
     const event = makeEvent();
 
     searchYoutube(event as never, { query: 'broken' });
@@ -405,6 +405,10 @@ describe('searchYoutube', () => {
 
     const proc = currentProc();
 
+    proc.stdout.emit(
+      'data',
+      Buffer.from(ndjson([{ id: 'abcdefghijk', title: 'Partial result' }])),
+    );
     proc.stderr.emit('data', Buffer.from('ERROR: no internet\nmore detail\n'));
     proc.emit('close', 1);
 
@@ -413,10 +417,12 @@ describe('searchYoutube', () => {
     );
 
     const reply = lastReply(event, 'search-youtube')!.args[0] as {
-      error: string;
+      error?: string;
+      results?: unknown[];
     };
 
     expect(reply.error).toContain('ERROR: no internet');
+    expect(reply.results).toBeUndefined();
   });
 
   it('replies with an honest error and never spawns when yt-dlp is unavailable', async () => {

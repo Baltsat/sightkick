@@ -141,6 +141,19 @@ describe('SpeedAudioPlayer', () => {
     expect(stream.seek).toHaveBeenCalled();
   });
 
+  it('restarts when speed changes while a loop restart is awaiting its first chunk', async () => {
+    const { player, stream } = await makePlayer();
+    const pending = player.start(0);
+
+    player.setPlaybackSpeed(0.8);
+    await pending;
+    await flush();
+
+    expect(stream.setSpeed).toHaveBeenCalledWith(0.8);
+    expect(player.isInitialised).toBe(true);
+    expect(context.bufferSources.at(-1)?.stopped).toBe(false);
+  });
+
   it('keeps the deferred start when speed changes before playback begins', async () => {
     const { player } = await makePlayer();
     const deferredStart = context.currentTime + 5;

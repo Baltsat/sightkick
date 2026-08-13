@@ -391,6 +391,25 @@ describe('SongSearch', () => {
     );
   });
 
+  it('offers a retry after an honest search error', () => {
+    renderSongSearch();
+
+    typeQuery('some song');
+    flushDebounce();
+
+    act(() => {
+      ipc.emit('search-youtube', { error: 'YouTube search failed' });
+    });
+
+    fireEvent.click(screen.getByTestId('song-search-retry'));
+    flushDebounce();
+
+    expect(ipc.sent).toEqual([
+      { channel: 'search-youtube', args: [{ query: 'some song' }] },
+      { channel: 'search-youtube', args: [{ query: 'some song' }] },
+    ]);
+  });
+
   it('does not search when the input is empty', () => {
     renderSongSearch();
 

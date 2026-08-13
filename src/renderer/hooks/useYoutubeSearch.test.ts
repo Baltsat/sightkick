@@ -96,6 +96,30 @@ describe('useYoutubeSearch', () => {
     expect(result.current.results).toEqual([]);
   });
 
+  it('retries the same query after an error', () => {
+    const { result } = renderHook(() => useYoutubeSearch('some song'));
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+      ipc.emit('search-youtube', { error: 'YouTube search failed' });
+    });
+
+    act(() => {
+      result.current.retry();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(ipc.sent).toEqual([
+      { channel: 'search-youtube', args: [{ query: 'some song' }] },
+      { channel: 'search-youtube', args: [{ query: 'some song' }] },
+    ]);
+    expect(result.current.loading).toBe(true);
+    expect(result.current.error).toBeUndefined();
+  });
+
   it('drops the pending listener when the query changes before the reply arrives', () => {
     const { rerender } = renderHook(({ query }) => useYoutubeSearch(query), {
       initialProps: { query: 'first query' },

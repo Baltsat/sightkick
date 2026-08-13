@@ -292,6 +292,34 @@ describe('AutoChart', () => {
     ).toHaveTextContent('Download audio');
   });
 
+  it('replaces a failed job with its retry successor', () => {
+    renderAutoChart();
+
+    emitJob({
+      id: 'job-1',
+      attempt: 1,
+      stage: 'failed',
+      backend: 'sightkick',
+      message: 'Chart creation failed',
+      error: 'Forced failure',
+      sourceName: 'First attempt',
+    });
+    emitJob({
+      id: 'job-2',
+      attempt: 2,
+      stage: 'downloading',
+      backend: 'sightkick',
+      message: 'Downloading audio from YouTube',
+      sourceName: 'Retry attempt',
+      percent: 10,
+    });
+
+    expect(screen.getByTestId('auto-chart-progress')).toHaveTextContent(
+      'Retry attempt',
+    );
+    expect(screen.queryByTestId('auto-chart-retry')).not.toBeInTheDocument();
+  });
+
   it('lets the user cancel an in-flight chart at any stage', () => {
     renderAutoChart();
     emitBackends({

@@ -909,7 +909,7 @@ describe('SongListView — loading the library', () => {
     ).toBeEnabled();
   });
 
-  it('carries the selected collection and track identity into local auto-charting', () => {
+  it('does not expose local-audio auto-charting from a source row', () => {
     const view = setupSongListView();
     const drums = parseYandexPlaylistCandidates(yandexSource);
     const track = drums.tracks[0];
@@ -921,34 +921,14 @@ describe('SongListView — loading the library', () => {
         favorites: parseYandexPlaylistCandidates(yandexFavoritesSource),
       },
     });
-    fireEvent.click(
+    expect(
       within(
         screen.getByTestId(`library-candidate-Drums-${track.ordinal}`),
-      ).getByRole('button', { name: /use lawful local audio/i }),
-    );
-
-    expect(view.ipc.sent).toContainEqual({
-      channel: 'create-auto-chart',
-      args: [
-        {
-          localFile: true,
-          sourceProvenance: {
-            provider: 'yandex-music',
-            collectionId: drums.playlist.id,
-            collectionName: drums.playlist.name,
-            trackId: track.id,
-            title: track.title,
-            artists: track.artists,
-            ...(track.durationSeconds !== null
-              ? { durationSeconds: track.durationSeconds }
-              : {}),
-            ...(track.sourceTrackUrl
-              ? { sourceUrl: track.sourceTrackUrl }
-              : {}),
-          },
-        },
-      ],
-    });
+      ).queryByRole('button', { name: /local audio/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      view.ipc.sent.some((message) => message.channel === 'create-auto-chart'),
+    ).toBe(false);
   });
 
   it('keeps a private Favorites row eligible for an exact chart check', () => {

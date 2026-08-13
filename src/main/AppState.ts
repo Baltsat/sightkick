@@ -89,6 +89,8 @@ class AppState {
   private static instance: AppState;
   private mainWindow: BrowserWindow | null = null;
   private powerSaveBlockerId: number = -1;
+  private cleanupPromise: Promise<void> | undefined;
+  private quitting = false;
   readonly store = new Store();
   readonly practicePresence = new PracticePresenceController({
     store: this.store,
@@ -137,9 +139,19 @@ class AppState {
         app.quit();
       }
     });
-    app.on('before-quit', () => {
+    app.on('before-quit', (event) => {
+      if (this.quitting) {
+        return;
+      }
+
+      event.preventDefault();
       this.practicePresence.dispose();
-      this.cleanup();
+      void this.cleanup()
+        .catch(() => undefined)
+        .finally(() => {
+          this.quitting = true;
+          app.quit();
+        });
     });
     app
       .whenReady()
@@ -404,12 +416,20 @@ class AppState {
     }
   }
 
-  cleanup(): void {
+  cleanup(): Promise<void> {
+    if (this.cleanupPromise) {
+      return this.cleanupPromise;
+    }
+
     this.resumeSleep();
     stopListenMidi();
     killActiveSplit();
     cancelStemTools();
-    void autoChartQueue.shutdown();
+    this.cleanupPromise = autoChartQueue.shutdown().finally(() => {
+      this.cleanupPromise = undefined;
+    });
+
+    return this.cleanupPromise;
   }
 }
 

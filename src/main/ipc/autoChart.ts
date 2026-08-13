@@ -990,11 +990,11 @@ export function validateSightkickRuntime(
   }
 
   return {
-    runnerPath,
-    ffmpegPath,
-    dataDir: runtime.dataDir,
-    uvPath,
-    pythonPath,
+    runnerPath: path.resolve(runnerPath),
+    ffmpegPath: path.resolve(ffmpegPath),
+    dataDir: path.resolve(runtime.dataDir),
+    uvPath: uvPath ? path.resolve(uvPath) : undefined,
+    pythonPath: pythonPath ? path.resolve(pythonPath) : undefined,
   };
 }
 

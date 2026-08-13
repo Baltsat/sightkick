@@ -451,6 +451,7 @@ describe('tutor machine', () => {
       minimumResolvedEvents: 8,
       minimumDistinctErrors: 3,
     });
+
     for (let repetition = 0; repetition < 2; repetition += 1) {
       const region = state.recovery!.region;
 

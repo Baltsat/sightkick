@@ -124,7 +124,9 @@ export function remediationTaskWhy(task: RemediationTask): string {
   const skill = skillLabel(task);
 
   return task.approach === 'tempo-variation'
-    ? `The anchor is in. Keep ${skill} through this phrase at ${task.playbackSpeed.toFixed(1)}× so it holds when the song moves on.`
+    ? `The anchor is in. Keep ${skill} through this phrase at ${task.playbackSpeed.toFixed(
+        1,
+      )}× so it holds when the song moves on.`
     : `Build ${skill} in this phrase first; one clean anchor earns a nearby-tempo return.`;
 }
 
@@ -220,7 +222,7 @@ export function getActiveRemediationTask(
   queue: RemediationQueue,
 ): RemediationTask | null {
   return queue.status === 'active'
-    ? (queue.tasks[queue.activeTaskIndex] ?? null)
+    ? queue.tasks[queue.activeTaskIndex] ?? null
     : null;
 }
 
@@ -282,8 +284,8 @@ function makeAttempt(
   const progressAfter = qualifiesAsCleanPass
     ? task.consecutiveCleanPasses + 1
     : nearMiss
-      ? task.consecutiveCleanPasses
-      : Math.max(0, task.consecutiveCleanPasses - 1);
+    ? task.consecutiveCleanPasses
+    : Math.max(0, task.consecutiveCleanPasses - 1);
 
   return {
     ...input,
@@ -515,8 +517,8 @@ function isTask(value: unknown): value is RemediationTask {
     expectedCleanPasses = attempt.qualifiesAsCleanPass
       ? expectedCleanPasses + 1
       : assessment.nearMiss
-        ? expectedCleanPasses
-        : Math.max(0, expectedCleanPasses - 1);
+      ? expectedCleanPasses
+      : Math.max(0, expectedCleanPasses - 1);
 
     if (attempt.consecutiveCleanPassesAfter !== expectedCleanPasses) {
       // v1 queues created before retained progress reset a near miss to zero.

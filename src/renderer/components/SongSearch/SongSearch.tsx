@@ -95,7 +95,9 @@ function SongSearchInner({
   // nothing to fetch and nothing honest to show while `active` is false —
   // this both saves the network call and stops a misleading "no YouTube
   // results" flash while local matches are on screen.
-  const { results, loading, error } = useYoutubeSearch(active ? query : '');
+  const { results, loading, error, retry } = useYoutubeSearch(
+    active ? query : '',
+  );
   const candidates = rankAutoImportCandidates(
     query,
     results,
@@ -173,7 +175,15 @@ function SongSearchInner({
           role="alert"
           data-testid="song-search-error"
         >
-          {error}
+          <div>{error}</div>
+          <button
+            type="button"
+            className="mt-2 text-xs font-semibold text-text-body underline underline-offset-2"
+            data-testid="song-search-retry"
+            onClick={retry}
+          >
+            Retry search
+          </button>
         </div>
       )}
 

@@ -134,16 +134,16 @@ function tutorNextReason(
           ? `${expected} placement`
           : 'the intended drum placement'
         : recovery.trigger.reason === 'timing-spread'
-          ? 'a steadier pulse'
-          : 'the phrase handoff';
+        ? 'a steadier pulse'
+        : 'the phrase handoff';
     const observation =
       recovery.trigger.reason === 'repeated-wrong-pad-pair' &&
       actual &&
       expected
         ? `the ${actual} → ${expected} switch repeated`
         : recovery.trigger.reason === 'timing-spread'
-          ? 'the pulse spread across this phrase'
-          : 'this phrase needs a smaller, musical return';
+        ? 'the pulse spread across this phrase'
+        : 'this phrase needs a smaller, musical return';
     const nextAction =
       recovery.approach === 'return-context'
         ? 'carry it through one more bar so it survives the return to the song.'
@@ -210,7 +210,7 @@ export function TutorHud({
         : message.title,
     detail:
       displayState === 'kit-paused'
-        ? (controlPrompt?.label ?? 'Use Play to count in again.')
+        ? controlPrompt?.label ?? 'Use Play to count in again.'
         : message.detail,
   };
   const nextReason = tutorNextReason(state, displayState, recoveryCaption);
@@ -218,18 +218,18 @@ export function TutorHud({
     displayState === 'remediation'
       ? 'Coach loop'
       : displayState === 'recovery-explain' || recoveryCaption
-        ? 'Recovery'
-        : displayState === 'kit-paused' || displayState === 'inactivity-paused'
-          ? 'Paused'
-          : labelForPhase(state.phase);
+      ? 'Recovery'
+      : displayState === 'kit-paused' || displayState === 'inactivity-paused'
+      ? 'Paused'
+      : labelForPhase(state.phase);
   const tone =
     message.tone === 'success'
       ? 'earned'
       : message.tone === 'warning'
-        ? 'warning'
-        : message.tone === 'recovery'
-          ? 'recovery'
-          : 'neutral';
+      ? 'warning'
+      : message.tone === 'recovery'
+      ? 'recovery'
+      : 'neutral';
 
   return (
     <aside

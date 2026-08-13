@@ -391,11 +391,11 @@ function finishRecoveryAttempt(
       shouldDefer
         ? nextSpeed
         : canPromoteTempo
-          ? Math.min(
-              state.targetSpeed,
-              state.currentSpeed + state.settings.speedStep,
-            )
-          : state.currentSpeed,
+        ? Math.min(
+            state.targetSpeed,
+            state.currentSpeed + state.settings.speedStep,
+          )
+        : state.currentSpeed,
     );
     const nextState: TutorState = {
       ...state,

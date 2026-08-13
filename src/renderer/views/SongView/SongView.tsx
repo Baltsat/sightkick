@@ -83,7 +83,7 @@ import { serializeMeasureToDsl } from '../../components/SheetMusic';
 import { AudioVolume } from '../../components/AudioVolume';
 import { GameMode, PracticeRange } from '../../types';
 import { resolveModePolicy } from '../../modes';
-import { RenderData } from '../../../chart-parser/types';
+import { ParsedChart, RenderData } from '../../../chart-parser/types';
 import { SheetMusicLayout } from '../../../chart-parser/renderer';
 import { AICoach } from '../../components/AICoach';
 import {
@@ -130,7 +130,9 @@ import { SettingLabel } from '../../components/SettingsButton/SettingLabel';
 import { PracticeOutletContext } from '../practice-context';
 import { chartContentRevision } from '../../services/chart-revision';
 import { curriculumItemManifest } from '../../services/pedagogy/item-manifest';
+import { build_my_wave_item_profile } from '../../services/pedagogy/my-wave';
 import { deriveAtomicSkillEvidence } from '../../services/pedagogy/skill-state';
+import { ItemSkillManifest } from '../../services/pedagogy/types';
 import { useWordBoundaryTruncate } from './useWordBoundaryTruncate';
 import './SongView.css';
 
@@ -164,6 +166,41 @@ function createPracticeRunIdentity(): PracticeRunIdentity {
     sessionId:
       randomId ??
       `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+  };
+}
+
+function chartManifestForFreePlay(
+  songId: string | undefined,
+  chart: ParsedChart | null | undefined,
+  chartRevision: string,
+): ItemSkillManifest | undefined {
+  if (!songId || !chart) {
+    return undefined;
+  }
+
+  const profile = build_my_wave_item_profile({
+    id: songId,
+    title: songId,
+    kind: 'song',
+    chart,
+    chart_revision: chartRevision,
+  });
+
+  if (!profile.features || profile.demands.length === 0) {
+    return undefined;
+  }
+
+  return {
+    item_id: songId,
+    source: 'chart_analysis',
+    source_revision: `chart-analysis:${chartRevision}`,
+    chart_revision: chartRevision,
+    demands: profile.demands,
+    context_signature: `meter=${profile.features.meter};subdivision=${
+      profile.features.subdivision
+    };lanes=${profile.features.active_lanes.join(',')}`,
+    assessment_confidence: profile.evidence_confidence,
+    chart_total_notes: profile.features.note_count,
   };
 }
 
@@ -766,22 +803,15 @@ export function SongView() {
               }).findings,
             )
           : [];
-      // The Bayesian mastery/spaced-review system reads atomicSkillEvidence
-      // exclusively (SongListView's replayAtomicSkillState) - without this,
-      // it is permanently starved regardless of how much he practices. Only
-      // curriculum lesson songs carry a manifest to derive it against;
-      // priorAtomicEvidence is this song's own already-saved runs (prefetched
-      // on load below) so a same-context rep can classify as 'retention'
-      // instead of every rep looking like first-time 'acquisition' forever.
-      const lessonManifest = songData?.lesson
+      const itemManifest = songData?.lesson
         ? curriculumItemManifest(songData.lesson.id)
-        : undefined;
-      const atomicSkillEvidence = lessonManifest
+        : chartManifestForFreePlay(id, chart, currentChartRevision);
+      const atomicSkillEvidence = itemManifest
         ? [
             ...deriveAtomicSkillEvidence({
               run_id: identity.sessionId,
               summary: baseRunSummary,
-              manifest: lessonManifest,
+              manifest: itemManifest,
               previous_events: (fullRuns ?? []).flatMap(
                 (run) => run.summary.atomicSkillEvidence ?? [],
               ),
@@ -1287,6 +1317,17 @@ export function SongView() {
     onPracticeRangeChange(undefined);
     clearSelection();
   }, [clearSelection, onPracticeRangeChange, setIsLooping]);
+  const applyCoachSpeed = useCallback(
+    (speed: number) => {
+      setCoachSpeedChange(
+        Math.abs(playbackSpeed - speed) > 0.001
+          ? { previous: playbackSpeed, applied: speed }
+          : undefined,
+      );
+      setPlaybackSpeed(speed);
+    },
+    [playbackSpeed, setPlaybackSpeed],
+  );
   const applyCoachLoop = useCallback(
     (barStart: number, barEnd: number, speed: number): boolean => {
       const start = barStart - 1;
@@ -1298,12 +1339,7 @@ export function SongView() {
       }
 
       pause();
-      setCoachSpeedChange(
-        Math.abs(playbackSpeed - speed) > 0.001
-          ? { previous: playbackSpeed, applied: speed }
-          : undefined,
-      );
-      setPlaybackSpeed(speed);
+      applyCoachSpeed(speed);
       setIsLooping(true);
       onPracticeRangeChange({ start, end });
       seekSeconds(
@@ -1315,6 +1351,7 @@ export function SongView() {
       return true;
     },
     [
+      applyCoachSpeed,
       chart,
       delaySeconds,
       onPracticeRangeChange,
@@ -1322,8 +1359,6 @@ export function SongView() {
       renderData,
       seekSeconds,
       setIsLooping,
-      setPlaybackSpeed,
-      playbackSpeed,
     ],
   );
   const keepLearnerPlaybackSpeed = useCallback(() => {
@@ -1394,7 +1429,9 @@ export function SongView() {
       percent: Math.round((completedUnits / totalUnits) * 100),
     };
   }, [remediationSession.activeTask, remediationSession.queue]);
-  const appliedRemediationTaskRef = useRef<string | undefined>(undefined);
+  const appliedRemediationTaskRef = useRef<
+    { token: string; barStart: number; barEnd: number } | undefined
+  >(undefined);
   const handledRemediationCompletionRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -1406,17 +1443,39 @@ export function SongView() {
     }
 
     const token = `${queue.id}:${task.id}`;
+    const previous = appliedRemediationTaskRef.current;
 
-    if (appliedRemediationTaskRef.current === token) {
+    if (previous?.token === token) {
+      return;
+    }
+
+    if (
+      previous?.barStart === task.barStart &&
+      previous.barEnd === task.barEnd &&
+      isLooping
+    ) {
+      applyCoachSpeed(task.playbackSpeed);
+      appliedRemediationTaskRef.current = {
+        token,
+        barStart: task.barStart,
+        barEnd: task.barEnd,
+      };
+
       return;
     }
 
     if (applyCoachLoop(task.barStart, task.barEnd, task.playbackSpeed)) {
-      appliedRemediationTaskRef.current = token;
+      appliedRemediationTaskRef.current = {
+        token,
+        barStart: task.barStart,
+        barEnd: task.barEnd,
+      };
     }
   }, [
+    applyCoachSpeed,
     applyCoachLoop,
     gameMode,
+    isLooping,
     remediationSession.activeTask,
     remediationSession.queue,
   ]);

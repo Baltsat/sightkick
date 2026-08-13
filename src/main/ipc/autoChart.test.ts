@@ -568,6 +568,35 @@ describe('auto-chart source and worker protocol', () => {
     ).toMatchObject({ runnerPath, ffmpegPath, uvPath, dataDir: root });
   });
 
+  it('normalizes executable paths before a worker changes into its temp directory', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auto-chart-relative-'));
+
+    cleanup.push(root);
+
+    const runnerPath = path.join(root, 'run.sh');
+    const ffmpegPath = path.join(root, 'ffmpeg');
+    const uvPath = path.join(root, 'uv');
+
+    for (const filePath of [runnerPath, ffmpegPath, uvPath]) {
+      fs.writeFileSync(filePath, '');
+      fs.chmodSync(filePath, 0o700);
+    }
+
+    const runtime = validateSightkickRuntime({
+      runnerPath: path.relative(process.cwd(), runnerPath),
+      ffmpegPath: path.relative(process.cwd(), ffmpegPath),
+      uvPath: path.relative(process.cwd(), uvPath),
+      dataDir: path.relative(process.cwd(), root),
+    });
+
+    expect(runtime).toMatchObject({
+      runnerPath,
+      ffmpegPath,
+      uvPath,
+      dataDir: root,
+    });
+  });
+
   it('resolves only the packaged or cached Apple Silicon LGPL runtime', () => {
     expect(
       drumrollFfmpegRuntimeCandidates({
@@ -1414,6 +1443,51 @@ describe('auto-chart queue — sightkick backend', () => {
       expect(latestJob(event)).toMatchObject({ stage: 'cancelled' }),
     );
     expect(fs.existsSync(tempDir)).toBe(false);
+  });
+
+  it('shuts down a half-completed YouTube fetch, removes its work dir, and leaves a fresh attempt unblocked', async () => {
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+    });
+
+    cleanup.push(harness.root);
+
+    const first = makeEvent();
+
+    await harness.queue.create(first as never, {
+      youtubeUrl: 'https://youtu.be/abcdefghijk',
+    });
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+
+    const firstTempDir = harness.skRuns[0].input.tempDir;
+
+    fs.writeFileSync(path.join(firstTempDir, 'partial-audio.m4a'), 'partial');
+    await harness.queue.shutdown();
+
+    expect(harness.skRuns[0].kill).toHaveBeenCalledOnce();
+    expect(latestJob(first)).toMatchObject({ stage: 'cancelled' });
+    expect(fs.existsSync(firstTempDir)).toBe(false);
+
+    harness.skRuns[0].finish();
+    await nextTurn();
+
+    const second = makeEvent();
+
+    await harness.queue.create(second as never, {
+      youtubeUrl: 'https://youtu.be/aaaaaaaaaaa',
+    });
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(2));
+
+    const secondTempDir = harness.skRuns[1].input.tempDir;
+
+    expect(secondTempDir).not.toBe(firstTempDir);
+    expect(fs.existsSync(secondTempDir)).toBe(true);
+
+    await harness.queue.cancel(latestJob(second).id);
+    harness.skRuns[1].finish();
+    await vi.waitFor(() =>
+      expect(latestJob(second)).toMatchObject({ stage: 'cancelled' }),
+    );
   });
 
   it('cancels a download queued behind another active job before it ever starts', async () => {

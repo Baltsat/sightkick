@@ -39,6 +39,8 @@ export class SpeedAudioPlayer
   private outputProducedSeconds: number = 0;
   private totalOutputSeconds: number = 0;
   private pumping: boolean = false;
+  private startPending: boolean = false;
+  private pendingStartAt: number | undefined;
   private epoch: number = 0;
 
   constructor(
@@ -73,11 +75,15 @@ export class SpeedAudioPlayer
     }
 
     const running = this.isInitialised && this.context.state === 'running';
-    const resumeAt = running ? this.currentTime : undefined;
+    const resumeAt = running
+      ? this.currentTime
+      : this.startPending
+      ? this.offset
+      : undefined;
     const deferredStart =
       running && this.startedAt > this.context.currentTime
         ? this.startedAt
-        : undefined;
+        : this.pendingStartAt;
 
     this._playbackSpeed = speed;
     this.prepare();
@@ -144,6 +150,8 @@ export class SpeedAudioPlayer
     }
 
     this.offset = offset;
+    this.startPending = true;
+    this.pendingStartAt = requestedStartAt;
     this.epoch += 1;
 
     const epoch = this.epoch;
@@ -204,6 +212,8 @@ export class SpeedAudioPlayer
     }
 
     this.timer = setInterval(this.pump, SCHEDULER_INTERVAL_MS);
+    this.startPending = false;
+    this.pendingStartAt = undefined;
   }
 
   /**
@@ -349,6 +359,8 @@ export class SpeedAudioPlayer
    * un-pausing the song behind a UI that still says paused.
    */
   pause(): void {
+    this.startPending = false;
+    this.pendingStartAt = undefined;
     this.epoch += 1;
     super.pause();
   }
@@ -362,6 +374,8 @@ export class SpeedAudioPlayer
     this.audioTracks.forEach((track) => track.stop());
     this.isInitialised = false;
     this.startedAt = -1;
+    this.startPending = false;
+    this.pendingStartAt = undefined;
     this.epoch += 1;
   }
 

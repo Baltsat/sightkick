@@ -732,6 +732,51 @@ describe('practice mode analytics', () => {
     }
   }, 30000);
 
+  it('writes chart-derived atomic skill evidence from a free-play song run', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView({
+        settings: {
+          countIn: false,
+          adaptiveTutorEnabled: false,
+          handsFreeControlsEnabled: false,
+        },
+        keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+      });
+
+      await view.loadSong(makeSong(), DRUM_CHART);
+      view.clickPlay();
+      await view.pressKey('KeyJ');
+      await view.finishSong();
+
+      const payload = view.ipc.sent
+        .filter((entry) => entry.channel === 'save-practice-run')
+        .map((entry) => entry.args[0])
+        .at(-1) as
+        | {
+            summary: {
+              atomicSkillEvidence?: {
+                item_id: string;
+                manifest_revision: string;
+              }[];
+            };
+          }
+        | undefined;
+
+      expect(payload?.summary.atomicSkillEvidence).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            item_id: 'song-1',
+            manifest_revision: expect.stringMatching(/^chart-analysis:/),
+          }),
+        ]),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 30000);
+
   it('does not unlock a lesson when a run starts below the learning tempo and only finishes at target speed', async () => {
     vi.useFakeTimers();
 
@@ -1092,7 +1137,7 @@ describe('practice mode analytics', () => {
         'First anchor acquired',
       );
 
-      await playCleanFirstBar(view, frames, 0.7);
+      await playCleanFirstBar(view, frames, 0.8);
 
       const completedQueue = JSON.parse(
         window.localStorage.getItem(storageKey) ?? 'null',

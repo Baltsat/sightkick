@@ -63,6 +63,24 @@ function makeLessonBundle(
   return bundle;
 }
 
+function makeImportedSong(libraryRoot: string, name = 'Imported Song'): string {
+  const dir = path.join(libraryRoot, name);
+
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, 'song.ini'),
+    '[Song]\nname = Imported Song\nartist = A Musician\npro_drums = True\n',
+  );
+  fs.writeFileSync(path.join(dir, 'notes.chart'), CHART);
+  fs.writeFileSync(path.join(dir, 'drums.ogg'), 'imported-audio');
+  fs.writeFileSync(
+    path.join(dir, '.sightkick'),
+    JSON.stringify({ id: 'imported-song' }),
+  );
+
+  return dir;
+}
+
 describe('bootstrapLessonLibrary', () => {
   it('makes all 170 bundled lessons discoverable in a clean private profile with stable IDs', () => {
     const bundle = makeLessonBundle();
@@ -134,6 +152,33 @@ describe('bootstrapLessonLibrary', () => {
     ).toHaveLength(170);
   });
 
+  it('keeps an imported song in the default lesson-backed library across relaunch', () => {
+    const bundle = makeLessonBundle();
+    const userDataRoot = path.join(root, 'default-library-import');
+    const first = bootstrapLessonLibrary({
+      bundledRoot: bundle,
+      userDataRoot,
+    });
+    const importedDir = makeImportedSong(first.libraryRoot!);
+    const imported = {
+      id: 'imported-song',
+      dir: importedDir,
+      name: 'Imported Song',
+    };
+    const second = bootstrapLessonLibrary({
+      bundledRoot: bundle,
+      userDataRoot,
+      existingSongs: {
+        ...first.songs,
+        'imported-song': imported,
+      } as never,
+    });
+
+    expect(second.installed).toBe(false);
+    expect(fs.existsSync(importedDir)).toBe(true);
+    expect(second.songs?.['imported-song']).toMatchObject(imported);
+  });
+
   it('transactionally upgrades a same-schema 118-lesson install to 170 while preserving musician data', () => {
     const oldBundle = makeLessonBundle(118, 'old-bundle', 'old-audio');
     const newBundle = makeLessonBundle(170, 'new-bundle', 'new-audio');
@@ -163,11 +208,23 @@ describe('bootstrapLessonLibrary', () => {
       Object.keys(old.songs ?? {}).filter((id) => id.startsWith('lesson:')),
     ).toHaveLength(118);
 
+    const importedDir = makeImportedSong(
+      old.libraryRoot!,
+      'Imported During Upgrade',
+    );
+    const imported = {
+      id: 'imported-song',
+      dir: importedDir,
+      name: 'Imported Song',
+    };
     const upgraded = bootstrapLessonLibrary({
       bundledRoot: newBundle,
       userDataRoot,
       existingLibraryRoot: selectedLibrary,
-      existingSongs: old.songs,
+      existingSongs: {
+        ...old.songs,
+        'imported-song': imported,
+      } as never,
     });
     const privateRoot = path.join(userDataRoot, DESKTOP_LESSON_LIBRARY_FOLDER);
     const installedManifest = JSON.parse(
@@ -182,6 +239,8 @@ describe('bootstrapLessonLibrary', () => {
       ),
     ).toHaveLength(170);
     expect(upgraded.songs?.personal?.dir).toBe(selectedLibrary);
+    expect(upgraded.songs?.['imported-song']).toMatchObject(imported);
+    expect(fs.existsSync(importedDir)).toBe(true);
     expect(upgraded.songs?.['lesson:01.01']?.liked).toBe(true);
     expect(upgraded.songs?.['lesson:01.01']?.scoreData).toEqual({
       expert: { score: 1234 },
