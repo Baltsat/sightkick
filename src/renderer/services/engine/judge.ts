@@ -38,8 +38,17 @@ export class Judge {
   private nextResolveIndex = 0;
   private wrongJudgementSequence = 0;
   private latencyMs = 0;
+  private playbackSpeed = 1;
   private hitToleranceSeconds = HIT_TOLERANCE_SECONDS;
   private preferUnhitNotes = false;
+  /**
+   * Notes struck on the right pad at the right time but the wrong dynamic
+   * (accent/ghost). The strike is already scored as a 'wrong' judgement in
+   * `maybeRecordFalseHit`; this stops the late-hit window from *also*
+   * resolving the same note as a scoreable 'miss' once it closes (see
+   * `resolveUntil`), which would double-count one physical strike.
+   */
+  private velocityFailedKeys = new Map<number, Set<string>>();
 
   setContext(context: JudgeContext): void {
     const chartChanged = this.chart !== context.chart;
@@ -76,6 +85,17 @@ export class Judge {
     this.latencyMs = ms;
   }
 
+  /**
+   * The active practice/perform playback speed. Song-time advances at this
+   * many times wall-clock speed (see SpeedAudioPlayer.currentTime), so a
+   * fixed hardware/input latency in wall-clock ms must be scaled by this
+   * factor before being subtracted from a song-time tick — see
+   * `compensateLatency`.
+   */
+  setPlaybackSpeed(speed: number): void {
+    this.playbackSpeed = speed;
+  }
+
   rewindTo(tick: number): void {
     for (const [hitTick, prefixes] of this.hits) {
       if (hitTick >= tick) {
@@ -89,6 +109,12 @@ export class Judge {
     for (const missTick of this.resolvedMisses.keys()) {
       if (missTick >= tick) {
         this.resolvedMisses.delete(missTick);
+      }
+    }
+
+    for (const velocityTick of this.velocityFailedKeys.keys()) {
+      if (velocityTick >= tick) {
+        this.velocityFailedKeys.delete(velocityTick);
       }
     }
 
@@ -128,6 +154,17 @@ export class Judge {
     return this.resolvedMisses.get(tick)?.has(prefix) ?? false;
   }
 
+  /**
+   * True for a note-key already scored as a wrong-dynamic strike (right pad,
+   * right time, failed accent/ghost velocity). Engine's `deriveMisses()`
+   * must treat this the same as `isHit` — the note already has a scoreable
+   * outcome ('wrong'), so it must not also be fabricated as a miss in the
+   * persisted run summary.
+   */
+  isVelocityFailed(tick: number, prefix: string): boolean {
+    return this.velocityFailedKeys.get(tick)?.has(prefix) ?? false;
+  }
+
   get hitCount(): number {
     return this.hitTotal;
   }
@@ -141,6 +178,7 @@ export class Judge {
     this.hitTotal = 0;
     this.falseHitTicks = [];
     this.resolvedMisses.clear();
+    this.velocityFailedKeys.clear();
     this.nextResolveIndex = 0;
     this.wrongJudgementSequence = 0;
   }
@@ -268,7 +306,8 @@ export class Judge {
       entry.note.notes.map(keyPrefix).forEach((prefix) => {
         if (
           this.isHit(entry.tick, prefix) ||
-          this.resolvedMisses.get(entry.tick)?.has(prefix)
+          this.resolvedMisses.get(entry.tick)?.has(prefix) ||
+          this.velocityFailedKeys.get(entry.tick)?.has(prefix)
         ) {
           return;
         }
@@ -324,7 +363,14 @@ export class Judge {
     }
 
     const rawTimeS = ticksToSeconds(rawTick, chart.resolution, chart.tempos);
-    const adjustedTimeS = rawTimeS - this.latencyMs / 1000;
+    // `rawTick`/`rawTimeS` are song-time, which advances at `playbackSpeed`
+    // times wall-clock speed (SpeedAudioPlayer.currentTime). The calibrated
+    // latency is a fixed WALL-CLOCK hardware delay, so it must be scaled by
+    // the same factor to land as the correct amount of song-time drift —
+    // otherwise a slower-than-1x practice speed overcompensates and a
+    // faster one undercompensates.
+    const adjustedTimeS =
+      rawTimeS - (this.latencyMs / 1000) * this.playbackSpeed;
 
     return secondsToTicks(adjustedTimeS, chart.resolution, chart.tempos);
   }
@@ -374,6 +420,7 @@ export class Judge {
         ? KEY_TO_ELEMENT[expectedPrefix]
         : undefined,
       actualElement,
+      scoreable,
     };
 
     this.falseHitListeners.forEach((listener) => listener(record));
@@ -503,6 +550,26 @@ export class Judge {
       );
 
     if (newPrefixes.length === 0) {
+      // Right pad, right time, wrong dynamic: the note itself was really
+      // matched (that's how it became `bestEntry`), so its still-unhit
+      // prefixes here are exactly the ones this strike attempted and failed
+      // on velocity. Mark them so the late-hit window closing doesn't also
+      // resolve this same note as a second, scoreable 'miss' below in
+      // `resolveUntil` — one physical strike, one scoreable outcome.
+      hit.notes
+        .map(keyPrefix)
+        .filter((p) => expectedPrefixes.has(p) && !this.isHit(hit.tick, p))
+        .forEach((prefix) => {
+          let prefixes = this.velocityFailedKeys.get(hit.tick);
+
+          if (!prefixes) {
+            prefixes = new Set();
+            this.velocityFailedKeys.set(hit.tick, prefixes);
+          }
+
+          prefixes.add(prefix);
+        });
+
       this.maybeRecordFalseHit(
         tick,
         toleranceTicks,
@@ -521,13 +588,20 @@ export class Judge {
       chart.resolution,
       chart.tempos,
     );
+    // Every prefix here belongs to the note that was actually matched, so
+    // its lane is unambiguous from the fixed key table — unlike
+    // `resolveElement(controlId)`, which can return the wrong lane when two
+    // kit elements share one raw MIDI control (see constants.ts's
+    // KEY_TO_ELEMENT doc comment and engine.ts's deriveMisses for the same
+    // rule applied to misses).
+    const primaryElement = KEY_TO_ELEMENT[newPrefixes[0]];
 
     this.hitListeners.forEach((listener) =>
       listener(pos, newPrefixes, {
         tick: hit.tick,
         timeSeconds: currentTimeS,
         deltaMs: (currentTimeS - expectedTimeS) * 1000,
-        element: this.resolveElement(controlId),
+        element: primaryElement,
         velocity: value,
       }),
     );
@@ -538,7 +612,7 @@ export class Judge {
         expectedTick: hit.tick,
         actualTick: tick,
         expectedElement: KEY_TO_ELEMENT[prefix],
-        actualElement: this.resolveElement(controlId),
+        actualElement: KEY_TO_ELEMENT[prefix],
         measureIndex: pos.measureIdx,
         deltaMs: (currentTimeS - expectedTimeS) * 1000,
         velocity: value,

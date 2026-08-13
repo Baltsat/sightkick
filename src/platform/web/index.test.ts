@@ -605,49 +605,83 @@ describe('web platform channel mapping', () => {
   });
 
   it('reports a quota failure and leaves existing run history unchanged', async () => {
-    const original_set_item = localStorage.setItem.bind(localStorage);
+    // jsdom's real Storage is Proxy-backed, so vi.spyOn cannot intercept its
+    // setItem calls (verified: a spied throw never reaches callers). Swap the
+    // whole localStorage global for a plain-object stand-in instead, the same
+    // pattern src/__tests__/setup.ts already uses as its own fallback mock.
+    const values = new Map<string, string>();
 
-    localStorage.setItem(
+    values.set(
       'drumroll.web.practice-runs',
       JSON.stringify({ existing: [{ completedAt: 'legacy' }] }),
     );
-    vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
-      if (key === 'drumroll.web.practice-runs') {
-        throw new DOMException('Storage quota exceeded', 'QuotaExceededError');
-      }
 
-      return original_set_item(key, value);
+    const quotaStorage: Storage = {
+      get length() {
+        return values.size;
+      },
+      clear: () => values.clear(),
+      getItem: (key) => values.get(key) ?? null,
+      key: (index) => [...values.keys()][index] ?? null,
+      removeItem: (key) => {
+        values.delete(key);
+      },
+      setItem: (key, value) => {
+        if (key === 'drumroll.web.practice-runs') {
+          throw new DOMException(
+            'Storage quota exceeded',
+            'QuotaExceededError',
+          );
+        }
+
+        values.set(key, String(value));
+      },
+    };
+    const originalDescriptor = Object.getOwnPropertyDescriptor(
+      globalThis,
+      'localStorage',
+    );
+
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: quotaStorage,
     });
 
-    await expect(
-      replyWithArgs('save-practice-run', 'save-practice-run', {
-        songId: 'song-1',
-        summary: {
-          completedAt: '2026-08-08T14:00:00.000Z',
-          totalHits: 0,
-          totalMisses: 1,
-          totalWrong: 0,
-          overallAccuracy: 0,
-          laneAccuracy: [],
-          laneBias: [],
-          timingBias: {
-            meanMs: 0,
-            medianMs: 0,
-            spreadMs: 0,
-            earlyCount: 0,
-            lateCount: 0,
-            onTimeCount: 0,
-            sampleCount: 0,
+    try {
+      await expect(
+        replyWithArgs('save-practice-run', 'save-practice-run', {
+          songId: 'song-1',
+          summary: {
+            completedAt: '2026-08-08T14:00:00.000Z',
+            totalHits: 0,
+            totalMisses: 1,
+            totalWrong: 0,
+            overallAccuracy: 0,
+            laneAccuracy: [],
+            laneBias: [],
+            timingBias: {
+              meanMs: 0,
+              medianMs: 0,
+              spreadMs: 0,
+              earlyCount: 0,
+              lateCount: 0,
+              onTimeCount: 0,
+              sampleCount: 0,
+            },
+            wrongHitCounts: [],
           },
-          wrongHitCounts: [],
-        },
-      }),
-    ).resolves.toEqual({
-      error: expect.stringContaining('Storage quota exceeded'),
-    });
+        }),
+      ).resolves.toEqual({
+        error: expect.stringContaining('Storage quota exceeded'),
+      });
 
-    expect(
-      JSON.parse(localStorage.getItem('drumroll.web.practice-runs') ?? '{}'),
-    ).toEqual({ existing: [{ completedAt: 'legacy' }] });
+      expect(
+        JSON.parse(localStorage.getItem('drumroll.web.practice-runs') ?? '{}'),
+      ).toEqual({ existing: [{ completedAt: 'legacy' }] });
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(globalThis, 'localStorage', originalDescriptor);
+      }
+    }
   });
 });

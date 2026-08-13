@@ -77,6 +77,19 @@ describe('ScoreSummary', () => {
     expect(modalEl.querySelectorAll('[data-filled]')).toHaveLength(5);
   });
 
+  it('does not claim Perfect / Every note landed on a near-100% run that actually missed a note', () => {
+    // Regression: calculateAccuracy rounds to 2dp, so 249/250 (falseHits 0)
+    // rounds to "1.00" and the pre-fix `=== 1` check called that Perfect,
+    // contradicting the "1 missed" tile on the same screen.
+    const { modal } = renderSummary({
+      scoreData: { hitNotes: 249, totalNotes: 250, falseHits: 0 },
+    });
+
+    expect(modal.queryByText('Perfect')).not.toBeInTheDocument();
+    expect(modal.queryByText('Every note landed.')).not.toBeInTheDocument();
+    expect(modal.getByText('1 note missed')).toBeInTheDocument();
+  });
+
   it('renders real practice stats for a Perform run that also carries a practice summary', () => {
     const summary = multiLaneRunFixture();
     const { modal } = renderSummary({

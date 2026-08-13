@@ -11,8 +11,8 @@
   position: relative;
   z-index: 5;
   display: flex;
-  width: 12.5rem;
-  flex: 0 0 12.5rem;
+  width: 13rem;
+  flex: 0 0 13rem;
   flex-direction: column;
   padding: 1.25rem 0.75rem 1rem;
   border-right: 1px solid var(--line-soft);
@@ -33,23 +33,12 @@
   cursor: pointer;
 }
 
-.arena-shell__brand strong {
-  display: block;
+.arena-shell__brand-name {
   font-family: var(--font-display);
-  font-size: 1.55rem;
+  font-size: 1.4rem;
   font-weight: 700;
   line-height: 1;
-  letter-spacing: -0.05em;
-}
-
-.arena-shell__brand small {
-  display: block;
-  margin-top: 0.26rem;
-  color: var(--color-ink-soft);
-  font-size: 0.57rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  letter-spacing: -0.04em;
 }
 
 .arena-shell__brand-mark {
@@ -57,6 +46,7 @@
   overflow: hidden;
   width: 2rem;
   height: 2rem;
+  flex: 0 0 auto;
   place-items: center;
   border: 0;
   border-radius: 50%;
@@ -86,10 +76,8 @@
   color: var(--color-ink-soft);
   background: transparent;
   font: inherit;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 0.9rem;
+  font-weight: 650;
   text-align: left;
   cursor: pointer;
   transition:
@@ -115,13 +103,51 @@
   filter: none;
 }
 
-.arena-shell__rail-note {
-  margin: auto 0.6rem 0.1rem;
-  color: color-mix(in srgb, var(--color-ink-soft) 74%, transparent);
-  font-family: var(--font-display);
-  font-size: 0.82rem;
-  font-style: italic;
-  line-height: 1.25;
+/* One quiet, fixed foot: profile and settings, never the top of the page. */
+.arena-shell__rail-foot {
+  display: flex;
+  margin-top: auto;
+  flex-direction: column;
+  gap: 0.18rem;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 0.5rem;
+}
+
+.arena-shell__rail-utility {
+  display: flex;
+  align-items: center;
+  padding: 0.2rem 0.7rem;
+}
+
+.arena-shell__profile {
+  display: flex;
+  min-height: 2.7rem;
+  align-items: center;
+  gap: 0.72rem;
+  padding: 0.62rem 0.7rem 0.62rem 0.8rem;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0;
+  color: var(--color-ink-soft);
+  background: transparent;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.arena-shell__profile:hover,
+.arena-shell__profile--active {
+  border-left-color: var(--signal-wine);
+  color: var(--color-ink);
+}
+
+.arena-shell__profile--active svg {
+  color: var(--signal-wine);
 }
 
 .arena-shell__workspace {
@@ -133,75 +159,6 @@
   flex-direction: column;
 }
 
-.arena-shell__topbar {
-  position: relative;
-  z-index: 4;
-  display: flex;
-  min-height: 4.5rem;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.85rem clamp(1rem, 2.1vw, 2rem);
-  border-bottom: 1px solid var(--line-soft);
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-}
-
-.arena-shell__eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 0.48rem;
-  color: var(--color-ink-soft);
-  font-size: 0.64rem;
-  font-weight: 750;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-}
-
-.arena-shell__sun {
-  color: var(--color-amber);
-  filter: drop-shadow(0 0 0.4rem rgb(255 173 47 / 68%));
-}
-
-.arena-shell__actions,
-.arena-shell__status {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.arena-shell__profile {
-  display: flex;
-  min-width: 2.75rem;
-  min-height: 2.75rem;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  padding: 0.65rem 0.9rem;
-  border: 0;
-  border-left: 1px solid var(--line-soft);
-  border-radius: 0;
-  color: var(--color-ink);
-  background: transparent;
-  box-shadow: none;
-  cursor: pointer;
-}
-
-.arena-shell__profile-label {
-  font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.arena-shell__profile:hover {
-  color: var(--signal-wine);
-  border-left-color: var(--signal-wine);
-}
-
 .arena-shell__content {
   position: relative;
   min-height: 0;
@@ -209,71 +166,47 @@
   overflow: hidden;
 }
 
-@media (max-width: 900px) {
-  .arena-shell {
-    flex-direction: column;
-  }
+.arena-shell__brand:focus-visible,
+.arena-shell__nav-item:focus-visible,
+.arena-shell__profile:focus-visible {
+  outline: 2px solid var(--dr-focus, #256eaa);
+  outline-offset: -2px;
+}
 
+/* Below the doc's compact threshold the rail narrows to icons; it stays a
+   fixed-width vertical column so a route never gains a horizontal header
+   bar or an externally-scrolling workspace. */
+@media (max-width: 1120px) {
   .arena-shell__rail {
-    position: sticky;
-    top: 0;
-    display: flex;
-    width: 100%;
-    min-height: auto;
-    flex: initial;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.7rem;
-    padding: 0.55rem 0.7rem;
-    border-right: 0;
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  .arena-shell__workspace {
-    height: auto;
+    width: 4rem;
+    flex: 0 0 4rem;
+    padding: 1rem 0.5rem;
   }
 
   .arena-shell__brand {
-    padding: 0.28rem;
-  }
-
-  .arena-shell__brand small,
-  .arena-shell__rail-note,
-  .arena-shell__nav-item span {
-    display: none;
-  }
-
-  .arena-shell__nav {
-    display: flex;
-    flex: 1;
-    justify-content: flex-end;
-  }
-
-  .arena-shell__nav-item {
-    width: 2.55rem;
-    min-height: 2.55rem;
     justify-content: center;
-    padding: 0.5rem;
+    padding: 0.3rem 0 1rem;
   }
 
-  .arena-shell__topbar {
-    min-height: 4.1rem;
-  }
-}
-
-@media (max-width: 620px) {
-  .arena-shell__eyebrow,
-  .arena-shell__status {
+  /* Each control already carries its own aria-label; hide the redundant
+     visible word entirely instead of leaving a visually-hidden duplicate
+     that assistive tech would announce twice. */
+  .arena-shell__brand-name,
+  .arena-shell__nav-label,
+  .arena-shell__profile-label {
     display: none;
   }
 
-  .arena-shell__topbar {
-    justify-content: flex-end;
+  .arena-shell__nav-item,
+  .arena-shell__profile {
+    justify-content: center;
+    padding: 0.62rem 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .arena-shell__nav-item {
+  .arena-shell__nav-item,
+  .arena-shell__profile {
     transition: none;
   }
 }

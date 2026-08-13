@@ -1,10 +1,21 @@
 import { Difficulty } from 'scan-chart';
 import { ALL_DIFFICULTIES } from '../../../constants';
-import {
-  DIRECTIONAL_KEYS,
-  SORT_OPTIONS,
-  SortState,
-} from '../../components/SortButton';
+import { UnifiedLibrarySort } from '../../services/library/unified-library';
+
+export interface LibrarySortOption {
+  key: UnifiedLibrarySort;
+  label: string;
+}
+
+// Difficulty first: sit down, hit play, learn something. The shelf opens on
+// the order that actually teaches. The rest are quiet alternatives, never
+// the default.
+export const LIBRARY_SORT_OPTIONS: LibrarySortOption[] = [
+  { key: 'difficulty', label: 'Difficulty' },
+  { key: 'recent', label: 'Recently added' },
+  { key: 'length', label: 'Shortest' },
+  { key: 'ready', label: 'Ready first' },
+];
 
 export function nextSongIndex(
   current: number | undefined,
@@ -23,45 +34,20 @@ export function nextSongIndex(
 }
 
 export function wrapSortIndex(current: number, delta: number): number {
-  return (current + delta + SORT_OPTIONS.length) % SORT_OPTIONS.length;
+  return (
+    (current + delta + LIBRARY_SORT_OPTIONS.length) %
+    LIBRARY_SORT_OPTIONS.length
+  );
 }
 
-export function sortForFocusedIndex(
-  index: number,
-  currentSort: SortState,
-): SortState {
-  const { key } = SORT_OPTIONS[index];
-
-  if (key === 'favorite') {
-    return { key: 'favorite', direction: 'asc' };
-  }
-
-  return {
-    key,
-    direction: currentSort.key === key ? currentSort.direction : 'asc',
-  };
-}
-
-export function toggledSortForIndex(
-  index: number,
-  currentSort: SortState,
-): SortState | undefined {
-  const { key } = SORT_OPTIONS[index];
-
-  if (!DIRECTIONAL_KEYS.includes(key)) {
-    return undefined;
-  }
-
-  return {
-    key,
-    direction: currentSort.direction === 'asc' ? 'desc' : 'asc',
-  };
-}
-
-export function sortIndexForKey(key: SortState['key']): number {
-  const index = SORT_OPTIONS.findIndex((option) => option.key === key);
+export function sortIndexForKey(key: UnifiedLibrarySort): number {
+  const index = LIBRARY_SORT_OPTIONS.findIndex((option) => option.key === key);
 
   return index === -1 ? 0 : index;
+}
+
+export function sortForIndex(index: number): UnifiedLibrarySort {
+  return LIBRARY_SORT_OPTIONS[index]?.key ?? 'difficulty';
 }
 
 export function nextDifficulty(current: Difficulty): Difficulty {

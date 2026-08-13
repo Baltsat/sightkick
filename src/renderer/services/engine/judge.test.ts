@@ -106,6 +106,39 @@ describe('Judge', () => {
     });
   });
 
+  it('attributes a hit to the note actually matched, not the first lane sharing the struck MIDI control', () => {
+    const onHit = vi.fn<JudgeHitHandler>();
+    const onJudgement = vi.fn<ResolvedJudgementHandler>();
+    const { engine } = setup(
+      {
+        measures: [measure([note(['a/5'], 480)])],
+        // 'ride' still on its DTX default, 'crash' just Learned onto the
+        // same physical control - a normal, plausible remap collision.
+        mapping: { ride: ['midi:51'], crash: ['midi:51'] },
+      },
+      { tick: 480 },
+    );
+
+    engine.onHit(onHit);
+    engine.onJudgement(onJudgement);
+    engine.handleInput(hit('midi:51'));
+
+    expect(engine.isHit(480, 'a/5')).toBe(true);
+    expect(engine.falseHitCount).toBe(0);
+    expect(onHit).toHaveBeenCalledWith(
+      { measureIdx: 0, noteIdx: 0 },
+      ['a/5'],
+      expect.objectContaining({ element: 'crash' }),
+    );
+    expect(onJudgement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        verdict: 'hit',
+        expectedElement: 'crash',
+        actualElement: 'crash',
+      }),
+    );
+  });
+
   it('resolves a miss only after the late-hit tolerance window closes', () => {
     const onJudgement = vi.fn<ResolvedJudgementHandler>();
     const { engine } = setup({
@@ -641,6 +674,30 @@ describe('Judge', () => {
     expect(engine.falseHitCount).toBe(0);
   });
 
+  it('does not also resolve a wrong-dynamic strike as a later miss once the late-hit window closes', () => {
+    const onJudgement = vi.fn<ResolvedJudgementHandler>();
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 480, { accents: ['c/5'] })])] },
+      { tick: 480 },
+    );
+
+    engine.onJudgement(onJudgement);
+    // Right pad, right time, too soft for the accent - already scored as
+    // one 'wrong' judgement by maybeRecordFalseHit.
+    engine.handleInput(hit('midi:38', 80));
+
+    expect(engine.falseHitCount).toBe(1);
+
+    onJudgement.mockClear();
+    engine.resolveAll();
+
+    // One physical strike, one scoreable outcome: the late-hit window
+    // closing must not fabricate a second scoreable judgement (a 'miss')
+    // for the exact same note.
+    expect(onJudgement).not.toHaveBeenCalled();
+    expect(engine.isHit(480, 'c/5')).toBe(false);
+  });
+
   it('does not count a false hit inside a fully silent measure toward the score', () => {
     const { engine } = setup(
       {
@@ -815,6 +872,24 @@ describe('Judge', () => {
     expect(engine.falseHitCount).toBe(1);
   });
 
+  it('scales input-latency compensation by the active playback speed, not a flat wall-clock offset', () => {
+    // Note at 480 ticks = 0.5s. At 2x, a 200ms hardware-delay calibration
+    // is 400ms of drifted song-time (200ms * 2), not a flat 200ms - a real
+    // on-time strike reports its raw (uncompensated) position at
+    // 0.5 + 0.4 = 0.9s (864 ticks), not 0.7s.
+    const { engine } = setup(
+      { measures: [measure([note(['c/5'], 480)])] },
+      { tick: 864 },
+    );
+
+    engine.setLatencyMs(200);
+    engine.setPlaybackSpeed(2);
+    engine.handleInput(hit('midi:38'));
+
+    expect(engine.isHit(480, 'c/5')).toBe(true);
+    expect(engine.falseHitCount).toBe(0);
+  });
+
   it('notifies an onFalseHit listener with the tick, controlId, resolved element and time of a wrong hit', () => {
     const onFalseHit = vi.fn();
     const { engine } = setup(
@@ -837,6 +912,7 @@ describe('Judge', () => {
       actualTick: 480,
       expectedElement: 'kick',
       actualElement: 'snare',
+      scoreable: true,
     });
   });
 

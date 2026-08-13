@@ -700,6 +700,7 @@ describe('GameRenderer paintWrongHit', () => {
       controlId: 'midi:49',
       element: 'crash',
       timeSeconds: 0.5,
+      scoreable: true,
     });
 
     const marker = overlay.querySelector('.vf-wronghit-marker');
@@ -727,6 +728,7 @@ describe('GameRenderer paintWrongHit', () => {
       controlId: 'midi:49',
       element: 'crash',
       timeSeconds: 0.5,
+      scoreable: true,
     });
 
     const marker = overlay.querySelector('.vf-wronghit-marker');
@@ -753,6 +755,7 @@ describe('GameRenderer paintWrongHit', () => {
       controlId: 'midi:49',
       element: 'crash',
       timeSeconds: 5,
+      scoreable: true,
     });
 
     expect(overlay.children.length).toBe(0);
@@ -774,6 +777,7 @@ describe('GameRenderer paintWrongHit', () => {
       controlId: 'midi:49',
       element: 'crash',
       timeSeconds: 0.5,
+      scoreable: true,
     });
     expect(overlay.children.length).toBe(1);
 
@@ -797,6 +801,7 @@ describe('GameRenderer paintWrongHit', () => {
       controlId: 'midi:49',
       element: 'crash',
       timeSeconds: 0.6,
+      scoreable: true,
     });
     expect(overlay.querySelectorAll('.vf-wronghit-marker').length).toBe(1);
 
@@ -831,12 +836,14 @@ describe('GameRenderer paintWrongHit', () => {
       controlId: 'midi:49',
       element: 'crash',
       timeSeconds: 0.5,
+      scoreable: true,
     });
     view.paintWrongHit({
       tick: 500,
       controlId: 'midi:38',
       element: 'snare',
       timeSeconds: 0.52,
+      scoreable: true,
     });
 
     const markers = Array.from(overlay.querySelectorAll('.vf-wronghit-marker'));
@@ -865,12 +872,14 @@ describe('GameRenderer paintWrongHit', () => {
       controlId: 'midi:49',
       element: 'crash',
       timeSeconds: 0,
+      scoreable: true,
     });
     view.paintWrongHit({
       tick: 1900,
       controlId: 'midi:38',
       element: 'snare',
       timeSeconds: 4,
+      scoreable: true,
     });
 
     const markers = Array.from(overlay.querySelectorAll('.vf-wronghit-marker'));
@@ -897,12 +906,14 @@ describe('GameRenderer paintWrongHit', () => {
       controlId: 'midi:49',
       element: 'crash',
       timeSeconds: 0.5,
+      scoreable: true,
     });
     view.paintWrongHit({
       tick: 490,
       controlId: 'midi:38',
       element: 'snare',
       timeSeconds: 0.51,
+      scoreable: true,
     });
 
     expect(overlay.textContent).toBe('');

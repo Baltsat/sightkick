@@ -282,8 +282,8 @@ export function AutoChart({ disabled, onImported }: Props) {
           disabled
             ? 'Select a library folder first'
             : active
-              ? 'Finish or cancel the current chart first'
-              : 'Turn a YouTube video into a playable drum chart'
+            ? 'Finish or cancel the current chart first'
+            : 'Turn a YouTube video into a playable drum chart'
         }
       >
         <Button

@@ -81,6 +81,15 @@ export class Engine {
    * checkpoint retains every resolved pass through a troublesome phrase.
    */
   private attemptRecords: HitRecord[] = [];
+  /**
+   * The lowest chart tick this attempt has ever been positioned at, via any
+   * play/seek. `deriveMisses()` must not fabricate a miss for a note before
+   * this boundary — the player never had a chance to reach it this attempt
+   * (resuming an interrupted checkpoint, or scrubbing to a mid-song
+   * measure both start play strictly after tick 0). Reset alongside
+   * `runRecords`/`attemptRecords` once an attempt completes.
+   */
+  private minReachedTick: number | undefined;
   private controlGestureCapture:
     | {
         attemptRecordCount: number;
@@ -118,6 +127,10 @@ export class Engine {
         this.seekStartListeners.forEach((listener) => listener());
       },
       onSeek: (tick) => {
+        this.minReachedTick =
+          this.minReachedTick === undefined
+            ? tick
+            : Math.min(this.minReachedTick, tick);
         this.judge.rewindTo(tick);
         // Mirror Judge.rewindTo's own cutoff: a looped practice-range replay
         // shouldn't double-count a bar's hits into one growing run every
@@ -173,7 +186,11 @@ export class Engine {
     this.falseHitUnsub = this.judge.onFalseHit((record) => {
       this.renderer.paintWrongHit(record);
 
-      if (!isKitElement(record.element)) {
+      // An unscoreable false hit (a warm-up tap in a rest, nowhere near a
+      // real note — see Judge.maybeRecordFalseHit) is shown to the player
+      // but must never be persisted as scored evidence: it would corrupt
+      // the run's wrong-hit tally and, downstream, mastery quality.
+      if (!record.scoreable || !isKitElement(record.element)) {
         return;
       }
 
@@ -521,6 +538,10 @@ export class Engine {
 
   setPlaybackSpeed(speed: number): void {
     this.transport.setPlaybackSpeed(speed);
+    // Judge's input-latency compensation is a wall-clock hardware delay
+    // that must be scaled by the active speed to land as the right amount
+    // of song-time drift (see Judge.compensateLatency).
+    this.judge.setPlaybackSpeed(speed);
   }
 
   renderFrame(isSeek = false): void {
@@ -605,6 +626,7 @@ export class Engine {
 
     this.runRecords = [];
     this.attemptRecords = [];
+    this.minReachedTick = undefined;
 
     this.onEndedCb(
       {
@@ -643,8 +665,16 @@ export class Engine {
   }
 
   /**
-   * A note-key is a miss iff it's a real (non-rest) chart note whose prefix
-   * was never marked hit by the time the run ends. The lane comes from
+   * A note-key is a miss iff it's a real (non-rest) chart note at or after
+   * `minReachedTick` — the earliest tick this attempt was ever positioned
+   * at — whose prefix was never marked hit AND never already scored as a
+   * wrong-dynamic strike by the time the run ends. A note before that
+   * boundary was never reachable this playthrough (a resumed checkpoint or
+   * a scrub-to-measure both start play strictly after tick 0), so it must
+   * not be fabricated as a miss. A note Judge already scored 'wrong' for a
+   * failed accent/ghost velocity (isVelocityFailed) already has its one
+   * scoreable outcome; it must not also be persisted here as a second,
+   * fabricated miss for the same physical strike. The lane comes from
    * `KEY_TO_ELEMENT` (the fixed VexFlow-key <-> element table used to draw
    * the chart), not `this.mapping` (the player's controller mapping) —
    * those answer different questions and only one tells us what a given
@@ -657,17 +687,21 @@ export class Engine {
 
     const chart = this.chart;
     const misses: HitRecord[] = [];
+    const minReachedTick = this.minReachedTick ?? 0;
 
     for (const measure of this.measures) {
       for (const note of measure.notes) {
-        if (note.isRest) {
+        if (note.isRest || note.tick < minReachedTick) {
           continue;
         }
 
         for (const key of note.notes) {
           const prefix = keyPrefix(key);
 
-          if (this.judge.isHit(note.tick, prefix)) {
+          if (
+            this.judge.isHit(note.tick, prefix) ||
+            this.judge.isVelocityFailed(note.tick, prefix)
+          ) {
             continue;
           }
 

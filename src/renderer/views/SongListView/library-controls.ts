@@ -7,7 +7,6 @@ const LIBRARY_CONTROL_KEYS: (keyof ControlMapping)[] = [
   'confirm',
   'back',
   'difficulty',
-  'library',
   'sort',
 ];
 
@@ -56,7 +55,6 @@ function explicitLegend(mapping: ControlMapping): string {
   const confirm = assignedLabels(mapping, ['confirm']);
   const back = assignedLabels(mapping, ['back']);
   const difficulty = assignedLabels(mapping, ['difficulty']);
-  const library = assignedLabels(mapping, ['library']);
   const sort = assignedLabels(mapping, ['sort']);
 
   if (move.length > 0) {
@@ -69,10 +67,6 @@ function explicitLegend(mapping: ControlMapping): string {
 
   if (difficulty.length > 0) {
     parts.push(`${difficulty.join(' / ')} filters difficulty`);
-  }
-
-  if (library.length > 0) {
-    parts.push(`${library.join(' / ')} changes source`);
   }
 
   if (sort.length > 0) {
@@ -107,10 +101,6 @@ function kitLegend(
 
   if (has('difficulty') && (mapping.difficulty?.length ?? 0) > 0) {
     parts.push('Hi-hat filters difficulty');
-  }
-
-  if (has('library') && (mapping.library?.length ?? 0) > 0) {
-    parts.push('Ride changes source');
   }
 
   if (has('sort') && (mapping.sort?.length ?? 0) > 0) {
@@ -164,7 +154,6 @@ export function resolveLibraryControls(
     down: fill('down', inputMapping.tom2),
     confirm: fill('confirm', inputMapping.snare),
     difficulty: fill('difficulty', inputMapping.hihat),
-    library: fill('library', inputMapping.ride),
     sort: fill('sort', inputMapping.tom3),
     back: fill('back', inputMapping.crash),
   };

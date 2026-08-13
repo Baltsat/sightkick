@@ -3,23 +3,6 @@ import type {
   YandexPlaylistCandidate,
 } from '../../../types';
 
-export function filterLibraryCandidates(
-  tracks: readonly YandexPlaylistCandidate[],
-  query: string,
-): YandexPlaylistCandidate[] {
-  const normalized = query.trim().toLocaleLowerCase();
-
-  if (!normalized) {
-    return [...tracks];
-  }
-
-  return tracks.filter((track) =>
-    [track.title, ...track.artists].some((value) =>
-      value.toLocaleLowerCase().includes(normalized),
-    ),
-  );
-}
-
 export function libraryCandidateState(
   track: YandexPlaylistCandidate,
   linked = false,

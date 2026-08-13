@@ -323,4 +323,62 @@ describe('SongSearch', () => {
     expect(ipc.sent).toEqual([]);
     expect(screen.queryByTestId('song-search-panel')).not.toBeInTheDocument();
   });
+
+  it('reports every keystroke through onQueryChange', () => {
+    const onQueryChange = vi.fn();
+
+    render(
+      <AntdApp>
+        <SongSearch onQueryChange={onQueryChange} />
+      </AntdApp>,
+    );
+
+    expect(onQueryChange).toHaveBeenLastCalledWith('');
+
+    typeQuery('boulevard');
+
+    expect(onQueryChange).toHaveBeenLastCalledWith('boulevard');
+  });
+
+  it('stays visible but suppresses the YouTube panel and network search while inactive', () => {
+    const view = render(
+      <AntdApp>
+        <SongSearch active={false} />
+      </AntdApp>,
+    );
+
+    typeQuery('boulevard of broken dreams');
+    flushDebounce();
+
+    expect(ipc.sent).toEqual([]);
+    expect(screen.queryByTestId('song-search-panel')).not.toBeInTheDocument();
+    expect(screen.getByTestId('song-search-input')).toHaveValue(
+      'boulevard of broken dreams',
+    );
+
+    // Once a caller's own library search comes up empty, flipping back to
+    // active resumes the same YouTube fallback proven above.
+    view.rerender(
+      <AntdApp>
+        <SongSearch active />
+      </AntdApp>,
+    );
+    flushDebounce();
+
+    expect(ipc.sent).toContainEqual({
+      channel: 'search-youtube',
+      args: [{ query: 'boulevard of broken dreams' }],
+    });
+  });
+
+  it('renders the input under a caller-chosen testid', () => {
+    render(
+      <AntdApp>
+        <SongSearch inputTestId="song-search" />
+      </AntdApp>,
+    );
+
+    expect(screen.getByTestId('song-search')).toBeInTheDocument();
+    expect(screen.queryByTestId('song-search-input')).not.toBeInTheDocument();
+  });
 });

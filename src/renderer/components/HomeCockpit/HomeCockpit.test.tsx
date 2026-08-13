@@ -5,11 +5,19 @@ import type { UseGamificationResult } from '../../hooks/useGamification';
 import { InputProvider } from '../../context/InputContext';
 import type { RunSummary } from '../../services/practice-stats';
 import type {
+  HomeSessionReceipt,
   PracticeWaveResult,
   RankedPracticeCandidate,
 } from '../../services/next-practice';
+import { localDateKey, type PracticeDays } from '../../services/streaks';
 import { installIpcMock, installLocalStorage } from '../../hooks/test-support';
-import { HomeCockpit } from './HomeCockpit';
+import {
+  describeGoalProgress,
+  describeStreak,
+  HomeCockpit,
+  liveDailyProgress,
+  resolveShelfCopy,
+} from './HomeCockpit';
 
 vi.mock('../../services/kit-preview-audio', () => ({
   playKitPreview: vi.fn(),
@@ -314,5 +322,174 @@ describe('HomeCockpit kit home', () => {
     fireEvent.click(screen.getByTestId('home-open-profile'));
 
     expect(onOpenProfile).toHaveBeenCalledOnce();
+  });
+
+  it('renders a real stored day that far exceeds the goal as complete, never as a raw fraction', () => {
+    // This is the exact shape of the reported defect: a stored day of
+    // xp: 411 against a 50 XP goal, shown next to a genuine 1-day streak.
+    const exceededGamification = {
+      ...gamification,
+      streak: { current: 1 },
+      todayXp: 411,
+      goalXp: 50,
+    } as unknown as UseGamificationResult;
+
+    render(
+      <InputProvider>
+        <HomeCockpit
+          songList={[song]}
+          gamification={exceededGamification}
+          recommendation={recommendation}
+          onStartRecommended={vi.fn()}
+          onOpenSongs={vi.fn()}
+          onOpenProfile={vi.fn()}
+        />
+      </InputProvider>,
+    );
+
+    const snapshot = screen.getByTestId('home-profile-snapshot');
+
+    expect(snapshot).toHaveTextContent('1-day streak');
+    expect(snapshot).toHaveTextContent('Set complete · 411 XP');
+    expect(snapshot).not.toHaveTextContent('411 / 50');
+  });
+});
+
+describe('describeStreak', () => {
+  it('names zero as no active streak, not "0-day streak"', () => {
+    expect(describeStreak(0)).toBe('No active streak');
+  });
+
+  it('keeps a single day singular', () => {
+    expect(describeStreak(1)).toBe('1-day streak');
+  });
+
+  it('pluralises many days', () => {
+    expect(describeStreak(2)).toBe('2-day streak');
+    expect(describeStreak(30)).toBe('30-day streak');
+  });
+});
+
+describe('describeGoalProgress', () => {
+  it('reads zero as a plain fraction, not "complete"', () => {
+    expect(describeGoalProgress(0, 50)).toBe('Today · 0 / 50 XP');
+  });
+
+  it('reads partway progress as a fraction', () => {
+    expect(describeGoalProgress(25, 50)).toBe('Today · 25 / 50 XP');
+  });
+
+  it('reads exactly meeting the goal as complete', () => {
+    expect(describeGoalProgress(50, 50)).toBe('Set complete · 50 XP');
+  });
+
+  it('reads far exceeding the goal as complete with the real total, never a fraction past 100%', () => {
+    expect(describeGoalProgress(411, 50)).toBe('Set complete · 411 XP');
+  });
+});
+
+describe('liveDailyProgress', () => {
+  it('falls back to the hook-provided numbers when no days map is available', () => {
+    const fixture = {
+      days: undefined,
+      todayXp: 42,
+      streak: { current: 3 },
+    } as unknown as UseGamificationResult;
+
+    expect(liveDailyProgress(fixture)).toEqual({
+      todayXp: 42,
+      streakCurrent: 3,
+    });
+  });
+
+  it('prefers the live days map over a stale hook-provided number for today', () => {
+    const now = new Date(2026, 7, 13, 10, 0, 0);
+    const days: PracticeDays = {
+      [localDateKey(now)]: { runs: 1, stars: 1, minutes: 12, xp: 65 },
+    };
+    const fixture = {
+      days,
+      // Deliberately wrong, to prove the live days map wins.
+      todayXp: 999,
+      streak: { current: 0 },
+    } as unknown as UseGamificationResult;
+
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    try {
+      expect(liveDailyProgress(fixture)).toEqual({
+        todayXp: 65,
+        streakCurrent: 1,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rolls over honestly at local midnight: yesterday still counts, today starts at zero', () => {
+    const yesterday = new Date(2026, 7, 12, 21, 0, 0);
+    const now = new Date(2026, 7, 13, 0, 30, 0);
+    const days: PracticeDays = {
+      [localDateKey(yesterday)]: { runs: 1, stars: 1, minutes: 20, xp: 80 },
+    };
+    // Stale numbers a hook instance computed before midnight, if nothing
+    // re-rendered its owner since - the exact staleness liveDailyProgress
+    // exists to correct.
+    const fixture = {
+      days,
+      todayXp: 80,
+      streak: { current: 1 },
+    } as unknown as UseGamificationResult;
+
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    try {
+      // "Yesterday continues" (streaks.ts): the streak still reads 1 even
+      // though today has no run yet. Today's own XP, though, is honestly 0
+      // - it must not still show yesterday's total.
+      expect(liveDailyProgress(fixture)).toEqual({
+        todayXp: 0,
+        streakCurrent: 1,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('resolveShelfCopy', () => {
+  it('shows the choose-a-song state when there is no session at all', () => {
+    expect(resolveShelfCopy(undefined)).toEqual({
+      title: 'Choose a song to begin',
+      detail: 'Pick a song, then strike a highlighted drum to start.',
+    });
+  });
+
+  it('never surfaces next-practice/home-session.ts own dead-end placeholder verbatim', () => {
+    const deadEnd: HomeSessionReceipt = {
+      title: 'No musical payoff yet',
+      detail: 'No playable favourite-song section is currently ranked.',
+    };
+
+    expect(resolveShelfCopy(deadEnd)).toEqual({
+      title: 'Choose a song to begin',
+      detail: 'Pick a song, then strike a highlighted drum to start.',
+    });
+  });
+
+  it('passes a real payoff receipt through unchanged', () => {
+    const payoff: HomeSessionReceipt = {
+      title: 'Boulevard of Broken Dreams',
+      detail:
+        'Apply the session in your goal song. A safe section probe will appear when chart evidence supports one.',
+      candidateId: 'song-1',
+    };
+
+    expect(resolveShelfCopy(payoff)).toEqual({
+      title: payoff.title,
+      detail: payoff.detail,
+    });
   });
 });

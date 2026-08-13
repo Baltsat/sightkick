@@ -596,6 +596,94 @@ describe('Engine', () => {
     );
   });
 
+  it('scales the latency compensation by the active playback speed', async () => {
+    const note = staveNote(['c/5']);
+    const { engine, onEnded, player } = await setup({
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [rendered(480, note)],
+          [{ tick: 480, isRest: false, notes: ['c/5'] } as Note],
+        ),
+      ],
+    });
+
+    engine.setSettings({ playheadStyle: 'Cursor' });
+    engine.setRendererRefs({
+      cursorEl: document.createElement('div'),
+      highlightEls: [],
+    });
+    engine.setMapping({ snare: ['midi:38'] });
+    engine.setLatencyMs(250);
+    engine.setPlaybackSpeed(2);
+    engine.playFromTick(0);
+    // At 2x, the 250ms hardware-delay calibration is 500ms of drifted
+    // song-time (250ms * 2), not a flat 250ms - a real on-time strike at
+    // the note's own 0.5s therefore reports its raw (uncompensated)
+    // position 1.0s in, not 0.75s.
+    engine.seekSeconds(1);
+
+    emitInput('midi:38');
+
+    expect(hasClass(note, 'vf-note-hit')).toBe(true);
+
+    player.onEnded();
+    expect(onEnded).toHaveBeenCalledWith(
+      expect.objectContaining({ hitNotes: 1, falseHits: 0 }),
+      expect.objectContaining({
+        totalHits: 1,
+        totalMisses: 0,
+        laneAccuracy: [{ element: 'snare', hits: 1, misses: 0, accuracy: 1 }],
+        timingBias: expect.objectContaining({ meanMs: 0, sampleCount: 1 }),
+      }),
+      expect.any(Array),
+    );
+  });
+
+  it("does not fabricate misses for notes before this attempt's starting tick", async () => {
+    const n0 = staveNote(['c/5']);
+    const n1 = staveNote(['d/5']);
+    const { engine, onEnded, player } = await setup({
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [rendered(480, n0), rendered(960, n1)],
+          [
+            { tick: 480, isRest: false, notes: ['c/5'] } as Note,
+            { tick: 960, isRest: false, notes: ['d/5'] } as Note,
+          ],
+        ),
+      ],
+    });
+
+    engine.setSettings({ playheadStyle: 'Cursor' });
+    engine.setRendererRefs({
+      cursorEl: document.createElement('div'),
+      highlightEls: [],
+    });
+    engine.setMapping({ snare: ['midi:38'], tom2: ['midi:47'] });
+    // Mimics resuming an interrupted checkpoint, or clicking a measure to
+    // scrub-and-continue: this attempt never plays before tick 960, so the
+    // untouched note at 480 was never reachable this playthrough.
+    engine.playFromTick(960);
+
+    emitInput('midi:47');
+
+    player.onEnded();
+    expect(onEnded).toHaveBeenCalledWith(
+      expect.objectContaining({ hitNotes: 1, falseHits: 0 }),
+      expect.objectContaining({
+        totalHits: 1,
+        totalMisses: 0,
+        totalWrong: 0,
+        laneAccuracy: [{ element: 'tom2', hits: 1, misses: 0, accuracy: 1 }],
+      }),
+      expect.any(Array),
+    );
+  });
+
   it('forwards a wrong hit to the renderer as a marker in the overlay', async () => {
     const note = staveNote(['c/5']);
     const { engine } = await setup({
@@ -634,6 +722,96 @@ describe('Engine', () => {
         actualElement: 'crash',
       }),
     ]);
+  });
+
+  it('paints a false hit inside a fully silent measure but never persists it as scored evidence', async () => {
+    const { engine, onEnded, player } = await setup({
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [],
+          [{ tick: 0, isRest: true, notes: ['x/4'] } as Note],
+        ),
+      ],
+    });
+    const overlayEl = document.createElement('div');
+
+    engine.setSettings({ playheadStyle: 'Cursor' });
+    engine.setRendererRefs({
+      cursorEl: document.createElement('div'),
+      highlightEls: [],
+      overlayEl,
+    });
+    engine.setMapping({ crash: ['midi:49'] });
+    engine.playFromTick(0);
+    engine.seekSeconds(0.5);
+
+    emitInput('midi:49');
+
+    // A warm-up tap during a rest is still shown to the player, honestly,
+    // at the timing it was struck...
+    expect(overlayEl.querySelector('.vf-wronghit-marker')).not.toBeNull();
+    // ...but Judge already decided this strike is unscoreable (no real note
+    // is anywhere nearby), so it must not corrupt the run's wrong-hit
+    // evidence and, downstream, mastery quality.
+    expect(engine.getRunRecords()).toEqual([]);
+
+    player.onEnded();
+    // The persisted RunSummary — not just the in-flight run records — must
+    // stay clean too, since that's what's actually saved and feeds mastery.
+    expect(onEnded).toHaveBeenCalledWith(
+      expect.objectContaining({ falseHits: 0 }),
+      expect.objectContaining({ totalWrong: 0, totalMisses: 0 }),
+      expect.any(Array),
+    );
+  });
+
+  it('persists a wrong-dynamic strike as exactly one scoreable outcome in the saved run summary', async () => {
+    const note = staveNote(['c/5']);
+    const { engine, onEnded, player } = await setup({
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [rendered(480, note)],
+          [
+            {
+              tick: 480,
+              isRest: false,
+              notes: ['c/5'],
+              accents: ['c/5'],
+            } as Note,
+          ],
+        ),
+      ],
+    });
+
+    engine.setSettings({ playheadStyle: 'Cursor' });
+    engine.setRendererRefs({
+      cursorEl: document.createElement('div'),
+      highlightEls: [],
+    });
+    engine.setMapping({ snare: ['midi:38'] });
+    engine.playFromTick(0);
+    engine.seekSeconds(0.5);
+
+    // Right pad, right time, too soft for the accent.
+    emitInput('midi:38', 80);
+
+    player.onEnded();
+    // One physical strike, one scoreable outcome in the durably saved
+    // evidence - not a 'wrong' from the strike itself AND a fabricated
+    // 'miss' for the same note once the late-hit window closes.
+    expect(onEnded).toHaveBeenCalledWith(
+      expect.objectContaining({ hitNotes: 0, falseHits: 1 }),
+      expect.objectContaining({
+        totalHits: 0,
+        totalWrong: 1,
+        totalMisses: 0,
+      }),
+      expect.any(Array),
+    );
   });
 
   it('prunes a false hit made ahead of a seek when seeking back', async () => {

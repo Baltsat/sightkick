@@ -139,10 +139,14 @@ export function musicalReceipt(
   const target = loopTarget(summary);
 
   if (target) {
+    // loopTarget returns "bar N" for one bar and "bars N–M" for a range -
+    // the verb has to agree with whichever it picked.
+    const verb = target.startsWith('bars ') ? 'are' : 'is';
+
     return {
       headline: `${target[0].toUpperCase()}${target.slice(
         1,
-      )} is ready for a loop`,
+      )} ${verb} ready for a loop`,
       meaning:
         'This run saved a specific target; no musical change is claimed yet.',
       action: 'replay',

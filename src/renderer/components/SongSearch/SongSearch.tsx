@@ -1,4 +1,4 @@
-import { KeyboardEvent, useState } from 'react';
+import { KeyboardEvent, useEffect, useState } from 'react';
 import { App, Empty, Input, Popover, Spin } from 'antd';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
@@ -22,6 +22,21 @@ export interface SongSearchRequest {
 interface Props {
   disabled?: boolean;
   requestedSearch?: SongSearchRequest;
+  /**
+   * Reports every keystroke so a caller can search its own local library
+   * against the same text. Optional — existing callers that only want the
+   * YouTube-import behaviour can ignore it.
+   */
+  onQueryChange?: (query: string) => void;
+  /**
+   * When explicitly false, this stays the single visible search field but
+   * suppresses the YouTube results panel (and the network search that
+   * feeds it) — used to keep it quiet while the caller's own library
+   * already has matches for the same text. Defaults to true.
+   */
+  active?: boolean;
+  /** Overrides the input's data-testid; defaults to "song-search-input". */
+  inputTestId?: string;
 }
 
 function resultSubtitle(result: IpcYoutubeSearchResult): string {
@@ -38,9 +53,15 @@ function resultSubtitle(result: IpcYoutubeSearchResult): string {
   return parts.join(' · ');
 }
 
-function SongSearchInner({ disabled, requestedSearch }: Props) {
+function SongSearchInner({
+  disabled,
+  requestedSearch,
+  onQueryChange,
+  active = true,
+  inputTestId = 'song-search-input',
+}: Props) {
   const { notification } = App.useApp();
-  const requestedQuery = disabled ? '' : (requestedSearch?.query.trim() ?? '');
+  const requestedQuery = disabled ? '' : requestedSearch?.query.trim() ?? '';
   const [query, setQuery] = useState(requestedQuery);
   const [open, setOpen] = useState(Boolean(requestedQuery));
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -56,8 +77,20 @@ function SongSearchInner({ disabled, requestedSearch }: Props) {
       artists: [...requestedSearch.sourceProvenance.artists],
     };
   });
+
+  useEffect(() => {
+    onQueryChange?.(query);
+    // Only the query itself should retrigger this — onQueryChange is
+    // typically a fresh closure every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
   const trimmed = query.trim();
-  const { results, loading, error } = useYoutubeSearch(query);
+  // A caller's own library search already covers this text, so there is
+  // nothing to fetch and nothing honest to show while `active` is false —
+  // this both saves the network call and stops a misleading "no YouTube
+  // results" flash while local matches are on screen.
+  const { results, loading, error } = useYoutubeSearch(active ? query : '');
   const [prevResults, setPrevResults] = useState(results);
 
   if (results !== prevResults) {
@@ -122,7 +155,7 @@ function SongSearchInner({ disabled, requestedSearch }: Props) {
       select(results[activeIndex >= 0 ? activeIndex : 0]);
     }
   };
-  const showPanel = open && Boolean(trimmed);
+  const showPanel = open && Boolean(trimmed) && active;
   const content = (
     <div className="flex w-88 flex-col gap-1" data-testid="song-search-panel">
       {loading && (
@@ -215,11 +248,11 @@ function SongSearchInner({ disabled, requestedSearch }: Props) {
     </div>
   );
   const input = (
-    <div className="w-52 shrink-0">
+    <div className="w-full">
       <Input
-        data-testid="song-search-input"
-        aria-label="Find any song"
-        placeholder="Find any song…"
+        data-testid={inputTestId}
+        aria-label="Search your music"
+        placeholder="Search your music…"
         className="w-full"
         prefix={
           <FontAwesomeIcon

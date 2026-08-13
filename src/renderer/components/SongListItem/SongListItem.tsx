@@ -60,9 +60,30 @@ export function SongListItem({
   onPreviewEnd,
 }: SongListItemProps) {
   const local = 'source' in songData ? undefined : songData;
+  const hasAudio = (local?.audio?.length ?? 0) > 0;
+  const hasChart = (local?.drumDifficulties?.length ?? 0) > 0;
+  const isSourceLinked = Boolean(
+    local?.sourceLinked || local?.sourceProvenance,
+  );
+  // An online (not-yet-downloaded) row has no `local` shape to check and is
+  // handled entirely by the download button below, so it stays "playable"
+  // here. For anything already in the library, missing audio or a missing
+  // drum chart makes a song unplayable regardless of source-link status —
+  // this is the same gate the main process already enforces before ever
+  // storing a song (see src/main/playability.ts).
   const playable =
-    !(local?.sourceLinked || local?.sourceProvenance) ||
-    isPlayableEvidence(local.playability);
+    !local ||
+    (hasAudio &&
+      hasChart &&
+      (!isSourceLinked || isPlayableEvidence(local.playability)));
+  const unplayableReason =
+    !local || playable
+      ? undefined
+      : !hasAudio
+      ? 'audio'
+      : !hasChart
+      ? 'chart'
+      : 'proof';
   const { albumCover, id, name, artist, charter, drumDifficulty } = songData;
   const autoChartTool =
     'autoChartTool' in songData ? songData.autoChartTool : undefined;
@@ -304,12 +325,24 @@ export function SongListItem({
           )}
 
           {local && !playable && (
-            <Tooltip title="This source-linked song still needs identity, lawful audio, reviewed chart, scan-chart, and launch proof">
+            <Tooltip
+              title={
+                unplayableReason === 'audio'
+                  ? "No audio file was found for this song, so it can't be played yet."
+                  : unplayableReason === 'chart'
+                  ? "No drum chart was found for this song, so it can't be played yet."
+                  : 'This source-linked song still needs identity, lawful audio, reviewed chart, scan-chart, and launch proof'
+              }
+            >
               <span
                 className="text-xs text-orange"
                 aria-label={`${name} is not playable yet`}
               >
-                Needs proof
+                {unplayableReason === 'audio'
+                  ? 'No audio'
+                  : unplayableReason === 'chart'
+                  ? 'No chart'
+                  : 'Needs proof'}
               </span>
             </Tooltip>
           )}

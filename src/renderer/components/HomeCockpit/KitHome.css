@@ -1,24 +1,77 @@
+/*
+ * The kit owns the whole field: `.kit-home__studio` bleeds edge to edge and
+ * `.kit-home__context` is an overlay on TOP of that same photograph, not a
+ * separate framed-card column beside it (see design-acceptance-notes.md
+ * verdict #1 and visual-system-v3's "hero / kit stage" rule). Both are
+ * absolutely positioned within this shared stacking context so the manifest
+ * and the low shelf read as text sitting directly on the studio plane.
+ */
 .kit-home {
-  display: grid;
+  position: relative;
   min-height: 0;
   height: 100%;
-  grid-template-columns: minmax(10.5rem, 14rem) minmax(0, 1fr);
-  gap: clamp(0.9rem, 1.8vw, 1.7rem);
   overflow: hidden;
-  padding: 0 clamp(0.75rem, 1.75vw, 1.5rem) clamp(0.75rem, 1.5vw, 1.25rem);
-  background: transparent;
+  background: var(--surface-studio);
 }
 
 .kit-home__context {
+  /* theme.css now publishes the v3 token contract, so read the shared
+   * `--dr-studio-ink` instead of duplicating its hex here (the fallback
+   * keeps this resilient if the token is ever missing). Shared here (not on
+   * `__manifest` alone) so the low shelf below it - a sibling, not a
+   * descendant of the manifest - inherits the same ink. */
+  --kit-home-studio-ink: var(--dr-studio-ink, #fff8ed);
+  --kit-home-studio-ink-muted: color-mix(
+    in srgb,
+    var(--kit-home-studio-ink) 74%,
+    transparent
+  );
+  --kit-home-studio-line: color-mix(
+    in srgb,
+    var(--kit-home-studio-ink) 24%,
+    transparent
+  );
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 2;
   display: flex;
-  min-width: 0;
+  width: min(38%, 27rem);
+  min-width: 15rem;
+  min-height: 0;
   flex-direction: column;
   justify-content: space-between;
-  padding: clamp(1rem, 3vh, 2rem) 0 0.35rem;
+  padding: clamp(1.5rem, 4.5vh, 3.25rem) clamp(1.25rem, 3vw, 2.5rem);
+  /* Text sits over live strike zones (hi-hat/crash reach ~14-35% from the
+   * left edge) - only the manifest/shelf's own controls should capture
+   * clicks, so an empty part of the overlay lets a pad underneath it stay
+   * reachable, matching "leave cymbals, heads, and strike zones physically
+   * visible" (visual-system-v3, hero/kit stage). */
+  pointer-events: none;
+}
+
+/*
+ * Only the real controls re-enable pointer-events, not their wrapping
+ * boxes: `.kit-home__manifest`/`.kit-home__shelf` are large flex
+ * containers whose bounding rect covers plenty of "empty" title/text
+ * space that visually sits over a pad (see the crash/hi-hat overlap in
+ * the manifest). Re-enabling the whole box - `.kit-home__context > *` -
+ * would silently swallow clicks there on a real cursor, even though
+ * nothing renders to receive them; jsdom's `fireEvent` bypasses hit
+ * testing, so that regression is invisible to component tests.
+ * `pointer-events` is inherited, so `<details>` picks its popover
+ * (`.kit-home__session-details`, including the practice-card buttons
+ * inside it) back up automatically once it is interactive again.
+ */
+.kit-home__context button,
+.kit-home__context details,
+.kit-home__context summary {
+  pointer-events: auto;
 }
 
 .kit-home__studio {
-  position: relative;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -43,15 +96,17 @@
   pointer-events: none;
   background:
     linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--surface-studio) 78%, transparent) 0%,
-      color-mix(in srgb, var(--surface-studio) 42%, transparent) 31%,
-      transparent 58%
+      100deg,
+      color-mix(in srgb, var(--surface-studio) 90%, transparent) 0%,
+      color-mix(in srgb, var(--surface-studio) 64%, transparent) 26%,
+      color-mix(in srgb, var(--surface-studio) 22%, transparent) 44%,
+      transparent 62%
     ),
     linear-gradient(
       0deg,
-      color-mix(in srgb, var(--surface-studio) 56%, transparent) 0%,
-      transparent 38%
+      color-mix(in srgb, var(--surface-studio) 84%, transparent) 0%,
+      color-mix(in srgb, var(--surface-studio) 40%, transparent) 27%,
+      transparent 52%
     );
 }
 
@@ -60,26 +115,31 @@
 }
 
 .kit-home__manifest h1 {
-  max-width: 12ch;
+  /* No character cap: the column's own width (not a "Nch" guess) decides
+   * wrapping, so a long lesson title breaks into a few generous lines
+   * instead of five cramped fragments (design-acceptance-notes.md #2). */
+  max-width: 100%;
   margin: 0;
-  color: var(--ink-strong);
+  color: var(--kit-home-studio-ink);
   font-family: var(--font-display);
-  font-size: clamp(1.85rem, 2.8vw, 3.2rem);
+  font-size: clamp(2.1rem, 3.6vw, 3.5rem);
   font-weight: 650;
-  letter-spacing: -0.052em;
-  line-height: 0.93;
+  letter-spacing: -0.03em;
+  line-height: 0.98;
+  text-shadow: 0 0.35rem 1.4rem rgb(10 8 5 / 55%);
   text-wrap: balance;
 }
 
 .kit-home__primary-action {
-  margin-top: 0.9rem;
-  padding: 0.62rem 0.85rem;
+  margin-top: 1.1rem;
+  padding: 0.7rem 1.1rem;
   border: 1px solid color-mix(in srgb, var(--signal-ember) 78%, transparent);
   border-radius: 0.5rem;
   color: var(--surface-studio);
   background: var(--signal-ember);
+  box-shadow: 0 0.85rem 1.8rem -1rem rgb(0 0 0 / 60%);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   font-weight: 760;
   cursor: pointer;
   transition:
@@ -107,9 +167,23 @@
 }
 
 .kit-home__pad {
+  /*
+   * The kit-color-maturity service fades `--kit-color-vividness` toward 0%
+   * as the player masters a lane (services/kit-color-maturity) - by design
+   * for a lesson node's decorative tint, but a strike zone is not
+   * decoration: he memorises the kit by these colours and must read them
+   * "at a glance from two metres away" at every maturity stage
+   * (design-acceptance-notes.md #2, visual-system-v3's kit colour
+   * discipline: "at least an ink outline ... when colour saturation
+   * fades"). `max()` floors the mix toward the lane hue no matter how
+   * faded the maturity signal gets, without touching the maturity service
+   * itself - full color-mix() saturation still ramps in above the floor,
+   * so an early, unfaded pad looks identical to today.
+   */
+  --kit-pad-vividness: max(var(--kit-color-vividness, 100%), 46%);
   --kit-pad-signal: color-mix(
     in srgb,
-    var(--color-yellow) var(--kit-color-vividness, 100%),
+    var(--color-yellow) var(--kit-pad-vividness),
     #050608
   );
   position: absolute;
@@ -122,14 +196,14 @@
   background: transparent;
   clip-path: ellipse(50% 50% at 50% 50%);
   cursor: var(--drumstick-cursor), pointer;
-  filter: saturate(var(--kit-color-saturation, 100%));
+  filter: saturate(max(var(--kit-color-saturation, 100%), 55%));
   isolation: isolate;
 }
 
 .kit-home__pad[data-color-lane='orange'] {
   --kit-pad-signal: color-mix(
     in srgb,
-    var(--color-orange) var(--kit-color-vividness, 100%),
+    var(--color-orange) var(--kit-pad-vividness),
     #050608
   );
 }
@@ -137,7 +211,7 @@
 .kit-home__pad[data-color-lane='red'] {
   --kit-pad-signal: color-mix(
     in srgb,
-    var(--color-red) var(--kit-color-vividness, 100%),
+    var(--color-red) var(--kit-pad-vividness),
     #050608
   );
 }
@@ -145,7 +219,7 @@
 .kit-home__pad[data-color-lane='yellow'] {
   --kit-pad-signal: color-mix(
     in srgb,
-    var(--color-yellow) var(--kit-color-vividness, 100%),
+    var(--color-yellow) var(--kit-pad-vividness),
     #050608
   );
 }
@@ -153,7 +227,7 @@
 .kit-home__pad[data-color-lane='blue'] {
   --kit-pad-signal: color-mix(
     in srgb,
-    var(--color-blue) var(--kit-color-vividness, 100%),
+    var(--color-blue) var(--kit-pad-vividness),
     #050608
   );
 }
@@ -161,7 +235,7 @@
 .kit-home__pad[data-color-lane='green'] {
   --kit-pad-signal: color-mix(
     in srgb,
-    var(--color-green) var(--kit-color-vividness, 100%),
+    var(--color-green) var(--kit-pad-vividness),
     #050608
   );
 }
@@ -176,18 +250,23 @@
 .kit-home__pad-head {
   inset: 0;
   z-index: -1;
-  border: 2px solid color-mix(in srgb, var(--kit-pad-signal) 74%, white);
+  border: 2.5px solid color-mix(in srgb, var(--kit-pad-signal) 78%, white);
   background: radial-gradient(
     ellipse at 50% 50%,
-    color-mix(in srgb, var(--kit-pad-signal) 26%, transparent),
-    color-mix(in srgb, var(--kit-pad-signal) 8%, transparent) 71%,
+    color-mix(in srgb, var(--kit-pad-signal) 30%, transparent),
+    color-mix(in srgb, var(--kit-pad-signal) 10%, transparent) 71%,
     transparent 76%
   );
+  /* An always-on dark ring under the colour ring, independent of
+   * `--kit-pad-signal` - a light-coloured border alone can wash out
+   * against a bright cymbal in the same photo, so the zone keeps a fixed
+   * ink edge no matter what's behind it or how faded the colour gets. */
   box-shadow:
-    0 0 0 0.14rem color-mix(in srgb, var(--kit-pad-signal) 14%, transparent),
-    0 0 1rem color-mix(in srgb, var(--kit-pad-signal) 32%, transparent),
-    inset 0 0 0.75rem color-mix(in srgb, var(--kit-pad-signal) 18%, transparent);
-  opacity: 0.62;
+    0 0 0 1px rgb(10 8 5 / 55%),
+    0 0 0 0.16rem color-mix(in srgb, var(--kit-pad-signal) 20%, transparent),
+    0 0 1.15rem color-mix(in srgb, var(--kit-pad-signal) 38%, transparent),
+    inset 0 0 0.75rem color-mix(in srgb, var(--kit-pad-signal) 22%, transparent);
+  opacity: 0.88;
   transform: scale(0.98);
   transition:
     opacity 150ms ease,
@@ -208,9 +287,10 @@
   opacity: 1;
   transform: scale(1.015);
   box-shadow:
-    0 0 0 0.22rem color-mix(in srgb, var(--kit-pad-signal) 22%, transparent),
-    0 0 1.7rem color-mix(in srgb, var(--kit-pad-signal) 52%, transparent),
-    inset 0 0 1rem color-mix(in srgb, var(--kit-pad-signal) 32%, transparent);
+    0 0 0 1px rgb(10 8 5 / 55%),
+    0 0 0 0.22rem color-mix(in srgb, var(--kit-pad-signal) 26%, transparent),
+    0 0 1.7rem color-mix(in srgb, var(--kit-pad-signal) 56%, transparent),
+    inset 0 0 1rem color-mix(in srgb, var(--kit-pad-signal) 36%, transparent);
 }
 
 .kit-home__pad[data-active='true'] .kit-home__pad-head {
@@ -268,95 +348,101 @@
   position: absolute;
 }
 
+/*
+ * One low shelf, flush to the image's bottom-left corner, holding the
+ * goal-song payoff (the reason to practice - design-acceptance-notes.md
+ * #5) and a single quiet progress caption underneath it, separated by one
+ * hairline rather than each living in its own bordered block. "no cards"
+ * (visual-system-v3, home screen direction: "a one-line strip ... uses
+ * dividers, no cards").
+ */
+.kit-home__shelf {
+  display: grid;
+  min-width: 0;
+  gap: 0.85rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-studio) 40%, transparent),
+    color-mix(in srgb, var(--surface-studio) 74%, transparent)
+  );
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 8%);
+}
+
 .kit-home__session-summary {
   display: grid;
   min-width: 0;
-  gap: 0.34rem;
-  padding: 0.85rem 0 0;
-  border-top: 1px solid var(--line-soft);
-  color: var(--ink-strong);
-  background: transparent;
+  gap: 0.3rem;
+  color: var(--kit-home-studio-ink);
 }
 
 .kit-home__profile-snapshot {
-  display: grid;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   min-width: 0;
-  gap: 0.22rem;
-  padding: 0.75rem 0;
-  border-top: 1px solid var(--line-soft);
-  border-bottom: 1px solid var(--line-soft);
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--kit-home-studio-line);
 }
 
-.kit-home__profile-snapshot p {
-  margin: 0;
-  color: var(--ink-muted);
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.kit-home__profile-snapshot strong {
-  overflow: hidden;
-  color: var(--ink-strong);
-  font-family: var(--font-display);
-  font-size: clamp(1.05rem, 1.45vw, 1.32rem);
-  font-weight: 650;
-  letter-spacing: -0.035em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+/* This is the streak/XP sentence's only rendered surface - clipping it with
+ * an ellipsis (the previous rule) can hide the actual number behind "...",
+ * which reads as a wrong readout even though the underlying string is
+ * honest. Let it wrap onto a second line instead of losing digits; the
+ * neighbouring "View profile" button stays fixed-width so it never crowds
+ * out real evidence. */
 .kit-home__profile-snapshot > span {
-  overflow: hidden;
-  color: var(--ink-muted);
-  font-size: 0.73rem;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+  color: var(--kit-home-studio-ink-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
 }
 
 .kit-home__profile-snapshot button {
-  width: fit-content;
-  margin-top: 0.2rem;
+  flex: none;
   padding: 0;
   border: 0;
-  color: var(--signal-wine);
+  color: var(--kit-home-studio-ink);
   background: transparent;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 760;
+  text-decoration: underline;
+  text-decoration-color: rgb(255 248 237 / 38%);
+  text-underline-offset: 0.15rem;
   cursor: pointer;
 }
 
 .kit-home__profile-snapshot button:hover {
-  color: color-mix(in srgb, var(--signal-wine) 78%, var(--ink-strong));
+  text-decoration-color: var(--kit-home-studio-ink);
 }
 
 .kit-home__session-summary > strong {
-  overflow: hidden;
+  overflow-wrap: break-word;
   font-family: var(--font-display);
-  font-size: clamp(1rem, 1.35vw, 1.25rem);
+  font-size: clamp(1.15rem, 1.7vw, 1.55rem);
   font-weight: 650;
-  letter-spacing: -0.035em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
 .kit-home__session-summary > span {
-  overflow: hidden;
-  color: var(--ink-muted);
-  font-size: 0.82rem;
-  line-height: 1.35;
+  color: var(--kit-home-studio-ink-muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 .kit-home__session-summary details {
   position: relative;
-  margin-top: 0.2rem;
+  margin-top: 0.3rem;
 }
 
 .kit-home__session-summary summary {
-  color: var(--ink-muted);
+  color: var(--kit-home-studio-ink-muted);
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
@@ -434,30 +520,31 @@
   }
 }
 
+/* Drumroll's minimum supported window is 1024x700 (windowConfig.ts) - this
+ * breakpoint covers that floor, so the goal-song reason line (the whole
+ * point of item #5) must stay readable here, not disappear. */
 @media (max-width: 1100px) {
-  .kit-home {
-    grid-template-columns: minmax(9.75rem, 11.5rem) minmax(0, 1fr);
-    gap: 0.9rem;
-    padding: 0 0.75rem 0.75rem;
+  .kit-home__context {
+    width: min(46%, 23rem);
+    padding: clamp(1.1rem, 3.5vh, 2rem) clamp(1rem, 2.5vw, 1.75rem);
   }
 
   .kit-home__manifest h1 {
-    font-size: clamp(1.7rem, 3vw, 2.6rem);
+    font-size: clamp(1.8rem, 3.6vw, 2.6rem);
   }
 
-  .kit-home__session-summary > span {
-    display: none;
+  .kit-home__shelf {
+    padding: 0.9rem 1rem;
   }
 }
 
 @media (max-width: 720px) {
-  .kit-home {
-    grid-template-columns: minmax(8.5rem, 10rem) minmax(0, 1fr);
-    gap: 0.65rem;
+  .kit-home__context {
+    width: min(62%, 19rem);
   }
 
-  .kit-home__session-summary {
-    padding: 0.65rem 0;
+  .kit-home__shelf {
+    padding: 0.75rem 0.85rem;
   }
 }
 

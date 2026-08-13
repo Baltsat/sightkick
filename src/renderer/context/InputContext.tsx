@@ -113,19 +113,67 @@ function isControlElement(
 // from the result, rather than seeded with an empty array — otherwise a
 // single "Learn" on one lane would mark every other, untouched lane as
 // "explicitly configured to empty" and silently blank out its DTX default.
+//
+// A lane that has never been stored can still *silently* own this controlId
+// through `defaults` (the DTX/GM map). Moving that note onto `element` must
+// also strip it from that still-default lane, or the same physical strike
+// keeps matching both lanes forever (Judge unions every mapping entry that
+// contains the struck controlId) — reachable any time a player Learns a
+// note that collides with another lane's untouched default.
 function assignInto(
   current: Partial<Record<keyof InputMapping, string[]>> | undefined,
   element: keyof InputMapping,
   controlId: string,
+  defaults?: Record<keyof InputMapping, string[]>,
 ): Partial<Record<keyof InputMapping, string[]>> {
   const deduped = mapValues(current ?? {}, (list) =>
     list ? without(list, controlId) : list,
   );
 
+  if (defaults) {
+    (Object.keys(EMPTY_INPUT_MAPPING) as (keyof InputMapping)[]).forEach(
+      (key) => {
+        if (key === element || deduped[key] !== undefined) {
+          return;
+        }
+
+        if (defaults[key]?.includes(controlId)) {
+          deduped[key] = without(defaults[key], controlId);
+        }
+      },
+    );
+  }
+
   return {
     ...deduped,
     [element]: uniq([...(deduped[element] ?? []), controlId]),
   };
+}
+
+// The single source of truth for "what does this lane currently listen to",
+// shared by the `inputMapping` memo (read path) and `removeControl` (write
+// path) so the two can never disagree about whether a lane is still on its
+// DTX/GM default. Always returns a fresh array: `DEFAULT_MIDI_INPUT_MAPPING`
+// and `EMPTY_INPUT_MAPPING` are module-level constants read by every device
+// for the app's whole lifetime, so handing out the shared reference would
+// let an in-place mutation by any consumer corrupt the default for every
+// other lane and device that falls back to the same entry.
+function resolveInputList(
+  stored: Partial<Record<keyof InputMapping, string[]>> | undefined,
+  useDefaults: boolean,
+  key: keyof InputMapping,
+): string[] {
+  const storedList = stored?.[key];
+
+  if (storedList !== undefined) {
+    return storedList;
+  }
+
+  return [
+    ...(useDefaults
+      ? DEFAULT_MIDI_INPUT_MAPPING[key]
+      : EMPTY_INPUT_MAPPING[key]),
+  ];
 }
 
 function assignControlInto(
@@ -290,23 +338,25 @@ export function InputProvider({ children }: { children: ReactNode }) {
       : undefined;
     const useDefaults = selectedDevice?.sourceId === 'midi';
 
-    return mapValues(EMPTY_INPUT_MAPPING, (fallback, key) => {
+    return mapValues(EMPTY_INPUT_MAPPING, (_fallback, key) =>
+      resolveInputList(stored, useDefaults, key),
+    );
+  }, [selectedDevice, inputMappings]);
+  const controlMapping = useMemo(() => {
+    const stored = selectedDevice
+      ? controlMappings[selectedDevice.id]
+      : undefined;
+
+    // Clone the shared `EMPTY_CONTROL_MAPPING` fallback arrays for the same
+    // reason `resolveInputList` does below: they are module-level constants
+    // read by every device, so handing out the live reference would let an
+    // in-place mutation leak into every other never-configured control.
+    return mapValues(EMPTY_CONTROL_MAPPING, (fallback, key) => {
       const storedList = stored?.[key];
 
-      if (storedList !== undefined) {
-        return storedList;
-      }
-
-      return useDefaults ? DEFAULT_MIDI_INPUT_MAPPING[key] : fallback;
+      return storedList !== undefined ? storedList : [...fallback];
     });
-  }, [selectedDevice, inputMappings]);
-  const controlMapping = useMemo(
-    () => ({
-      ...EMPTY_CONTROL_MAPPING,
-      ...(selectedDevice ? controlMappings[selectedDevice.id] : undefined),
-    }),
-    [selectedDevice, controlMappings],
-  );
+  }, [selectedDevice, controlMappings]);
   const kitControlIds = useMemo(
     () => new Set(Object.values(inputMapping).flat()),
     [inputMapping],
@@ -336,6 +386,9 @@ export function InputProvider({ children }: { children: ReactNode }) {
           prev[selectedDevice.id],
           element,
           controlId,
+          selectedDevice.sourceId === 'midi'
+            ? DEFAULT_MIDI_INPUT_MAPPING
+            : undefined,
         ),
       }));
     },
@@ -362,16 +415,28 @@ export function InputProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setInputMappings((prev) => ({
-        ...prev,
-        [selectedDevice.id]: {
-          ...prev[selectedDevice.id],
-          [element]: without(
-            prev[selectedDevice.id]?.[element] ?? [],
-            controlId,
-          ),
-        },
-      }));
+      // Remove from the lane's *effective* list (stored override, or the
+      // DTX/GM default it is still silently relying on) rather than from
+      // whatever happens to be stored. A never-configured lane has no
+      // stored entry at all, so subtracting from `?? []` would otherwise
+      // "succeed" at removing nothing and then persist an explicit empty
+      // array — which stops the lane from ever falling back to its default
+      // again and silently wipes every other default note it listed too.
+      setInputMappings((prev) => {
+        const stored = prev[selectedDevice.id];
+        const useDefaults = selectedDevice.sourceId === 'midi';
+
+        return {
+          ...prev,
+          [selectedDevice.id]: {
+            ...stored,
+            [element]: without(
+              resolveInputList(stored, useDefaults, element),
+              controlId,
+            ),
+          },
+        };
+      });
     },
     [selectedDevice, setControlMappings, setInputMappings],
   );

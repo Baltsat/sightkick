@@ -2,13 +2,16 @@ import { fireEvent, screen } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { setupSongListView } from './test-support';
+import { setupSongListView, SongListHarness } from './test-support';
 
 const laptopViewports = [
   { width: 1225, height: 768 },
   { width: 1024, height: 700 },
 ] as const;
-const routes = [
+const routes: Array<{
+  name: string;
+  open: (view: SongListHarness) => void | Promise<void>;
+}> = [
   {
     name: 'Home',
     open: () => expect(screen.getByTestId('home-cockpit')).toBeInTheDocument(),
@@ -35,13 +38,26 @@ const routes = [
     },
   },
   {
-    name: 'Insights',
-    open: () => {
+    // The shell has no "Insights" heading of its own — that copy lives (or
+    // used to live) inside ProfileView, which is out of this suite's
+    // ownership and free to change wording. What the shell guarantees is
+    // its own contract: the persistent rail's profile control opens the
+    // route and marks itself as the current page, and the route mounts far
+    // enough to prove it lives inside the fixed viewport, not a spinner
+    // standing in for it.
+    name: 'Profile',
+    open: async (view) => {
+      view.emit('load-goals', { goals: [] });
       fireEvent.click(screen.getByTestId('open-profile-button'));
-      expect(screen.getByText('Insights')).toBeInTheDocument();
+
+      expect(await screen.findByTestId('profile-view')).toBeInTheDocument();
+      expect(screen.getByTestId('open-profile-button')).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
     },
   },
-] as const;
+];
 const originalViewport = {
   width: window.innerWidth,
   height: window.innerHeight,
@@ -83,11 +99,12 @@ describe.each(laptopViewports)(
   (viewport) => {
     it.each(routes)(
       '$name keeps its route root inside the fixed viewport',
-      ({ open }) => {
+      async ({ open }) => {
         setViewport(viewport);
-        setupSongListView();
 
-        open();
+        const view = setupSongListView();
+
+        await open(view);
         expectFixedOuterViewport();
       },
     );

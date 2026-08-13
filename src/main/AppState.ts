@@ -339,10 +339,10 @@ class AppState {
         process.platform === 'win32'
           ? getAssetPath('icon.ico')
           : process.platform === 'linux'
-            ? getAssetPath('icons', '512x512.png')
-            : process.platform === 'darwin'
-              ? getAssetPath('icon.icns')
-              : getAssetPath('icon.png'),
+          ? getAssetPath('icons', '512x512.png')
+          : process.platform === 'darwin'
+          ? getAssetPath('icon.icns')
+          : getAssetPath('icon.png'),
       webPreferences: {
         preload: path.join(__dirname, '../preload/index.js'),
         backgroundThrottling: false,

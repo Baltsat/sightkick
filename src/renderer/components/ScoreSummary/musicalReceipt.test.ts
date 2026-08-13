@@ -47,6 +47,29 @@ describe('musicalReceipt', () => {
     });
   });
 
+  it('agrees the verb with a multi-bar loop target', () => {
+    const summary = {
+      ...multiLaneRunFixture(),
+      coachEvidence: [
+        {
+          id: 'bars-1-17',
+          kind: 'timing',
+          severity: 'medium' as const,
+          skillTag: 'timing',
+          sampleCount: 12,
+          barStart: 1,
+          barEnd: 17,
+        },
+      ],
+    };
+
+    expect(musicalReceipt(summary, undefined)).toMatchObject({
+      headline: 'Bars 1–17 are ready for a loop',
+      action: 'replay',
+      changed: false,
+    });
+  });
+
   it('keeps an older or first run honest when no comparison exists', () => {
     expect(musicalReceipt(multiLaneRunFixture(), undefined)).toMatchObject({
       headline: 'This run is saved for comparison',

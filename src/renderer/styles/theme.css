@@ -1,13 +1,37 @@
 @theme {
-  --surface-canvas: #f5f0e7;
-  --surface-raised: #fffdf8;
-  --ink-strong: #1b1814;
-  --ink-muted: #6f685e;
-  --line-soft: #ddd3c4;
-  --signal-ember: #d75a34;
-  --signal-wine: #932d4c;
-  --signal-green: #287a64;
-  --surface-studio: #24201b;
+  /* v2 legacy aliases — pinned to the v3 token contract values below so a
+     surface reading either name never disagrees with another. Do not add
+     new consumers of these names; read the --dr-* tokens instead. */
+  --surface-canvas: #f4efe5;
+  --surface-raised: #fcf9f2;
+  --ink-strong: #241f19;
+  --ink-muted: #71685e;
+  --line-soft: #d9cebd;
+  --signal-ember: #e85a36;
+  --signal-wine: #7b3d46;
+  --signal-green: #2e8068;
+  --surface-studio: #28221b;
+
+  /* drumroll v3 token contract — docs/visual-system-v3.md "token contract".
+     Defined once here; every surface reads these instead of inventing its
+     own colour. Kit-lane colours stay owned by
+     HomeCockpit/kit-zone-map.ts — do not shadow them here. */
+  --dr-canvas: #f4efe5;
+  --dr-paper: #fcf9f2;
+  --dr-paper-low: #eae1d3;
+  --dr-ink: #241f19;
+  --dr-ink-muted: #71685e;
+  --dr-line: #d9cebd;
+  --dr-studio: #28221b;
+  --dr-studio-ink: #fff8ed;
+  --dr-ember: #e85a36;
+  --dr-ember-pressed: #c8452b;
+  --dr-wine: #7b3d46;
+  --dr-count: #f4bd3d;
+  --dr-earned: #2e8068;
+  --dr-warning: #a95e28;
+  --dr-error: #b9473d;
+  --dr-focus: #256eaa;
 
   --color-bg: #f8f5ef;
   --color-surface: #ffffff;
@@ -79,39 +103,61 @@
   --color-cyan: #56d8f2;
 
   --font-display: 'Newsreader', Georgia, serif;
-  --font-ui: 'Instrument Sans Variable', 'Instrument Sans', system-ui,
-    sans-serif;
+  --font-ui:
+    'Instrument Sans Variable', 'Instrument Sans', system-ui, sans-serif;
 
-  --shadow-frame: 0 40px 90px -30px rgba(17, 23, 34, 0.18),
+  --shadow-frame:
+    0 40px 90px -30px rgba(17, 23, 34, 0.18),
     0 0 0 1px rgba(255, 255, 255, 0.72);
-  --shadow-panel: 0 40px 90px -30px rgba(17, 23, 34, 0.18),
+  --shadow-panel:
+    0 40px 90px -30px rgba(17, 23, 34, 0.18),
     0 0 0 1px rgba(255, 255, 255, 0.72);
-  --shadow-accent-button: 0 12px 32px -6px color-mix(in srgb, var(
-            --color-accent
-          )
-          60%, transparent),
+  --shadow-accent-button:
+    0 12px 32px -6px color-mix(in srgb, var(--color-accent) 60%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  --shadow-accent-chip: 0 6px 16px -4px color-mix(in srgb, var(--color-accent)
-        50%, transparent);
-  --shadow-accent-soft: 0 6px 6px -6px color-mix(in srgb, var(--color-accent)
-        50%, transparent);
-  --shadow-paper: inset 0 1px 0 rgba(255, 255, 255, 0.9),
+  --shadow-accent-chip: 0 6px 16px -4px
+    color-mix(in srgb, var(--color-accent) 50%, transparent);
+  --shadow-accent-soft: 0 6px 6px -6px
+    color-mix(in srgb, var(--color-accent) 50%, transparent);
+  --shadow-paper:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
     0 18px 40px -20px rgba(17, 23, 34, 0.22);
   --shadow-float-label: 0 8px 20px rgba(17, 23, 34, 0.16);
-  --shadow-paper-strong: 0 14px 34px -8px rgba(17, 23, 34, 0.24),
+  --shadow-paper-strong:
+    0 14px 34px -8px rgba(17, 23, 34, 0.24),
     0 4px 12px -4px rgba(17, 23, 34, 0.14);
 }
 
 :root {
-  --surface-canvas: #f5f0e7;
-  --surface-raised: #fffdf8;
-  --ink-strong: #1b1814;
-  --ink-muted: #6f685e;
-  --line-soft: #ddd3c4;
-  --signal-ember: #d75a34;
-  --signal-wine: #932d4c;
-  --signal-green: #287a64;
-  --surface-studio: #24201b;
+  --surface-canvas: #f4efe5;
+  --surface-raised: #fcf9f2;
+  --ink-strong: #241f19;
+  --ink-muted: #71685e;
+  --line-soft: #d9cebd;
+  --signal-ember: #e85a36;
+  --signal-wine: #7b3d46;
+  --signal-green: #2e8068;
+  --surface-studio: #28221b;
+
+  /* drumroll v3 token contract — kept in sync with the @theme block above so
+     it resolves the same whether Tailwind's theme layer or a plain
+     stylesheet cascade reads it first. See docs/visual-system-v3.md. */
+  --dr-canvas: #f4efe5;
+  --dr-paper: #fcf9f2;
+  --dr-paper-low: #eae1d3;
+  --dr-ink: #241f19;
+  --dr-ink-muted: #71685e;
+  --dr-line: #d9cebd;
+  --dr-studio: #28221b;
+  --dr-studio-ink: #fff8ed;
+  --dr-ember: #e85a36;
+  --dr-ember-pressed: #c8452b;
+  --dr-wine: #7b3d46;
+  --dr-count: #f4bd3d;
+  --dr-earned: #2e8068;
+  --dr-warning: #a95e28;
+  --dr-error: #b9473d;
+  --dr-focus: #256eaa;
 
   --gradient-header: linear-gradient(180deg, #ffffff, #eee8dc);
   --gradient-header-reverse: linear-gradient(180deg, #eee8dc, #ffffff);

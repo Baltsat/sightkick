@@ -201,6 +201,14 @@
     box-shadow 160ms ease;
 }
 
+.daybreak-season-tab__number {
+  /* Flex items shrink by default even with nowrap content, so this
+   * two-digit badge was losing its own digits to the row's squeeze instead
+   * of only the label truncating (e.g. season 10 rendered as "1.."). It
+   * never needs to shrink - it is always exactly two characters. */
+  flex: none;
+}
+
 .daybreak-season-tab__label {
   overflow: hidden;
   min-width: 0;
@@ -448,6 +456,29 @@
 .daybreak-lesson-node {
   --lesson-lane-color: var(--color-yellow);
   --lesson-lane-dark: var(--color-yellow-dark);
+  /*
+   * `lessonKitColorProperties` (services/kit-color-maturity) sets
+   * `--lesson-lane-color`/`--lesson-lane-dark` inline as *already-mixed*
+   * `color-mix(...)` strings driven by `--kit-color-vividness`, which also
+   * fades toward 0% with mastery - inline wins the cascade for those two
+   * properties, so they can't be floored from this stylesheet. But
+   * `--kit-color-vividness` itself is still readable here (inline only
+   * blocks *overriding* it, not *reading* it), so a same-named-differently
+   * signal, floored the same way as the home kit pads (KitHome.css), can
+   * still guarantee a lesson stays colour-identifiable at every maturity
+   * stage instead of fading to near-black.
+   */
+  --node-signal-vividness: max(var(--kit-color-vividness, 100%), 46%);
+  --node-signal: color-mix(
+    in srgb,
+    var(--color-yellow) var(--node-signal-vividness),
+    #050608
+  );
+  --node-signal-dark: color-mix(
+    in srgb,
+    var(--color-yellow-dark) var(--node-signal-vividness),
+    #050608
+  );
   z-index: 2;
   display: grid;
   width: clamp(9.4rem, 14.5vw, 11rem);
@@ -466,26 +497,76 @@
 .daybreak-lesson-node[data-color-lane='orange'] {
   --lesson-lane-color: var(--color-orange);
   --lesson-lane-dark: var(--color-orange-dark);
+  --node-signal: color-mix(
+    in srgb,
+    var(--color-orange) var(--node-signal-vividness),
+    #050608
+  );
+  --node-signal-dark: color-mix(
+    in srgb,
+    var(--color-orange-dark) var(--node-signal-vividness),
+    #050608
+  );
 }
 
 .daybreak-lesson-node[data-color-lane='red'] {
   --lesson-lane-color: var(--color-red);
   --lesson-lane-dark: var(--color-red-dark);
+  --node-signal: color-mix(
+    in srgb,
+    var(--color-red) var(--node-signal-vividness),
+    #050608
+  );
+  --node-signal-dark: color-mix(
+    in srgb,
+    var(--color-red-dark) var(--node-signal-vividness),
+    #050608
+  );
 }
 
 .daybreak-lesson-node[data-color-lane='yellow'] {
   --lesson-lane-color: var(--color-yellow);
   --lesson-lane-dark: var(--color-yellow-dark);
+  --node-signal: color-mix(
+    in srgb,
+    var(--color-yellow) var(--node-signal-vividness),
+    #050608
+  );
+  --node-signal-dark: color-mix(
+    in srgb,
+    var(--color-yellow-dark) var(--node-signal-vividness),
+    #050608
+  );
 }
 
 .daybreak-lesson-node[data-color-lane='blue'] {
   --lesson-lane-color: var(--color-blue);
   --lesson-lane-dark: var(--color-blue-dark);
+  --node-signal: color-mix(
+    in srgb,
+    var(--color-blue) var(--node-signal-vividness),
+    #050608
+  );
+  --node-signal-dark: color-mix(
+    in srgb,
+    var(--color-blue-dark) var(--node-signal-vividness),
+    #050608
+  );
 }
 
 .daybreak-lesson-node[data-color-lane='green'] {
   --lesson-lane-color: var(--color-green);
   --lesson-lane-dark: var(--color-green-dark);
+  --node-signal: color-mix(
+    in srgb,
+    var(--color-green) var(--node-signal-vividness),
+    #050608
+  );
+  --node-signal-dark: color-mix(
+    in srgb,
+    var(--color-green-dark) var(--node-signal-vividness),
+    #050608
+  );
 }
 
 .daybreak-lesson-node--offstage {
@@ -573,19 +654,18 @@
   bottom: -3%;
   left: 0;
   height: 72%;
-  border: 3px solid color-mix(in srgb, var(--lesson-lane-color) 84%, #fffaf2);
+  border: 3px solid color-mix(in srgb, var(--node-signal) 84%, #fffaf2);
   border-radius: 50%;
   background: radial-gradient(
     ellipse,
-    color-mix(in srgb, var(--lesson-lane-color) 48%, rgb(17 23 34 / 76%)),
+    color-mix(in srgb, var(--node-signal) 48%, rgb(17 23 34 / 76%)),
     rgb(17 23 34 / 72%) 56%,
     transparent 72%
   );
   box-shadow:
     0 0.55rem 1rem rgb(17 23 34 / 25%),
-    0 0 2.25rem color-mix(in srgb, var(--lesson-lane-color) 68%, transparent),
-    inset 0 0 1.4rem
-      color-mix(in srgb, var(--lesson-lane-color) 32%, transparent);
+    0 0 2.25rem color-mix(in srgb, var(--node-signal) 68%, transparent),
+    inset 0 0 1.4rem color-mix(in srgb, var(--node-signal) 32%, transparent);
   transform: perspective(240px) rotateX(58deg);
 }
 
@@ -599,7 +679,7 @@
   filter: saturate(1.16) contrast(1.08)
     drop-shadow(0 0.7rem 0.65rem rgb(17 23 34 / 32%))
     drop-shadow(
-      0 0 0.75rem color-mix(in srgb, var(--lesson-lane-color) 42%, transparent)
+      0 0 0.75rem color-mix(in srgb, var(--node-signal) 42%, transparent)
     );
   user-select: none;
 }
@@ -637,7 +717,7 @@
   border: 1px solid rgb(255 255 255 / 72%);
   border-radius: 0.72rem;
   color: #fffaf2;
-  background: color-mix(in srgb, var(--lesson-lane-dark) 86%, #111722);
+  background: color-mix(in srgb, var(--node-signal-dark) 86%, #111722);
   box-shadow: 0 0.45rem 1rem rgb(17 23 34 / 22%);
   font-family: var(--font-ui);
   font-size: 0.62rem;
@@ -655,13 +735,13 @@
   margin-top: -1.12rem;
   padding: 0.45rem 0.58rem 0.5rem;
   border: 1px solid
-    color-mix(in srgb, var(--lesson-lane-color) 44%, rgb(255 255 255 / 34%));
+    color-mix(in srgb, var(--node-signal) 44%, rgb(255 255 255 / 34%));
   border-radius: 0.88rem;
   color: #fffaf2;
   background: linear-gradient(135deg, rgb(17 23 34 / 91%), rgb(46 34 53 / 80%));
   box-shadow:
     0 0.75rem 1.8rem rgb(17 23 34 / 26%),
-    0 0 1.15rem color-mix(in srgb, var(--lesson-lane-color) 18%, transparent),
+    0 0 1.15rem color-mix(in srgb, var(--node-signal) 18%, transparent),
     inset 0 1px 0 rgb(255 255 255 / 14%);
   backdrop-filter: blur(13px) saturate(1.12);
 }
@@ -676,7 +756,7 @@
 
 .daybreak-node-lane {
   overflow: hidden;
-  color: color-mix(in srgb, var(--lesson-lane-color) 70%, #fffaf2);
+  color: color-mix(in srgb, var(--node-signal) 70%, #fffaf2);
   font-size: 0.61rem;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -707,7 +787,7 @@
 .daybreak-lesson-node:focus-visible .daybreak-lesson-node__glow {
   box-shadow:
     0 0.55rem 1rem rgb(17 23 34 / 20%),
-    0 0 2rem color-mix(in srgb, var(--lesson-lane-color) 62%, transparent);
+    0 0 2rem color-mix(in srgb, var(--node-signal) 62%, transparent);
 }
 
 .daybreak-lesson-node[data-node-state='locked'] {
@@ -744,17 +824,17 @@
 }
 
 .daybreak-lesson-node[data-node-state='next-up'] .daybreak-lesson-node__plaque {
-  border-color: color-mix(in srgb, var(--lesson-lane-color) 76%, #fffaf2);
+  border-color: color-mix(in srgb, var(--node-signal) 76%, #fffaf2);
   background: linear-gradient(135deg, rgb(38 28 39 / 94%), rgb(85 35 62 / 88%));
   box-shadow:
     0 0.8rem 1.9rem rgb(17 23 34 / 18%),
-    0 0 1.8rem color-mix(in srgb, var(--lesson-lane-color) 30%, transparent);
+    0 0 1.8rem color-mix(in srgb, var(--node-signal) 30%, transparent);
 }
 
 .daybreak-lesson-node[data-node-state='next-up'] .daybreak-lesson-node__glow {
   box-shadow:
     0 0.6rem 1rem rgb(17 23 34 / 22%),
-    0 0 1.8rem color-mix(in srgb, var(--lesson-lane-color) 64%, transparent);
+    0 0 1.8rem color-mix(in srgb, var(--node-signal) 64%, transparent);
 }
 
 .daybreak-node-status {

@@ -4,7 +4,6 @@ import {
   faBookOpen,
   faHouse,
   faMusic,
-  faSun,
   faUser,
   faWandMagicSparkles,
 } from '@fortawesome/free-solid-svg-icons';
@@ -17,7 +16,15 @@ export type ArenaView = 'home' | 'wave' | 'songs' | 'journey' | 'insights';
 interface AppShellProps {
   view: ArenaView;
   onViewChange: (view: ArenaView) => void;
-  statusSlot: ReactNode;
+  /**
+   * Practice/streak evidence. The v3 shell is a quiet rail on a continuous
+   * field, not a header bar with chips, so this is intentionally not
+   * rendered here anymore — status belongs where it is earned (inside a
+   * route), never as permanent chrome. Kept optional so callers built for
+   * the old topbar keep compiling; wiring a quiet, reachable home for it
+   * inside a route is owned by whichever lane rebuilds that route.
+   */
+  statusSlot?: ReactNode;
   settingsSlot: ReactNode;
   onOpenProfile: () => void;
   children: ReactNode;
@@ -55,14 +62,16 @@ const VIEW_LABELS: Record<ArenaView, string> = {
 };
 
 /**
- * Persistent desktop/web chrome for Daybreak Arena. It owns navigation only:
- * song data and input state remain in SongListView so opening a practice run
- * does not reset a list, a goal, or a score cache.
+ * Persistent chrome: a quiet rail on a continuous field. It owns navigation
+ * only — song data and input state remain in SongListView so opening a
+ * practice run does not reset a list, a goal, or a score cache. There is no
+ * header bar: the selected rail item is the only "where am I" signal, and
+ * profile/settings sit as quiet controls at the rail foot rather than as a
+ * status/action row across the top of every route.
  */
 export function AppShell({
   view,
   onViewChange,
-  statusSlot,
   settingsSlot,
   onOpenProfile,
   children,
@@ -79,10 +88,7 @@ export function AppShell({
           <span className="arena-shell__brand-mark" aria-hidden="true">
             <img src={appIcon} alt="" />
           </span>
-          <span>
-            <strong>Drumroll</strong>
-            <small>Daybreak Arena</small>
-          </span>
+          <strong className="arena-shell__brand-name">Drumroll</strong>
         </button>
 
         <nav className="arena-shell__nav" aria-label="Primary">
@@ -99,6 +105,7 @@ export function AppShell({
                   'arena-shell__nav-item',
                   isCurrent && 'arena-shell__nav-item--active',
                 )}
+                title={item.label}
                 aria-label={`Open ${item.label}`}
                 aria-current={isCurrent ? 'page' : undefined}
                 onClick={() => onViewChange(item.id)}
@@ -108,45 +115,39 @@ export function AppShell({
                   fixedWidth
                   aria-hidden="true"
                 />
-                <span>{item.label}</span>
+                <span className="arena-shell__nav-label">{item.label}</span>
               </button>
             );
           })}
         </nav>
 
-        <p className="arena-shell__rail-note">
-          Learn the motion.
-          <br />
-          Own the room.
-        </p>
+        <div className="arena-shell__rail-foot">
+          <div className="arena-shell__rail-utility">{settingsSlot}</div>
+          <button
+            type="button"
+            className={cn(
+              'arena-shell__profile',
+              view === 'insights' && 'arena-shell__profile--active',
+            )}
+            data-testid="open-profile-button"
+            title="Profile"
+            aria-label="Open your profile"
+            aria-current={view === 'insights' ? 'page' : undefined}
+            onClick={onOpenProfile}
+          >
+            <FontAwesomeIcon icon={faUser} fixedWidth aria-hidden="true" />
+            <span className="arena-shell__profile-label">Profile</span>
+          </button>
+        </div>
       </aside>
 
       <div className="arena-shell__workspace">
-        <header className="arena-shell__topbar">
-          <div className="arena-shell__eyebrow">
-            <FontAwesomeIcon
-              className="arena-shell__sun"
-              icon={faSun}
-              aria-hidden="true"
-            />
-            <span>{VIEW_LABELS[view]}</span>
-          </div>
-          <div className="arena-shell__actions">
-            <div className="arena-shell__status">{statusSlot}</div>
-            {settingsSlot}
-            <button
-              type="button"
-              className="arena-shell__profile"
-              data-testid="open-profile-button"
-              aria-label="Open your profile"
-              onClick={onOpenProfile}
-            >
-              <FontAwesomeIcon icon={faUser} aria-hidden="true" />
-              <span className="arena-shell__profile-label">Profile</span>
-            </button>
-          </div>
-        </header>
-        <main className="arena-shell__content">{children}</main>
+        <main
+          className="arena-shell__content"
+          aria-label={`${VIEW_LABELS[view]} content`}
+        >
+          {children}
+        </main>
       </div>
     </div>
   );

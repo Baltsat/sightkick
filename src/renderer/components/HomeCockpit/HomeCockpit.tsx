@@ -11,9 +11,11 @@ import { Song } from '../../../types';
 import { useInput } from '../../context/InputContext';
 import { inputBus } from '../../input';
 import { UseGamificationResult } from '../../hooks/useGamification';
+import { computeStreak, localDateKey } from '../../services/streaks';
 import {
   composeHomeSession,
   DeadlinePacingSummary,
+  HomeSessionReceipt,
   OneKickHomeSession,
   PracticeCandidate,
   PracticeWaveResult,
@@ -87,6 +89,92 @@ const KIT_HOTSPOTS: KitHotspot[] = [
   { element: 'tom3', label: 'Floor tom' },
   { element: 'kick', label: 'Kick' },
 ];
+/**
+ * `next-practice/home-session.ts`'s own last-resort placeholder when no
+ * musical payoff can be ranked. Visual-system-v3 explicitly forbids
+ * surfacing this verbatim ("dead-end proof claims ... framed as a payoff
+ * rather than a truthful neutral state") - Home intercepts it and falls
+ * back to the same honest "nothing chosen yet" copy used when there is no
+ * session at all, rather than presenting an empty state as a completed one.
+ */
+const NO_PAYOFF_PLACEHOLDER = 'No musical payoff yet';
+
+/**
+ * `useGamification`'s `todayXp`/`streak` are computed once per render of
+ * the hook's *owner* (SongListView), from `new Date()` at that instant. If
+ * nothing else re-renders that owner near local midnight, the header can
+ * keep showing yesterday's numbers after the day has actually rolled over.
+ * `days` itself stays live (it is pushed on every `record-practice-day`
+ * broadcast), so Home re-derives "today" straight from it on every render
+ * instead of trusting a value that can go stale - this is the one honest
+ * source close enough to render time to self-correct across midnight.
+ * Falls back to the hook's own numbers when `days` isn't supplied (e.g.
+ * lightweight test doubles), so behaviour is unchanged wherever `days` is
+ * unavailable.
+ */
+export function liveDailyProgress(gamification: UseGamificationResult): {
+  todayXp: number;
+  streakCurrent: number;
+} {
+  const { days } = gamification;
+
+  if (!days) {
+    return {
+      todayXp: gamification.todayXp,
+      streakCurrent: gamification.streak.current,
+    };
+  }
+
+  const now = new Date();
+
+  return {
+    todayXp: days[localDateKey(now)]?.xp ?? 0,
+    streakCurrent: computeStreak(days, now).current,
+  };
+}
+
+/** One quiet, honest sentence - never a bare fraction once the day's set is
+ * cleared, never a number the stored days map can't back up. */
+export function describeStreak(streakDays: number): string {
+  if (streakDays <= 0) {
+    return 'No active streak';
+  }
+
+  return streakDays === 1 ? '1-day streak' : `${streakDays}-day streak`;
+}
+
+export function describeGoalProgress(todayXp: number, goalXp: number): string {
+  if (todayXp >= goalXp) {
+    return `Set complete · ${todayXp.toLocaleString('en-US')} XP`;
+  }
+
+  return `Today · ${todayXp.toLocaleString('en-US')} / ${goalXp.toLocaleString(
+    'en-US',
+  )} XP`;
+}
+
+export interface ShelfCopy {
+  title: string;
+  detail: string;
+}
+
+const EMPTY_SHELF_COPY: ShelfCopy = {
+  title: 'Choose a song to begin',
+  detail: 'Pick a song, then strike a highlighted drum to start.',
+};
+
+/** The goal-song low shelf's copy, honest about the one state
+ * `next-practice/home-session.ts` can hand back that isn't actually a
+ * payoff: its own `NO_PAYOFF_PLACEHOLDER` fallback string. */
+export function resolveShelfCopy(
+  sessionSummary: HomeSessionReceipt | undefined,
+): ShelfCopy {
+  if (!sessionSummary || sessionSummary.title === NO_PAYOFF_PLACEHOLDER) {
+    return EMPTY_SHELF_COPY;
+  }
+
+  return { title: sessionSummary.title, detail: sessionSummary.detail };
+}
 
 export function HomeCockpit({
   songList,
@@ -205,6 +293,13 @@ export function HomeCockpit({
     [gamification.runsBySong],
   );
   const kitColors = useKitColorMaturity(kitColorRuns);
+  const { todayXp: liveTodayXp, streakCurrent: liveStreakCurrent } =
+    liveDailyProgress(gamification);
+  const progressLine = `${describeStreak(
+    liveStreakCurrent,
+  )} · ${describeGoalProgress(liveTodayXp, gamification.goalXp)}`;
+  const { title: shelfTitle, detail: shelfDetail } =
+    resolveShelfCopy(sessionSummary);
 
   useLayoutEffect(() => {
     const studio = studioRef.current;
@@ -316,6 +411,7 @@ export function HomeCockpit({
       window.clearTimeout(clearPointerStrikeRef.current);
     };
   }, [elementByControlId, hasPracticeTarget, pulseLane, startCurrentPractice]);
+
   const rootStyle = {
     '--drumstick-cursor': `url(${drumstickCursor}) 6 6`,
     ...kitColors.properties,
@@ -331,86 +427,6 @@ export function HomeCockpit({
       data-kit-color-maturity={kitColors.presentation.maturity.toFixed(3)}
       aria-labelledby="home-cockpit-title"
     >
-      <aside className="kit-home__context" aria-label="Current practice">
-        <div
-          className="kit-home__manifest"
-          data-testid="home-session-manifest"
-          data-state={sessionState}
-        >
-          <h1 id="home-cockpit-title">
-            {practiceTarget?.name ?? 'Choose a song'}
-          </h1>
-          <button
-            type="button"
-            className="kit-home__primary-action"
-            data-testid={
-              hasPracticeTarget ? 'home-start-practice' : 'home-choose-song'
-            }
-            onClick={() =>
-              hasPracticeTarget ? startCurrentPractice('kick') : onOpenSongs()
-            }
-          >
-            {hasPracticeTarget ? 'Start practice' : 'Choose a song'}
-          </button>
-        </div>
-
-        <section
-          className="kit-home__profile-snapshot"
-          data-testid="home-profile-snapshot"
-          aria-label="Your practice profile"
-        >
-          <p>Your practice</p>
-          <strong>
-            {gamification.streak.current === 0
-              ? 'No active streak'
-              : `${gamification.streak.current}-day streak`}
-          </strong>
-          <span>
-            {gamification.todayXp >= gamification.goalXp
-              ? `Set complete · ${gamification.todayXp.toLocaleString('en-US')} XP`
-              : `Today · ${gamification.todayXp.toLocaleString('en-US')} / ${gamification.goalXp.toLocaleString('en-US')} XP`}
-          </span>
-          <button
-            type="button"
-            data-testid="home-open-profile"
-            onClick={onOpenProfile}
-          >
-            View profile
-          </button>
-        </section>
-
-        <section
-          className="kit-home__session-summary"
-          aria-label="Today’s practice"
-          data-testid="home-session-summary"
-        >
-          <strong>{sessionSummary?.title ?? 'Choose a song to begin'}</strong>
-          <span>
-            {sessionSummary?.detail ??
-              'Pick a song, then strike a highlighted drum to start.'}
-          </span>
-          <details>
-            <summary>Session details</summary>
-            <div className="kit-home__session-details">
-              {sessionDetails.map(({ label, stop }) =>
-                stop ? (
-                  <p key={stop.title}>
-                    <strong>{label}</strong>
-                    <span>{stop.title}</span>
-                  </p>
-                ) : null,
-              )}
-              <EvidencePracticeCards
-                compact
-                cards={homePracticeCards.cards}
-                onStart={onStartPracticeCard}
-                testId="home-practice-card"
-              />
-            </div>
-          </details>
-        </section>
-      </aside>
-
       <section
         ref={studioRef}
         className="kit-home__studio"
@@ -431,8 +447,8 @@ export function HomeCockpit({
           {inputReadiness === 'connected'
             ? `${selectedDevice?.name ?? 'MIDI kit'} mapped · ready`
             : inputReadiness === 'reconnecting'
-              ? 'Kit reconnecting · your target stays armed'
-              : 'Mouse works now · connect MIDI when ready'}
+            ? 'Kit reconnecting · your target stays armed'
+            : 'Mouse works now · connect MIDI when ready'}
         </p>
 
         <div className="kit-home__pads" role="group" aria-label="Practice kit">
@@ -484,12 +500,80 @@ export function HomeCockpit({
           data-testid="home-hit-feedback"
         >
           {activeLane
-            ? `${
-                KIT_HOTSPOTS.find((item) => item.element === activeLane)?.label
-              } hit`
+            ? `${KIT_HOTSPOTS.find((item) => item.element === activeLane)
+                ?.label} hit`
             : ''}
         </p>
       </section>
+
+      <aside className="kit-home__context" aria-label="Current practice">
+        <div
+          className="kit-home__manifest"
+          data-testid="home-session-manifest"
+          data-state={sessionState}
+        >
+          <h1 id="home-cockpit-title">
+            {practiceTarget?.name ?? 'Choose a song'}
+          </h1>
+          <button
+            type="button"
+            className="kit-home__primary-action"
+            data-testid={
+              hasPracticeTarget ? 'home-start-practice' : 'home-choose-song'
+            }
+            onClick={() =>
+              hasPracticeTarget ? startCurrentPractice('kick') : onOpenSongs()
+            }
+          >
+            {hasPracticeTarget ? 'Start practice' : 'Choose a song'}
+          </button>
+        </div>
+
+        <div className="kit-home__shelf">
+          <section
+            className="kit-home__session-summary"
+            aria-label="Today’s practice"
+            data-testid="home-session-summary"
+          >
+            <strong>{shelfTitle}</strong>
+            <span>{shelfDetail}</span>
+            <details>
+              <summary>Session details</summary>
+              <div className="kit-home__session-details">
+                {sessionDetails.map(({ label, stop }) =>
+                  stop ? (
+                    <p key={stop.title}>
+                      <strong>{label}</strong>
+                      <span>{stop.title}</span>
+                    </p>
+                  ) : null,
+                )}
+                <EvidencePracticeCards
+                  compact
+                  cards={homePracticeCards.cards}
+                  onStart={onStartPracticeCard}
+                  testId="home-practice-card"
+                />
+              </div>
+            </details>
+          </section>
+
+          <section
+            className="kit-home__profile-snapshot"
+            data-testid="home-profile-snapshot"
+            aria-label="Your practice profile"
+          >
+            <span>{progressLine}</span>
+            <button
+              type="button"
+              data-testid="home-open-profile"
+              onClick={onOpenProfile}
+            >
+              View profile
+            </button>
+          </section>
+        </div>
+      </aside>
 
       <p
         className="sr-only"
@@ -501,10 +585,10 @@ export function HomeCockpit({
         {sessionState === 'count-in'
           ? `Count-in for ${practiceTarget?.name ?? 'your selected target'}.`
           : hasPracticeTarget && targetRecommendation
-            ? `${practiceTarget?.name} is armed at ${(
-                homeSession?.launchSpeed ?? targetRecommendation.suggestedSpeed
-              ).toFixed(1)} times speed. Any mapped pad starts it.`
-            : 'Choose a song to arm a practice target. Any mapped drum then starts it.'}
+          ? `${practiceTarget?.name} is armed at ${(
+              homeSession?.launchSpeed ?? targetRecommendation.suggestedSpeed
+            ).toFixed(1)} times speed. Any mapped pad starts it.`
+          : 'Choose a song to arm a practice target. Any mapped drum then starts it.'}
       </p>
     </section>
   );

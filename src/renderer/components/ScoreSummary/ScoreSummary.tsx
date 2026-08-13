@@ -160,7 +160,19 @@ export function ScoreSummary({
       return false;
     }
 
-    return calculateAccuracy(scoreData) === 1;
+    // calculateAccuracy rounds to 2 decimal places for display, so a run
+    // with a real miss (e.g. 249/250, falseHits 0 -> 0.996 -> "1.00") can
+    // round up to a perfect-looking ratio. "Perfect" and "Every note
+    // landed" are absolute claims shown on the same screen as the
+    // hit/missed/false-hit grid — they must agree with the unrounded
+    // counts that grid is built from, not the rounded display accuracy.
+    const hitNotes = scoreData.hitNotes ?? 0;
+
+    return (
+      scoreData.totalNotes > 0 &&
+      hitNotes === scoreData.totalNotes &&
+      (scoreData.falseHits ?? 0) === 0
+    );
   }, [scoreData]);
   const accuracy = scoreData ? calculateAccuracy(scoreData) : 0;
   const hitNotes = scoreData?.hitNotes ?? 0;

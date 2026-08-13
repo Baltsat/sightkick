@@ -117,6 +117,34 @@ describe('tutor machine', () => {
     });
   });
 
+  it('replaces a stale judgement when a rewind re-resolves the same note id', () => {
+    let state = dispatch(createTutorState(), {
+      type: 'start',
+      targetSpeed: 1,
+    }).state;
+
+    state = dispatch(state, {
+      type: 'judgement',
+      judgement: judgement(0, 0, 'miss'),
+    }).state;
+
+    expect(state.judgementsByMeasure[0]).toEqual([
+      expect.objectContaining({ id: 'note:0:0', verdict: 'miss' }),
+    ]);
+
+    // A loop wrap (or any other rewind) resets Judge and replays the same
+    // chart position, so the corrected outcome arrives with the identical
+    // deterministic id ('note:0:0') as the earlier miss - not a new one.
+    state = dispatch(state, {
+      type: 'judgement',
+      judgement: judgement(0, 0, 'hit'),
+    }).state;
+
+    expect(state.judgementsByMeasure[0]).toEqual([
+      expect.objectContaining({ id: 'note:0:0', verdict: 'hit' }),
+    ]);
+  });
+
   it('normalizes an invalid failed-attempt cap to a bounded value', () => {
     expect(
       createTutorState({ maximumFailedRecoveryAttempts: 0 }).settings
