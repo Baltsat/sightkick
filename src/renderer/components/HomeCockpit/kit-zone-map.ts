@@ -27,54 +27,64 @@ export interface KitZoneStyle {
   zIndex: number;
 }
 
+export type HomeKitDoor =
+  | 'continue'
+  | 'my-wave'
+  | 'next-lesson'
+  | 'songs'
+  | 'discover'
+  | 'top-song-1'
+  | 'top-song-2'
+  | 'top-song-3';
+
 export const HOME_KIT_ZONE_MAP: KitZoneMap = {
   image: { width: 1586, height: 992 },
   zones: {
     hihat: {
-      center: { x: 0.244, y: 0.466 },
-      radii: { x: 0.101, y: 0.048 },
+      center: { x: 0.244, y: 0.445 },
+      radii: { x: 0.101, y: 0.052 },
       rotation: 1.8,
       depth: 2,
     },
     crash: {
-      center: { x: 0.289, y: 0.255 },
+      center: { x: 0.289, y: 0.221 },
       radii: { x: 0.096, y: 0.057 },
       rotation: 3.2,
       depth: 1,
     },
     tom1: {
-      center: { x: 0.445, y: 0.318 },
+      center: { x: 0.445, y: 0.315 },
       radii: { x: 0.064, y: 0.054 },
       rotation: -1.8,
       depth: 2,
     },
     tom2: {
-      center: { x: 0.581, y: 0.319 },
+      center: { x: 0.576, y: 0.323 },
       radii: { x: 0.064, y: 0.056 },
       rotation: 1.3,
       depth: 2,
     },
     ride: {
-      center: { x: 0.764, y: 0.229 },
-      radii: { x: 0.123, y: 0.081 },
+      center: { x: 0.764, y: 0.226 },
+      radii: { x: 0.123, y: 0.078 },
       rotation: -1.7,
       depth: 1,
     },
     snare: {
-      center: { x: 0.433, y: 0.497 },
-      radii: { x: 0.085, y: 0.055 },
+      center: { x: 0.435, y: 0.494 },
+      radii: { x: 0.086, y: 0.057 },
       rotation: -1.4,
       depth: 4,
     },
     tom3: {
-      center: { x: 0.708, y: 0.55 },
-      radii: { x: 0.098, y: 0.069 },
+      center: { x: 0.708, y: 0.526 },
+      radii: { x: 0.098, y: 0.066 },
       rotation: 1.7,
       depth: 3,
     },
     kick: {
-      center: { x: 0.469, y: 0.744 },
-      radii: { x: 0.086, y: 0.136 },
+      center: { x: 0.469, y: 0.746 },
+      radii: { x: 0.087, y: 0.143 },
       rotation: 0,
       depth: 1,
     },
@@ -90,6 +100,17 @@ export const HOME_KIT_ZONE_LANES: Record<KitElement, KitColorLane> = {
   tom2: 'blue',
   crash: 'green',
   tom3: 'green',
+};
+
+export const HOME_KIT_DOORS: Record<KitElement, HomeKitDoor> = {
+  kick: 'continue',
+  snare: 'my-wave',
+  hihat: 'next-lesson',
+  ride: 'songs',
+  crash: 'discover',
+  tom1: 'top-song-1',
+  tom2: 'top-song-2',
+  tom3: 'top-song-3',
 };
 
 export const HOME_KIT_ZONE_FILL_OPACITY = 0.82;

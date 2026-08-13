@@ -66,6 +66,10 @@ const gamification = {
     'song-1': Array.from({ length: 12 }, (_, index) => run(index)),
   },
 } as unknown as UseGamificationResult;
+const emptyGamification = {
+  ...gamification,
+  runsBySong: {},
+} as unknown as UseGamificationResult;
 const recommendation = {
   candidate: {
     id: song.id,
@@ -149,7 +153,7 @@ describe('HomeCockpit kit home', () => {
     installIpcMock();
   });
 
-  it('starts the same selected practice target from every visible pad', () => {
+  it('continues the armed target from the kick', () => {
     const onStartRecommended = vi.fn();
 
     render(
@@ -165,13 +169,9 @@ describe('HomeCockpit kit home', () => {
       </InputProvider>,
     );
 
-    ['kick', 'snare', 'hihat', 'tom1', 'tom2', 'tom3', 'ride', 'crash'].forEach(
-      (element) => {
-        fireEvent.click(screen.getByTestId(`kit-hotspot-${element}`));
-      },
-    );
+    fireEvent.click(screen.getByTestId('kit-hotspot-kick'));
 
-    expect(onStartRecommended).toHaveBeenCalledTimes(8);
+    expect(onStartRecommended).toHaveBeenCalledOnce();
     expect(screen.getByTestId('home-session-manifest')).toHaveAttribute(
       'data-state',
       'count-in',
@@ -263,7 +263,7 @@ describe('HomeCockpit kit home', () => {
     expect(readiness).not.toHaveClass('sr-only');
   });
 
-  it('requires the same confirm control as Songs before a physical kit starts the armed target', () => {
+  it('keeps a stray strike inert until confirm starts the selected My Wave door', () => {
     window.localStorage.setItem(
       'settings.selectedDevice',
       JSON.stringify({
@@ -289,15 +289,21 @@ describe('HomeCockpit kit home', () => {
     );
 
     const onStartRecommended = vi.fn();
+    const onOpenSongs = vi.fn();
+    const onOpenJourney = vi.fn();
+    const onStartSession = vi.fn();
 
     render(
       <InputProvider>
         <HomeCockpit
           songList={[song]}
           gamification={gamification}
-          recommendation={recommendation}
+          recommendation={songRecommendation}
+          practiceRanking={[songRecommendation]}
           onStartRecommended={onStartRecommended}
-          onOpenSongs={vi.fn()}
+          onStartSession={onStartSession}
+          onOpenSongs={onOpenSongs}
+          onOpenJourney={onOpenJourney}
           onOpenProfile={vi.fn()}
         />
       </InputProvider>,
@@ -306,13 +312,42 @@ describe('HomeCockpit kit home', () => {
     fireEvent.keyDown(window, { code: 'KeyA' });
 
     expect(onStartRecommended).not.toHaveBeenCalled();
+    expect(screen.getByTestId('kit-hotspot-kick')).toHaveAttribute(
+      'data-struck',
+      'true',
+    );
+    expect(screen.getByTestId('kit-hotspot-kick')).toHaveAttribute(
+      'data-armed',
+      'true',
+    );
+
+    fireEvent.keyDown(window, { code: 'KeyC' });
+
+    expect(onStartSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId('kit-hotspot-hihat')).toHaveAttribute(
+      'data-armed',
+      'true',
+    );
 
     fireEvent.keyDown(window, { code: 'KeyB' });
-    fireEvent.keyDown(window, { code: 'KeyH' });
 
-    expect(onStartRecommended).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('home-session-status')).toHaveTextContent(
-      'Count-in for Practice song',
+    expect(onStartRecommended).not.toHaveBeenCalled();
+    expect(onOpenSongs).not.toHaveBeenCalled();
+    expect(onStartSession).not.toHaveBeenCalled();
+    expect(onOpenJourney).toHaveBeenCalledOnce();
+
+    fireEvent.keyDown(window, { code: 'KeyB' });
+
+    expect(onStartRecommended).not.toHaveBeenCalled();
+    expect(onOpenSongs).not.toHaveBeenCalled();
+    expect(onOpenJourney).toHaveBeenCalledOnce();
+    expect(onStartSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        intent: 'songs',
+        launch: expect.objectContaining({
+          candidate: expect.objectContaining({ id: song.id }),
+        }),
+      }),
     );
   });
 
@@ -323,7 +358,7 @@ describe('HomeCockpit kit home', () => {
       <InputProvider>
         <HomeCockpit
           songList={[song]}
-          gamification={gamification}
+          gamification={emptyGamification}
           onStartRecommended={vi.fn()}
           onOpenSongs={onOpenSongs}
           onOpenProfile={vi.fn()}

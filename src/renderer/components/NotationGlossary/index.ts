@@ -1,5 +1,6 @@
 export {
   NotationGlossary,
+  NotationKitKey,
   notationElementForTarget,
   notationKindForTarget,
   placeNotationGlossary,

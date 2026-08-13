@@ -34,6 +34,77 @@ function isKitElement(value: string): value is KitElement {
 }
 
 const KIT_ELEMENTS = Object.keys(KIT_ELEMENT_LABEL) as KitElement[];
+const NOTATION_KIT_KEY: ReadonlyArray<{
+  element: KitElement;
+  head: 'round' | 'cross';
+  position: 'low' | 'lower-middle' | 'middle' | 'upper-middle' | 'high';
+}> = [
+  { element: 'kick', head: 'round', position: 'low' },
+  { element: 'snare', head: 'round', position: 'lower-middle' },
+  { element: 'hihat', head: 'cross', position: 'high' },
+  { element: 'tom1', head: 'round', position: 'upper-middle' },
+  { element: 'tom2', head: 'round', position: 'middle' },
+  { element: 'tom3', head: 'round', position: 'lower-middle' },
+  { element: 'ride', head: 'cross', position: 'high' },
+  { element: 'crash', head: 'cross', position: 'high' },
+];
+const POSITION_MARK: Record<
+  (typeof NOTATION_KIT_KEY)[number]['position'],
+  string
+> = {
+  low: '↓',
+  'lower-middle': '↙',
+  middle: '↔',
+  'upper-middle': '↗',
+  high: '↑',
+};
+
+export function NotationKitKey({ layout }: { layout: 'classic' | 'flow' }) {
+  return (
+    <aside
+      className="drumroll-notation-key"
+      data-testid="notation-kit-key"
+      data-layout={layout}
+      aria-label="Drum kit notation key"
+    >
+      <div className="drumroll-notation-key__heading">
+        <strong>kit key</strong>
+        <span>● drums · × cymbals · low → high</span>
+      </div>
+      <ul>
+        {NOTATION_KIT_KEY.map(({ element, head, position }) => (
+          <li
+            key={element}
+            data-kit-element={element}
+            aria-label={`${KIT_ELEMENT_LABEL[element]}: ${
+              head === 'round' ? 'round head' : 'cross head'
+            }, ${position} on the staff`}
+            style={
+              {
+                '--notation-key-color': KIT_ELEMENT_COLOR_VAR[element],
+              } as CSSProperties
+            }
+          >
+            <span
+              className="drumroll-notation-key__head"
+              data-head={head}
+              aria-hidden="true"
+            >
+              {head === 'round' ? '●' : '×'}
+            </span>
+            <span>{KIT_ELEMENT_LABEL[element]}</span>
+            <span
+              className="drumroll-notation-key__position"
+              aria-hidden="true"
+            >
+              {POSITION_MARK[position]}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  );
+}
 
 export function notationElementForTarget(
   target: EventTarget | null,

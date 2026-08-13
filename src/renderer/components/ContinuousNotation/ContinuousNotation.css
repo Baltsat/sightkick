@@ -32,7 +32,7 @@
    * much taller than it needs to be"). A small amount remains so the score
    * never touches the bottom edge caption strip. */
   padding: 0 0 0.75rem !important;
-  background: var(--dr-paper, var(--color-paper-light));
+  background: transparent;
   scrollbar-color: var(--dr-line, var(--color-paper)) transparent;
 }
 
@@ -41,7 +41,11 @@
   position: relative;
   overflow: hidden;
   color: var(--dr-ink, var(--color-ink));
-  background: var(--dr-paper, var(--color-paper-light));
+  background: color-mix(
+    in srgb,
+    var(--dr-paper, var(--color-paper-light)) 42%,
+    transparent
+  );
 }
 
 .drumroll-flow-stage {
@@ -403,34 +407,6 @@
 .drumroll-flow-notation .vf-note-pop {
   filter: none;
   transform: none;
-}
-
-.vf-note-missed.vf-note-kick {
-  fill: var(--color-orange);
-  opacity: 0.68;
-}
-
-.vf-note-missed.vf-note-snare {
-  fill: var(--color-red);
-  opacity: 0.68;
-}
-
-.vf-note-missed.vf-note-hihat,
-.vf-note-missed.vf-note-tom1 {
-  fill: var(--color-yellow);
-  opacity: 0.68;
-}
-
-.vf-note-missed.vf-note-ride,
-.vf-note-missed.vf-note-tom2 {
-  fill: var(--color-blue);
-  opacity: 0.68;
-}
-
-.vf-note-missed.vf-note-crash,
-.vf-note-missed.vf-note-tom3 {
-  fill: var(--color-green);
-  opacity: 0.68;
 }
 
 .drumroll-notation-location {

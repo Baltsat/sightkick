@@ -1,15 +1,16 @@
 .drumroll-practice-shell {
   height: 100%;
   min-height: 0;
+  margin-left: 13rem;
   overflow: hidden;
   color: var(--dr-ink, var(--color-ink));
-  background: var(--dr-canvas, var(--color-paper-light));
+  background: transparent;
 }
 
 .drumroll-notation-stage {
   position: relative;
   min-height: 0;
-  background: var(--dr-paper, var(--color-paper-light));
+  background: transparent;
 }
 
 .drumroll-flow-viewport {
@@ -19,7 +20,7 @@
 .drumroll-classic-viewport {
   padding: 1.25rem 1.25rem 4.25rem;
   overflow: auto;
-  background: var(--dr-canvas, var(--color-paper-light));
+  background: transparent;
   scrollbar-width: none;
 }
 
@@ -31,7 +32,11 @@
   position: relative;
   z-index: 24;
   border-bottom: 1px solid var(--dr-line, rgb(36 31 25 / 16%));
-  background: var(--dr-paper, var(--color-paper-light));
+  background: color-mix(
+    in srgb,
+    var(--dr-paper, var(--color-paper-light)) 58%,
+    transparent
+  );
 }
 
 .drumroll-practice-toolbar > .ant-btn {
@@ -183,5 +188,11 @@
 
   .drumroll-practice-streak {
     top: 0.75rem;
+  }
+}
+
+@media (max-width: 1120px) {
+  .drumroll-practice-shell {
+    margin-left: 4rem;
   }
 }

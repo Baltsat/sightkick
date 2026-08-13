@@ -43,7 +43,10 @@ function ElementChip({
   roleLabel: string;
 }) {
   return (
-    <span className="drumroll-tutor-hud__mistake-chip">
+    <span
+      className="drumroll-tutor-hud__mistake-chip"
+      data-kit-element={element}
+    >
       <span
         className="drumroll-tutor-hud__mistake-swatch"
         style={

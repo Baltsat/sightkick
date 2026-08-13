@@ -21,6 +21,7 @@ import {
 import { Playback } from '../../components/Playback';
 import { SettingsButton } from '../../components/SettingsButton';
 import { SheetMusic } from '../../components/SheetMusic';
+import { NotationKitKey } from '../../components/NotationGlossary';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowLeft,
@@ -272,14 +273,8 @@ export function SongView() {
     midiPortEpoch,
     inputLatencyMs,
   } = useInput();
-  const {
-    playheadStyle,
-    enableColors,
-    showBarNumbers,
-    showTempo,
-    countIn,
-    zoom,
-  } = useSongViewSettings();
+  const { playheadStyle, showBarNumbers, showTempo, countIn, zoom } =
+    useSongViewSettings();
   const { notification, message } = App.useApp();
   const [scoreData, setScoreData] = useState<ScoreData>();
   const [practiceSummary, setPracticeSummary] = useState<RunSummary>();
@@ -530,7 +525,6 @@ export function SongView() {
   const availableDifficulties: Difficulty[] = songData?.drumDifficulties?.length
     ? songData.drumDifficulties
     : [difficulty];
-  const notationColorsEnabled = notationLayout === 'flow' || enableColors;
   const practiceInputStatus = useMemo(() => {
     if (selectedDevice?.sourceId === 'keyboard') {
       return {
@@ -574,7 +568,7 @@ export function SongView() {
     songId: songData?.id,
     difficulty,
     showBarNumbers: isDev && showBarNumbers,
-    enableColors: notationColorsEnabled,
+    enableColors: true,
     showTempo,
     layout: notationLayout,
   });
@@ -2645,6 +2639,7 @@ export function SongView() {
     <Layout
       className="drumroll-practice-shell h-full pointer-events-auto"
       data-session-phase={practicePresentationPhase}
+      data-shared-field="true"
       data-loop-escape={loopEscape ? 'active' : undefined}
       onPointerDownCapture={inactivityPauseVeil.release}
       onPointerMoveCapture={inactivityPauseVeil.release}
@@ -2955,6 +2950,7 @@ export function SongView() {
             />
           )}
         </Content>
+        <NotationKitKey layout={notationLayout} />
         {showInactivityCaption && (
           <InactivityPauseVeil
             visible={inactivityPauseVeil.visible}

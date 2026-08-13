@@ -1,0 +1,82 @@
+{
+  "notes": [
+    {
+      "viewport": {
+        "width": 1225,
+        "height": 768
+      },
+      "sharedField": {
+        "practiceBox": {
+          "left": 208,
+          "right": 1225,
+          "width": 1017
+        },
+        "railBox": {
+          "left": 0,
+          "right": 208,
+          "width": 208
+        },
+        "keyBox": {
+          "left": 246.3984375,
+          "right": 710.3984375,
+          "top": 636.1875,
+          "bottom": 704,
+          "width": 464,
+          "height": 67.8125
+        },
+        "practiceBackground": "rgba(0, 0, 0, 0)",
+        "stageBackground": "rgba(0, 0, 0, 0)",
+        "fieldBackground": "radial-gradient(70% 88% at 10% 10%, color(srgb 0.890196 0.541176 0.364706 / 0.36), rgba(0, 0, 0, 0) 72%), radial-gradient(70% 90% at 94% 88%, color(srgb 0.658824 0.435294 0.470588 / 0.22), rgba(0, 0, 0, 0) 76%), linear-gradient(118deg, rgb(241, 231, 217) 0%, rgb(244, 239, 229) 45%, rgb(225, 207, 190) 100%)",
+        "keyText": "kit key● drums · × cymbals · low → high●Kick↓●Snare↙×Hi-hat↑●Tom 1↗●Tom 2↔●Tom 3↙×Ride↑×Crash↑"
+      }
+    },
+    {
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "sharedField": {
+        "practiceBox": {
+          "left": 64,
+          "right": 1024,
+          "width": 960
+        },
+        "railBox": {
+          "left": 0,
+          "right": 64,
+          "width": 64
+        },
+        "keyBox": {
+          "left": 102.3984375,
+          "right": 566.3984375,
+          "top": 568.1875,
+          "bottom": 636,
+          "width": 464,
+          "height": 67.8125
+        },
+        "practiceBackground": "rgba(0, 0, 0, 0)",
+        "stageBackground": "rgba(0, 0, 0, 0)",
+        "fieldBackground": "radial-gradient(70% 88% at 10% 10%, color(srgb 0.890196 0.541176 0.364706 / 0.36), rgba(0, 0, 0, 0) 72%), radial-gradient(70% 90% at 94% 88%, color(srgb 0.658824 0.435294 0.470588 / 0.22), rgba(0, 0, 0, 0) 76%), linear-gradient(118deg, rgb(241, 231, 217) 0%, rgb(244, 239, 229) 45%, rgb(225, 207, 190) 100%)",
+        "keyText": "kit key● drums · × cymbals · low → high●Kick↓●Snare↙×Hi-hat↑●Tom 1↗●Tom 2↔●Tom 3↙×Ride↑×Crash↑"
+      }
+    },
+    {
+      "wrongNoteExplanation": {
+        "text": "WhyExtra hit: KickYou hitKickNothing was scored there in Bar 1.No correction needed — stay with the notation for the next real note.",
+        "swatches": [
+          {
+            "element": "kick",
+            "color": "rgb(233, 93, 55)"
+          }
+        ],
+        "keyBox": {
+          "x": 246.3984375,
+          "y": 636.1875,
+          "width": 464,
+          "height": 67.8125
+        }
+      }
+    }
+  ],
+  "pageErrors": []
+}

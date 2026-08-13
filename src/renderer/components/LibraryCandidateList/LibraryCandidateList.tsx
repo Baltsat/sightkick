@@ -7,7 +7,7 @@ import {
   faMagnifyingGlass,
   faWandMagicSparkles,
 } from '@fortawesome/free-solid-svg-icons';
-import appIcon from '../../../../assets/icon.png';
+import songArtPlaceholder from '../../../../assets/song-art-placeholder.svg';
 import type {
   LibraryCandidateResolution,
   Song,
@@ -144,10 +144,10 @@ function SongRow({
       )}
     >
       <img
-        src={song.albumCover ?? appIcon}
+        src={song.albumCover ?? songArtPlaceholder}
         alt=""
         onError={(event) => {
-          event.currentTarget.src = appIcon;
+          event.currentTarget.src = songArtPlaceholder;
         }}
         className="size-14 shrink-0 rounded-lg object-cover outline outline-1 -outline-offset-1 outline-white/10"
       />
@@ -319,7 +319,7 @@ function SourceRow({
       )}
     >
       <img
-        src={appIcon}
+        src={songArtPlaceholder}
         alt=""
         className="size-14 shrink-0 rounded-lg object-cover opacity-70 outline outline-1 -outline-offset-1 outline-white/10"
       />

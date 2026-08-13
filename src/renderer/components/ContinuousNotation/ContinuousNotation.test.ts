@@ -9,6 +9,11 @@ import { describeMistake } from '../../services/pedagogy';
 import { TimeStore } from '../../services/time-store';
 import { secondsToTicks } from '../../../chart-parser/timing';
 import { getXForTick } from '../../services/engine/cursor-geometry';
+import {
+  KIT_ELEMENT_COLOR_VAR,
+  KIT_ELEMENT_LABEL,
+} from '../../services/pedagogy';
+import { HOME_KIT_ZONE_LANES } from '../HomeCockpit/kit-zone-map';
 import { notationElementForTarget } from '../NotationGlossary';
 import {
   flowBeatCount,
@@ -277,7 +282,7 @@ describe('Flow meter and current location', () => {
     );
   });
 
-  it('keeps a judged note in the same lane colour named by its explanation', () => {
+  it('keeps every notehead colour aligned with its matching kit zone', () => {
     const noteHead = document.createElementNS(
       'http://www.w3.org/2000/svg',
       'path',
@@ -298,13 +303,29 @@ describe('Flow meter and current location', () => {
         scoreable: true,
       } satisfies ResolvedJudgement)?.title,
     ).toBe('Bar 1: Hi-hat expected');
-    expect(
-      readFileSync(
-        'src/renderer/components/ContinuousNotation/ContinuousNotation.css',
-        'utf8',
-      ),
-    ).toMatch(
-      /\.vf-note-missed\.vf-note-hihat,\s*\.vf-note-missed\.vf-note-tom1\s*\{\s*fill:\s*var\(--color-yellow\);/,
+
+    const notationCss = readFileSync(
+      'src/renderer/styles/sheet-music.css',
+      'utf8',
+    );
+
+    (
+      Object.keys(KIT_ELEMENT_LABEL) as Array<keyof typeof KIT_ELEMENT_LABEL>
+    ).forEach((kitElement) => {
+      const kitColour = `var(--color-${HOME_KIT_ZONE_LANES[kitElement]})`;
+
+      expect(KIT_ELEMENT_COLOR_VAR[kitElement]).toBe(kitColour);
+      expect(notationCss).toMatch(
+        new RegExp(
+          `\\.vf-note-${kitElement}\\s*\\{\\s*--vf-note-lane-color:\\s*${kitColour.replace(
+            /[()]/g,
+            '\\$&',
+          )};`,
+        ),
+      );
+    });
+    expect(notationCss).toContain(
+      'fill: var(--vf-note-lane-color, var(--color-red-dark, #8b1c1c));',
     );
   });
 

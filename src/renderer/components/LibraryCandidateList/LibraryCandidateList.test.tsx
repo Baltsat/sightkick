@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Difficulty } from 'scan-chart';
+import songArtPlaceholder from '../../../../assets/song-art-placeholder.svg';
 import {
   YandexLibraryCandidateSources,
   YandexPlaylistCandidate,
@@ -100,6 +101,35 @@ afterEach(() => {
 });
 
 describe('LibraryCandidateList — song rows', () => {
+  it('uses neutral song art when a library song has no album cover', () => {
+    const entries = build_unified_library({
+      songs: [makeListSong('artless-song', { name: 'Artless Song' })],
+      sources: sources([]),
+      now: '2026-08-12T00:00:00.000Z',
+    });
+
+    render(
+      <LibraryCandidateList
+        entries={entries}
+        difficulty={DIFFICULTY}
+        canUseLocalAudio
+        onPlaySong={vi.fn()}
+        onResolveSource={vi.fn()}
+        onUseLocalAudioForSource={vi.fn()}
+      />,
+    );
+
+    const artwork = screen
+      .getByTestId('song-item-artless-song')
+      .querySelector('img');
+
+    expect(artwork).toHaveAttribute('src', songArtPlaceholder);
+
+    fireEvent.error(artwork!);
+
+    expect(artwork).toHaveAttribute('src', songArtPlaceholder);
+  });
+
   it('plays a ready song row on click and never acts playable when not ready', () => {
     const onPlaySong = vi.fn();
     const ready = makeListSong('ready-song', { name: 'Ready Song' });
@@ -287,6 +317,29 @@ describe('LibraryCandidateList — song rows', () => {
 });
 
 describe('LibraryCandidateList — source rows', () => {
+  it('uses neutral song art for an unresolved source row', () => {
+    const entries = build_unified_library({
+      songs: [],
+      sources: sources([sourceTrack('source-artless', 'Artless Source')]),
+      now: '2026-08-12T00:00:00.000Z',
+    });
+
+    render(
+      <LibraryCandidateList
+        entries={entries}
+        difficulty={DIFFICULTY}
+        canUseLocalAudio
+        onPlaySong={vi.fn()}
+        onResolveSource={vi.fn()}
+        onUseLocalAudioForSource={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByTestId('library-candidate-Drums-1').querySelector('img'),
+    ).toHaveAttribute('src', songArtPlaceholder);
+  });
+
   it('renders an honest Drums row and wires check-charts / use-local-audio to the exact track', () => {
     const onResolveSource = vi.fn();
     const onUseLocalAudioForSource = vi.fn();

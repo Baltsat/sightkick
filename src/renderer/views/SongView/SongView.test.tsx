@@ -373,7 +373,7 @@ describe('playhead', () => {
 });
 
 describe('sheet appearance', () => {
-  it('keeps Flow lane colors readable and lets Classic colors be switched off', async () => {
+  it('keeps kit lane colours on every practice notation layout', async () => {
     const view = setupSongView();
 
     await view.loadSong();
@@ -398,9 +398,9 @@ describe('sheet appearance', () => {
 
     await waitFor(() => {
       expect(
-        document.querySelectorAll('.vf-note-uncolored').length,
+        document.querySelectorAll('.vf-note-snare').length,
       ).toBeGreaterThan(0);
-      expect(document.querySelectorAll('.vf-note-snare')).toHaveLength(0);
+      expect(document.querySelectorAll('.vf-note-uncolored')).toHaveLength(0);
     });
   });
 });

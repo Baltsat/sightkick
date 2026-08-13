@@ -4,6 +4,7 @@ import type { PointerEvent } from 'react';
 import { describe, expect, it } from 'vitest';
 import {
   NotationGlossary,
+  NotationKitKey,
   placeNotationGlossary,
   notationKindForTarget,
   useNotationGlossaryIntent,
@@ -49,6 +50,22 @@ function GlossaryProbe() {
 }
 
 describe('NotationGlossary', () => {
+  it('keeps a compact shape-and-position kit key available beside the score', () => {
+    render(<NotationKitKey layout="classic" />);
+
+    const key = screen.getByTestId('notation-kit-key');
+
+    expect(key).toHaveAccessibleName('Drum kit notation key');
+    expect(key.querySelectorAll('[data-kit-element]')).toHaveLength(8);
+    expect(key).toHaveTextContent('● drums · × cymbals · low → high');
+    expect(key.querySelector('[data-kit-element="kick"]')).toHaveAccessibleName(
+      'Kick: round head, low on the staff',
+    );
+    expect(
+      key.querySelector('[data-kit-element="hihat"]'),
+    ).toHaveAccessibleName('Hi-hat: cross head, high on the staff');
+  });
+
   it('requires an option-click and never reopens from ordinary pointer movement', () => {
     render(<GlossaryProbe />);
 

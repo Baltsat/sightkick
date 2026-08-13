@@ -89,7 +89,9 @@ async function assert_journey_world_title_fits(page) {
       });
 
     notes.push(
-      `journey title fit ${viewport.width}x${viewport.height}: ${JSON.stringify(metrics)}`,
+      `journey title fit ${viewport.width}x${viewport.height}: ${JSON.stringify(
+        metrics,
+      )}`,
     );
 
     if (
@@ -97,7 +99,9 @@ async function assert_journey_world_title_fits(page) {
       metrics.textRight > metrics.boxRight + 1
     ) {
       throw new Error(
-        `Journey title clips at ${viewport.width}x${viewport.height}: ${JSON.stringify(metrics)}`,
+        `Journey title clips at ${viewport.width}x${
+          viewport.height
+        }: ${JSON.stringify(metrics)}`,
       );
     }
   }

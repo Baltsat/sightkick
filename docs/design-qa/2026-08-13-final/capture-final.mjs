@@ -95,14 +95,20 @@ async function assertJourneyWorldTitleFits(page) {
         };
       });
 
-    notes.push(`journey title fit ${viewport.width}x${viewport.height}: ${JSON.stringify(metrics)}`);
+    notes.push(
+      `journey title fit ${viewport.width}x${viewport.height}: ${JSON.stringify(
+        metrics,
+      )}`,
+    );
 
     if (
       metrics.scrollWidth > metrics.clientWidth + 1 ||
       metrics.textRight > metrics.boxRight + 1
     ) {
       throw new Error(
-        `Journey title clips at ${viewport.width}x${viewport.height}: ${JSON.stringify(metrics)}`,
+        `Journey title clips at ${viewport.width}x${
+          viewport.height
+        }: ${JSON.stringify(metrics)}`,
       );
     }
   }

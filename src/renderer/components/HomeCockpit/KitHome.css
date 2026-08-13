@@ -64,7 +64,8 @@
   gap: 0.5rem;
   padding: clamp(0.7rem, 2.1vh, 1.15rem) clamp(1.25rem, 3vw, 2.75rem);
   overflow: hidden;
-  background: linear-gradient(
+  background:
+    linear-gradient(
       100deg,
       color-mix(in srgb, var(--surface-studio) 82%, transparent) 0%,
       color-mix(in srgb, var(--surface-studio) 58%, transparent) 40%,
@@ -167,7 +168,8 @@
   display: flex;
   align-items: center;
   gap: clamp(1rem, 2vw, 1.75rem);
-  background: linear-gradient(
+  background:
+    linear-gradient(
       100deg,
       color-mix(in srgb, var(--surface-studio) 76%, transparent) 0%,
       color-mix(in srgb, var(--surface-studio) 46%, transparent) 44%,
@@ -366,14 +368,23 @@
 
 .kit-home__pad-impact {
   inset: -12%;
-  z-index: -2;
-  border: 1px solid var(--kit-pad-signal);
+  z-index: 2;
+  border: 3px solid var(--kit-pad-signal);
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    transparent 42%,
+    color-mix(in srgb, var(--kit-pad-signal) 72%, transparent) 54%,
+    transparent 74%
+  );
+  box-shadow: 0 0 1.8rem 0.45rem
+    color-mix(in srgb, var(--kit-pad-signal) 72%, transparent);
   opacity: 0;
 }
 
 .kit-home__pad:hover .kit-home__pad-head,
 .kit-home__pad:focus-visible .kit-home__pad-head,
-.kit-home__pad[data-active='true'] .kit-home__pad-head {
+.kit-home__pad[data-armed='true'] .kit-home__pad-head,
+.kit-home__pad[data-struck='true'] .kit-home__pad-head {
   opacity: 1;
   transform: scale(1.015);
   box-shadow:
@@ -383,37 +394,63 @@
     inset 0 0 1.05rem color-mix(in srgb, var(--kit-pad-signal) 40%, transparent);
 }
 
-.kit-home__pad[data-active='true'] .kit-home__pad-head {
+.kit-home__pad[data-struck='true'] .kit-home__pad-head {
   animation: kit-home-pad-hit 160ms ease-out 1;
 }
 
-.kit-home__pad[data-active='true'] .kit-home__pad-impact {
+.kit-home__pad[data-struck='true'] .kit-home__pad-impact {
   animation: kit-home-impact-ring 220ms ease-out 1;
+}
+
+.kit-home__pad[data-armed='true'] .kit-home__pad-head {
+  animation: kit-home-door-armed 3.2s ease-in-out infinite;
+}
+
+.kit-home__pad[data-armed='true'][data-struck='true'] .kit-home__pad-head {
+  animation: kit-home-pad-hit 160ms ease-out 1;
 }
 
 .kit-home__pad-label {
   position: relative;
   z-index: 1;
-  max-width: 7ch;
+  display: grid;
+  max-width: calc(100% - 1rem);
+  gap: 0.12rem;
+  padding: 0.22rem 0.32rem;
+  border: 1px solid color-mix(in srgb, var(--kit-pad-signal) 84%, white);
+  border-radius: 0.25rem;
   color: #fffaf2;
-  font-size: clamp(0.62rem, 0.9vw, 0.78rem);
-  font-weight: 780;
-  letter-spacing: 0.06em;
-  line-height: 1.05;
+  background: rgb(12 10 7 / 62%);
+  box-shadow: 0 0.1rem 0.7rem rgb(12 10 7 / 68%);
+  font-size: clamp(0.7rem, 0.96vw, 0.9rem);
+  font-weight: 760;
+  letter-spacing: 0.02em;
+  line-height: 1.08;
   text-align: center;
   text-shadow: 0 0.12rem 0.6rem rgb(17 23 34 / 95%);
-  text-transform: uppercase;
-  opacity: 0;
-  transform: translateY(0.25rem);
-  transition:
-    opacity 150ms ease,
-    transform 150ms ease;
+  transform: translateY(0);
+  transition: transform 150ms ease;
+}
+
+.kit-home__pad-label > span {
+  color: color-mix(in srgb, var(--kit-pad-signal) 72%, white);
+}
+
+.kit-home__pad-label small {
+  overflow: hidden;
+  max-width: 100%;
+  color: #fffaf2;
+  font-size: 0.78em;
+  font-weight: 640;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .kit-home__pad:hover .kit-home__pad-label,
 .kit-home__pad:focus-visible .kit-home__pad-label,
-.kit-home__pad[data-active='true'] .kit-home__pad-label {
-  opacity: 1;
+.kit-home__pad[data-armed='true'] .kit-home__pad-label,
+.kit-home__pad[data-struck='true'] .kit-home__pad-label {
   transform: translateY(0);
 }
 
@@ -430,7 +467,7 @@
   pointer-events: none;
 }
 
-.kit-home__pad-stick[data-active='true'] {
+.kit-home__pad-stick[data-struck='true'] {
   animation: kit-home-stick-hit 160ms ease-out 1;
 }
 
@@ -529,27 +566,48 @@
 
 @keyframes kit-home-pad-hit {
   0% {
+    filter: brightness(1.35) saturate(1.3);
     transform: scale(1.05);
   }
 
   45% {
+    filter: brightness(1.65) saturate(1.55);
     transform: scale(0.84);
   }
 
   100% {
+    filter: none;
     transform: scale(1.05);
+  }
+}
+
+@keyframes kit-home-door-armed {
+  0%,
+  100% {
+    opacity: 0.9;
+    transform: scale(0.98);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
   }
 }
 
 @keyframes kit-home-impact-ring {
   0% {
-    opacity: 0.9;
-    transform: scale(0.74);
+    opacity: 0.96;
+    transform: scale(0.66);
+  }
+
+  42% {
+    opacity: 0.72;
+    transform: scale(1.08);
   }
 
   100% {
     opacity: 0;
-    transform: scale(1.3);
+    transform: scale(1.48);
   }
 }
 
@@ -592,7 +650,8 @@
   .kit-home__primary-action,
   .kit-home__pad-head,
   .kit-home__pad-impact,
-  .kit-home__pad-stick {
+  .kit-home__pad-stick,
+  .kit-home__pad-label {
     transition: none;
     animation: none;
   }

@@ -7,10 +7,10 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Song } from '../../../types';
+import type { Song } from '../../../types';
 import { useInput } from '../../context/InputContext';
 import { inputBus } from '../../input';
-import { UseGamificationResult } from '../../hooks/useGamification';
+import type { UseGamificationResult } from '../../hooks/useGamification';
 import { computeStreak, localDateKey } from '../../services/streaks';
 import {
   composeHomeSession,
@@ -38,15 +38,17 @@ import homeKitStudio from '../../assets/daybreak/home-kit-studio.png';
 import drumstickCursor from '../../assets/daybreak/drumstick-cursor-reversed.png';
 import {
   fitKitZone,
+  HOME_KIT_DOORS,
   HOME_KIT_ZONE_FILL_OPACITY,
   HOME_KIT_ZONE_LANES,
   HOME_KIT_ZONE_MAP,
+  type HomeKitDoor,
 } from './kit-zone-map';
 import { computeKitTextSafeBands } from './kit-text-safe-bands';
 import { resolveLibraryControls } from '../../views/SongListView/library-controls';
 import './KitHome.css';
 
-interface HomeCockpitProps {
+export interface HomeCockpitProps {
   songList: Song[];
   gamification: UseGamificationResult;
   recommendation?: RankedPracticeCandidate;
@@ -65,24 +67,78 @@ interface HomeCockpitProps {
   onStartSession?: (session: OneKickHomeSession) => void;
   onStartPracticeCard?: (option: PracticeCardOption) => void;
   onOpenSongs: () => void;
+  onOpenJourney?: () => void;
+  onFindNewMusic?: () => void;
+  onStartSong?: (song: Song) => void;
   onOpenProfile: () => void;
 }
 
 interface KitHotspot {
   element: KitElement;
+  drumLabel: string;
+  door: HomeKitDoor;
+}
+
+interface ResolvedKitDoor {
+  action: HomeKitDoor;
   label: string;
+  detail: string;
+  ariaLabel: string;
+  song?: Song;
 }
 
 const KIT_HOTSPOTS: KitHotspot[] = [
-  { element: 'hihat', label: 'Hi-hat' },
-  { element: 'crash', label: 'Crash' },
-  { element: 'tom1', label: 'Tom 1' },
-  { element: 'tom2', label: 'Tom 2' },
-  { element: 'ride', label: 'Ride' },
-  { element: 'snare', label: 'Snare' },
-  { element: 'tom3', label: 'Floor tom' },
-  { element: 'kick', label: 'Kick' },
+  { element: 'hihat', drumLabel: 'Hi-hat', door: HOME_KIT_DOORS.hihat },
+  { element: 'crash', drumLabel: 'Crash', door: HOME_KIT_DOORS.crash },
+  { element: 'tom1', drumLabel: 'Tom 1', door: HOME_KIT_DOORS.tom1 },
+  { element: 'tom2', drumLabel: 'Tom 2', door: HOME_KIT_DOORS.tom2 },
+  { element: 'ride', drumLabel: 'Ride', door: HOME_KIT_DOORS.ride },
+  { element: 'snare', drumLabel: 'Snare', door: HOME_KIT_DOORS.snare },
+  { element: 'tom3', drumLabel: 'Floor tom', door: HOME_KIT_DOORS.tom3 },
+  { element: 'kick', drumLabel: 'Kick', door: HOME_KIT_DOORS.kick },
 ];
+
+export function rankHomeTopSongs(
+  songList: readonly Song[],
+  runsBySong: UseGamificationResult['runsBySong'] | undefined,
+): Song[] {
+  return songList
+    .filter((song) => !song.lesson)
+    .map((song) => ({ song, playCount: runsBySong?.[song.id]?.length ?? 0 }))
+    .filter(({ playCount }) => playCount > 0)
+    .sort(
+      (left, right) =>
+        right.playCount - left.playCount ||
+        left.song.id.localeCompare(right.song.id),
+    )
+    .slice(0, 3)
+    .map(({ song }) => song);
+}
+
+function lastWorkedSong(
+  songList: readonly Song[],
+  runsBySong: UseGamificationResult['runsBySong'] | undefined,
+): Song | undefined {
+  return songList
+    .map((song) => ({
+      song,
+      lastCompletedAt: Math.max(
+        Number.NEGATIVE_INFINITY,
+        ...(runsBySong?.[song.id] ?? []).map(({ completedAt }) =>
+          Number.isFinite(Date.parse(completedAt))
+            ? Date.parse(completedAt)
+            : Number.NEGATIVE_INFINITY,
+        ),
+      ),
+    }))
+    .filter(({ lastCompletedAt }) => Number.isFinite(lastCompletedAt))
+    .sort(
+      (left, right) =>
+        right.lastCompletedAt - left.lastCompletedAt ||
+        left.song.id.localeCompare(right.song.id),
+    )[0]?.song;
+}
+
 /**
  * `next-practice/home-session.ts`'s own last-resort placeholder when no
  * musical payoff can be ranked. Visual-system-v3 explicitly forbids
@@ -220,17 +276,22 @@ export function HomeCockpit({
   onStartSession,
   onStartPracticeCard,
   onOpenSongs,
+  onOpenJourney,
+  onFindNewMusic,
+  onStartSong,
 }: HomeCockpitProps) {
   const { inputMapping, controlMapping, inputReadiness, selectedDevice } =
     useInput();
-  const [activeLane, setActiveLane] = useState<KitElement>();
+  const [struckLane, setStruckLane] = useState<KitElement>();
   const [pointerStrikeLane, setPointerStrikeLane] = useState<KitElement>();
+  const [pendingDoor, setPendingDoor] = useState<KitElement>();
   const [sessionState, setSessionState] = useState<'armed' | 'count-in'>(
     'armed',
   );
   const [studioSize, setStudioSize] = useState({ width: 0, height: 0 });
   const clearPulseRef = useRef<number | undefined>(undefined);
   const clearPointerStrikeRef = useRef<number | undefined>(undefined);
+  const clearPendingDoorRef = useRef<number | undefined>(undefined);
   const studioRef = useRef<HTMLElement>(null);
   const homeRanking = useMemo(() => {
     const ranked: RankedPracticeCandidate[] = [];
@@ -255,6 +316,35 @@ export function HomeCockpit({
     () =>
       composeHomeSession({
         intent: 'learning',
+        ranking: homeRanking,
+        pedagogyRanking,
+        practiceWave,
+        activeGoal,
+        goalPayoffCandidate,
+        goalTargetDate,
+        deadlinePacing,
+        atomicStates,
+        size: 'full',
+        energy: sessionEnergy,
+        recentEarlyExits,
+      }),
+    [
+      activeGoal,
+      atomicStates,
+      deadlinePacing,
+      goalPayoffCandidate,
+      goalTargetDate,
+      homeRanking,
+      pedagogyRanking,
+      practiceWave,
+      recentEarlyExits,
+      sessionEnergy,
+    ],
+  );
+  const myWaveSession = useMemo(
+    () =>
+      composeHomeSession({
+        intent: 'songs',
         ranking: homeRanking,
         pedagogyRanking,
         practiceWave,
@@ -327,8 +417,22 @@ export function HomeCockpit({
   const recommendedSong = songList.find(
     (song) => song.id === targetRecommendation?.candidate.id,
   );
-  const practiceTarget = targetRecommendation ? recommendedSong : undefined;
-  const hasPracticeTarget = Boolean(practiceTarget && targetRecommendation);
+  const resumedSong = useMemo(
+    () => lastWorkedSong(songList, gamification.runsBySong),
+    [gamification.runsBySong, songList],
+  );
+  const continuationSong = recommendedSong ?? resumedSong;
+  const hasContinuationTarget = Boolean(continuationSong);
+  const topSongs = useMemo(
+    () => rankHomeTopSongs(songList, gamification.runsBySong),
+    [gamification.runsBySong, songList],
+  );
+  const nextLesson = homeRanking.find(
+    ({ candidate }) =>
+      candidate.kind === 'lesson' &&
+      candidate.available &&
+      candidate.unlocked !== false,
+  );
   // The lesson library keeps the lesson number and the lesson name as two
   // separate fields (`song.lesson.id`/`.title` - see
   // `library/manifest.json`'s `sk_lesson_id`/`sk_lesson_title`); `song.name`
@@ -337,11 +441,13 @@ export function HomeCockpit({
   // here is what turns that concatenation into a small eyebrow plus one
   // confident title line (2026-08-13 critique, home item 17) instead of
   // wrapping the whole combined string across four lines.
-  const heroEyebrow = practiceTarget?.lesson
-    ? `Lesson ${practiceTarget.lesson.id}`
-    : practiceTarget?.artist;
+  const heroEyebrow = continuationSong?.lesson
+    ? `Lesson ${continuationSong.lesson.id}`
+    : continuationSong?.artist;
   const heroTitle =
-    practiceTarget?.lesson?.title ?? practiceTarget?.name ?? 'Choose a song';
+    continuationSong?.lesson?.title ??
+    continuationSong?.name ??
+    'Choose a song';
   const safeBands = useMemo(
     () => computeKitTextSafeBands(HOME_KIT_ZONE_MAP, studioSize),
     [studioSize],
@@ -353,7 +459,7 @@ export function HomeCockpit({
   const kitColors = useKitColorMaturity(kitColorRuns);
   const { title: shelfTitle, detail: shelfDetail } = resolveShelfCopy(
     sessionSummary,
-    hasPracticeTarget,
+    hasContinuationTarget,
   );
 
   useLayoutEffect(() => {
@@ -411,59 +517,207 @@ export function HomeCockpit({
       : inputReadiness === 'reconnecting'
       ? `Reconnecting · ${selectedDevice?.name ?? 'MIDI kit'}`
       : 'No MIDI kit found';
-  const homeStartHint = homeControls.kitActions.includes('confirm')
-    ? 'Strike snare to start.'
-    : homeConfirmControls.length > 0
-    ? 'Use your confirm control to start.'
-    : 'Set a confirm control in Configure input to start from the kit.';
+  const kitDoors = useMemo<Record<KitElement, ResolvedKitDoor>>(
+    () => ({
+      kick: {
+        action: 'continue',
+        label: 'Continue',
+        detail: continuationSong?.name ?? 'Choose a song first',
+        ariaLabel: continuationSong
+          ? `Kick. Continue ${continuationSong.name}.`
+          : 'Kick. Choose a song before continuing.',
+      },
+      snare: {
+        action: 'my-wave',
+        label: 'My Wave',
+        detail:
+          myWaveSession?.launch.candidate.title ??
+          'Add a song to build your stream',
+        ariaLabel: myWaveSession
+          ? `Snare. My Wave: start ${myWaveSession.launch.candidate.title}.`
+          : 'Snare. My Wave needs a playable song.',
+      },
+      hihat: {
+        action: 'next-lesson',
+        label: 'Next lesson',
+        detail: nextLesson?.candidate.title ?? 'Open Journey to choose one',
+        ariaLabel: nextLesson
+          ? `Hi-hat. Open your next lesson, ${nextLesson.candidate.title}.`
+          : 'Hi-hat. Open Journey to choose your next lesson.',
+      },
+      ride: {
+        action: 'songs',
+        label: 'Your songs',
+        detail: 'Open your library',
+        ariaLabel: 'Ride. Open your songs library.',
+      },
+      crash: {
+        action: 'discover',
+        label: 'Find new',
+        detail: 'Browse new practice music',
+        ariaLabel: 'Crash. Find new practice music.',
+      },
+      tom1: {
+        action: 'top-song-1',
+        label: 'Top 1',
+        detail: topSongs[0]?.name ?? 'Play to set this tom',
+        ariaLabel: topSongs[0]
+          ? `Tom 1. Top song: ${topSongs[0].name}. Start it.`
+          : 'Tom 1. No top song yet. Play a song to set this tom.',
+        song: topSongs[0],
+      },
+      tom2: {
+        action: 'top-song-2',
+        label: 'Top 2',
+        detail: topSongs[1]?.name ?? 'Play to set this tom',
+        ariaLabel: topSongs[1]
+          ? `Tom 2. Second top song: ${topSongs[1].name}. Start it.`
+          : 'Tom 2. No second top song yet. Play a song to set this tom.',
+        song: topSongs[1],
+      },
+      tom3: {
+        action: 'top-song-3',
+        label: 'Top 3',
+        detail: topSongs[2]?.name ?? 'Play to set this tom',
+        ariaLabel: topSongs[2]
+          ? `Floor tom. Third top song: ${topSongs[2].name}. Start it.`
+          : 'Floor tom. No third top song yet. Play a song to set this tom.',
+        song: topSongs[2],
+      },
+    }),
+    [continuationSong, myWaveSession, nextLesson, topSongs],
+  );
+  const armedDoor = pendingDoor ?? (hasContinuationTarget ? 'kick' : undefined);
+  const homeStartHint = pendingDoor
+    ? `${kitDoors[pendingDoor].label} is selected. Use your confirm control to start it.`
+    : homeControls.kitActions.includes('confirm') ||
+      homeConfirmControls.length > 0
+    ? 'Strike a labelled door, then use your confirm control to start it.'
+    : 'Set a confirm control in Configure input to use the kit hands-free.';
   const pulseLane = useCallback((element: KitElement) => {
     window.clearTimeout(clearPulseRef.current);
-    setActiveLane(element);
+    setStruckLane(element);
     clearPulseRef.current = window.setTimeout(() => {
-      setActiveLane(undefined);
-    }, 120);
+      setStruckLane(undefined);
+    }, 220);
   }, []);
-  const startCurrentPractice = useCallback(
-    (element: KitElement) => {
-      pulseLane(element);
+  const selectDoor = useCallback((element: KitElement) => {
+    window.clearTimeout(clearPendingDoorRef.current);
+    setPendingDoor(element);
+    clearPendingDoorRef.current = window.setTimeout(() => {
+      setPendingDoor(undefined);
+    }, 1_500);
+  }, []);
+  const clearSelectedDoor = useCallback(() => {
+    window.clearTimeout(clearPendingDoorRef.current);
+    setPendingDoor(undefined);
+  }, []);
+  const startSession = useCallback(
+    (session: OneKickHomeSession | undefined) => {
       setSessionState('count-in');
 
-      if (homeSession && onStartSession) {
-        onStartSession(homeSession);
+      if (session && onStartSession) {
+        onStartSession(session);
 
         return;
       }
 
       onStartRecommended();
     },
-    [homeSession, onStartRecommended, onStartSession, pulseLane],
+    [onStartRecommended, onStartSession],
+  );
+  const startSong = useCallback(
+    (song: Song) => {
+      if (!onStartSong) {
+        onOpenSongs();
+
+        return;
+      }
+
+      setSessionState('count-in');
+      onStartSong(song);
+    },
+    [onOpenSongs, onStartSong],
+  );
+  const executeDoor = useCallback(
+    (element: KitElement) => {
+      const door = kitDoors[element];
+
+      if (door.action === 'continue') {
+        if (homeSession) {
+          startSession(homeSession);
+        } else if (targetRecommendation) {
+          startSession(undefined);
+        } else if (continuationSong) {
+          startSong(continuationSong);
+        } else {
+          onOpenSongs();
+        }
+
+        return;
+      }
+
+      if (door.action === 'my-wave') {
+        if (myWaveSession) {
+          startSession(myWaveSession);
+        } else {
+          onOpenSongs();
+        }
+
+        return;
+      }
+
+      if (door.action === 'next-lesson') {
+        (onOpenJourney ?? onOpenSongs)();
+
+        return;
+      }
+
+      if (door.action === 'songs') {
+        onOpenSongs();
+
+        return;
+      }
+
+      if (door.action === 'discover') {
+        (onFindNewMusic ?? onOpenSongs)();
+
+        return;
+      }
+
+      if (door.song) {
+        startSong(door.song);
+      } else {
+        onOpenSongs();
+      }
+    },
+    [
+      continuationSong,
+      homeSession,
+      kitDoors,
+      myWaveSession,
+      onFindNewMusic,
+      onOpenJourney,
+      onOpenSongs,
+      startSession,
+      startSong,
+      targetRecommendation,
+    ],
   );
   const handlePointerStrike = useCallback(
     (element: KitElement) => {
       playKitPreview(element);
+      clearSelectedDoor();
       window.clearTimeout(clearPointerStrikeRef.current);
       setPointerStrikeLane(element);
       clearPointerStrikeRef.current = window.setTimeout(() => {
         setPointerStrikeLane(undefined);
       }, 120);
 
-      if (hasPracticeTarget) {
-        startCurrentPractice(element);
-      } else {
-        pulseLane(element);
-      }
+      pulseLane(element);
+      executeDoor(element);
     },
-    [hasPracticeTarget, pulseLane, startCurrentPractice],
-  );
-  const handlePadClick = useCallback(
-    (element: KitElement) => {
-      handlePointerStrike(element);
-
-      if (!hasPracticeTarget) {
-        onOpenSongs();
-      }
-    },
-    [handlePointerStrike, hasPracticeTarget, onOpenSongs],
+    [clearSelectedDoor, executeDoor, pulseLane],
   );
 
   useEffect(() => {
@@ -474,14 +728,17 @@ export function HomeCockpit({
         return;
       }
 
-      if (hasPracticeTarget && homeConfirmControls.includes(event.controlId)) {
-        startCurrentPractice(element ?? 'snare');
-
-        return;
-      }
-
       if (element) {
         pulseLane(element);
+      }
+
+      if (homeConfirmControls.includes(event.controlId)) {
+        const door = pendingDoor ?? element ?? 'kick';
+
+        clearSelectedDoor();
+        executeDoor(door);
+      } else if (element) {
+        selectDoor(element);
       }
     });
 
@@ -489,13 +746,16 @@ export function HomeCockpit({
       unsubscribe();
       window.clearTimeout(clearPulseRef.current);
       window.clearTimeout(clearPointerStrikeRef.current);
+      window.clearTimeout(clearPendingDoorRef.current);
     };
   }, [
+    clearSelectedDoor,
     elementByControlId,
-    hasPracticeTarget,
+    executeDoor,
     homeConfirmControls,
+    pendingDoor,
     pulseLane,
-    startCurrentPractice,
+    selectDoor,
   ]);
 
   const rootStyle = {
@@ -527,10 +787,10 @@ export function HomeCockpit({
 
         <div className="kit-home__pads" role="group" aria-label="Practice kit">
           {KIT_HOTSPOTS.map((hotspot) => {
-            const isActive = activeLane === hotspot.element;
+            const isStruck = struckLane === hotspot.element;
             const isPointerStrike = pointerStrikeLane === hotspot.element;
-            const targetLabel =
-              practiceTarget?.name ?? 'the selected practice target';
+            const isArmed = armedDoor === hotspot.element;
+            const door = kitDoors[hotspot.element];
 
             return (
               <button
@@ -538,7 +798,10 @@ export function HomeCockpit({
                 type="button"
                 data-testid={`kit-hotspot-${hotspot.element}`}
                 className="kit-home__pad"
-                data-active={isActive}
+                data-door={door.action}
+                data-armed={isArmed || undefined}
+                data-struck={isStruck || undefined}
+                data-active={isStruck || undefined}
                 data-color-lane={HOME_KIT_ZONE_LANES[hotspot.element]}
                 style={
                   fitKitZone(
@@ -547,23 +810,23 @@ export function HomeCockpit({
                     studioSize,
                   ) as CSSProperties
                 }
-                aria-label={
-                  hasPracticeTarget
-                    ? `${hotspot.label}. Start ${targetLabel}.`
-                    : `${hotspot.label}. Choose a song to arm practice.`
-                }
-                onClick={() => handlePadClick(hotspot.element)}
+                aria-label={door.ariaLabel}
+                onClick={() => handlePointerStrike(hotspot.element)}
               >
                 <span className="kit-home__pad-head" aria-hidden="true" />
                 <span className="kit-home__pad-impact" aria-hidden="true" />
                 <img
                   className="kit-home__pad-stick"
+                  data-struck={isPointerStrike || undefined}
                   data-active={isPointerStrike}
                   src={drumstickCursor}
                   alt=""
                   aria-hidden="true"
                 />
-                <span className="kit-home__pad-label">{hotspot.label}</span>
+                <span className="kit-home__pad-label" aria-hidden="true">
+                  <span>{door.label}</span>
+                  <small>{door.detail}</small>
+                </span>
               </button>
             );
           })}
@@ -573,9 +836,9 @@ export function HomeCockpit({
           className="kit-home__hit-feedback sr-only"
           data-testid="home-hit-feedback"
         >
-          {activeLane
-            ? `${KIT_HOTSPOTS.find((item) => item.element === activeLane)
-                ?.label} hit`
+          {struckLane
+            ? `${KIT_HOTSPOTS.find((item) => item.element === struckLane)
+                ?.drumLabel} hit`
             : ''}
         </p>
       </section>
@@ -644,14 +907,12 @@ export function HomeCockpit({
           type="button"
           className="kit-home__primary-action"
           data-testid={
-            hasPracticeTarget ? 'home-start-practice' : 'home-choose-song'
+            hasContinuationTarget ? 'home-start-practice' : 'home-choose-song'
           }
           data-state={sessionState}
-          onClick={() =>
-            hasPracticeTarget ? startCurrentPractice('kick') : onOpenSongs()
-          }
+          onClick={() => executeDoor('kick')}
         >
-          {hasPracticeTarget ? 'Start practice' : 'Choose a song'}
+          {hasContinuationTarget ? 'Continue' : 'Choose a song'}
         </button>
 
         <section
@@ -691,12 +952,19 @@ export function HomeCockpit({
         data-testid="home-session-status"
       >
         {sessionState === 'count-in'
-          ? `Count-in for ${practiceTarget?.name ?? 'your selected target'}.`
-          : hasPracticeTarget && targetRecommendation
-          ? `${practiceTarget?.name} is armed at ${(
-              homeSession?.launchSpeed ?? targetRecommendation.suggestedSpeed
-            ).toFixed(1)} times speed. ${homeStartHint}`
-          : 'Choose a song to arm a practice target.'}
+          ? `Count-in for ${continuationSong?.name ?? 'your selected target'}.`
+          : pendingDoor
+          ? homeStartHint
+          : hasContinuationTarget && continuationSong
+          ? `${continuationSong.name} is armed on Kick${
+              targetRecommendation
+                ? ` at ${(
+                    homeSession?.launchSpeed ??
+                    targetRecommendation.suggestedSpeed
+                  ).toFixed(1)} times speed`
+                : ''
+            }. ${homeStartHint}`
+          : `Kick is waiting for a song. ${homeStartHint}`}
       </p>
     </section>
   );

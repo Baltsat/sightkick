@@ -175,6 +175,16 @@ describe('TutorHud', () => {
       expect(
         screen.getByText('Move to the Snare zone next time.'),
       ).toBeInTheDocument();
+      expect(
+        screen
+          .getByTestId('tutor-mistake')
+          .querySelector('[data-kit-element="snare"]'),
+      ).toBeInTheDocument();
+      expect(
+        screen
+          .getByTestId('tutor-mistake')
+          .querySelector('[data-kit-element="ride"]'),
+      ).toBeInTheDocument();
     });
 
     it('anchors a miss to the bar number, never a fabricated timing claim', () => {
