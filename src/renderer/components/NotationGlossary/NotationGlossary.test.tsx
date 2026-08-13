@@ -1,69 +1,55 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fireEvent, render, screen } from '@testing-library/react';
+import type { PointerEvent } from 'react';
+import { describe, expect, it } from 'vitest';
 import {
-  NOTATION_GLOSSARY_DELAY_MS,
   NotationGlossary,
+  placeNotationGlossary,
   notationKindForTarget,
   useNotationGlossaryIntent,
 } from './NotationGlossary';
 
 function GlossaryProbe() {
-  const { intent, observe, dismiss } = useNotationGlossaryIntent();
+  const { intent, summon } = useNotationGlossaryIntent();
+  const inspect = (event: PointerEvent<HTMLElement>) => {
+    if (event.altKey) {
+      summon(event.target, event.clientX, event.clientY);
+    }
+  };
 
   return (
     <>
-      <button
-        data-notation-kind="accent"
-        onPointerLeave={dismiss}
-        onPointerMove={(event) =>
-          observe(event.target, event.clientX, event.clientY)
-        }
-      >
+      <button data-notation-kind="accent" onPointerDown={inspect}>
         accent
       </button>
       <button
         data-notation-kind="colored-head"
         data-notation-element="snare"
-        onPointerLeave={dismiss}
-        onPointerMove={(event) =>
-          observe(event.target, event.clientX, event.clientY)
-        }
+        onPointerDown={inspect}
       >
         snare head
       </button>
       <button
         data-notation-kind="colored-head"
         data-notation-element="kick"
-        onPointerLeave={dismiss}
-        onPointerMove={(event) =>
-          observe(event.target, event.clientX, event.clientY)
-        }
+        onPointerDown={inspect}
       >
         kick head
       </button>
-      {/* No data-notation-element — the shape every current SheetMusic note
-          head renders today, unmodified by this contract. */}
       <button
         data-notation-kind="colored-head"
-        onPointerLeave={dismiss}
-        onPointerMove={(event) =>
-          observe(event.target, event.clientX, event.clientY)
-        }
+        className="vf-note-hihat vf-note-missed"
+        onPointerDown={inspect}
       >
-        unmapped head
+        missed hi-hat head
       </button>
       <NotationGlossary intent={intent} />
     </>
   );
 }
 
-afterEach(() => {
-  vi.useRealTimers();
-});
-
 describe('NotationGlossary', () => {
-  it('waits for hover intent before opening a notation explanation', () => {
-    vi.useFakeTimers();
+  it('requires an option-click and never reopens from ordinary pointer movement', () => {
     render(<GlossaryProbe />);
 
     fireEvent.pointerMove(screen.getByRole('button', { name: 'accent' }), {
@@ -71,55 +57,115 @@ describe('NotationGlossary', () => {
       clientY: 80,
     });
 
-    act(() => vi.advanceTimersByTime(NOTATION_GLOSSARY_DELAY_MS - 1));
     expect(screen.queryByTestId('notation-glossary')).not.toBeInTheDocument();
 
-    act(() => vi.advanceTimersByTime(1));
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'accent' }), {
+      altKey: true,
+      clientX: 120,
+      clientY: 80,
+    });
     expect(screen.getByTestId('notation-glossary')).toHaveTextContent('Accent');
-    expect(screen.getByTestId('notation-glossary')).toHaveTextContent(
-      'stronger',
-    );
+    fireEvent.pointerLeave(screen.getByRole('button', { name: 'accent' }));
+    expect(screen.getByTestId('notation-glossary')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByTestId('notation-glossary')).not.toBeInTheDocument();
+
+    fireEvent.pointerMove(screen.getByRole('button', { name: 'accent' }), {
+      clientX: 120,
+      clientY: 80,
+    });
+    expect(screen.queryByTestId('notation-glossary')).not.toBeInTheDocument();
   });
 
-  it('keeps the original generic copy when no element context is set — every current caller', () => {
-    vi.useFakeTimers();
+  it('names the lane carried by a missed rendered note, with one card at a time', () => {
     render(<GlossaryProbe />);
 
-    fireEvent.pointerMove(
-      screen.getByRole('button', { name: 'unmapped head' }),
-      { clientX: 10, clientY: 10 },
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'missed hi-hat head' }),
+      { altKey: true, clientX: 40, clientY: 40 },
     );
-    act(() => vi.advanceTimersByTime(NOTATION_GLOSSARY_DELAY_MS));
 
-    const glossary = screen.getByTestId('notation-glossary');
-
-    expect(glossary).toHaveTextContent('Colored note head');
-    expect(glossary).toHaveTextContent('Color names the drum or cymbal lane.');
+    expect(screen.getByTestId('notation-glossary')).toHaveTextContent(
+      'Hi-hat note head',
+    );
+    expect(screen.getAllByTestId('notation-glossary')).toHaveLength(1);
   });
 
-  it('names the exact drum and re-triggers when hovering a different colored head', () => {
-    vi.useFakeTimers();
-    render(<GlossaryProbe />);
+  it('portals an open card into the active practice layer above the score', () => {
+    const arena = document.createElement('div');
 
-    fireEvent.pointerMove(screen.getByRole('button', { name: 'snare head' }), {
-      clientX: 10,
-      clientY: 10,
-    });
-    act(() => vi.advanceTimersByTime(NOTATION_GLOSSARY_DELAY_MS));
-    expect(screen.getByTestId('notation-glossary')).toHaveTextContent(
-      'Snare note head',
+    arena.className = 'drumroll-practice-shell';
+    document.body.append(arena);
+
+    const view = render(
+      <NotationGlossary
+        intent={{ kind: 'colored-head', x: 900, y: 240, element: 'snare' }}
+      />,
     );
 
-    fireEvent.pointerMove(screen.getByRole('button', { name: 'kick head' }), {
-      clientX: 40,
-      clientY: 40,
-    });
-    // Same `kind` ('colored-head'), different element — must not be
-    // deduped away by the same-kind shortcut.
-    act(() => vi.advanceTimersByTime(NOTATION_GLOSSARY_DELAY_MS));
-    expect(screen.getByTestId('notation-glossary')).toHaveTextContent(
-      'Kick note head',
+    expect(
+      arena.querySelector('[data-testid="notation-glossary"]'),
+    ).toHaveTextContent('Snare note head');
+
+    view.unmount();
+    arena.remove();
+  });
+
+  it('stacks the card above the fixed practice overlay', () => {
+    const css = readFileSync(
+      'src/renderer/components/NotationGlossary/NotationGlossary.css',
+      'utf8',
     );
+
+    expect(css).toContain('z-index: 110');
+  });
+
+  it('flips a right-edge card inward without covering the explained note', () => {
+    const placement = placeNotationGlossary(
+      {
+        kind: 'colored-head',
+        x: 990,
+        y: 320,
+        anchor: { left: 982, right: 998, top: 312, bottom: 328 },
+      },
+      { width: 340, height: 140 },
+      { width: 1024, height: 700 },
+    );
+
+    expect(placement.side).toBe('left');
+    expect(placement.left).toBeGreaterThanOrEqual(16);
+    expect(placement.left + 340).toBeLessThanOrEqual(1008);
+    expect(placement.left + 340).toBeLessThanOrEqual(964);
+  });
+
+  it('keeps an inspected card inside both supported practice viewports', () => {
+    [
+      { width: 1024, height: 700 },
+      { width: 1225, height: 768 },
+    ].forEach((viewport) => {
+      const anchor = {
+        left: viewport.width - 42,
+        right: viewport.width - 26,
+        top: Math.floor(viewport.height / 2) - 8,
+        bottom: Math.floor(viewport.height / 2) + 8,
+      };
+      const placement = placeNotationGlossary(
+        {
+          kind: 'colored-head',
+          x: anchor.right,
+          y: anchor.top,
+          anchor,
+        },
+        { width: 340, height: 140 },
+        viewport,
+      );
+
+      expect(placement.left).toBeGreaterThanOrEqual(16);
+      expect(placement.top).toBeGreaterThanOrEqual(16);
+      expect(placement.left + 340).toBeLessThanOrEqual(viewport.width - 16);
+      expect(placement.top + 140).toBeLessThanOrEqual(viewport.height - 16);
+      expect(placement.left + 340).toBeLessThanOrEqual(anchor.left - 18);
+    });
   });
 
   it('uses the specific glyph before a note-wide annotation', () => {

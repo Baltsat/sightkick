@@ -2907,7 +2907,7 @@ export function SongView() {
             'drumroll-notation-stage grow m-0 flex min-h-0 flex-col font-display text-ink',
             notationLayout === 'flow'
               ? 'drumroll-flow-viewport overflow-hidden'
-              : 'drumroll-classic-viewport items-center overflow-auto',
+              : 'drumroll-classic-viewport items-start overflow-auto',
           )}
         >
           {notationLayout === 'classic' && chart && (

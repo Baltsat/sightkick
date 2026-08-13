@@ -1,11 +1,15 @@
 import { act, render, screen } from '@testing-library/react';
 import { createElement } from 'react';
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Stave, StaveNote } from 'vexflow';
 import { Measure, ParsedChart, RenderData } from '../../../chart-parser/types';
+import type { ResolvedJudgement } from '../../services/engine';
+import { describeMistake } from '../../services/pedagogy';
 import { TimeStore } from '../../services/time-store';
 import { secondsToTicks } from '../../../chart-parser/timing';
 import { getXForTick } from '../../services/engine/cursor-geometry';
+import { notationElementForTarget } from '../NotationGlossary';
 import {
   flowBeatCount,
   flowFixedPlayheadGeometry,
@@ -19,6 +23,8 @@ import {
   loopEscapeEnergy,
   loopEscapePhase,
   NotationLocationReadout,
+  PatternBands,
+  repeatedNotationPatterns,
 } from './ContinuousNotation';
 
 function measureData(
@@ -28,6 +34,7 @@ function measureData(
   width: number,
   timeSig: [number, number] = [4, 4],
   isCompound = false,
+  notes: Measure['notes'] = [],
 ): RenderData {
   const note = {
     isRest: () => true,
@@ -45,6 +52,7 @@ function measureData(
       endTick,
       timeSig,
       isCompound,
+      notes,
     } as Measure,
     stave,
     renderedNotes: [{ tick: startTick, note }],
@@ -221,6 +229,83 @@ describe('Flow meter and current location', () => {
       [4, 400],
     ]);
     expect(bars[1].beats[0].x).toBe(500);
+  });
+
+  it('marks consecutive matching figures as one calm repeat passage', () => {
+    const figure = [
+      {
+        notes: ['C/5'],
+        duration: '8',
+        dots: 0,
+        isRest: false,
+        tick: 0,
+      },
+      {
+        notes: ['D/5'],
+        duration: '8',
+        dots: 0,
+        isRest: false,
+        tick: 200,
+      },
+    ] as Measure['notes'];
+    const data = Array.from({ length: 4 }, (_, measureIndex) => {
+      const startTick = measureIndex * 400;
+
+      return measureData(
+        startTick,
+        startTick + 400,
+        measureIndex * 400,
+        400,
+        [4, 4],
+        false,
+        figure.map((note) => ({ ...note, tick: note.tick + startTick })),
+      );
+    });
+
+    expect(repeatedNotationPatterns(data)).toEqual([
+      { startIndex: 0, endIndex: 3, count: 4 },
+    ]);
+
+    render(createElement(PatternBands, { renderData: data }));
+
+    expect(screen.getByTestId('notation-pattern-0-3')).toHaveAttribute(
+      'data-repeat-count',
+      '4',
+    );
+    expect(screen.getByTestId('notation-pattern-0-3')).toHaveTextContent(
+      'repeat ×4',
+    );
+  });
+
+  it('keeps a judged note in the same lane colour named by its explanation', () => {
+    const noteHead = document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'path',
+    );
+
+    noteHead.classList.add('vf-note-missed', 'vf-note-hihat');
+    document.body.append(noteHead);
+
+    const element = notationElementForTarget(noteHead);
+
+    expect(element).toBe('hihat');
+    expect(
+      describeMistake({
+        id: 'note:0:hihat',
+        verdict: 'miss',
+        expectedElement: element,
+        measureIndex: 0,
+        scoreable: true,
+      } satisfies ResolvedJudgement)?.title,
+    ).toBe('Bar 1: Hi-hat expected');
+    expect(
+      readFileSync(
+        'src/renderer/components/ContinuousNotation/ContinuousNotation.css',
+        'utf8',
+      ),
+    ).toMatch(
+      /\.vf-note-missed\.vf-note-hihat,\s*\.vf-note-missed\.vf-note-tom1\s*\{\s*fill:\s*var\(--color-yellow\);/,
+    );
   });
 
   it('keeps a live bar/total and beat readout for Classic notation', () => {

@@ -175,23 +175,59 @@ describe('opening a song', () => {
       /Bar 1 of \d+, beat 1 of 4/,
     );
 
-    const classicHeading = screen
-      .getAllByRole('heading', { name: 'Master of Puppets' })
-      .find((heading) => heading.classList.contains('text-4xl'));
+    const classicHeading = screen.getByTestId('sheet-score-title');
 
-    expect(classicHeading).toBeDefined();
-    expect(classicHeading?.parentElement?.parentElement).toHaveStyle({
+    expect(classicHeading).toHaveClass('text-xl');
+    expect(classicHeading.parentElement?.parentElement).toHaveStyle({
       zoom: '1.15',
     });
     expect(screen.getByTestId('classic-notation')).toHaveAttribute(
       'data-presentation-zoom',
       '1.15',
     );
+    expect(document.querySelector('.drumroll-classic-viewport')).toHaveClass(
+      'items-start',
+    );
+    expect(
+      document.querySelector('.drumroll-classic-viewport'),
+    ).not.toHaveClass('items-center');
     expect(
       JSON.parse(
         window.localStorage.getItem('settings.practiceNotationLayout') ?? '""',
       ),
     ).toBe('classic');
+  });
+
+  it('removes duplicate method credits from an own lesson score header', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      settings: { practiceNotationLayout: 'classic' },
+    });
+
+    await view.loadSong(
+      makeSong({
+        name: 'Lesson 01.01 — Alternating Singles Warm-Up',
+        artist: 'Drumroll Method',
+        charter: 'Drumroll Method',
+        lesson: {
+          id: '01.01',
+          starsToUnlock: 0,
+          unit: 'Foundations',
+          title: 'Alternating Singles Warm-Up',
+        },
+      }),
+    );
+
+    expect(screen.getByTestId('sheet-score-title')).toHaveTextContent(
+      'Lesson 01.01 — Alternating Singles Warm-Up',
+    );
+    expect(screen.queryByTestId('sheet-score-credits')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Music by Drumroll Method'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Arranged by Drumroll Method'),
+    ).not.toBeInTheDocument();
   });
 
   it('opens Coach from a Home deep link without consuming any loop params', async () => {

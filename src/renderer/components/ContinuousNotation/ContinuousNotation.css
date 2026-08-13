@@ -228,6 +228,40 @@
   pointer-events: none;
 }
 
+.drumroll-pattern-bands {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+}
+
+.drumroll-pattern-band {
+  position: absolute;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  border-inline: 1px solid
+    color-mix(in srgb, var(--dr-violet, #7c3aed) 20%, transparent);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--dr-violet, #7c3aed) 6%, transparent);
+}
+
+.drumroll-pattern-band > span {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.7rem;
+  color: color-mix(
+    in srgb,
+    var(--dr-violet, #7c3aed) 80%,
+    var(--dr-ink-muted, var(--color-text-muted))
+  );
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .drumroll-flow-meter__bar {
   position: absolute;
   top: 0;
@@ -369,6 +403,34 @@
 .drumroll-flow-notation .vf-note-pop {
   filter: none;
   transform: none;
+}
+
+.vf-note-missed.vf-note-kick {
+  fill: var(--color-orange);
+  opacity: 0.68;
+}
+
+.vf-note-missed.vf-note-snare {
+  fill: var(--color-red);
+  opacity: 0.68;
+}
+
+.vf-note-missed.vf-note-hihat,
+.vf-note-missed.vf-note-tom1 {
+  fill: var(--color-yellow);
+  opacity: 0.68;
+}
+
+.vf-note-missed.vf-note-ride,
+.vf-note-missed.vf-note-tom2 {
+  fill: var(--color-blue);
+  opacity: 0.68;
+}
+
+.vf-note-missed.vf-note-crash,
+.vf-note-missed.vf-note-tom3 {
+  fill: var(--color-green);
+  opacity: 0.68;
 }
 
 .drumroll-notation-location {

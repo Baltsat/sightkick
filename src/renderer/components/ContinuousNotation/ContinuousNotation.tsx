@@ -145,6 +145,64 @@ interface FlowMeterBar {
   x: number;
   width: number;
   beats: FlowMeterBeat[];
+  pattern?: NotationPatternRun;
+}
+
+export interface NotationPatternRun {
+  startIndex: number;
+  endIndex: number;
+  count: number;
+}
+
+function notationPatternKey(measure: RenderData['measure']): string {
+  const duration = Math.max(1, measure.endTick - measure.startTick);
+
+  return JSON.stringify([
+    measure.timeSig,
+    measure.isCompound,
+    (measure.notes ?? []).map((note) => [
+      (note.tick - measure.startTick) / duration,
+      note.duration,
+      note.dots,
+      note.isRest,
+      [...note.notes].sort(),
+      note.tupletId ?? null,
+      note.graceNotes ?? [],
+      [...(note.accents ?? [])].sort(),
+      [...(note.ghosts ?? [])].sort(),
+    ]),
+  ]);
+}
+
+export function repeatedNotationPatterns(
+  renderData: RenderData[],
+): NotationPatternRun[] {
+  const patterns: NotationPatternRun[] = [];
+  let startIndex = 0;
+
+  while (startIndex < renderData.length) {
+    const key = notationPatternKey(renderData[startIndex].measure);
+    let endIndex = startIndex + 1;
+
+    while (
+      endIndex < renderData.length &&
+      notationPatternKey(renderData[endIndex].measure) === key
+    ) {
+      endIndex += 1;
+    }
+
+    if (endIndex - startIndex > 1) {
+      patterns.push({
+        startIndex,
+        endIndex: endIndex - 1,
+        count: endIndex - startIndex,
+      });
+    }
+
+    startIndex = endIndex;
+  }
+
+  return patterns;
 }
 
 /**
@@ -198,6 +256,18 @@ export function flowLocationForTick(
 }
 
 export function flowMeterBars(renderData: RenderData[]): FlowMeterBar[] {
+  const patternsByMeasure = new Map<number, NotationPatternRun>();
+
+  repeatedNotationPatterns(renderData).forEach((pattern) => {
+    for (
+      let measureIndex = pattern.startIndex;
+      measureIndex <= pattern.endIndex;
+      measureIndex += 1
+    ) {
+      patternsByMeasure.set(measureIndex, pattern);
+    }
+  });
+
   return renderData.map((measureData, measureIndex) => {
     const { measure, stave } = measureData;
     const beatCount = flowBeatCount(measure);
@@ -219,8 +289,42 @@ export function flowMeterBars(renderData: RenderData[]): FlowMeterBar[] {
       x: stave.getX(),
       width: stave.getWidth(),
       beats,
+      pattern: patternsByMeasure.get(measureIndex),
     };
   });
+}
+
+export function PatternBands({ renderData }: { renderData: RenderData[] }) {
+  const bars = flowMeterBars(renderData);
+  const patterns = repeatedNotationPatterns(renderData);
+
+  return (
+    <div className="drumroll-pattern-bands" aria-hidden="true">
+      {patterns.map((pattern) => {
+        const firstBar = bars[pattern.startIndex];
+        const lastBar = bars[pattern.endIndex];
+
+        if (!firstBar || !lastBar) {
+          return null;
+        }
+
+        return (
+          <div
+            key={`${pattern.startIndex}:${pattern.endIndex}`}
+            className="drumroll-pattern-band"
+            data-repeat-count={pattern.count}
+            data-testid={`notation-pattern-${pattern.startIndex}-${pattern.endIndex}`}
+            style={{
+              left: firstBar.x,
+              width: lastBar.x + lastBar.width - firstBar.x,
+            }}
+          >
+            <span>repeat ×{pattern.count}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export type LoopEscapePhase = 'control' | 'lock' | 'release';
@@ -379,6 +483,7 @@ export function FlowMeter({ renderData }: { renderData: RenderData[] }) {
           key={bar.measureIndex}
           className="drumroll-flow-meter__bar"
           data-flow-bar={bar.measureIndex}
+          data-flow-repeat={bar.pattern?.count}
           style={{ left: bar.x, width: bar.width }}
         >
           <span className="drumroll-flow-meter__bar-label">

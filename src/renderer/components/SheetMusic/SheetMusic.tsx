@@ -30,6 +30,7 @@ import {
   FlowMeter,
   LoopEscapeRunway,
   LoopEscapeRunwayModel,
+  PatternBands,
 } from '../ContinuousNotation';
 import {
   NotationGlossary,
@@ -91,7 +92,7 @@ export function SheetMusic({
   const dragAnchorRef = useRef<number | undefined>(undefined);
   const {
     intent: notationGlossaryIntent,
-    observe: observeNotation,
+    summon: summonNotation,
     dismiss: dismissNotation,
   } = useNotationGlossaryIntent();
   // The scroll container a selection drag is happening over, cached for
@@ -166,17 +167,30 @@ export function SheetMusic({
   );
   const handleScorePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.altKey) {
+        summonNotation(event.target, event.clientX, event.clientY);
+        event.preventDefault();
+
+        return;
+      }
+
+      dismissNotation();
+
       const index = measureIndexAtPoint(event.clientX, event.clientY);
 
       if (index === undefined) {
         return;
       }
 
-      dismissNotation();
       event.preventDefault();
       handleMeasureMouseDown(index);
     },
-    [dismissNotation, handleMeasureMouseDown, measureIndexAtPoint],
+    [
+      dismissNotation,
+      handleMeasureMouseDown,
+      measureIndexAtPoint,
+      summonNotation,
+    ],
   );
   const handleScorePointerMove = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -191,15 +205,8 @@ export function SheetMusic({
 
         return;
       }
-
-      observeNotation(event.target, event.clientX, event.clientY);
     },
-    [
-      dismissNotation,
-      handleMeasureMouseEnter,
-      measureIndexAtPoint,
-      observeNotation,
-    ],
+    [dismissNotation, handleMeasureMouseEnter, measureIndexAtPoint],
   );
 
   // Keeps the sheet scrollable by mouse wheel / trackpad, and auto-scrolls
@@ -400,6 +407,14 @@ export function SheetMusic({
     handleMeasureMouseEnter,
   ]);
   const isFlow = layout === 'flow';
+  const scoreCredits = songData.lesson
+    ? []
+    : [
+        songData.artist ? `Music by ${songData.artist}` : undefined,
+        songData.charter && songData.charter !== songData.artist
+          ? `Arranged by ${songData.charter}`
+          : undefined,
+      ].filter((credit): credit is string => Boolean(credit));
   const flowPlayhead = !isFlow ? null : (
     <div
       ref={fixedFlowPlayheadRef}
@@ -510,13 +525,22 @@ export function SheetMusic({
       >
         {!isFlow && (
           <>
-            <h1 className="my-0 mx-auto text-4xl text-ink font-semibold">
+            <h1
+              className="my-0 mx-auto text-xl text-ink font-semibold"
+              data-testid="sheet-score-title"
+            >
               {songData.name}
             </h1>
-            <div className="ml-auto text-[15px] italic font-bold flex flex-col items-end text-ink">
-              <div>Music by {songData.artist}</div>
-              <div>Arranged by {songData.charter}</div>
-            </div>
+            {scoreCredits.length > 0 && (
+              <div
+                className="ml-auto text-[15px] italic font-bold flex flex-col items-end text-ink"
+                data-testid="sheet-score-credits"
+              >
+                {scoreCredits.map((credit) => (
+                  <div key={credit}>{credit}</div>
+                ))}
+              </div>
+            )}
           </>
         )}
         <div
@@ -524,8 +548,8 @@ export function SheetMusic({
           className="min-w-max relative z-0"
           onPointerDownCapture={handleScorePointerDown}
           onPointerMoveCapture={handleScorePointerMove}
-          onPointerLeave={dismissNotation}
         >
+          {gameMode === 'practice' && <PatternBands renderData={renderData} />}
           {isFlow && <FlowMeter renderData={renderData} />}
           {isFlow && loopEscape && (
             <LoopEscapeRunway renderData={renderData} model={loopEscape} />
@@ -533,7 +557,7 @@ export function SheetMusic({
           <div
             ref={vexflowContainerRef}
             className={cn(
-              'min-w-max drumroll-sheet-music__notation',
+              'min-w-max relative z-1 drumroll-sheet-music__notation',
               isFlow && 'drumroll-flow-score',
             )}
           />

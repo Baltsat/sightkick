@@ -214,6 +214,61 @@ describe('TutorHud', () => {
       expect(document.body.textContent).not.toMatch(/\d+\s?ms/i);
     });
 
+    it('closes a previously opened why card when fresh judgement evidence arrives', () => {
+      const message = {
+        title: 'Paused',
+        detail: 'Use the kit controls to continue.',
+        tone: 'warning' as const,
+      };
+      const { rerender } = render(
+        <TutorHud
+          state={{
+            ...createTutorState(),
+            judgementsByMeasure: {
+              0: [
+                {
+                  id: 'miss:one',
+                  verdict: 'miss',
+                  expectedElement: 'hihat',
+                  measureIndex: 0,
+                  scoreable: true,
+                },
+              ],
+            },
+          }}
+          message={message}
+        />,
+      );
+
+      fireEvent.click(screen.getByTestId('tutor-mistake-summary'));
+      expect(screen.getByTestId('tutor-mistake')).toHaveAttribute('open');
+
+      rerender(
+        <TutorHud
+          state={{
+            ...createTutorState(),
+            judgementsByMeasure: {
+              1: [
+                {
+                  id: 'miss:one',
+                  verdict: 'miss',
+                  expectedElement: 'snare',
+                  measureIndex: 1,
+                  scoreable: true,
+                },
+              ],
+            },
+          }}
+          message={message}
+        />,
+      );
+
+      expect(screen.getByTestId('tutor-mistake')).not.toHaveAttribute('open');
+      expect(screen.getByTestId('tutor-mistake-summary')).toHaveTextContent(
+        'Bar 2: Snare expected',
+      );
+    });
+
     it('skips a non-scoreable false hit so a warm-up tap never headlines', () => {
       render(
         <TutorHud

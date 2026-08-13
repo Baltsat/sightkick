@@ -14,9 +14,11 @@ function GlossaryDemo({ pinnedKind }: { pinnedKind?: NotationKind }) {
   return (
     <main
       onPointerLeave={glossary.dismiss}
-      onPointerMove={(event) =>
-        glossary.observe(event.target, event.clientX, event.clientY)
-      }
+      onPointerDown={(event) => {
+        if (event.altKey) {
+          glossary.summon(event.target, event.clientX, event.clientY);
+        }
+      }}
       style={{
         minHeight: '100vh',
         padding: '12vh 10vw',
@@ -38,7 +40,7 @@ function GlossaryDemo({ pinnedKind }: { pinnedKind?: NotationKind }) {
         notation guide
       </p>
       <h1 style={{ margin: '8px 0 18px', fontFamily: 'var(--font-display)' }}>
-        linger over a mark
+        option-click a mark
       </h1>
       <div
         style={{
@@ -70,8 +72,7 @@ function GlossaryDemo({ pinnedKind }: { pinnedKind?: NotationKind }) {
         </span>
       </div>
       <p style={{ maxWidth: 440, color: '#6d6258', lineHeight: 1.55 }}>
-        hover an element for half a second to see its plain-language musical
-        meaning.
+        option-click an element to see its plain-language musical meaning.
       </p>
       <NotationGlossary intent={intent} />
     </main>
@@ -87,7 +88,7 @@ export default meta;
 
 type Story = StoryObj<typeof GlossaryDemo>;
 
-export const HoverIntent: Story = {};
+export const DeliberateInspect: Story = {};
 
 export const VisibleTripleBeam: Story = {
   args: { pinnedKind: 'triple-beam' },

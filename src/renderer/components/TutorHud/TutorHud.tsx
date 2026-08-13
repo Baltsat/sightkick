@@ -120,8 +120,14 @@ export function TutorHud({
   const detailId = useId();
   const mistake = useMemo(() => {
     const judgement = lastScoreableMistake(state.judgementsByMeasure);
+    const evidence = judgement ? describeMistake(judgement) : undefined;
 
-    return judgement ? describeMistake(judgement) : undefined;
+    return evidence && judgement
+      ? {
+          key: JSON.stringify(state.judgementsByMeasure),
+          evidence,
+        }
+      : undefined;
   }, [state.judgementsByMeasure]);
 
   if (
@@ -200,7 +206,9 @@ export function TutorHud({
           </Button>
         </>
       )}
-      {mistake && <TutorMistakeDisclosure mistake={mistake} />}
+      {mistake && (
+        <TutorMistakeDisclosure key={mistake.key} mistake={mistake.evidence} />
+      )}
     </aside>
   );
 }

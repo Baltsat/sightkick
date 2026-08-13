@@ -1,0 +1,94 @@
+{
+  "notes": [
+    {
+      "viewport": {
+        "width": 1225,
+        "height": 768
+      },
+      "header": {
+        "left": 540.8203125,
+        "right": 989.5625,
+        "width": 448.7421875,
+        "scrollLeft": 0,
+        "title": "Lesson 01.01 — Alternating Singles Warm-Up"
+      }
+    },
+    {
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "header": {
+        "left": 540.8203125,
+        "right": 989.5625,
+        "width": 448.7421875,
+        "scrollLeft": 0,
+        "title": "Lesson 01.01 — Alternating Singles Warm-Up"
+      }
+    },
+    {
+      "repeatedFigureBands": 1
+    },
+    {
+      "viewport": {
+        "width": 1225,
+        "height": 768
+      },
+      "rightEdgeWhy": {
+        "cardBox": {
+          "x": 686.3125,
+          "y": 139.0390625,
+          "width": 340,
+          "height": 124.3984375
+        },
+        "headBox": {
+          "x": 1043.168212890625,
+          "y": 194.28009033203125,
+          "width": 16.0240478515625,
+          "height": 13.9241943359375
+        },
+        "overlap": false,
+        "cardState": {
+          "text": "notation guideSnare note headThis colour is the snare lane. Match it to the snare zone on the kit, then hit that voice.",
+          "display": "grid",
+          "visibility": "visible",
+          "opacity": "1",
+          "zIndex": "110",
+          "backgroundColor": "color(srgb 0.881333 0.860627 0.81898)"
+        },
+        "topmostTestId": "notation-glossary"
+      }
+    },
+    {
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "rightEdgeWhy": {
+        "cardBox": {
+          "x": 485.3125,
+          "y": 139.0390625,
+          "width": 340,
+          "height": 124.3984375
+        },
+        "headBox": {
+          "x": 842.168212890625,
+          "y": 194.28009033203125,
+          "width": 16.0240478515625,
+          "height": 13.9241943359375
+        },
+        "overlap": false,
+        "cardState": {
+          "text": "notation guideSnare note headThis colour is the snare lane. Match it to the snare zone on the kit, then hit that voice.",
+          "display": "grid",
+          "visibility": "visible",
+          "opacity": "1",
+          "zIndex": "110",
+          "backgroundColor": "color(srgb 0.881333 0.860627 0.81898)"
+        },
+        "topmostTestId": "notation-glossary"
+      }
+    }
+  ],
+  "pageErrors": []
+}
