@@ -18,6 +18,8 @@ import {
   liveDailyProgress,
   resolveShelfCopy,
 } from './HomeCockpit';
+import { HOME_KIT_ZONE_MAP, type KitZoneMap } from './kit-zone-map';
+import { computeKitTextSafeBands } from './kit-text-safe-bands';
 
 vi.mock('../../services/kit-preview-audio', () => ({
   playKitPreview: vi.fn(),
@@ -359,6 +361,185 @@ describe('HomeCockpit kit home', () => {
   });
 });
 
+/**
+ * Independent re-implementation of a zone's projected bounding box - a
+ * fresh reading of the geometry, not a call into `computeKitTextSafeBands`
+ * or `fitKitZone` - so these assertions cannot pass merely because the
+ * production code and the test share one bug. Same cover/crop projection
+ * `fitKitZone` uses, applied to each ellipse's true rotated bounding box.
+ */
+function projectZoneBox(
+  zone: KitZoneMap['zones'][keyof KitZoneMap['zones']],
+  image: KitZoneMap['image'],
+  container: { width: number; height: number },
+) {
+  const scale = Math.max(
+    container.width / image.width,
+    container.height / image.height,
+  );
+  const renderedWidth = image.width * scale;
+  const renderedHeight = image.height * scale;
+  const cropX = (renderedWidth - container.width) / 2;
+  const cropY = (renderedHeight - container.height) / 2;
+  const radians = (zone.rotation * Math.PI) / 180;
+  const halfX = Math.sqrt(
+    (zone.radii.x * Math.cos(radians)) ** 2 +
+      (zone.radii.y * Math.sin(radians)) ** 2,
+  );
+  const halfY = Math.sqrt(
+    (zone.radii.x * Math.sin(radians)) ** 2 +
+      (zone.radii.y * Math.cos(radians)) ** 2,
+  );
+
+  return {
+    left: (zone.center.x - halfX) * renderedWidth - cropX,
+    right: (zone.center.x + halfX) * renderedWidth - cropX,
+    top: (zone.center.y - halfY) * renderedHeight - cropY,
+    bottom: (zone.center.y + halfY) * renderedHeight - cropY,
+  };
+}
+
+function rectsOverlap(
+  a: { top: number; left: number; width: number; height: number },
+  b: { left: number; right: number; top: number; bottom: number },
+): boolean {
+  const aRight = a.left + a.width;
+  const aBottom = a.top + a.height;
+
+  return (
+    a.left < b.right && aRight > b.left && a.top < b.bottom && aBottom > b.top
+  );
+}
+
+function readBandRect(testId: string) {
+  const el = screen.getByTestId(testId);
+
+  return {
+    top: parseFloat(el.style.top || '0'),
+    left: parseFloat(el.style.left || '0'),
+    width: parseFloat(el.style.width || '0'),
+    height: parseFloat(el.style.height || '0'),
+  };
+}
+
+const geometryLesson = {
+  id: 'lesson-geometry',
+  name: 'Lesson 01.01 — Alternating Singles Warm-Up',
+  artist: 'Drumroll Method',
+  lesson: {
+    id: '01.01',
+    title: 'Alternating Singles Warm-Up',
+    starsToUnlock: 0,
+    unit: 'Foundations',
+  },
+} as unknown as Song;
+const geometryRecommendation = {
+  candidate: {
+    id: geometryLesson.id,
+    title: geometryLesson.name,
+    kind: 'lesson',
+    difficulty: 'easy',
+    available: true,
+  },
+  suggestedSpeed: 0.7,
+  predictedSuccess: 0.7,
+} as never;
+
+describe('text-safe geometry (2026-08-13 critique: text must never cover a strike zone)', () => {
+  // The two window sizes Drumroll actually ships/captures QA against -
+  // `windowConfig.ts`'s default (1366x768; the QA harness's own capture
+  // script narrows the wide shot to 1225) and its enforced minimum
+  // (1024x700) - minus the rail `AppShell.css` actually reserves (13rem
+  // desktop, 4rem below the 1120px compact breakpoint; the content pane
+  // itself carries no padding), which is the studio's real box.
+  const VIEWPORTS = [
+    {
+      name: 'wide (1225x768 window, 208px rail)',
+      width: 1225 - 208,
+      height: 768,
+    },
+    {
+      name: 'compact (1024x700 window, 64px rail)',
+      width: 1024 - 64,
+      height: 700,
+    },
+  ];
+
+  VIEWPORTS.forEach(({ name, width, height }) => {
+    it(`keeps the title band and the action band clear of every strike zone at the ${name} studio size, and matches computeKitTextSafeBands exactly`, () => {
+      const gbcrSpy = vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockReturnValue({
+          width,
+          height,
+          top: 0,
+          left: 0,
+          right: width,
+          bottom: height,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        } as DOMRect);
+
+      try {
+        render(
+          <InputProvider>
+            <HomeCockpit
+              songList={[geometryLesson]}
+              gamification={gamification}
+              recommendation={geometryRecommendation}
+              onStartRecommended={vi.fn()}
+              onOpenSongs={vi.fn()}
+              onOpenProfile={vi.fn()}
+            />
+          </InputProvider>,
+        );
+
+        const titleBand = readBandRect('home-session-manifest');
+        const actionBand = readBandRect('home-action-band');
+
+        // Sanity: the component actually measured the mocked studio and
+        // positioned real, non-degenerate bands - not the zero-size
+        // fallback `computeKitTextSafeBands` returns for an unmeasured
+        // container.
+        expect(titleBand.height).toBeGreaterThan(0);
+        expect(actionBand.height).toBeGreaterThan(0);
+
+        // Proves the rendered bands are actually WIRED to the geometry
+        // function at this exact studio size - not just coincidentally
+        // safe - so this test keeps holding if `HOME_KIT_ZONE_MAP` or the
+        // hero photo's aspect ratio ever changes: the safe-band unit tests
+        // (kit-text-safe-bands.test.ts) prove the math; this proves the
+        // component actually uses it.
+        const expected = computeKitTextSafeBands(HOME_KIT_ZONE_MAP, {
+          width,
+          height,
+        });
+
+        (['top', 'left', 'width', 'height'] as const).forEach((key) => {
+          expect(titleBand[key]).toBeCloseTo(expected.top[key], 1);
+          expect(actionBand[key]).toBeCloseTo(expected.bottom[key], 1);
+        });
+
+        // The actual proof rule 1 asks for: neither band's rendered
+        // bounding box intersects any strike zone's projected ellipse
+        // bounding box, for every one of the eight zones.
+        Object.values(HOME_KIT_ZONE_MAP.zones).forEach((zone) => {
+          const box = projectZoneBox(zone, HOME_KIT_ZONE_MAP.image, {
+            width,
+            height,
+          });
+
+          expect(rectsOverlap(titleBand, box)).toBe(false);
+          expect(rectsOverlap(actionBand, box)).toBe(false);
+        });
+      } finally {
+        gbcrSpy.mockRestore();
+      }
+    });
+  });
+});
+
 describe('describeStreak', () => {
   it('names zero as no active streak, not "0-day streak"', () => {
     expect(describeStreak(0)).toBe('No active streak');
@@ -497,15 +678,19 @@ describe('resolveShelfCopy', () => {
     // as a payoff: the shelf must say so honestly, never fall back to the
     // idle "Choose a song to begin" copy - that was exactly the bug the
     // 2026-08-13 critique caught (hero armed, shelf still idle) because the
-    // call site once dropped this second argument entirely.
+    // call site once dropped this second argument entirely. The copy
+    // itself changed for the same critique's item 5 ("No song payoff yet
+    // - No favourite-song section is ranked to play yet" only ever named
+    // an absence): it must now point at the next real thing, not repeat
+    // "no"/"ranked" back at the player.
     expect(resolveShelfCopy(deadEnd, true)).toEqual({
-      title: 'No song payoff yet',
-      detail: 'No favourite-song section is ranked to play yet.',
+      title: 'Building toward your next song',
+      detail: 'Clean reps here move a favourite-song section into range.',
     });
 
     expect(resolveShelfCopy(undefined, true)).toEqual({
-      title: 'No song payoff yet',
-      detail: 'No favourite-song section is ranked to play yet.',
+      title: 'Building toward your next song',
+      detail: 'Clean reps here move a favourite-song section into range.',
     });
   });
 

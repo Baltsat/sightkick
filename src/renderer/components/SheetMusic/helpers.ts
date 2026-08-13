@@ -58,9 +58,17 @@ export function autoScrollSpeed(clientY: number, edge: ScrollEdge): number {
 // narrow window can't blow the stave up absurdly.
 export const FLOW_AUTO_ZOOM_MIN_MULTIPLIER = 1.15;
 
-export const FLOW_AUTO_ZOOM_MAX_MULTIPLIER = 2.6;
+// 2026-08-13 truth critique: at the prior 0.6/2.6 pair the stave still read
+// as "about a third of a canvas that is much taller than it needs to be" -
+// the fraction target was rarely the thing actually limiting the size (the
+// fitted value sat comfortably under the old cap at both proven widths), so
+// raising the fraction alone would have been silently absorbed by the same
+// cap that was never the constraint. Both move together: a higher target
+// fraction with the old cap would just clip back down to the same result at
+// the wider 1225-1366 range once the fitted ratio crossed 2.6.
+export const FLOW_AUTO_ZOOM_MAX_MULTIPLIER = 3.2;
 
-export const FLOW_AUTO_ZOOM_TARGET_HEIGHT_FRACTION = 0.6;
+export const FLOW_AUTO_ZOOM_TARGET_HEIGHT_FRACTION = 0.78;
 
 /**
  * `naturalNotationHeight` and `availableViewportHeight` must both be real

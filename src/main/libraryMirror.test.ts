@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Song } from '../types';
 import { createLibraryMirrorEntry, LibraryMirrorQueue } from './libraryMirror';
 
@@ -11,6 +11,8 @@ afterEach(() => {
   for (const root of roots.splice(0)) {
     fs.rmSync(root, { recursive: true, force: true });
   }
+
+  vi.unstubAllGlobals();
 });
 
 function create_song(root: string): Song {
@@ -131,6 +133,111 @@ describe('library mirror', () => {
     });
     expect(uploaded).toHaveLength(2);
     expect(uploaded).toEqual(expect.arrayContaining(['song-1', 'song-2']));
+  });
+
+  it('keeps a token-rejected upload in the local outbox', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'library-mirror-'));
+
+    roots.push(root);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Response(null, { status: 401 })),
+    );
+
+    const queue = new LibraryMirrorQueue({
+      outboxDirectory: path.join(root, 'outbox'),
+      getRuntime: () => ({
+        endpoint: 'https://drumroll.example/api/library',
+        token: 'rejected-token',
+      }),
+    });
+
+    await expect(queue.enqueue(create_song(root))).resolves.toEqual({
+      state: 'queued',
+      pendingCount: 1,
+      error: 'Library mirror rejected its token',
+    });
+    expect(await queue.pendingCount()).toBe(1);
+  });
+
+  it('retains only the unfinished entry after a partial upload', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'library-mirror-'));
+
+    roots.push(root);
+
+    const first = create_song(root);
+    const second = { ...create_song(path.join(root, 'second')), id: 'song-2' };
+    const uploaded: string[] = [];
+    let attempts = 0;
+    let failSecondAttempt = true;
+    const queue = new LibraryMirrorQueue({
+      outboxDirectory: path.join(root, 'outbox'),
+      getRuntime: () => ({
+        endpoint: 'https://drumroll.example/api/library',
+        token: 'token',
+      }),
+      upload: async (_runtime, entry) => {
+        attempts += 1;
+
+        if (attempts === 2 && failSecondAttempt) {
+          throw new Error('mid-batch failure');
+        }
+
+        uploaded.push(entry.id);
+      },
+    });
+
+    await expect(queue.enqueueAll([first, second])).resolves.toEqual({
+      state: 'queued',
+      pendingCount: 1,
+      error: 'mid-batch failure',
+    });
+    expect(uploaded).toHaveLength(1);
+    expect(await queue.pendingCount()).toBe(1);
+
+    failSecondAttempt = false;
+
+    await expect(queue.flush()).resolves.toEqual({
+      state: 'synced',
+      pendingCount: 0,
+    });
+    expect(uploaded).toHaveLength(2);
+    expect(new Set(uploaded)).toEqual(new Set(['song-1', 'song-2']));
+  });
+
+  it('replaces an already mirrored chart after its local bytes change', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'library-mirror-'));
+
+    roots.push(root);
+
+    const song = create_song(root);
+    const uploaded: string[] = [];
+    const queue = new LibraryMirrorQueue({
+      outboxDirectory: path.join(root, 'outbox'),
+      getRuntime: () => ({
+        endpoint: 'https://drumroll.example/api/library',
+        token: 'token',
+      }),
+      upload: async (_runtime, entry) => {
+        uploaded.push(entry.chart.base64);
+      },
+    });
+
+    await expect(queue.enqueue(song)).resolves.toEqual({
+      state: 'synced',
+      pendingCount: 0,
+    });
+
+    fs.writeFileSync(path.join(song.dir, 'notes.mid'), 'changed-chart-bytes');
+
+    await expect(queue.enqueue(song)).resolves.toEqual({
+      state: 'synced',
+      pendingCount: 0,
+    });
+    expect(uploaded).toEqual([
+      Buffer.from('chart-bytes').toString('base64'),
+      Buffer.from('changed-chart-bytes').toString('base64'),
+    ]);
   });
 
   it('does not create an outbox entry before a mirror is configured', async () => {

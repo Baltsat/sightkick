@@ -40,6 +40,7 @@ import { playKitPreview } from '../../services/kit-preview-audio';
 import homeKitStudio from '../../assets/daybreak/home-kit-studio.png';
 import drumstickCursor from '../../assets/daybreak/drumstick-cursor-reversed.png';
 import { fitKitZone, HOME_KIT_ZONE_MAP } from './kit-zone-map';
+import { computeKitTextSafeBands } from './kit-text-safe-bands';
 import './KitHome.css';
 
 interface HomeCockpitProps {
@@ -171,10 +172,19 @@ const EMPTY_SHELF_COPY: ShelfCopy = {
  * title reads a specific armed lesson ... the line directly beneath says
  * 'Choose a song to begin'"). Stays factual about what is (nothing ranked)
  * rather than promising a future state the store can't guarantee.
+ *
+ * The wording itself was rewritten for the same critique's item 5:
+ * "No song payoff yet - No favourite-song section is ranked to play yet"
+ * only ever named an absence, twice, in the product's own internal noun
+ * ("ranked"). A player reads that as a dead end, not a plan. Clean reps
+ * are genuinely what the pedagogy engine uses to promote a song section
+ * into `payoffReceipt`'s ranking (see `home-session.ts`), so pointing at
+ * that mechanism is a true statement about what happens next, not a
+ * promise the store can't back.
  */
 const ARMED_SHELF_FALLBACK_COPY: ShelfCopy = {
-  title: 'No song payoff yet',
-  detail: 'No favourite-song section is ranked to play yet.',
+  title: 'Building toward your next song',
+  detail: 'Clean reps here move a favourite-song section into range.',
 };
 
 /** The goal-song low shelf's copy, honest about the one state
@@ -292,7 +302,23 @@ export function HomeCockpit({
       [
         { label: 'Warm up', stop: homeSession?.focus },
         { label: 'Build', stop: homeSession?.build },
-        { label: 'Play', stop: homeSession?.payoff },
+        // Same placeholder guard as `resolveShelfCopy`: `payoffReceipt`'s
+        // own dead-end fallback (`NO_PAYOFF_PLACEHOLDER`) must not leak
+        // into the "Session details" disclosure as a raw "Play" row
+        // reading "No musical payoff yet" - found while verifying this
+        // pass's shelf-copy fix (2026-08-13). Dropping the stop entirely
+        // (not swapping in different copy) is correct here: the "Warm up"
+        // and "Build" rows already say what today's rep actually is: a
+        // missing "Play" row is an honest, unremarked absence in a
+        // disclosure the player opened on purpose, not a claim on the
+        // first-read shelf.
+        {
+          label: 'Play',
+          stop:
+            homeSession?.payoff?.title === NO_PAYOFF_PLACEHOLDER
+              ? undefined
+              : homeSession?.payoff,
+        },
       ].filter(
         ({ stop }, index, stops) =>
           stop &&
@@ -309,6 +335,23 @@ export function HomeCockpit({
   );
   const practiceTarget = targetRecommendation ? recommendedSong : undefined;
   const hasPracticeTarget = Boolean(practiceTarget && targetRecommendation);
+  // The lesson library keeps the lesson number and the lesson name as two
+  // separate fields (`song.lesson.id`/`.title` - see
+  // `library/manifest.json`'s `sk_lesson_id`/`sk_lesson_title`); `song.name`
+  // only concatenates them ("Lesson 01.01 — Alternating Singles Warm-Up")
+  // for places that want one string. Reading the two fields back apart
+  // here is what turns that concatenation into a small eyebrow plus one
+  // confident title line (2026-08-13 critique, home item 17) instead of
+  // wrapping the whole combined string across four lines.
+  const heroEyebrow = practiceTarget?.lesson
+    ? `Lesson ${practiceTarget.lesson.id}`
+    : practiceTarget?.artist;
+  const heroTitle =
+    practiceTarget?.lesson?.title ?? practiceTarget?.name ?? 'Choose a song';
+  const safeBands = useMemo(
+    () => computeKitTextSafeBands(HOME_KIT_ZONE_MAP, studioSize),
+    [studioSize],
+  );
   const kitColorRuns = useMemo(
     () => Object.values(gamification.runsBySong ?? {}).flat(),
     [gamification.runsBySong],
@@ -455,7 +498,6 @@ export function HomeCockpit({
           src={homeKitStudio}
           alt="A pearl drum kit in a sunlit studio"
         />
-        <div className="kit-home__wash" aria-hidden="true" />
 
         <p
           className="sr-only"
@@ -524,59 +566,100 @@ export function HomeCockpit({
         </p>
       </section>
 
-      <aside className="kit-home__context" aria-label="Current practice">
-        <div
-          className="kit-home__manifest"
-          data-testid="home-session-manifest"
-          data-state={sessionState}
-        >
-          <h1 id="home-cockpit-title">
-            {practiceTarget?.name ?? 'Choose a song'}
-          </h1>
-          <button
-            type="button"
-            className="kit-home__primary-action"
-            data-testid={
-              hasPracticeTarget ? 'home-start-practice' : 'home-choose-song'
-            }
-            onClick={() =>
-              hasPracticeTarget ? startCurrentPractice('kick') : onOpenSongs()
-            }
-          >
-            {hasPracticeTarget ? 'Start practice' : 'Choose a song'}
-          </button>
-        </div>
+      {/*
+       * Two independent bands, each positioned from `safeBands` -
+       * `computeKitTextSafeBands` re-derives them from `HOME_KIT_ZONE_MAP`
+       * at the studio's real measured size, so they are the room around the
+       * kit (the "window wall" above, the "floor, rug" below), never a
+       * fixed-width column guessed to roughly clear the drums. Splitting
+       * the manifest text from the primary action/shelf this way - title
+       * up top, the "what do I do" cluster low - mirrors the reference's
+       * own `My Vibe` capture, where the giant title and the play control
+       * sit far apart, not stacked in one card (2026-08-13 critique, home
+       * item 17 root cause: "the title/manifest column and the kit photo
+       * are not laid out with any awareness of where the eight hotspots
+       * actually sit"). `overflow: hidden` on both bands (KitHome.css) is
+       * the hard backstop: even an unusually long title/copy string can
+       * only be clipped by its own band, never bleed into a zone.
+       */}
+      <div
+        className="kit-home__title-band"
+        data-testid="home-session-manifest"
+        data-state={sessionState}
+        style={
+          {
+            top: safeBands.top.top,
+            left: safeBands.top.left,
+            width: safeBands.top.width,
+            height: safeBands.top.height,
+            '--kit-safe-band-height': `${safeBands.top.height}px`,
+          } as CSSProperties
+        }
+      >
+        <h1 id="home-cockpit-title" className="kit-home__hero">
+          {heroEyebrow ? (
+            <span className="kit-home__eyebrow">{heroEyebrow}</span>
+          ) : null}
+          {heroEyebrow ? ' ' : null}
+          <span className="kit-home__hero-name">{heroTitle}</span>
+        </h1>
+      </div>
 
-        <div className="kit-home__shelf">
-          <section
-            className="kit-home__session-summary"
-            aria-label="Today’s practice"
-            data-testid="home-session-summary"
-          >
-            <strong>{shelfTitle}</strong>
-            <span>{shelfDetail}</span>
-            <details>
-              <summary>Session details</summary>
-              <div className="kit-home__session-details">
-                {sessionDetails.map(({ label, stop }) =>
-                  stop ? (
-                    <p key={stop.title}>
-                      <strong>{label}</strong>
-                      <span>{stop.title}</span>
-                    </p>
-                  ) : null,
-                )}
-                <EvidencePracticeCards
-                  compact
-                  cards={homePracticeCards.cards}
-                  onStart={onStartPracticeCard}
-                  testId="home-practice-card"
-                />
-              </div>
-            </details>
-          </section>
-        </div>
-      </aside>
+      <div
+        className="kit-home__action-band"
+        data-testid="home-action-band"
+        style={
+          {
+            top: safeBands.bottom.top,
+            left: safeBands.bottom.left,
+            width: safeBands.bottom.width,
+            height: safeBands.bottom.height,
+            '--kit-safe-band-height': `${safeBands.bottom.height}px`,
+          } as CSSProperties
+        }
+      >
+        <button
+          type="button"
+          className="kit-home__primary-action"
+          data-testid={
+            hasPracticeTarget ? 'home-start-practice' : 'home-choose-song'
+          }
+          data-state={sessionState}
+          onClick={() =>
+            hasPracticeTarget ? startCurrentPractice('kick') : onOpenSongs()
+          }
+        >
+          {hasPracticeTarget ? 'Start practice' : 'Choose a song'}
+        </button>
+
+        <section
+          className="kit-home__session-summary"
+          aria-label="Today’s practice"
+          data-testid="home-session-summary"
+        >
+          <strong>{shelfTitle}</strong>
+          <span>{shelfDetail}</span>
+          <details>
+            <summary>Session details</summary>
+            <div className="kit-home__session-details">
+              {sessionDetails.map(({ label, stop }) =>
+                stop ? (
+                  <p key={stop.title}>
+                    <strong>{label}</strong>
+                    <span>{stop.title}</span>
+                  </p>
+                ) : null,
+              )}
+              <EvidencePracticeCards
+                compact
+                cards={homePracticeCards.cards}
+                onStart={onStartPracticeCard}
+                testId="home-practice-card"
+              />
+            </div>
+          </details>
+        </section>
+      </div>
 
       <p
         className="sr-only"

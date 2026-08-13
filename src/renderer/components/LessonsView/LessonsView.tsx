@@ -288,7 +288,9 @@ export function LessonsView({
                 >
                   {String(index + 1).padStart(2, '0')}
                 </span>
-                <span className="daybreak-season-tab__label">{group.unit}</span>
+                <span className="daybreak-season-tab__label" title={group.unit}>
+                  {group.unit}
+                </span>
                 <span
                   className="daybreak-season-tab__state"
                   data-state={state}

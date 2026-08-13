@@ -162,10 +162,13 @@
   display: inline-flex;
   min-width: 0;
   flex: 0 0 auto;
-  align-items: center;
+  /* flex-start (not center): a wrapped two-line label needs the number
+   * badge and the state dot to sit at the top of the row, level with the
+   * label's first line, not centred against the whole two-line block. */
+  align-items: flex-start;
   gap: 0.45rem;
   justify-content: flex-start;
-  padding: 0.58rem 0.8rem;
+  padding: 0.5rem 0.8rem;
   border: 0;
   border-left: 2px solid transparent;
   border-radius: 0;
@@ -176,8 +179,8 @@
   font-weight: 670;
   letter-spacing: 0;
   text-transform: none;
+  text-align: left;
   cursor: pointer;
-  overflow: hidden;
   transition:
     border-color 180ms ease,
     color 180ms ease;
@@ -192,6 +195,7 @@
    * fixed this. */
   flex: none;
   overflow: hidden;
+  padding-top: 0.16rem;
   color: var(--ink-muted);
   font-size: 0.68rem;
   font-weight: 740;
@@ -201,11 +205,28 @@
   white-space: nowrap;
 }
 
+/*
+ * 2026-08-13 truth critique, item 16: a season name that ran past the
+ * available width used to hard-truncate mid-word with no way to read the
+ * rest ("Rudiment Gym I: Sticki..."), even with a full-length aria-label on
+ * the button for screen readers - a sighted player at the kit had no
+ * recourse at all. Rather than truncate, let the label fit itself onto up
+ * to three lines: at the narrowest proven rail width (1024px) the two
+ * longest real season names ("Rudiment Gym I: Sticking Foundations",
+ * "Rudiment Gym II: The Paradiddle Family") need all three lines to read in
+ * full; every shorter name settles on one or two and never reaches the
+ * clamp. The rail is independently scrollable
+ * (`.daybreak-season-rail { overflow-y: auto }`), so a taller row costs
+ * nothing.
+ */
 .daybreak-season-tab__label {
+  display: -webkit-box;
   overflow: hidden;
   max-width: 10rem;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-word;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 .daybreak-season-tab__state {
@@ -213,6 +234,7 @@
   width: 0.42rem;
   height: 0.42rem;
   flex: 0 0 auto;
+  margin-top: 0.22rem;
   border-radius: 50%;
   color: transparent;
   background: var(--line-soft);
