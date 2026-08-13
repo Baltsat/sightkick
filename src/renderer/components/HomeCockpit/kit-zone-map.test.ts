@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { fitKitZone, HOME_KIT_ZONE_MAP, type KitZone } from './kit-zone-map';
+import {
+  fitKitZone,
+  homeKitZoneFillDelta,
+  HOME_KIT_ZONE_MAP,
+  type KitZone,
+} from './kit-zone-map';
 
 describe('HOME_KIT_ZONE_MAP', () => {
   it('keeps a calibrated ellipse for every playable surface', () => {
@@ -41,6 +46,14 @@ describe('HOME_KIT_ZONE_MAP', () => {
       width: '20.000%',
       height: '25.019%',
       transform: 'translate(-50%, -50%) rotate(0deg)',
+    });
+  });
+
+  it('keeps every fill visibly distinct from its own photographic surface', () => {
+    Object.keys(HOME_KIT_ZONE_MAP.zones).forEach((element) => {
+      expect(
+        homeKitZoneFillDelta(element as keyof typeof HOME_KIT_ZONE_MAP.zones),
+      ).toBeGreaterThan(35);
     });
   });
 });

@@ -1,4 +1,5 @@
 import type { KitElement } from '../../services/practice-stats';
+import type { KitColorLane } from '../../services/kit-color-maturity';
 
 export interface KitZone {
   center: { x: number; y: number };
@@ -79,6 +80,63 @@ export const HOME_KIT_ZONE_MAP: KitZoneMap = {
     },
   },
 };
+
+export const HOME_KIT_ZONE_LANES: Record<KitElement, KitColorLane> = {
+  kick: 'orange',
+  snare: 'red',
+  hihat: 'yellow',
+  tom1: 'yellow',
+  ride: 'blue',
+  tom2: 'blue',
+  crash: 'green',
+  tom3: 'green',
+};
+
+export const HOME_KIT_ZONE_FILL_OPACITY = 0.82;
+
+type Rgb = readonly [number, number, number];
+
+const HOME_KIT_ZONE_BACKDROPS: Record<KitElement, Rgb> = {
+  hihat: [165, 123, 54],
+  crash: [175, 134, 57],
+  tom1: [228, 210, 174],
+  tom2: [220, 213, 197],
+  ride: [181, 141, 72],
+  snare: [218, 206, 187],
+  tom3: [218, 210, 193],
+  kick: [96, 82, 65],
+};
+const KIT_LANE_RGB: Record<KitColorLane, Rgb> = {
+  orange: [233, 93, 55],
+  red: [206, 63, 84],
+  yellow: [194, 122, 16],
+  blue: [36, 126, 174],
+  green: [22, 136, 91],
+};
+
+function blend(backdrop: Rgb, color: Rgb, opacity: number): Rgb {
+  return [
+    backdrop[0] * (1 - opacity) + color[0] * opacity,
+    backdrop[1] * (1 - opacity) + color[1] * opacity,
+    backdrop[2] * (1 - opacity) + color[2] * opacity,
+  ];
+}
+
+export function homeKitZoneFillDelta(element: KitElement): number {
+  const backdrop = HOME_KIT_ZONE_BACKDROPS[element];
+  const signal = blend(
+    [5, 6, 8],
+    KIT_LANE_RGB[HOME_KIT_ZONE_LANES[element]],
+    0.74,
+  );
+  const fill = blend(backdrop, signal, HOME_KIT_ZONE_FILL_OPACITY);
+
+  return Math.hypot(
+    fill[0] - backdrop[0],
+    fill[1] - backdrop[1],
+    fill[2] - backdrop[2],
+  );
+}
 
 function percent(value: number) {
   return `${(value * 100).toFixed(3)}%`;

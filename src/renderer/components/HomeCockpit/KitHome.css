@@ -59,8 +59,7 @@
   display: flex;
   align-items: center;
   overflow: hidden;
-  background:
-    linear-gradient(
+  background: linear-gradient(
       100deg,
       color-mix(in srgb, var(--surface-studio) 82%, transparent) 0%,
       color-mix(in srgb, var(--surface-studio) 58%, transparent) 40%,
@@ -138,8 +137,7 @@
   display: flex;
   align-items: center;
   gap: clamp(1rem, 2vw, 1.75rem);
-  background:
-    linear-gradient(
+  background: linear-gradient(
       100deg,
       color-mix(in srgb, var(--surface-studio) 76%, transparent) 0%,
       color-mix(in srgb, var(--surface-studio) 46%, transparent) 44%,
@@ -308,9 +306,13 @@
   border: 4px solid color-mix(in srgb, var(--kit-pad-signal) 88%, white);
   background: radial-gradient(
     ellipse at 50% 50%,
-    color-mix(in srgb, var(--kit-pad-signal) 58%, transparent),
-    color-mix(in srgb, var(--kit-pad-signal) 28%, transparent) 68%,
-    transparent 76%
+    color-mix(
+      in srgb,
+      var(--kit-pad-signal) var(--kit-pad-fill-opacity, 82%),
+      transparent
+    ),
+    color-mix(in srgb, var(--kit-pad-signal) 56%, transparent) 74%,
+    transparent 90%
   );
   /* An always-on dark ring under the colour ring, independent of
    * `--kit-pad-signal` and doubled in width/opacity from the previous pass

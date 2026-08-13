@@ -31,15 +31,17 @@ import type {
 } from '../../services/pedagogy/types';
 import { composePracticeCards } from '../../services/pedagogy';
 import { KitElement } from '../../services/practice-stats';
-import {
-  useKitColorMaturity,
-  type KitColorLane,
-} from '../../services/kit-color-maturity';
+import { useKitColorMaturity } from '../../services/kit-color-maturity';
 import { EvidencePracticeCards } from '../PracticeCards';
 import { playKitPreview } from '../../services/kit-preview-audio';
 import homeKitStudio from '../../assets/daybreak/home-kit-studio.png';
 import drumstickCursor from '../../assets/daybreak/drumstick-cursor-reversed.png';
-import { fitKitZone, HOME_KIT_ZONE_MAP } from './kit-zone-map';
+import {
+  fitKitZone,
+  HOME_KIT_ZONE_FILL_OPACITY,
+  HOME_KIT_ZONE_LANES,
+  HOME_KIT_ZONE_MAP,
+} from './kit-zone-map';
 import { computeKitTextSafeBands } from './kit-text-safe-bands';
 import './KitHome.css';
 
@@ -70,16 +72,6 @@ interface KitHotspot {
   label: string;
 }
 
-const KIT_COLOR_LANE: Record<KitElement, KitColorLane> = {
-  kick: 'orange',
-  snare: 'red',
-  hihat: 'yellow',
-  tom1: 'yellow',
-  ride: 'blue',
-  tom2: 'blue',
-  crash: 'green',
-  tom3: 'green',
-};
 const KIT_HOTSPOTS: KitHotspot[] = [
   { element: 'hihat', label: 'Hi-hat' },
   { element: 'crash', label: 'Crash' },
@@ -475,6 +467,7 @@ export function HomeCockpit({
 
   const rootStyle = {
     '--drumstick-cursor': `url(${drumstickCursor}) 6 6`,
+    '--kit-pad-fill-opacity': `${HOME_KIT_ZONE_FILL_OPACITY * 100}%`,
     ...kitColors.properties,
   } as CSSProperties;
 
@@ -525,7 +518,7 @@ export function HomeCockpit({
                 data-testid={`kit-hotspot-${hotspot.element}`}
                 className="kit-home__pad"
                 data-active={isActive}
-                data-color-lane={KIT_COLOR_LANE[hotspot.element]}
+                data-color-lane={HOME_KIT_ZONE_LANES[hotspot.element]}
                 style={
                   fitKitZone(
                     HOME_KIT_ZONE_MAP.zones[hotspot.element],
