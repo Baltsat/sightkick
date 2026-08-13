@@ -806,10 +806,12 @@ describe('resolveShelfCopy', () => {
     });
   });
 
-  it('never surfaces next-practice/home-session.ts own dead-end placeholder verbatim once armed', () => {
+  it('keeps an honest unavailable-payoff receipt instead of replacing it with generic motivation', () => {
     const deadEnd: HomeSessionReceipt = {
-      title: 'No musical payoff yet',
-      detail: 'No playable favourite-song section is currently ranked.',
+      unavailable: true,
+      title: 'No favourite-song payoff is ready',
+      detail:
+        'Today’s work is Alternating Singles. My Wave has no playable saved favourite linked to this session.',
     };
 
     // Armed (the hero reads a specific lesson/song), but nothing was ranked
@@ -822,13 +824,14 @@ describe('resolveShelfCopy', () => {
     // an absence): it must now point at the next real thing, not repeat
     // "no"/"ranked" back at the player.
     expect(resolveShelfCopy(deadEnd, true)).toEqual({
-      title: 'Building toward your next song',
-      detail: 'Clean reps here move a favourite-song section into range.',
+      title: deadEnd.title,
+      detail: deadEnd.detail,
     });
 
     expect(resolveShelfCopy(undefined, true)).toEqual({
-      title: 'Building toward your next song',
-      detail: 'Clean reps here move a favourite-song section into range.',
+      title: 'No favourite-song payoff is ready',
+      detail:
+        'My Wave needs a playable saved favourite before it can name a song section.',
     });
   });
 

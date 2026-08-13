@@ -1,0 +1,20 @@
+{
+  "lifecycle": "Electron process launched from out/main/index.js, then its main process received SIGKILL and relaunched with the same isolated user-data directory.",
+  "songId": "lesson:01.01",
+  "recordedProgress": {
+    "sessionId": "c9b5b8cf-2738-40ca-982a-049271790f60",
+    "recordCount": 8,
+    "positionTick": 3029,
+    "recordsPreserved": true,
+    "tickPreserved": true
+  },
+  "resumedUi": "Ready Kick to count in The first beat is armed.",
+  "expectedResumeCue": "Ready Resume bar N · kick to count in",
+  "loadedCheckpoints": [
+    {
+      "songId": "lesson:01.01",
+      "checkpoints": []
+    }
+  ],
+  "passed": false
+}

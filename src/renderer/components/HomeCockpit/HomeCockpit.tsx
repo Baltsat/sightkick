@@ -140,16 +140,6 @@ function lastWorkedSong(
 }
 
 /**
- * `next-practice/home-session.ts`'s own last-resort placeholder when no
- * musical payoff can be ranked. Visual-system-v3 explicitly forbids
- * surfacing this verbatim ("dead-end proof claims ... framed as a payoff
- * rather than a truthful neutral state") - Home intercepts it and falls
- * back to the same honest "nothing chosen yet" copy used when there is no
- * session at all, rather than presenting an empty state as a completed one.
- */
-const NO_PAYOFF_PLACEHOLDER = 'No musical payoff yet';
-
-/**
  * `useGamification`'s `todayXp`/`streak` are computed once per render of
  * the hook's *owner* (SongListView), from `new Date()` at that instant. If
  * nothing else re-renders that owner near local midnight, the header can
@@ -212,36 +202,12 @@ const EMPTY_SHELF_COPY: ShelfCopy = {
   title: 'Choose a song to begin',
   detail: 'Pick a song, then strike a highlighted drum to start.',
 };
-/**
- * Shown when a lesson/song target is already armed (the hero above already
- * reads "Start practice") but no musical payoff has been ranked yet. This
- * must never collapse to `EMPTY_SHELF_COPY` - "Choose a song to begin" is
- * idle-state copy, and showing it under an armed hero is exactly the
- * self-contradiction the 2026-08-13 critique flagged (item 1: "the hero
- * title reads a specific armed lesson ... the line directly beneath says
- * 'Choose a song to begin'"). Stays factual about what is (nothing ranked)
- * rather than promising a future state the store can't guarantee.
- *
- * The wording itself was rewritten for the same critique's item 5:
- * "No song payoff yet - No favourite-song section is ranked to play yet"
- * only ever named an absence, twice, in the product's own internal noun
- * ("ranked"). A player reads that as a dead end, not a plan. Clean reps
- * are genuinely what the pedagogy engine uses to promote a song section
- * into `payoffReceipt`'s ranking (see `home-session.ts`), so pointing at
- * that mechanism is a true statement about what happens next, not a
- * promise the store can't back.
- */
 const ARMED_SHELF_FALLBACK_COPY: ShelfCopy = {
-  title: 'Building toward your next song',
-  detail: 'Clean reps here move a favourite-song section into range.',
+  title: 'No favourite-song payoff is ready',
+  detail:
+    'My Wave needs a playable saved favourite before it can name a song section.',
 };
 
-/** The goal-song low shelf's copy, honest about the one state
- * `next-practice/home-session.ts` can hand back that isn't actually a
- * payoff: its own `NO_PAYOFF_PLACEHOLDER` fallback string. `hasPracticeTarget`
- * decides which "nothing to show" copy applies - idle copy only when no
- * target is armed at all, the armed-fallback copy when a target is armed but
- * simply has no ranked song payoff yet (see `ARMED_SHELF_FALLBACK_COPY`). */
 export function resolveShelfCopy(
   sessionSummary: HomeSessionReceipt | undefined,
   hasPracticeTarget: boolean,
@@ -250,7 +216,7 @@ export function resolveShelfCopy(
     return EMPTY_SHELF_COPY;
   }
 
-  if (!sessionSummary || sessionSummary.title === NO_PAYOFF_PLACEHOLDER) {
+  if (!sessionSummary) {
     return ARMED_SHELF_FALLBACK_COPY;
   }
 
@@ -386,22 +352,11 @@ export function HomeCockpit({
       [
         { label: 'Warm up', stop: homeSession?.focus },
         { label: 'Build', stop: homeSession?.build },
-        // Same placeholder guard as `resolveShelfCopy`: `payoffReceipt`'s
-        // own dead-end fallback (`NO_PAYOFF_PLACEHOLDER`) must not leak
-        // into the "Session details" disclosure as a raw "Play" row
-        // reading "No musical payoff yet" - found while verifying this
-        // pass's shelf-copy fix (2026-08-13). Dropping the stop entirely
-        // (not swapping in different copy) is correct here: the "Warm up"
-        // and "Build" rows already say what today's rep actually is: a
-        // missing "Play" row is an honest, unremarked absence in a
-        // disclosure the player opened on purpose, not a claim on the
-        // first-read shelf.
         {
           label: 'Play',
-          stop:
-            homeSession?.payoff?.title === NO_PAYOFF_PLACEHOLDER
-              ? undefined
-              : homeSession?.payoff,
+          stop: homeSession?.payoff?.unavailable
+            ? undefined
+            : homeSession?.payoff,
         },
       ].filter(
         ({ stop }, index, stops) =>
