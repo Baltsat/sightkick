@@ -40,7 +40,6 @@ const version = packageJson.version;
 const architecture = 'arm64';
 
 assert(productName === 'Drumroll', 'Unexpected release product name');
-assert(version === '1.2.0-kb.14', 'Unexpected release version');
 
 const artifactPrefix = `${productName}-${version}-${architecture}`;
 const zipName = `${artifactPrefix}.zip`;

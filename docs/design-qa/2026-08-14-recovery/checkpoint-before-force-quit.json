@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "state": "in-progress",
   "songId": "lesson:01.01",
-  "sessionId": "c9b5b8cf-2738-40ca-982a-049271790f60",
-  "startedAt": "2026-08-13T17:31:34.720Z",
-  "updatedAt": "2026-08-13T17:31:38.723Z",
+  "sessionId": "ebefc839-5289-4689-918b-885616976b94",
+  "startedAt": "2026-08-13T19:34:06.484Z",
+  "updatedAt": "2026-08-13T19:34:10.488Z",
   "chartRevision": "lesson:01.01:expert:mid:fnv1a64-d54c6645c869d012-1257",
   "mode": "practice",
   "difficulty": "expert",
   "playbackSpeed": 0.7,
-  "positionTick": 3029,
+  "positionTick": 3012,
   "records": [
     {
       "tick": 0,

@@ -1163,6 +1163,35 @@ describe('practice attempt checkpoints', () => {
     });
   });
 
+  it('loads an interrupted attempt whose literal song id contains dots', () => {
+    storeHolder.current = makeStore({});
+
+    const checkpoint = fakeCheckpoint('lesson-attempt');
+
+    checkpoint.checkpoint.songId = 'lesson:01.01';
+    checkpoint.checkpoint.positionTick = 3_029;
+    checkpoint.checkpoint.records = [fakeRecord(3_029)];
+
+    savePracticeAttemptCheckpoint(makeEvent() as never, checkpoint);
+
+    const event = makeEvent();
+
+    loadPracticeAttemptCheckpoints(event as never, 'lesson:01.01');
+
+    expect(
+      lastReply(event, 'load-practice-attempt-checkpoints')!.args[0],
+    ).toMatchObject({
+      songId: 'lesson:01.01',
+      checkpoints: [
+        expect.objectContaining({
+          sessionId: 'lesson-attempt',
+          positionTick: 3_029,
+          records: [expect.objectContaining({ tick: 3_029 })],
+        }),
+      ],
+    });
+  });
+
   it('can finalize an attempt atomically with its completed run', () => {
     storeHolder.current = makeStore({});
     savePracticeAttemptCheckpoint(

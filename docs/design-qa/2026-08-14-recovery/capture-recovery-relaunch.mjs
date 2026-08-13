@@ -100,7 +100,20 @@ async function startAndPlay(page) {
   const shell = page.locator('.drumroll-practice-shell');
   const playToggle = page.getByTestId('play-toggle');
 
-  await playToggle.click();
+  await page.bringToFront();
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await playToggle.click();
+    await page.waitForTimeout(250);
+
+    const phase = await shell.getAttribute('data-session-phase');
+
+    if (phase === 'playing' || phase === 'counting-in') {
+      break;
+    }
+
+    await page.waitForTimeout(1_000);
+  }
 
   try {
     await page

@@ -405,10 +405,6 @@ export function readPracticeAttemptCheckpoints(
     .slice(-MAX_PRACTICE_ATTEMPT_CHECKPOINTS_PER_SONG);
 }
 
-function checkpointStoreKey(songId: string): string {
-  return `${PRACTICE_ATTEMPT_CHECKPOINTS_STORE_KEY}.${songId}`;
-}
-
 function weightedMean(
   meanA: number,
   countA: number,
@@ -831,8 +827,12 @@ export function loadPracticeAttemptCheckpoints(
       throw new Error('songId is required');
     }
 
+    const checkpointsBySong =
+      (appState.store.get(PRACTICE_ATTEMPT_CHECKPOINTS_STORE_KEY) as
+        | PracticeAttemptCheckpointsStore
+        | undefined) ?? {};
     const checkpoints = readPracticeAttemptCheckpoints(
-      appState.store.get(checkpointStoreKey(songId)),
+      checkpointsBySong[songId],
     );
 
     event.reply('load-practice-attempt-checkpoints', {
