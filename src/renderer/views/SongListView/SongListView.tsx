@@ -60,7 +60,6 @@ import { localDateKey } from '../../services/streaks';
 import { useGoals } from '../../components/Goals';
 import { AppShell, ArenaView } from '../../components/AppShell';
 import { HomeCockpit } from '../../components/HomeCockpit';
-import { MyWave } from '../../components/MyWave';
 import { KitCommandPrompt } from '../../components/KitCommandPrompt';
 import ProfileView from '../../components/Profile';
 import { buildDrumLearningProfile } from '../../services/learning-profile';
@@ -576,11 +575,8 @@ export function SongListView() {
   );
   const { loadAchievements } = gamification;
 
-  // Home and My Wave expose saved lane analytics on their first paint. The
-  // request is intentionally scoped to those surfaces: the detailed Songs
-  // library remains as light as it was before the cockpit existed.
   useEffect(() => {
-    if (view === 'home' || view === 'wave') {
+    if (view === 'home') {
       loadAchievements();
     }
   }, [loadAchievements, view]);
@@ -1202,15 +1198,6 @@ export function SongListView() {
           />
         )}
 
-        {!songOpen && view === 'wave' && (
-          <MyWave
-            session={profileHomeSession}
-            onStart={startComposedSession}
-            onOpenSongs={() => setView('songs')}
-            onOpenJourney={() => setView('journey')}
-          />
-        )}
-
         {!songOpen && view === 'insights' && (
           <ProfileView
             songList={librarySongs}
@@ -1264,7 +1251,7 @@ export function SongListView() {
             className="flex h-full min-h-0 flex-col"
             id="library-content"
           >
-            <header className="border-b border-divider bg-surface-raised/76 px-5 py-5">
+            <header className="border-b border-divider bg-transparent px-5 py-5">
               <div className="mx-auto flex w-full max-w-360 flex-col gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0">
@@ -1530,7 +1517,7 @@ export function SongListView() {
               </div>
             </header>
 
-            <div className="relative mx-auto flex min-h-0 w-full max-w-360 grow flex-col overflow-hidden bg-bg">
+            <div className="relative mx-auto flex min-h-0 w-full max-w-360 grow flex-col overflow-hidden bg-transparent">
               {visibleEntries.length > 0 ? (
                 <LibraryCandidateList
                   entries={visibleEntries}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CoachFinding } from '../coach';
 import { DRUM_SKILL_AXES } from '../learning-profile';
 import type { DrumLearningProfile, DrumSkillAxisId } from '../learning-profile';
+import type { ItemSkillManifest } from '../pedagogy/types';
 import { RunSummary } from '../practice-stats';
 import { recommendNextPractice } from './recommend';
 import {
@@ -27,6 +28,29 @@ function makeCandidate(
     challengeLevel: 0.45,
     targetSpeed: 1,
     ...overrides,
+  };
+}
+
+function atomicManifest(
+  item_id: string,
+  target_bpm: number,
+): ItemSkillManifest {
+  return {
+    item_id,
+    source: 'curriculum',
+    source_revision: `${item_id}:revision`,
+    demands: [
+      {
+        skill_id: 'pulse.quarter',
+        weight: 1,
+        target_bpm,
+        context:
+          'meter=4/4;subdivision=quarter;lanes=K,S,H;limbs=joint;transition=joint;phrase=groove',
+      },
+    ],
+    context_signature:
+      'meter=4/4;subdivision=quarter;lanes=K,S,H;limbs=joint;transition=joint;phrase=groove',
+    assessment_confidence: 1,
   };
 }
 
@@ -181,6 +205,135 @@ describe('recommendNextPractice', () => {
       mastery: 100,
     });
     expect(Number.isFinite(result.ranking[1].suggestedSpeed)).toBe(true);
+  });
+
+  it('chooses joy inside the practice zone but does not let it override a song far beyond reach', () => {
+    const baseline = [
+      history('baseline', '2026-08-01T12:00:00.000Z', {
+        overallAccuracy: 0.8,
+        playbackSpeed: 0.8,
+      }),
+    ];
+    const neutralExercise = makeCandidate('neutral-exercise', {
+      kind: 'lesson',
+      challengeLevel: 0.3,
+      sequence: 1,
+    });
+    const lovedNextStep = makeCandidate('loved-next-step', {
+      liked: true,
+      challengeLevel: 0.42,
+    });
+    const lovedTooFar = makeCandidate('loved-too-far', {
+      liked: true,
+      challengeLevel: 0.98,
+    });
+    const withinReach = recommend({
+      candidates: [neutralExercise, lovedNextStep],
+      history: baseline,
+    });
+    const tooFar = recommend({
+      candidates: [neutralExercise, lovedTooFar],
+      history: baseline,
+    });
+
+    expect(withinReach.recommendation?.candidate.id).toBe('loved-next-step');
+    expect(
+      withinReach.recommendation?.factors.find(
+        (factor) => factor.key === 'preference',
+      ),
+    ).toMatchObject({ value: expect.any(Number) });
+    expect(withinReach.recommendation?.reason).toContain('saved favourite');
+    expect(tooFar.recommendation?.candidate.id).toBe('neutral-exercise');
+    expect(
+      tooFar.ranking
+        .find(({ candidate }) => candidate.id === 'loved-too-far')
+        ?.factors.find((factor) => factor.key === 'preference'),
+    ).toMatchObject({ value: 0 });
+  });
+
+  it('counts a song that the player replays as an affection signal when it remains reachable', () => {
+    const replayHistory = [
+      history('z-replayed-song', '2026-07-01T12:00:00.000Z'),
+      history('z-replayed-song', '2026-07-08T12:00:00.000Z'),
+      history('z-replayed-song', '2026-07-15T12:00:00.000Z'),
+      history('z-replayed-song', '2026-07-22T12:00:00.000Z'),
+      history('baseline', '2026-08-01T12:00:00.000Z'),
+      history('baseline', '2026-08-02T12:00:00.000Z'),
+      history('baseline', '2026-08-03T12:00:00.000Z'),
+    ];
+    const result = recommend({
+      candidates: [
+        makeCandidate('a-neutral-song', { challengeLevel: 0.42 }),
+        makeCandidate('z-replayed-song', { challengeLevel: 0.42 }),
+      ],
+      history: replayHistory,
+    });
+
+    expect(result.recommendation?.candidate.id).toBe('z-replayed-song');
+    expect(
+      result.recommendation?.factors.find(
+        (factor) => factor.key === 'preference',
+      )?.detail,
+    ).toContain('prior replays');
+  });
+
+  it('keeps joy inside the practice zone when atomic evidence ranks the live home stream', () => {
+    const baseline = [
+      history('baseline', '2026-08-01T12:00:00.000Z', {
+        overallAccuracy: 0.8,
+        playbackSpeed: 0.8,
+      }),
+    ];
+    const atomicStates = [
+      {
+        skill_id: 'pulse.quarter',
+        alpha: 20,
+        beta: 2,
+        effective_trials: 8,
+        best_supported_bpm: 80,
+        last_retention_at: '2026-08-01T12:00:00.000Z',
+        stage: 'retained' as const,
+        evidence_boundary: 'midi' as const,
+      },
+    ];
+    const neutralExercise = makeCandidate('atomic-neutral', {
+      kind: 'lesson',
+      challengeLevel: 0.3,
+      sequence: 1,
+      itemManifest: atomicManifest('atomic-neutral', 80),
+    });
+    const lovedNextStep = makeCandidate('atomic-loved-next-step', {
+      liked: true,
+      challengeLevel: 0.42,
+      itemManifest: atomicManifest('atomic-loved-next-step', 88),
+    });
+    const lovedTooFar = makeCandidate('atomic-loved-too-far', {
+      liked: true,
+      challengeLevel: 0.98,
+      itemManifest: atomicManifest('atomic-loved-too-far', 220),
+    });
+    const withinReach = recommend({
+      candidates: [neutralExercise, lovedNextStep],
+      history: baseline,
+      pedagogy: { atomicStates },
+    });
+    const tooFar = recommend({
+      candidates: [neutralExercise, lovedTooFar],
+      history: baseline,
+      pedagogy: { atomicStates },
+    });
+
+    expect(withinReach.strategy).toBe('atomic-evidence-ranked');
+    expect(withinReach.recommendation?.candidate.id).toBe(
+      'atomic-loved-next-step',
+    );
+    expect(withinReach.recommendation?.reason).toContain('saved favourite');
+    expect(tooFar.recommendation?.candidate.id).toBe('atomic-neutral');
+    expect(
+      tooFar.ranking
+        .find(({ candidate }) => candidate.id === 'atomic-loved-too-far')
+        ?.factors.find((factor) => factor.key === 'preference'),
+    ).toMatchObject({ value: 0 });
   });
 
   it('moves repeated failure to a matching remedial lesson', () => {

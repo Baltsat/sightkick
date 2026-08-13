@@ -15,7 +15,7 @@ import type {
 } from './types';
 import { scoreZpdCandidate } from './zpd-frontier';
 
-export const MY_WAVE_POLICY_VERSION = 'my-wave-v1';
+export const MY_WAVE_POLICY_VERSION = 'my-wave-v2';
 
 export type MyWaveIntent = 'songs' | 'learning' | 'mixed';
 
@@ -67,8 +67,16 @@ export interface MyWaveCandidate extends MyWaveItem {
   available: boolean;
   unlocked?: boolean;
   liked?: boolean;
+  replay_count?: number;
   sequence?: number;
   target_speed?: number;
+}
+
+export interface MyWaveAffection {
+  value: number;
+  favourite: boolean;
+  replay_count: number;
+  replay_share: number;
 }
 
 export interface MyWaveItemProfile {
@@ -121,6 +129,7 @@ export interface MyWaveReceipt {
   source_difficulty: MyWaveDifficulty;
   candidate_difficulty: MyWaveDifficulty;
   difficulty_delta: number;
+  affection: MyWaveAffection;
   predicted_success?: number;
   zpd_state?: PracticeDecision['state'];
   zpd_decision?: PracticeDecision;
@@ -134,6 +143,7 @@ export interface MyWaveRecommendation {
   reason: string;
   similarity: MyWaveSimilarity;
   difficulty: MyWaveDifficulty;
+  affection: MyWaveAffection;
   receipt: MyWaveReceipt;
 }
 
@@ -187,6 +197,7 @@ interface PreparedCandidate {
   profile: MyWaveItemProfile;
   difficulty: MyWaveDifficulty;
   similarity: MyWaveSimilarity;
+  affection: MyWaveAffection;
   decision?: PracticeDecision;
 }
 
@@ -235,6 +246,30 @@ function positive_number(value: number | undefined, fallback: number): number {
   return value !== undefined && Number.isFinite(value) && value > 0
     ? value
     : fallback;
+}
+
+export function score_my_wave_affection({
+  liked,
+  replay_count,
+  max_replay_count,
+}: {
+  liked?: boolean;
+  replay_count?: number;
+  max_replay_count?: number;
+}): MyWaveAffection {
+  const replayCount = Math.floor(positive_number(replay_count, 0));
+  const maxReplayCount = Math.floor(positive_number(max_replay_count, 0));
+  const replayShare =
+    maxReplayCount > 0
+      ? clamp01(Math.log1p(replayCount) / Math.log1p(maxReplayCount))
+      : 0;
+
+  return {
+    value: round((liked ? 0.68 : 0) + replayShare * 0.32),
+    favourite: liked === true,
+    replay_count: replayCount,
+    replay_share: round(replayShare),
+  };
 }
 
 function lane_for_note(
@@ -1103,11 +1138,24 @@ function reason_for({
   similarity: MyWaveSimilarity;
   step: MyWaveStep;
 }): string {
+  const affinity = candidate.affection.favourite
+    ? candidate.affection.replay_count > 0
+      ? 'a saved favourite you keep returning to'
+      : 'a saved favourite'
+    : candidate.affection.replay_count > 0
+    ? `a song you keep returning to (${
+        candidate.affection.replay_count
+      } prior replay${candidate.affection.replay_count === 1 ? '' : 's'})`
+    : undefined;
+
   if (
     source.evidence_level === 'thin' ||
     candidate.profile.evidence_level === 'thin'
   ) {
-    return 'playable continuation; chart and atomic-skill evidence are still thin.';
+    const continuation =
+      'playable continuation; chart and atomic-skill evidence are still thin.';
+
+    return affinity ? `${affinity}; ${continuation}` : continuation;
   }
 
   const phrase = shared_phrase(
@@ -1123,20 +1171,29 @@ function reason_for({
       : 0;
 
   if (step === 'consolidate') {
-    return `${phrase}, one notch easier to consolidate the pattern.`;
+    const continuation = `${phrase}, one notch easier to consolidate the pattern.`;
+
+    return affinity ? `${affinity}; ${continuation}` : continuation;
   }
 
   if (step === 'stretch') {
-    return `${phrase}, a short scaffolded stretch before the next clean pass.`;
+    const continuation = `${phrase}, a short scaffolded stretch before the next clean pass.`;
+
+    return affinity ? `${affinity}; ${continuation}` : continuation;
   }
 
   if (step === 'diagnostic') {
-    return `${phrase}, a short probe because the atomic evidence is still sparse.`;
+    const continuation = `${phrase}, a short probe because the atomic evidence is still sparse.`;
+
+    return affinity ? `${affinity}; ${continuation}` : continuation;
   }
 
-  return bpm_delta >= 4
-    ? `${phrase}, one notch faster.`
-    : `${phrase}, one notch more demanding.`;
+  const continuation =
+    bpm_delta >= 4
+      ? `${phrase}, one notch faster.`
+      : `${phrase}, one notch more demanding.`;
+
+  return affinity ? `${affinity}; ${continuation}` : continuation;
 }
 
 function prepared_sort(
@@ -1171,13 +1228,18 @@ function choose_for_step({
         1 - Math.abs(difficulty_delta - target_delta(planned_step)) / 0.16,
       );
       const zpd_fit = zpd_fit_for(prepared.decision, planned_step);
+      const joy_fit =
+        zpd_fit === Number.NEGATIVE_INFINITY
+          ? 0
+          : prepared.affection.value * Math.min(difficulty_fit, zpd_fit);
       const score =
         zpd_fit === Number.NEGATIVE_INFINITY
           ? Number.NEGATIVE_INFINITY
           : 0.48 * prepared.similarity.total +
             0.28 * difficulty_fit +
             0.18 * zpd_fit +
-            0.06 * intent_fit(prepared.candidate, intent);
+            0.06 * intent_fit(prepared.candidate, intent) +
+            0.24 * joy_fit;
 
       return { prepared, score };
     })
@@ -1231,6 +1293,10 @@ export function build_my_wave(input: BuildMyWaveInput): MyWaveResult {
   const playable = candidates_for_intent(input.candidates, input.intent);
   const distinct = playable.filter(({ id }) => id !== input.played.id);
   const pool = distinct.length > 0 ? distinct : playable;
+  const max_replay_count = Math.max(
+    0,
+    ...pool.map(({ replay_count }) => positive_number(replay_count, 0)),
+  );
   const prepared = pool.map((candidate) => {
     const profile = build_my_wave_item_profile(candidate);
 
@@ -1244,6 +1310,11 @@ export function build_my_wave(input: BuildMyWaveInput): MyWaveResult {
         playback_speed: candidate.target_speed,
       }),
       similarity: similarity_for(source, profile),
+      affection: score_my_wave_affection({
+        liked: candidate.liked,
+        replay_count: candidate.replay_count,
+        max_replay_count,
+      }),
       decision: zpd_for(candidate, input.atomic_states, input.now),
     } satisfies PreparedCandidate;
   });
@@ -1307,6 +1378,7 @@ export function build_my_wave(input: BuildMyWaveInput): MyWaveResult {
       source_difficulty,
       candidate_difficulty: selected.difficulty,
       difficulty_delta,
+      affection: selected.affection,
       ...(selected.decision
         ? {
             predicted_success: selected.decision.predicted_success,
@@ -1355,6 +1427,7 @@ export function build_my_wave(input: BuildMyWaveInput): MyWaveResult {
       reason,
       similarity: selected.similarity,
       difficulty: selected.difficulty,
+      affection: selected.affection,
       receipt,
     });
   });

@@ -1,17 +1,16 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBookOpen,
   faHouse,
   faMusic,
   faUser,
-  faWandMagicSparkles,
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '../../cn';
 import appIcon from '../../../../assets/icon.png';
 import './AppShell.css';
 
-export type ArenaView = 'home' | 'wave' | 'songs' | 'journey' | 'insights';
+export type ArenaView = 'home' | 'songs' | 'journey' | 'insights';
 
 interface AppShellProps {
   view: ArenaView;
@@ -37,12 +36,6 @@ const NAV_ITEMS: Array<{
   testId: string;
 }> = [
   { id: 'home', label: 'Home', icon: faHouse, testId: 'view-home' },
-  {
-    id: 'wave',
-    label: 'My Wave',
-    icon: faWandMagicSparkles,
-    testId: 'view-wave',
-  },
   { id: 'songs', label: 'Songs', icon: faMusic, testId: 'view-songs' },
   {
     id: 'journey',
@@ -55,7 +48,6 @@ const NAV_ITEMS: Array<{
 ];
 const VIEW_LABELS: Record<ArenaView, string> = {
   home: 'Home',
-  wave: 'My Wave',
   songs: 'Songs',
   journey: 'Journey',
   insights: 'Profile',
@@ -76,8 +68,31 @@ export function AppShell({
   onOpenProfile,
   children,
 }: AppShellProps) {
+  const previousViewRef = useRef(view);
+  const [isFieldTransitioning, setIsFieldTransitioning] = useState(false);
+
+  useEffect(() => {
+    if (previousViewRef.current === view) {
+      return undefined;
+    }
+
+    previousViewRef.current = view;
+
+    setIsFieldTransitioning(true);
+
+    const timer = window.setTimeout(() => setIsFieldTransitioning(false), 900);
+
+    return () => window.clearTimeout(timer);
+  }, [view]);
+
   return (
-    <div className="arena-shell">
+    <div
+      className={cn(
+        'arena-shell',
+        isFieldTransitioning && 'arena-shell--transitioning',
+      )}
+      data-view={view}
+    >
       <aside className="arena-shell__rail" aria-label="Drumroll navigation">
         <button
           type="button"

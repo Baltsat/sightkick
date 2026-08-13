@@ -32,6 +32,10 @@
   --dr-warning: #a95e28;
   --dr-error: #b9473d;
   --dr-focus: #256eaa;
+  --dr-field-base: #f1e7d9;
+  --dr-field-low: #e1cfbe;
+  --dr-field-ember: #e38a5d;
+  --dr-field-wine: #a86f78;
 
   --color-bg: #f8f5ef;
   --color-surface: #ffffff;
@@ -158,6 +162,10 @@
   --dr-warning: #a95e28;
   --dr-error: #b9473d;
   --dr-focus: #256eaa;
+  --dr-field-base: #f1e7d9;
+  --dr-field-low: #e1cfbe;
+  --dr-field-ember: #e38a5d;
+  --dr-field-wine: #a86f78;
 
   --gradient-header: linear-gradient(180deg, #ffffff, #eee8dc);
   --gradient-header-reverse: linear-gradient(180deg, #eee8dc, #ffffff);

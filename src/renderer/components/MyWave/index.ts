@@ -1,1 +1,0 @@
-export { MyWave } from './MyWave';

@@ -153,7 +153,7 @@ describe('SongListView — loading the library', () => {
     expect(opened.getAttribute('data-search')).toContain('autoStart=1');
   });
 
-  it('keeps a quiet mouse-ready state when no kit is selected', () => {
+  it('states honest kit availability when no kit is selected', () => {
     mountSongListView({ settings: { selectedDevice: null } });
 
     expect(screen.getByTestId('home-input-readiness')).toHaveAttribute(
@@ -161,7 +161,7 @@ describe('SongListView — loading the library', () => {
       'waiting',
     );
     expect(screen.getByTestId('home-input-readiness')).toHaveTextContent(
-      'Mouse works now',
+      'No MIDI kit found',
     );
     expect(screen.getByTestId('kit-hotspot-kick')).not.toHaveTextContent(
       'Waiting',
@@ -214,7 +214,7 @@ describe('SongListView — loading the library', () => {
     ]);
 
     expect(screen.getByTestId('home-input-readiness')).toHaveTextContent(
-      'Kit reconnecting',
+      'Reconnecting · Yamaha DTX402',
     );
     expect(screen.getByTestId('home-session-status')).toHaveTextContent(
       'Pulse and posture is armed',
@@ -234,7 +234,7 @@ describe('SongListView — loading the library', () => {
 
     await waitFor(() =>
       expect(screen.getByTestId('home-input-readiness')).toHaveTextContent(
-        'Yamaha DTX402 mapped · ready',
+        'Connected · Yamaha DTX402',
       ),
     );
     expect(screen.getByTestId('kit-hotspot-kick')).toBeEnabled();
@@ -530,12 +530,12 @@ describe('SongListView — loading the library', () => {
     );
   });
 
-  it('starts the recommendation from one deliberate Home kick and unmounts the background cockpit', async () => {
+  it('starts the recommendation from one deliberate Home snare and unmounts the background cockpit', async () => {
     const view = mountSongListView({
       settings: {
         inputMappings: {
           keyboard: {
-            kick: ['keyboard:KeyK'],
+            snare: ['keyboard:KeyK'],
           },
         },
       },
