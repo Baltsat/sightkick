@@ -181,6 +181,28 @@ describe('HomeCockpit kit home', () => {
     );
   });
 
+  it('keeps Continue on the kick and leaves the lower strip informational', () => {
+    render(
+      <InputProvider>
+        <HomeCockpit
+          songList={[song]}
+          gamification={gamification}
+          recommendation={recommendation}
+          onStartRecommended={vi.fn()}
+          onOpenSongs={vi.fn()}
+          onOpenProfile={vi.fn()}
+        />
+      </InputProvider>,
+    );
+
+    expect(screen.getByTestId('kit-hotspot-kick')).toHaveTextContent(
+      'Continue',
+    );
+    expect(
+      screen.getByTestId('home-action-band').querySelector('button'),
+    ).toBeNull();
+  });
+
   it('shows the selected input visibly on the kit home', () => {
     window.localStorage.setItem(
       'settings.selectedDevice',
@@ -372,11 +394,7 @@ describe('HomeCockpit kit home', () => {
     );
 
     expect(onOpenSongs).toHaveBeenCalledTimes(8);
-    expect(screen.getByTestId('home-choose-song')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId('home-choose-song'));
-
-    expect(onOpenSongs).toHaveBeenCalledTimes(9);
+    expect(screen.queryByTestId('home-choose-song')).not.toBeInTheDocument();
   });
 
   it('keeps one composed session behind the compact disclosure', () => {
@@ -471,7 +489,7 @@ describe('HomeCockpit kit home', () => {
       </InputProvider>,
     );
 
-    expect(screen.getByTestId('home-start-practice')).toBeInTheDocument();
+    expect(screen.queryByTestId('home-start-practice')).not.toBeInTheDocument();
 
     const shelfHeadline = screen
       .getByTestId('home-session-summary')

@@ -89,12 +89,83 @@ describe('SongListView — loading the library', () => {
     expect(screen.getByTestId('open-profile-button')).toHaveTextContent(
       'Profile',
     );
-    expect(screen.getByTestId('home-choose-song')).toBeEnabled();
+    expect(screen.queryByTestId('home-choose-song')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('kit-hotspot-hihat'));
 
     expect(playKitPreviewMock).toHaveBeenCalledOnce();
     expect(playKitPreviewMock).toHaveBeenCalledWith('hihat');
+  });
+
+  it('wires the kit doors to Journey, songs, discovery, and a top song', async () => {
+    const view = mountSongListView({ freshProfile: true });
+    const lesson = makeLessonSong('lesson-next', {
+      id: '01.02',
+      title: 'Eighth-note pulse',
+      starsToUnlock: 0,
+    });
+    const topSong = makeListSong('top-song', { liked: true });
+    const run = {
+      completedAt: '2026-08-13T12:00:00.000Z',
+      totalHits: 10,
+      totalMisses: 0,
+      totalWrong: 0,
+      overallAccuracy: 0.9,
+      laneAccuracy: [],
+      laneBias: [],
+      wrongHitCounts: [],
+      timingBias: {
+        meanMs: 0,
+        medianMs: 0,
+        spreadMs: 0,
+        earlyCount: 0,
+        lateCount: 0,
+        onTimeCount: 0,
+        sampleCount: 0,
+      },
+      mode: 'practice' as const,
+    };
+
+    view.loadSongs([lesson, topSong], '/music');
+    await waitFor(() =>
+      expect(view.sentChannels()).toContain('load-all-practice-runs'),
+    );
+    view.emit('load-all-practice-runs', {
+      runs: [run],
+      runsBySong: { [topSong.id]: [run] },
+      archiveBySong: {},
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('kit-hotspot-tom1')).toHaveTextContent(
+        topSong.name,
+      ),
+    );
+
+    fireEvent.click(screen.getByTestId('kit-hotspot-hihat'));
+    expect(
+      await screen.findByTestId('lesson-season-stage'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('view-home'));
+    expect(await screen.findByTestId('home-cockpit')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('kit-hotspot-ride'));
+    expect(await screen.findByTestId('library-toolbar')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('view-home'));
+    expect(await screen.findByTestId('home-cockpit')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('kit-hotspot-crash'));
+    expect(await screen.findByTestId('library-toolbar')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('song-search')).toHaveFocus(),
+    );
+
+    fireEvent.click(screen.getByTestId('view-home'));
+    expect(await screen.findByTestId('home-cockpit')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('kit-hotspot-tom1'));
+    expect(await screen.findByTestId('song-view-stub')).toHaveAttribute(
+      'data-song-id',
+      topSong.id,
+    );
   });
 
   it('keeps physical MIDI feedback silent and separate from the pointer stick', async () => {

@@ -1237,6 +1237,18 @@ export function SongListView() {
             onStartSession={startComposedSession}
             onStartPracticeCard={startPracticeCard}
             onOpenSongs={() => setView('songs')}
+            onOpenJourney={() => setView('journey')}
+            onFindNewMusic={() => {
+              setView('songs');
+              window.requestAnimationFrame(() => {
+                document
+                  .querySelector<HTMLInputElement>(
+                    '[data-testid="song-search"]',
+                  )
+                  ?.focus();
+              });
+            }}
+            onStartSong={(song) => openManualPractice(song.id)}
             onOpenProfile={() => {
               gamification.loadAchievements();
               setView('insights');

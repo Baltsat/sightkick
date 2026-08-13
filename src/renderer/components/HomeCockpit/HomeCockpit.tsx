@@ -903,18 +903,6 @@ export function HomeCockpit({
           } as CSSProperties
         }
       >
-        <button
-          type="button"
-          className="kit-home__primary-action"
-          data-testid={
-            hasContinuationTarget ? 'home-start-practice' : 'home-choose-song'
-          }
-          data-state={sessionState}
-          onClick={() => executeDoor('kick')}
-        >
-          {hasContinuationTarget ? 'Continue' : 'Choose a song'}
-        </button>
-
         <section
           className="kit-home__session-summary"
           aria-label="Today’s practice"

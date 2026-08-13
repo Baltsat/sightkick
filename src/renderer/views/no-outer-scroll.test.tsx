@@ -24,13 +24,6 @@ const routes: Array<{
     },
   },
   {
-    name: 'My Wave',
-    open: () => {
-      fireEvent.click(screen.getByTestId('view-wave'));
-      expect(screen.getByTestId('my-wave')).toBeInTheDocument();
-    },
-  },
-  {
     name: 'Journey',
     open: () => {
       fireEvent.click(screen.getByTestId('view-lessons'));
@@ -110,3 +103,9 @@ describe.each(laptopViewports)(
     );
   },
 );
+
+it('keeps My Wave out of the rail because it starts from the kit', () => {
+  setupSongListView();
+
+  expect(screen.queryByTestId('view-wave')).not.toBeInTheDocument();
+});
