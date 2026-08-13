@@ -431,6 +431,76 @@ describe('Engine', () => {
     );
   });
 
+  it('does not count a chart note key outside the fixed kit-lane table toward totalNotes, so the on-screen score cannot contradict the persisted summary', async () => {
+    // A malformed or mismatched-format chart (e.g. a five-lane/pro-drums
+    // flag mismatch in song.ini versus how notes.chart was actually
+    // authored) can hand the renderer a note key outside the fixed 8-lane
+    // ELEMENT_TO_KEYS/KEY_TO_ELEMENT table. Every other stage of scoring
+    // (Judge's live 'miss' judgement, engine.ts's deriveMisses catch-up)
+    // already filters such a key out via isKitElement — it can never
+    // become a hit, a miss, or a wrong-hit anywhere in the persisted
+    // RunSummary. totalNotes() must agree, or the raw {hitNotes,
+    // falseHits, totalNotes} tuple used for the on-screen "X of Y" score
+    // silently disagrees with the stored evidence: a chart with one real
+    // note and one unattributable phantom note would show "0 of 2" while
+    // the summary says only one note was ever missed.
+    const { onEnded, player } = await setup({
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [],
+          [
+            { isRest: false, notes: ['c/5'] } as Note,
+            { isRest: false, notes: ['z/9'] } as Note,
+          ],
+        ),
+      ],
+    });
+
+    player.onEnded();
+
+    expect(onEnded).toHaveBeenCalledWith(
+      {
+        hitNotes: 0,
+        falseHits: 0,
+        totalNotes: 1,
+      },
+      expect.objectContaining({
+        totalHits: 0,
+        totalMisses: 1,
+        totalWrong: 0,
+      }),
+      expect.any(Array),
+    );
+  });
+
+  it('reaches a natural end on an entirely empty/malformed chart without crashing and reports an honest zero-note summary', async () => {
+    // A chart that parsed but yielded no measures at all (every track
+    // rejected, or a genuinely empty notes.chart) must not crash the
+    // engine and must not fabricate any evidence — an honest zero, not a
+    // NaN accuracy or a thrown error, is the only correct outcome.
+    const { onEnded, player } = await setup({ renderData: [] });
+
+    expect(() => player.onEnded()).not.toThrow();
+
+    expect(onEnded).toHaveBeenCalledWith(
+      {
+        hitNotes: 0,
+        falseHits: 0,
+        totalNotes: 0,
+      },
+      expect.objectContaining({
+        totalHits: 0,
+        totalMisses: 0,
+        totalWrong: 0,
+        overallAccuracy: 0,
+        laneAccuracy: [],
+      }),
+      [],
+    );
+  });
+
   it('positions the cursor element from the current time', async () => {
     const note = staveNote(['c/5'], true);
     const { engine } = await setup({

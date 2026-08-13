@@ -34,6 +34,20 @@ export interface LibraryCandidateListProps {
   onPlaySong: (songId: string) => void;
   onResolveSource: (track: YandexPlaylistCandidate) => void;
   onUseLocalAudioForSource: (track: YandexPlaylistCandidate) => void;
+  /**
+   * A row that cannot be played says so once, quietly, and offers the one
+   * action that would fix it. For a song already source-linked to a
+   * playlist track, that fix is the same one the matching source row
+   * offers — only present once the song actually carries that provenance.
+   */
+  onUseLocalAudioForSong?: (song: Song) => void;
+  /**
+   * Songs whose difficulty parse has settled with no learner-relative
+   * score to show — a ready song can never fabricate a difficulty for a
+   * chart that has none, so it says so once, quietly. Absent while a
+   * parse is still in flight.
+   */
+  unratedSongIds?: ReadonlySet<string>;
 }
 
 const ROW_HEIGHT = 76;
@@ -63,9 +77,12 @@ interface SongRowProps {
   difficulty: Difficulty;
   focused: boolean;
   preview: SongHoverPreviewState | undefined;
+  canUseLocalAudio: boolean;
+  unrated: boolean;
   onPlay: () => void;
   onPreviewStart: () => void;
   onPreviewEnd: () => void;
+  onUseLocalAudio?: () => void;
 }
 
 function SongRow({
@@ -74,9 +91,12 @@ function SongRow({
   difficulty,
   focused,
   preview,
+  canUseLocalAudio,
+  unrated,
   onPlay,
   onPreviewStart,
   onPreviewEnd,
+  onUseLocalAudio,
 }: SongRowProps) {
   const score = song.scoreData?.[difficulty];
   const accuracy = score ? calculateAccuracy(score) : undefined;
@@ -85,6 +105,12 @@ function SongRow({
     accuracy !== undefined
       ? `Best score: ${Math.round(accuracy * 100)}% accuracy`
       : 'No best score yet. Play once to earn stars';
+  // The one action that would fix an unplayable row — only real when this
+  // song is already linked to a source track, mirroring the same action a
+  // matching, not-yet-downloaded source row offers.
+  const offersLocalAudioFix = !entry.ready && Boolean(onUseLocalAudio);
+  const canAutoChart =
+    canUseLocalAudio && song.sourceProvenance?.durationSeconds !== undefined;
 
   return (
     <div
@@ -109,10 +135,10 @@ function SongRow({
       data-focused={focused ? 'true' : undefined}
       data-previewing={preview ? 'true' : undefined}
       className={cn(
-        'flex min-w-0 items-center gap-3 border-b border-border-soft px-2 py-2 duration-100 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+        'group flex min-w-0 items-center gap-3 border-b border-border-soft px-2 py-2 duration-100 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--dr-focus)]',
         {
-          'cursor-pointer hover:bg-accent-soft-bg': entry.ready,
-          'bg-accent-soft-bg outline-2 -outline-offset-2 outline-accent':
+          'cursor-pointer hover:bg-[var(--dr-paper-low)]': entry.ready,
+          'bg-[var(--dr-paper-low)] outline-2 -outline-offset-2 outline-[var(--dr-focus)]':
             focused,
         },
       )}
@@ -137,9 +163,18 @@ function SongRow({
           <div className="truncate font-ui text-sm text-text-muted">
             {supportLine(
               entry.artists,
-              entry.sourceLabels[0]
-                ? `From ${entry.sourceLabels[0]}`
-                : undefined,
+              [
+                entry.sourceLabels[0]
+                  ? `From ${entry.sourceLabels[0]}`
+                  : undefined,
+                // Never fabricate a difficulty for a chart that has
+                // none — say so once, quietly, rather than leaving the
+                // rated/unrated boundary invisible. See
+                // docs/visual-system-v3.md's "difficulty" rule.
+                unrated ? 'Unrated' : undefined,
+              ]
+                .filter(Boolean)
+                .join(' · ') || undefined,
             )}
           </div>
 
@@ -157,11 +192,11 @@ function SongRow({
 
           {preview && (
             <div
-              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-soft-bg px-1.5 py-0.5 font-ui text-[10px] font-semibold text-accent"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--dr-paper-low)] px-1.5 py-0.5 font-ui text-[10px] font-semibold text-[var(--dr-ink)]"
               data-testid="song-preview-status"
               aria-live="polite"
             >
-              <span className="size-1.5 animate-pulse rounded-full bg-accent" />
+              <span className="size-1.5 animate-pulse rounded-full bg-[var(--dr-ember)]" />
               {preview.label}
             </div>
           )}
@@ -187,12 +222,39 @@ function SongRow({
             )}
           </span>
         ) : (
-          <span
-            className="text-xs text-orange"
-            aria-label={`${entry.title} is not playable yet`}
-          >
-            {entry.stateLabel}
-          </span>
+          <div className="flex flex-col items-end gap-1.5">
+            <span
+              className="text-xs font-medium text-[var(--dr-warning)]"
+              aria-label={`${entry.title} is not playable yet`}
+            >
+              {entry.stateLabel}
+            </span>
+            {offersLocalAudioFix && (
+              <div
+                className={cn(
+                  'flex shrink-0 opacity-0 transition-opacity duration-[120ms] ease-out focus-within:opacity-100 group-hover:opacity-100',
+                  { 'opacity-100': focused },
+                )}
+              >
+                <Tooltip
+                  title={
+                    canAutoChart
+                      ? 'Choose audio you own or are allowed to process; Drumroll will chart it locally'
+                      : 'Select a local library folder first'
+                  }
+                >
+                  <Button
+                    size="small"
+                    disabled={!canAutoChart}
+                    aria-label={`Use lawful local audio for ${entry.title}`}
+                    onClick={onUseLocalAudio}
+                  >
+                    Use local audio
+                  </Button>
+                </Tooltip>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -211,12 +273,15 @@ interface SourceRowProps {
 }
 
 function sourceStateClassName(state: UnifiedLibraryEntry['state']): string {
+  // A source row that cannot be resolved is an honest, recoverable
+  // limitation of the row — never the broken-save/input alarm docs/visual-
+  // system-v3.md reserves red/`--dr-error` for.
   if (state === 'reference-only') {
-    return 'text-red';
+    return 'text-[var(--dr-ink-muted)]';
   }
 
   if (state === 'metadata-only') {
-    return 'text-orange';
+    return 'text-[var(--dr-warning)]';
   }
 
   return 'text-text-muted';
@@ -248,7 +313,7 @@ function SourceRow({
       className={cn(
         'group flex min-w-0 items-center gap-3 border-b border-border-soft px-2 py-2',
         {
-          'bg-accent-soft-bg outline-2 -outline-offset-2 outline-accent':
+          'bg-[var(--dr-paper-low)] outline-2 -outline-offset-2 outline-[var(--dr-focus)]':
             focused,
         },
       )}
@@ -301,27 +366,14 @@ function SourceRow({
         <div
           data-testid={`library-candidate-actions-${testIdSuffix}`}
           className={cn(
-            'flex shrink-0 gap-2 opacity-0 transition-opacity duration-[120ms] ease-out focus-within:opacity-100 group-hover:opacity-100',
+            'flex shrink-0 items-center gap-2 opacity-0 transition-opacity duration-[120ms] ease-out focus-within:opacity-100 group-hover:opacity-100',
             { 'opacity-100': focused },
           )}
         >
-          <Tooltip title="Check Chorus Encore and RhythmVerse for an exact reviewed drum chart">
-            <Button
-              size="small"
-              icon={<FontAwesomeIcon icon={faMagnifyingGlass} />}
-              disabled={resolving}
-              aria-label={`Check reviewed public drum charts for ${
-                track.title
-              } by ${track.artists.join(', ')}`}
-              onClick={onResolve}
-            >
-              {resolving
-                ? 'Checking…'
-                : resolution?.status === 'exact-reviewed-chart'
-                ? 'Chart found'
-                : 'Check charts'}
-            </Button>
-          </Tooltip>
+          {/* One offered fix, not two equal buttons: "Use local audio" is
+              the row's real single action. "Check charts" stays reachable
+              as a quiet subordinate link, not a sibling of equal weight —
+              see docs/visual-system-v3.md's "lists and rows". */}
           <Tooltip
             title={
               track.durationSeconds === null
@@ -342,6 +394,25 @@ function SourceRow({
               Use local audio
             </Button>
           </Tooltip>
+          <Tooltip title="Check Chorus Encore and RhythmVerse for an exact reviewed drum chart">
+            <Button
+              type="text"
+              size="small"
+              className="text-xs text-text-muted"
+              icon={<FontAwesomeIcon icon={faMagnifyingGlass} />}
+              disabled={resolving}
+              aria-label={`Check reviewed public drum charts for ${
+                track.title
+              } by ${track.artists.join(', ')}`}
+              onClick={onResolve}
+            >
+              {resolving
+                ? 'Checking…'
+                : resolution?.status === 'exact-reviewed-chart'
+                ? 'Chart found'
+                : 'Check charts'}
+            </Button>
+          </Tooltip>
         </div>
       </div>
     </div>
@@ -360,6 +431,8 @@ export function LibraryCandidateList({
   onPlaySong,
   onResolveSource,
   onUseLocalAudioForSource,
+  onUseLocalAudioForSong,
+  unratedSongIds,
 }: LibraryCandidateListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const { preview, startPreview, stopPreview } = useSongHoverPreview(
@@ -422,9 +495,17 @@ export function LibraryCandidateList({
                   preview={
                     preview?.songId === entry.song.id ? preview : undefined
                   }
+                  canUseLocalAudio={canUseLocalAudio}
+                  unrated={unratedSongIds?.has(entry.song.id) ?? false}
                   onPlay={() => onPlaySong(entry.song!.id)}
                   onPreviewStart={() => startPreview(entry.song!)}
                   onPreviewEnd={() => stopPreview(entry.song!.id)}
+                  {...(onUseLocalAudioForSong && entry.song.sourceProvenance
+                    ? {
+                        onUseLocalAudio: () =>
+                          onUseLocalAudioForSong(entry.song!),
+                      }
+                    : {})}
                 />
               ) : entry.sourceRow ? (
                 <SourceRow

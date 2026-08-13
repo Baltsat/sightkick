@@ -198,7 +198,6 @@ export function LessonPath({
             {lessonSteps.length > 0 && (
               <KitCommandPrompt
                 compact
-                tone="dark"
                 model={{
                   label: 'Select',
                   steps: lessonSteps,
@@ -210,7 +209,6 @@ export function LessonPath({
             {seasonSteps.length > 0 && (
               <KitCommandPrompt
                 compact
-                tone="dark"
                 model={{
                   label: 'Season',
                   steps: seasonSteps,
@@ -222,14 +220,12 @@ export function LessonPath({
             {kitActions.includes('confirm') && (
               <KitCommandPrompt
                 compact
-                tone="dark"
                 model={{ label: 'Start', steps: ['snare'] }}
               />
             )}
             {kitActions.includes('back') && (
               <KitCommandPrompt
                 compact
-                tone="dark"
                 model={{ label: 'Back', steps: ['crash'] }}
               />
             )}

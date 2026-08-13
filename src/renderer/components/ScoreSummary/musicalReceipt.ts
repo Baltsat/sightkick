@@ -25,6 +25,25 @@ function laneLabel(element: KitElement): string {
   return labels[element];
 }
 
+/**
+ * A slower pass naturally lands more notes and tightens timing on its own,
+ * independent of any real skill change - comparing accuracy or timing
+ * across two different playback speeds is not a comparable musical fact,
+ * even when the numbers moved. Equal speed, a faster current pass, or an
+ * unknown speed on either side (older runs stored before this field
+ * existed) all stay eligible; only a confirmed slowdown blocks the claim.
+ */
+function speedIsComparable(summary: RunSummary, previous: RunSummary): boolean {
+  const currentSpeed = summary.playbackSpeed;
+  const previousSpeed = previous.playbackSpeed;
+
+  if (currentSpeed === undefined || previousSpeed === undefined) {
+    return true;
+  }
+
+  return currentSpeed >= previousSpeed;
+}
+
 function laneDelta(
   summary: RunSummary,
   previous: RunSummary,
@@ -139,7 +158,7 @@ export function musicalReceipt(
     };
   }
 
-  if (previous) {
+  if (previous && speedIsComparable(summary, previous)) {
     const lane = laneDelta(summary, previous);
 
     if (lane) {

@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
+  faCalendarDay,
+  faCalendarWeek,
+  faClockRotateLeft,
   faFire,
   faPlus,
   faStar,
   faTrophy,
 } from '@fortawesome/free-solid-svg-icons';
-import { Button, Spin } from 'antd';
+import { Button } from 'antd';
 import { Song } from '../../../types';
 import { UseGamificationResult } from '../../hooks/useGamification';
 import { last7Dates } from '../../hooks/useGamification';
@@ -104,7 +107,7 @@ function ProfileMetric({
       className="flex min-w-0 items-center gap-3 border-r border-border-soft pr-5 last:border-r-0 last:pr-0"
       data-testid="profile-stat-chip"
     >
-      <FontAwesomeIcon className="text-signal-ember" icon={icon} />
+      <FontAwesomeIcon className="text-[var(--signal-ember)]" icon={icon} />
       <div className="min-w-0">
         <div className="font-display text-xl font-semibold leading-none tabular-nums text-text">
           {value}
@@ -182,7 +185,7 @@ function SkillSpine({
     >
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
+          <p className="text-xs font-semibold tracking-[0.12em] text-[var(--signal-wine)]">
             What to work on
           </p>
           <h2
@@ -232,7 +235,9 @@ function SkillSpine({
                       'h-2 rounded-full bg-fill',
                       index <= activeIndex &&
                         stage !== 'unknown' &&
-                        (index >= 3 ? 'bg-signal-green' : 'bg-signal-wine'),
+                        (index >= 3
+                          ? 'bg-[var(--signal-green)]'
+                          : 'bg-[var(--signal-wine)]'),
                     )}
                   />
                 ))}
@@ -262,7 +267,7 @@ function ReviewQueue({ reviews }: { reviews: readonly SkillReview[] }) {
       className="border-t border-border-soft pt-5"
       data-testid="profile-review-queue"
     >
-      <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
+      <p className="text-xs font-semibold tracking-[0.12em] text-[var(--signal-wine)]">
         Next review
       </p>
       {next ? (
@@ -303,7 +308,7 @@ function DeadlineTargets({
       className="border-t border-border-soft pt-5"
       data-testid="profile-deadline-targets"
     >
-      <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
+      <p className="text-xs font-semibold tracking-[0.12em] text-[var(--signal-wine)]">
         Target pace
       </p>
       <p className="mt-2 text-sm leading-relaxed text-text-muted">
@@ -362,7 +367,7 @@ function WeeklyRhythmPanel({
     >
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
+          <p className="text-xs font-semibold tracking-[0.12em] text-[var(--signal-wine)]">
             Weekly rhythm
           </p>
           <h2
@@ -382,7 +387,7 @@ function WeeklyRhythmPanel({
               className={cn(
                 'rounded px-2 py-1 text-xs font-semibold capitalize',
                 rhythm === option
-                  ? 'bg-signal-ember text-surface-studio'
+                  ? 'bg-[var(--signal-ember)] text-[var(--surface-studio)]'
                   : 'text-text-muted hover:text-text',
               )}
               onClick={() => onRhythmChange?.(option)}
@@ -398,7 +403,7 @@ function WeeklyRhythmPanel({
             key={kind}
             className="grid gap-1 py-3 sm:grid-cols-[5.5rem_minmax(0,1fr)_minmax(13rem,0.85fr)] sm:items-baseline"
           >
-            <p className="m-0 text-xs font-semibold uppercase tracking-[0.12em] text-signal-wine">
+            <p className="m-0 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--signal-wine)]">
               {kind}
             </p>
             <strong className="truncate text-sm text-text">
@@ -421,9 +426,9 @@ function WeeklyRhythmPanel({
             className={cn(
               'grid min-h-13 place-items-center rounded border px-1 text-center text-[10px] font-semibold',
               day.state === 'played'
-                ? 'border-signal-green/40 bg-signal-green/10 text-text'
+                ? 'border-[var(--signal-green)]/40 bg-[var(--signal-green)]/10 text-text'
                 : day.state === 'planned'
-                ? 'border-signal-ember/35 bg-signal-ember/8 text-text-muted'
+                ? 'border-[var(--signal-ember)]/35 bg-[var(--signal-ember)]/8 text-text-muted'
                 : 'border-border-soft bg-fill text-text-faint',
             )}
             data-state={day.state}
@@ -443,7 +448,7 @@ function WeeklyRhythmPanel({
         {onRefresh && (
           <button
             type="button"
-            className="text-xs font-semibold text-signal-wine hover:text-signal-ember"
+            className="text-xs font-semibold text-[var(--signal-wine)] hover:text-[var(--signal-ember)]"
             data-testid="refresh-weekly-practice-set"
             onClick={onRefresh}
           >
@@ -473,7 +478,7 @@ function WeeklyMusicalRecapPanel({
       data-testid="weekly-musical-recap"
       aria-labelledby="weekly-musical-recap-title"
     >
-      <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
+      <p className="text-xs font-semibold tracking-[0.12em] text-[var(--signal-wine)]">
         This week in your hands
       </p>
       <h2
@@ -515,6 +520,95 @@ function WeeklyMusicalRecapPanel({
   );
 }
 
+type TimeScale = 'today' | '30d' | 'history';
+
+const SCALE_OPTIONS: Array<{
+  id: TimeScale;
+  label: string;
+  icon: typeof faCalendarDay;
+}> = [
+  { id: 'today', label: 'Today', icon: faCalendarDay },
+  { id: '30d', label: 'Last 30 days', icon: faCalendarWeek },
+  { id: 'history', label: 'All history', icon: faClockRotateLeft },
+];
+
+/**
+ * One time scale at a time, with one control to move between them — the
+ * owner's direct ask ("не вот этим узким экраном со скроллом, а на весь
+ * экран"): a profile route the player can actually read at a glance instead
+ * of a single accordion mixing today's target, this week's rhythm, and the
+ * all-time archive into one narrow scrolling column.
+ */
+function ScaleControl({
+  scale,
+  onChange,
+}: {
+  scale: TimeScale;
+  onChange: (scale: TimeScale) => void;
+}) {
+  return (
+    <div
+      className="flex flex-wrap gap-1"
+      role="tablist"
+      aria-label="Time scale"
+      data-testid="profile-scale-control"
+    >
+      {SCALE_OPTIONS.map((option) => {
+        const isSelected = option.id === scale;
+
+        return (
+          <button
+            key={option.id}
+            type="button"
+            role="tab"
+            aria-selected={isSelected}
+            data-testid={`profile-scale-${option.id}`}
+            className={cn(
+              'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors',
+              isSelected
+                ? 'border-[var(--signal-wine)] bg-[var(--signal-wine)] text-surface-raised'
+                : 'border-border-soft text-text-muted hover:text-text',
+            )}
+            onClick={() => onChange(option.id)}
+          >
+            <FontAwesomeIcon icon={option.icon} aria-hidden="true" />
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** A route-shaped skeleton (hero + scale control + content grid) instead of
+ * a generic centred spinner (visual-system-v3's kill list) — the geometry
+ * this route settles into holds while goals load in. */
+function ProfileSkeleton() {
+  return (
+    <div
+      className="flex h-full min-h-0 flex-col"
+      data-testid="profile-view-loading"
+      aria-busy="true"
+      aria-label="Loading your profile"
+    >
+      <div className="animate-pulse border-b border-border-soft px-6 py-5 sm:px-8">
+        <div className="h-3 w-20 rounded bg-fill" />
+        <div className="mt-3 h-9 w-2/3 max-w-100 rounded bg-fill" />
+        <div className="mt-3 h-4 w-1/2 max-w-80 rounded bg-fill" />
+      </div>
+      <div className="flex animate-pulse gap-2 border-b border-border-soft px-6 py-3 sm:px-8">
+        <div className="h-8 w-20 rounded-full bg-fill" />
+        <div className="h-8 w-28 rounded-full bg-fill" />
+        <div className="h-8 w-24 rounded-full bg-fill" />
+      </div>
+      <div className="grid flex-1 animate-pulse grid-cols-1 gap-6 overflow-hidden px-6 py-6 sm:px-8 lg:grid-cols-2">
+        <div className="h-40 rounded-2xl bg-fill" />
+        <div className="h-40 rounded-2xl bg-fill" />
+      </div>
+    </div>
+  );
+}
+
 export function ProfileView({
   songList,
   goals,
@@ -534,6 +628,7 @@ export function ProfileView({
   );
   const [isSetGoalOpen, setIsSetGoalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | undefined>(undefined);
+  const [scale, setScale] = useState<TimeScale>('today');
   const retiredLessons = useRetiredLessons();
   const activeGoal =
     goals.find((goal) => goal.id === selectedGoalId) ??
@@ -602,320 +697,348 @@ export function ProfileView({
   };
 
   if (!isGoalsLoaded) {
-    return (
-      <div
-        className="flex min-h-64 items-center justify-center"
-        data-testid="profile-view-loading"
-      >
-        <Spin size="large" />
-      </div>
-    );
+    return <ProfileSkeleton />;
   }
 
+  const goalSwitcher = goals.length > 1 && activeGoal && (
+    <div
+      className="flex flex-wrap gap-2"
+      role="tablist"
+      aria-label="Goals"
+      data-testid="goal-switcher"
+    >
+      {goals.map((goal) => {
+        const goalSong = songList.find((song) => song.id === goal.songId);
+
+        return (
+          <button
+            key={goal.id}
+            type="button"
+            role="tab"
+            aria-selected={goal.id === activeGoal.id}
+            data-testid={'goal-tab-' + goal.id}
+            className={cn(
+              'border-b px-1 py-2 text-sm transition-colors',
+              goal.id === activeGoal.id
+                ? 'border-[var(--signal-wine)] text-text'
+                : 'border-transparent text-text-muted hover:text-text',
+            )}
+            onClick={() => setSelectedGoalId(goal.id)}
+          >
+            {goalSong?.name ?? goal.songId}
+            {goal.isPrimary && ' ★'}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
-    <div className="h-full min-h-0 overflow-y-auto" data-testid="profile-view">
-      <div className="mx-auto flex w-full max-w-300 flex-col gap-8 px-5 py-7 sm:px-8">
-        <header
-          className="border-b border-border-soft pb-7"
-          data-testid="profile-insights-hero"
-        >
-          <p className="text-xs font-semibold tracking-[0.16em] text-signal-wine">
-            Insights
-          </p>
-          <div className="mt-3 grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-            <div className="min-w-0">
-              <h1 className="font-display text-4xl font-semibold leading-[0.95] tracking-[-0.055em] text-text sm:text-5xl">
-                {targetName}
-              </h1>
-              <p
-                className="mt-3 max-w-150 text-base leading-relaxed text-text-muted"
-                data-testid="profile-target-reason"
-              >
-                {targetReason}
-              </p>
-              {targetDetail && (
-                <p className="mt-2 text-sm text-text-muted">{targetDetail}</p>
+    <div
+      className="flex h-full min-h-0 flex-col overflow-hidden"
+      data-testid="profile-view"
+    >
+      <header
+        className="border-b border-border-soft px-6 py-5 sm:px-8"
+        data-testid="profile-insights-hero"
+      >
+        <p className="text-xs font-semibold tracking-[0.16em] text-[var(--signal-wine)]">
+          Insights
+        </p>
+        <div className="mt-3 grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div className="min-w-0">
+            <h1 className="font-display text-4xl font-semibold leading-[0.95] tracking-[-0.055em] text-text sm:text-5xl">
+              {targetName}
+            </h1>
+            <p
+              className="mt-3 max-w-150 text-base leading-relaxed text-text-muted"
+              data-testid="profile-target-reason"
+            >
+              {targetReason}
+            </p>
+            {targetDetail && (
+              <p className="mt-2 text-sm text-text-muted">{targetDetail}</p>
+            )}
+          </div>
+          {target && onStartTargetedPractice && (
+            <Button
+              type="primary"
+              size="large"
+              data-testid="profile-target-action"
+              onClick={onStartTargetedPractice}
+            >
+              Start targeted loop
+            </Button>
+          )}
+        </div>
+        <div className="mt-6 flex flex-wrap gap-x-6 gap-y-4">
+          <ProfileMetric
+            icon={faFire}
+            label="day streak"
+            value={gamification.streak.current}
+          />
+          <ProfileMetric
+            icon={faStar}
+            label="total stars"
+            value={gamification.totalStars}
+          />
+          <ProfileMetric
+            icon={faTrophy}
+            label="achievements"
+            value={unlockedAchievements}
+          />
+        </div>
+      </header>
+
+      <div className="flex items-center justify-between gap-4 border-b border-border-soft px-6 py-3 sm:px-8">
+        <ScaleControl scale={scale} onChange={setScale} />
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 sm:px-8">
+        <div className="mx-auto flex w-full max-w-360 flex-col gap-6">
+          {scale === 'today' && (
+            <div
+              className="flex flex-col gap-6"
+              role="tabpanel"
+              data-testid="profile-scale-panel-today"
+              aria-label="Today"
+            >
+              {insights?.practiceCards && (
+                <section data-testid="evidence-practice-cards">
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold tracking-[0.12em] text-[var(--signal-wine)]">
+                      Today’s practice
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed text-text-muted">
+                      Each option starts a real practice run.
+                    </p>
+                  </div>
+                  <EvidencePracticeCards
+                    cards={insights.practiceCards.cards}
+                    onStart={onStartPracticeCard}
+                  />
+                </section>
+              )}
+
+              <SkillSpine states={states} focusSkillIds={focusSkillIds} />
+              <ReviewQueue reviews={insights?.dueReviews ?? []} />
+
+              {!activeGoal && (
+                <section
+                  className="border-t border-border-soft pt-6"
+                  data-testid="no-goals-empty-state"
+                >
+                  <h2 className="font-display text-3xl font-semibold tracking-[-0.04em] text-text">
+                    Give the work a musical destination.
+                  </h2>
+                  <p className="mt-2 max-w-130 text-sm leading-relaxed text-text-muted">
+                    Save a song or lesson goal, then Drumroll can connect the
+                    next phrase to something you want to play.
+                  </p>
+                  <Button
+                    className="mt-4"
+                    type="primary"
+                    icon={<FontAwesomeIcon icon={faPlus} />}
+                    onClick={openNewGoalModal}
+                  >
+                    Set your first goal
+                  </Button>
+                </section>
               )}
             </div>
-            {target && onStartTargetedPractice && (
-              <Button
-                type="primary"
-                size="large"
-                data-testid="profile-target-action"
-                onClick={onStartTargetedPractice}
-              >
-                Start targeted loop
-              </Button>
-            )}
-          </div>
-          <div className="mt-7 flex flex-wrap gap-x-6 gap-y-4">
-            <ProfileMetric
-              icon={faFire}
-              label="day streak"
-              value={gamification.streak.current}
-            />
-            <ProfileMetric
-              icon={faStar}
-              label="total stars"
-              value={gamification.totalStars}
-            />
-            <ProfileMetric
-              icon={faTrophy}
-              label="achievements"
-              value={unlockedAchievements}
-            />
-          </div>
-        </header>
+          )}
 
-        {goals.length > 1 && activeGoal && (
-          <div
-            className="flex flex-wrap gap-2"
-            role="tablist"
-            aria-label="Goals"
-            data-testid="goal-switcher"
-          >
-            {goals.map((goal) => {
-              const goalSong = songList.find((song) => song.id === goal.songId);
-
-              return (
-                <button
-                  key={goal.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={goal.id === activeGoal.id}
-                  data-testid={'goal-tab-' + goal.id}
-                  className={cn(
-                    'border-b px-1 py-2 text-sm transition-colors',
-                    goal.id === activeGoal.id
-                      ? 'border-signal-wine text-text'
-                      : 'border-transparent text-text-muted hover:text-text',
-                  )}
-                  onClick={() => setSelectedGoalId(goal.id)}
-                >
-                  {goalSong?.name ?? goal.songId}
-                  {goal.isPrimary && ' ★'}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        <SkillSpine states={states} focusSkillIds={focusSkillIds} />
-        <details
-          className="border-t border-border-soft pt-5"
-          data-testid="profile-plan-details"
-        >
-          <summary className="cursor-pointer font-display text-2xl font-semibold tracking-[-0.03em] text-text">
-            Practice plan
-          </summary>
-          <div className="mt-5 flex flex-col gap-7">
-            <ReviewQueue reviews={insights?.dueReviews ?? []} />
-            <DeadlineTargets
-              targetDate={activeGoal?.targetDate}
-              pacing={insights?.deadlinePacing}
-            />
-            <WeeklyRhythmPanel
-              set={insights?.weeklySet}
-              rhythm={insights?.weeklySet?.rhythm}
-              calendar={insights?.weeklyRhythm}
-              onRhythmChange={onPracticeRhythmChange}
-              onRefresh={onRefreshPracticeSet}
-            />
-            <WeeklyMusicalRecapPanel recap={insights?.weeklyRecap} />
-          </div>
-        </details>
-        {insights?.practiceCards && (
-          <section
-            className="border-t border-border-soft pt-5"
-            data-testid="evidence-practice-cards"
-          >
-            <div className="mb-4">
-              <p className="text-xs font-semibold tracking-[0.12em] text-signal-wine">
-                Today’s practice
-              </p>
-              <p className="mt-1 text-sm leading-relaxed text-text-muted">
-                Each option starts a real practice run.
-              </p>
-            </div>
-            <EvidencePracticeCards
-              cards={insights.practiceCards.cards}
-              onStart={onStartPracticeCard}
-            />
-          </section>
-        )}
-        {!activeGoal && (
-          <section
-            className="border-t border-border-soft pt-6"
-            data-testid="no-goals-empty-state"
-          >
-            <h2 className="font-display text-3xl font-semibold tracking-[-0.04em] text-text">
-              Give the work a musical destination.
-            </h2>
-            <p className="mt-2 max-w-130 text-sm leading-relaxed text-text-muted">
-              Save a song or lesson goal, then Drumroll can connect the next
-              phrase to something you want to play.
-            </p>
-            <Button
-              className="mt-4"
-              type="primary"
-              icon={<FontAwesomeIcon icon={faPlus} />}
-              onClick={openNewGoalModal}
+          {scale === '30d' && (
+            <div
+              className="grid grid-cols-1 gap-x-8 gap-y-7 lg:grid-cols-2"
+              role="tabpanel"
+              data-testid="profile-scale-panel-30d"
+              aria-label="Last 30 days"
             >
-              Set your first goal
-            </Button>
-          </section>
-        )}
-
-        <details
-          className="border-t border-border-soft pt-5"
-          data-testid="profile-evidence-history"
-        >
-          <summary className="cursor-pointer font-display text-2xl font-semibold tracking-[-0.03em] text-text">
-            Past runs and goal details
-          </summary>
-          <div className="mt-6 flex flex-col gap-8">
-            <LearningEvidenceReceipt
-              summary={latestRun}
-              heading="Latest saved run"
-            />
-            {insights?.rejectedAtomicEvidenceCount ? (
-              <p
-                className="border-l-2 border-signal-ember pl-3 text-sm leading-relaxed text-text-muted"
-                data-testid="profile-rejected-atomic-evidence"
-              >
-                {insights.rejectedAtomicEvidenceCount} older run record
-                {insights.rejectedAtomicEvidenceCount === 1 ? '' : 's'} stay
-                hidden because this chart has changed.
-              </p>
-            ) : null}
-            <details data-testid="atomic-radar-disclosure">
-              <summary className="cursor-pointer text-sm font-semibold text-text">
-                Open skill map
-              </summary>
-              <div className="mt-5">
-                <AtomicSkillRadar
-                  states={states}
-                  focusSkillIds={focusSkillIds}
-                />
-              </div>
-            </details>
-
-            {activeGoal ? (
-              <>
-                <XpSkillLine
-                  weekXp={weekXp}
-                  dominantLaneProgress={mastery.dominantLaneProgress}
-                />
-                <GoalCard
-                  goal={activeGoal}
-                  song={activeSong}
-                  fallbackName={activeRetiredLesson?.name}
-                  breakdown={mastery.breakdown}
-                  timeline={mastery.timeline}
-                  trend={mastery.trend}
-                  needleLine={mastery.needleLine}
-                  isLoaded={mastery.isLoaded}
-                  onEdit={openEditGoalModal}
-                  bestAudition={insights?.bestAudition}
-                  auditionAvailable={insights?.auditionAvailable}
-                  onStartAudition={onStartAudition}
-                />
-                {activeRetiredLesson && (
-                  <p
-                    className="border-l-2 border-signal-ember pl-3 text-sm leading-relaxed text-text-muted"
-                    data-testid="retired-goal-notice"
-                  >
-                    This goal belongs to a retired curriculum exercise. Its
-                    score and practice history remain readable, but it does not
-                    unlock the new Journey.
-                  </p>
-                )}
-                {!activeGoal.isPrimary && (
-                  <Button
-                    data-testid="make-primary-button"
-                    onClick={() => onSetPrimaryGoal(activeGoal.id)}
-                  >
-                    Make this my primary goal
-                  </Button>
-                )}
-              </>
-            ) : null}
-
-            <section className="border-t border-border-soft pt-5">
-              <h3 className="font-display text-2xl font-semibold tracking-[-0.03em] text-text">
-                Per-drum accuracy
-              </h3>
-              <p
-                className="mt-1 text-sm leading-relaxed text-text-muted"
-                data-testid="profile-lane-accuracy-definition"
-              >
-                Accuracy from your scored notes in the last 30 days.
-              </p>
-              <div className="mt-4">
-                <SkillBars laneAccuracy={mastery.last30DaysLaneAccuracy} />
-              </div>
-            </section>
-
-            <PracticeHistory
-              progress={gamification.longitudinalProgress}
-              weeklyRecap={insights?.weeklyRecap}
-            />
-
-            {retiredLessons.length > 0 && (
-              <section
-                className="border-t border-border-soft pt-5"
-                data-testid="retired-lessons-history"
-              >
+              <section className="lg:col-span-2">
                 <h3 className="font-display text-2xl font-semibold tracking-[-0.03em] text-text">
-                  Archived curriculum history
+                  Per-drum accuracy
                 </h3>
-                <p className="mt-1 text-sm leading-relaxed text-text-muted">
-                  Older exercises keep their past results.
+                <p
+                  className="mt-1 text-sm leading-relaxed text-text-muted"
+                  data-testid="profile-lane-accuracy-definition"
+                >
+                  Accuracy from your scored notes in the last 30 days.
                 </p>
-                <div className="mt-4 divide-y divide-border-soft">
-                  {retiredLessons.map((lesson) => {
-                    const totalRuns =
-                      lesson.recentRunCount + lesson.archivedRunCount;
-
-                    return (
-                      <article
-                        key={lesson.legacySongIds.join(':')}
-                        className="py-3"
-                        data-testid="retired-lesson-row"
-                      >
-                        <div className="text-sm font-semibold text-text">
-                          {lesson.name}
-                        </div>
-                        <div className="mt-1 text-xs text-text-muted">
-                          Former lesson {lesson.lessonId ?? 'unlabelled'} ·{' '}
-                          {lesson.bestStars} star
-                          {lesson.bestStars === 1 ? '' : 's'} · {totalRuns} run
-                          {totalRuns === 1 ? '' : 's'}
-                          {lesson.goalCount > 0
-                            ? ' · ' +
-                              lesson.goalCount +
-                              ' saved goal' +
-                              (lesson.goalCount === 1 ? '' : 's')
-                            : ''}
-                        </div>
-                      </article>
-                    );
-                  })}
+                <div className="mt-4">
+                  <SkillBars laneAccuracy={mastery.last30DaysLaneAccuracy} />
                 </div>
               </section>
-            )}
 
-            {activeGoal && (
-              <Button
-                data-testid="add-another-goal-button"
-                icon={<FontAwesomeIcon icon={faPlus} />}
-                onClick={openNewGoalModal}
-              >
-                Add another goal
-              </Button>
-            )}
-          </div>
-        </details>
+              <DeadlineTargets
+                targetDate={activeGoal?.targetDate}
+                pacing={insights?.deadlinePacing}
+              />
+              {activeGoal && (
+                <div className="flex flex-col justify-end">
+                  <XpSkillLine
+                    weekXp={weekXp}
+                    dominantLaneProgress={mastery.dominantLaneProgress}
+                  />
+                </div>
+              )}
+
+              <div className="lg:col-span-2">
+                <WeeklyRhythmPanel
+                  set={insights?.weeklySet}
+                  rhythm={insights?.weeklySet?.rhythm}
+                  calendar={insights?.weeklyRhythm}
+                  onRhythmChange={onPracticeRhythmChange}
+                  onRefresh={onRefreshPracticeSet}
+                />
+              </div>
+              <div className="lg:col-span-2">
+                <WeeklyMusicalRecapPanel recap={insights?.weeklyRecap} />
+              </div>
+            </div>
+          )}
+
+          {scale === 'history' && (
+            <div
+              className="flex flex-col gap-7"
+              role="tabpanel"
+              data-testid="profile-scale-panel-history"
+              aria-label="All history"
+            >
+              {goalSwitcher}
+
+              {activeGoal ? (
+                <>
+                  <GoalCard
+                    goal={activeGoal}
+                    song={activeSong}
+                    fallbackName={activeRetiredLesson?.name}
+                    breakdown={mastery.breakdown}
+                    timeline={mastery.timeline}
+                    trend={mastery.trend}
+                    needleLine={mastery.needleLine}
+                    isLoaded={mastery.isLoaded}
+                    onEdit={openEditGoalModal}
+                    bestAudition={insights?.bestAudition}
+                    auditionAvailable={insights?.auditionAvailable}
+                    onStartAudition={onStartAudition}
+                  />
+                  {activeRetiredLesson && (
+                    <p
+                      className="border-l-2 border-[var(--signal-ember)] pl-3 text-sm leading-relaxed text-text-muted"
+                      data-testid="retired-goal-notice"
+                    >
+                      This goal belongs to a retired curriculum exercise. Its
+                      score and practice history remain readable, but it does
+                      not unlock the new Journey.
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {!activeGoal.isPrimary && (
+                      <Button
+                        data-testid="make-primary-button"
+                        onClick={() => onSetPrimaryGoal(activeGoal.id)}
+                      >
+                        Make this my primary goal
+                      </Button>
+                    )}
+                    <Button
+                      data-testid="add-another-goal-button"
+                      icon={<FontAwesomeIcon icon={faPlus} />}
+                      onClick={openNewGoalModal}
+                    >
+                      Add another goal
+                    </Button>
+                  </div>
+                </>
+              ) : null}
+
+              <div className="grid grid-cols-1 gap-x-8 gap-y-7 border-t border-border-soft pt-7 lg:grid-cols-2">
+                <LearningEvidenceReceipt
+                  summary={latestRun}
+                  heading="Latest saved run"
+                />
+                <div>
+                  {insights?.rejectedAtomicEvidenceCount ? (
+                    <p
+                      className="mb-3 border-l-2 border-[var(--signal-ember)] pl-3 text-sm leading-relaxed text-text-muted"
+                      data-testid="profile-rejected-atomic-evidence"
+                    >
+                      {insights.rejectedAtomicEvidenceCount} older run record
+                      {insights.rejectedAtomicEvidenceCount === 1
+                        ? ''
+                        : 's'}{' '}
+                      stay hidden because this chart has changed.
+                    </p>
+                  ) : null}
+                  <details data-testid="atomic-radar-disclosure">
+                    <summary className="cursor-pointer text-sm font-semibold text-text">
+                      Open skill map
+                    </summary>
+                    <div className="mt-5">
+                      <AtomicSkillRadar
+                        states={states}
+                        focusSkillIds={focusSkillIds}
+                      />
+                    </div>
+                  </details>
+                </div>
+              </div>
+
+              <div className="border-t border-border-soft pt-7">
+                <PracticeHistory
+                  progress={gamification.longitudinalProgress}
+                  weeklyRecap={insights?.weeklyRecap}
+                />
+              </div>
+
+              {retiredLessons.length > 0 && (
+                <section
+                  className="border-t border-border-soft pt-7"
+                  data-testid="retired-lessons-history"
+                >
+                  <h3 className="font-display text-2xl font-semibold tracking-[-0.03em] text-text">
+                    Archived curriculum history
+                  </h3>
+                  <p className="mt-1 text-sm leading-relaxed text-text-muted">
+                    Older exercises keep their past results.
+                  </p>
+                  <div className="mt-4 divide-y divide-border-soft">
+                    {retiredLessons.map((lesson) => {
+                      const totalRuns =
+                        lesson.recentRunCount + lesson.archivedRunCount;
+
+                      return (
+                        <article
+                          key={lesson.legacySongIds.join(':')}
+                          className="py-3"
+                          data-testid="retired-lesson-row"
+                        >
+                          <div className="text-sm font-semibold text-text">
+                            {lesson.name}
+                          </div>
+                          <div className="mt-1 text-xs text-text-muted">
+                            Former lesson {lesson.lessonId ?? 'unlabelled'} ·{' '}
+                            {lesson.bestStars} star
+                            {lesson.bestStars === 1 ? '' : 's'} · {totalRuns}{' '}
+                            run
+                            {totalRuns === 1 ? '' : 's'}
+                            {lesson.goalCount > 0
+                              ? ' · ' +
+                                lesson.goalCount +
+                                ' saved goal' +
+                                (lesson.goalCount === 1 ? '' : 's')
+                              : ''}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <SetGoalModal

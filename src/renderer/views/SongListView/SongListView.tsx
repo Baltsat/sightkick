@@ -15,6 +15,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import songArtPlaceholder from '../../../../assets/song-art-placeholder.svg';
+import { cn } from '../../cn';
 import {
   ControlMapping,
   IpcResolveLibraryCandidatesResponse,
@@ -101,6 +102,7 @@ import {
   UnifiedLibrarySort,
 } from '../../services/library/unified-library';
 import { buildLessonManifests, EMPTY_YANDEX_SOURCES } from './unified-sources';
+import { useLibraryDifficultyCharts } from './use-library-difficulty-charts';
 import {
   LIBRARY_SORT_OPTIONS,
   nextDifficulty,
@@ -573,6 +575,29 @@ export function SongListView() {
     () => songList.filter((song) => !isLessonSong(song)),
     [songList],
   );
+  // Background, bounded-concurrency parse of the player's own local charts
+  // so the shelf's default "Difficulty" sort can use the real My Wave
+  // learner-relative score instead of a fabricated tie — see
+  // use-library-difficulty-charts.ts. Only requested while Songs is the
+  // open tab; a song whose chart never resolves stays honestly unrated.
+  const { charts: libraryDifficultyCharts, settled: libraryDifficultySettled } =
+    useLibraryDifficultyCharts(librarySongs, !songOpen && view === 'songs');
+  // Every song whose parse settled with no learner-relative score — a
+  // ready song row says "Unrated" once instead of leaving the rated/
+  // unrated boundary invisible. Never includes a song still parsing.
+  const unratedSongIds = useMemo(
+    () =>
+      new Set(
+        librarySongs
+          .filter(
+            (song) =>
+              libraryDifficultySettled.has(song.id) &&
+              !libraryDifficultyCharts.has(song.id),
+          )
+          .map((song) => song.id),
+      ),
+    [librarySongs, libraryDifficultySettled, libraryDifficultyCharts],
+  );
   const { loadAchievements } = gamification;
 
   useEffect(() => {
@@ -605,10 +630,18 @@ export function SongListView() {
         songs: songList,
         sources: yandexSources,
         manifests: lessonManifests,
+        charts: libraryDifficultyCharts,
         atomicStates,
         now: libraryNow,
       }),
-    [songList, yandexSources, lessonManifests, atomicStates, libraryNow],
+    [
+      songList,
+      yandexSources,
+      lessonManifests,
+      libraryDifficultyCharts,
+      atomicStates,
+      libraryNow,
+    ],
   );
   // The default shelf never shows a lesson song — Journey owns the
   // curriculum, and mixing it into "Songs" would put the same content on
@@ -640,21 +673,20 @@ export function SongListView() {
     );
 
     // `order_unified_library`'s 'difficulty' sort ranks by each entry's
-    // chart-derived difficulty (unified-library.ts's `song_difficulty`),
-    // but this call site never supplies a per-song chart map — doing so
-    // would mean eagerly parsing every song's chart just to sort a list.
-    // Every entry (real songs and unresolved source-row suggestions alike)
-    // therefore ties at the same "no known difficulty" value, and the sort
-    // silently collapses to alphabetical-by-title with no regard for
-    // whether the row can actually be played. That let a screen of
-    // unresolved "Needs proof" suggestions from Favorites/Drums sort ahead
-    // of every one of the songs the header's own "N ready to play" count
-    // promises — see docs/design-qa/2026-08-13-finish/critique.md, Songs
-    // finding 2. Until real per-song difficulty is threaded through, break
-    // the tie on the one honest fact already on hand: whether it plays.
-    // This mirrors the existing 'ready' sort's own tie-break, so it isn't
-    // new sorting behaviour — the 'Difficulty' chip stays the default and
-    // keeps its title order within each group.
+    // real My Wave learner-relative score (unified-library.ts's
+    // `song_difficulty`, fed by `libraryDifficultyCharts` above). A song
+    // whose chart has not resolved yet (still parsing, or a source-row
+    // suggestion with no local chart at all) has no known difficulty and
+    // ties at the end of its readiness group rather than fabricating a
+    // value — see docs/visual-system-v3.md's "difficulty" rule and
+    // docs/design-acceptance-notes.md. Readiness still wins the outer
+    // partition: an unresolved "Needs proof" suggestion from
+    // Favorites/Drums must never rank ahead of a song the header's own "N
+    // ready to play" count already promises can play right now, formerly
+    // tracked as docs/design-qa/2026-08-13-finish/critique.md, Songs
+    // finding 2. This mirrors the existing 'ready' sort's own tie-break —
+    // the 'Difficulty' chip stays the default and keeps its real order
+    // within each group as charts finish parsing in the background.
     if (sort !== 'difficulty') {
       return ordered;
     }
@@ -781,6 +813,20 @@ export function SongListView() {
     },
     [yandexSources],
   );
+  // The row-level "Use local audio" fix for a song already linked to a
+  // source track — same IPC shape as `autoChartCandidate` above, just keyed
+  // off the song's own carried provenance instead of a still-unresolved
+  // source row.
+  const autoChartSong = useCallback((song: Song) => {
+    if (!song.sourceProvenance) {
+      return;
+    }
+
+    window.electron.ipcRenderer.sendMessage('create-auto-chart', {
+      localFile: true,
+      sourceProvenance: song.sourceProvenance,
+    });
+  }, []);
 
   if (
     nameFilter !== prevNameFilter ||
@@ -1255,7 +1301,7 @@ export function SongListView() {
               <div className="mx-auto flex w-full max-w-360 flex-col gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <div className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
+                    <div className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--dr-wine)]">
                       Practice library
                     </div>
                     <h1 className="font-display text-3xl font-semibold leading-tight tracking-[-0.02em] text-text">
@@ -1286,7 +1332,7 @@ export function SongListView() {
                       }}
                     />
                     <div className="min-w-0 grow">
-                      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-accent-text">
+                      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--dr-wine)]">
                         Continue practicing
                       </div>
                       <h2
@@ -1311,7 +1357,7 @@ export function SongListView() {
                     <Button
                       type="primary"
                       size="large"
-                      className="min-h-11 shrink-0"
+                      className="min-h-11 shrink-0 border-none !bg-[var(--dr-ember)] hover:!bg-[var(--dr-ember-pressed)] focus:!bg-[var(--dr-ember-pressed)]"
                       icon={<FontAwesomeIcon icon={faPlay} />}
                       aria-label={`Play ${continuedSong.name}`}
                       onClick={() => play(continuedSong.id)}
@@ -1393,7 +1439,11 @@ export function SongListView() {
                         <Button
                           key={option.key}
                           size="small"
-                          type={sort === option.key ? 'primary' : 'text'}
+                          type="text"
+                          className={cn(
+                            sort === option.key &&
+                              '!bg-[var(--dr-paper)] !text-[var(--dr-ink)] !outline-2 !-outline-offset-2 !outline-[var(--dr-wine)]',
+                          )}
                           data-testid={`sort-option-${option.key}`}
                           aria-pressed={sort === option.key}
                           onClick={() => setSort(option.key)}
@@ -1405,7 +1455,11 @@ export function SongListView() {
 
                     <Button
                       size="small"
-                      type={readinessFilter === 'ready' ? 'primary' : 'text'}
+                      type="text"
+                      className={cn(
+                        readinessFilter === 'ready' &&
+                          '!bg-[var(--dr-paper)] !text-[var(--dr-ink)] !outline-2 !-outline-offset-2 !outline-[var(--dr-wine)]',
+                      )}
                       data-testid="library-ready-filter"
                       aria-pressed={readinessFilter === 'ready'}
                       onClick={() =>
@@ -1508,7 +1562,10 @@ export function SongListView() {
                     )
                   }
                   {libraryCandidates.error && (
-                    <p className="text-xs text-orange" role="status">
+                    <p
+                      className="text-xs text-[var(--dr-warning)]"
+                      role="status"
+                    >
                       Drums and Favorites didn’t load: {libraryCandidates.error}
                       . Your own songs still work.
                     </p>
@@ -1531,10 +1588,12 @@ export function SongListView() {
                   onPlaySong={play}
                   onResolveSource={resolveCandidate}
                   onUseLocalAudioForSource={autoChartCandidate}
+                  onUseLocalAudioForSong={autoChartSong}
+                  unratedSongIds={unratedSongIds}
                 />
               ) : currentPath === null ? (
                 <section className="m-auto flex max-w-md flex-col items-center gap-3 px-6 text-center">
-                  <div className="flex size-12 items-center justify-center rounded-full bg-fill text-accent-text">
+                  <div className="flex size-12 items-center justify-center rounded-full bg-fill text-[var(--dr-wine)]">
                     <FontAwesomeIcon icon={faFolder} />
                   </div>
                   <h2 className="font-display text-2xl font-semibold text-text-body">

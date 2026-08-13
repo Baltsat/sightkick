@@ -9,6 +9,7 @@ import {
 import { GameMode, PLAYHEAD_STYLES } from '../../types';
 import { useSongViewSettings } from '../../context/SongViewSettingsContext';
 import { SettingLabel } from './SettingLabel';
+import { KitSignalCheck } from './KitSignalCheck';
 import { Tooltip } from '../Tooltip';
 import { useApp } from '../../context/AppContext';
 import themedark from '../../theme';
@@ -73,6 +74,10 @@ export function SongViewSettings({
           <Divider />
         </>
       ) : null}
+
+      <KitSignalCheck onSetupInput={onSetupInput} />
+
+      <Divider />
 
       {onExportPdf && (
         <Tooltip

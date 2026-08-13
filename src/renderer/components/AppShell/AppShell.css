@@ -10,6 +10,22 @@
   }
 }
 
+/* The field's own idle life — not a route event, so it lives on a separate
+   layer (`::after`) from the route-change arrival (`::before`), because both
+   would otherwise fight over `transform` on the same element. Slow, warm,
+   low-contrast: a 110s alternate drift of the same ember/wine blobs, never
+   the base gradient itself, so it reads as "the light is moving" rather
+   than "the page is moving". Disabled entirely under reduced motion. */
+@keyframes arena-field-drift {
+  from {
+    transform: translate3d(-1.4%, -1%, 0) scale(1.01);
+  }
+
+  to {
+    transform: translate3d(1.4%, 1.2%, 0) scale(1.01);
+  }
+}
+
 .arena-shell {
   position: relative;
   display: flex;
@@ -27,7 +43,8 @@
   inset: -14%;
   content: '';
   pointer-events: none;
-  background: radial-gradient(
+  background:
+    radial-gradient(
       70% 88% at 10% 10%,
       color-mix(in srgb, var(--dr-field-ember) 36%, transparent),
       transparent 72%
@@ -46,8 +63,31 @@
   transform: translate3d(0, 0, 0);
 }
 
+.arena-shell::after {
+  position: absolute;
+  z-index: 0;
+  inset: -18%;
+  content: '';
+  pointer-events: none;
+  background:
+    radial-gradient(
+      70% 88% at 10% 10%,
+      color-mix(in srgb, var(--dr-field-ember) 20%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      70% 90% at 94% 88%,
+      color-mix(in srgb, var(--dr-field-wine) 16%, transparent),
+      transparent 76%
+    );
+  transform: translate3d(0, 0, 0);
+  animation: arena-field-drift 110s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
 .arena-shell[data-view='home']::before {
-  background: radial-gradient(
+  background:
+    radial-gradient(
       82% 100% at 90% 54%,
       color-mix(in srgb, var(--dr-field-ember) 40%, transparent),
       transparent 70%
@@ -62,6 +102,20 @@
       var(--dr-field-base) 0%,
       var(--dr-canvas) 48%,
       var(--dr-field-low) 100%
+    );
+}
+
+.arena-shell[data-view='home']::after {
+  background:
+    radial-gradient(
+      82% 100% at 90% 54%,
+      color-mix(in srgb, var(--dr-field-ember) 22%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      74% 86% at 3% 2%,
+      color-mix(in srgb, var(--dr-field-wine) 18%, transparent),
+      transparent 76%
     );
 }
 
@@ -80,6 +134,55 @@
   border-right: 1px solid var(--line-soft);
   background: transparent;
   box-shadow: none;
+  transition: border-color 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Home is the one route with a photograph to continue under the rail, so
+   it is the one route where a hard rail/content border would read as the
+   "panel edge" the owner rejects — everywhere else the hairline still
+   marks the rail honestly. */
+.arena-shell[data-view='home'] .arena-shell__rail {
+  border-right-color: transparent;
+}
+
+/*
+ * Kit-continuity bleed — the shell's half of the handoff documented on the
+ * field-bleed node in AppShell.tsx and on `--dr-home-field-crop` in
+ * theme.css. Contract (one line): publish
+ * `--dr-home-field-crop: url(<right-edge crop of the exact home kit
+ * photo, at least rail-width wide>)` on `:root` while home's kit is
+ * mounted, and clear it on unmount — this layer does the rest.
+ *
+ * `background-image: none` (the unset default) paints nothing, so an
+ * unpublished crop is pixel-identical to today's plain rail: that is the
+ * safe fallback. When a crop *is* published, it is anchored to the right
+ * (the seam with the content panel), sized to cover the rail, held at a
+ * quiet 55% so the ambient field still shows through, and dissolved via a
+ * mask before it reaches the brand/nav side rather than cut off — a blend,
+ * not a second hard edge.
+ */
+.arena-shell__field-bleed {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--dr-home-field-crop, none);
+  background-position: right center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: 0;
+  -webkit-mask-image: linear-gradient(
+    to left,
+    black 0%,
+    black 42%,
+    transparent 88%
+  );
+  mask-image: linear-gradient(to left, black 0%, black 42%, transparent 88%);
+  transition: opacity 900ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.arena-shell[data-view='home'] .arena-shell__field-bleed {
+  opacity: 0.55;
 }
 
 .arena-shell__brand {
@@ -274,6 +377,12 @@
     animation: none;
   }
 
+  .arena-shell::after {
+    animation: none;
+  }
+
+  .arena-shell__rail,
+  .arena-shell__field-bleed,
   .arena-shell__nav-item,
   .arena-shell__profile {
     transition: none;

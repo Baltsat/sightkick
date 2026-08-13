@@ -94,6 +94,22 @@ export function AppShell({
       data-view={view}
     >
       <aside className="arena-shell__rail" aria-label="Drumroll navigation">
+        {/*
+         * The kit-continuity handoff (see docs/kit-launcher-design.md "The
+         * field"): on home, the kit photograph should read as continuing
+         * underneath the rail rather than stopping dead at the panel edge.
+         * HomeCockpit owns that photograph and must not be touched from
+         * here, so this is only the shell's half of the contract — a quiet
+         * layer that bleeds whatever crop is published and fades to nothing
+         * when none is. See AppShell.css for the one-line publishing
+         * contract the other lane satisfies via `--dr-home-field-crop`.
+         */}
+        <div
+          className="arena-shell__field-bleed"
+          data-testid="arena-shell-field-bleed"
+          aria-hidden="true"
+        />
+
         <button
           type="button"
           className="arena-shell__brand"

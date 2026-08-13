@@ -397,7 +397,11 @@ describe('SongListView — loading the library', () => {
     expect(screen.getByTestId('home-session-manifest')).toHaveTextContent(
       'Mid and Floor Tom Signals',
     );
-    fireEvent.click(screen.getByTestId('kit-hotspot-tom2'));
+    // The kit is the launcher (docs/kit-launcher-design.md): kick continues
+    // the armed target. Tom 2 now starts the second top-played song, not a
+    // coach remediation route, so the armed-target/prerequisite assertion
+    // above is what this test protects; kick is how a player reaches it.
+    fireEvent.click(screen.getByTestId('kit-hotspot-kick'));
 
     const opened = await screen.findByTestId('song-view-stub');
 

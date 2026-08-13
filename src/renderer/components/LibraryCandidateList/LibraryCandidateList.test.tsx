@@ -178,6 +178,80 @@ describe('LibraryCandidateList — song rows', () => {
     fireEvent.pointerLeave(row);
   });
 
+  it('offers the one fix action for a not-ready song already linked to a source track', () => {
+    const onUseLocalAudioForSong = vi.fn();
+    const linked = makeListSong('linked-song', {
+      name: 'Linked Song',
+      audio: [],
+      drumDifficulties: undefined,
+      sourceProvenance: {
+        provider: 'yandex-music',
+        collectionId: 'drums',
+        collectionName: 'Drums',
+        trackId: 'track-1',
+        title: 'Linked Song',
+        artists: ['Artist'],
+        durationSeconds: 180,
+      },
+    });
+    const entries = build_unified_library({
+      songs: [linked],
+      sources: sources([]),
+      now: '2026-08-12T00:00:00.000Z',
+    });
+
+    render(
+      <LibraryCandidateList
+        entries={entries}
+        difficulty={DIFFICULTY}
+        focusedIndex={0}
+        canUseLocalAudio
+        onPlaySong={vi.fn()}
+        onResolveSource={vi.fn()}
+        onUseLocalAudioForSource={vi.fn()}
+        onUseLocalAudioForSong={onUseLocalAudioForSong}
+      />,
+    );
+
+    const fix = screen.getByRole('button', {
+      name: /use lawful local audio for linked song/i,
+    });
+
+    expect(fix).toBeEnabled();
+    fireEvent.click(fix);
+    expect(onUseLocalAudioForSong).toHaveBeenCalledWith(linked);
+  });
+
+  it('offers no fix action for a not-ready song with no source provenance', () => {
+    const notReady = makeListSong('plain-unready', {
+      name: 'Plain Unready',
+      audio: [],
+      drumDifficulties: undefined,
+    });
+    const entries = build_unified_library({
+      songs: [notReady],
+      sources: sources([]),
+      now: '2026-08-12T00:00:00.000Z',
+    });
+
+    render(
+      <LibraryCandidateList
+        entries={entries}
+        difficulty={DIFFICULTY}
+        focusedIndex={0}
+        canUseLocalAudio
+        onPlaySong={vi.fn()}
+        onResolveSource={vi.fn()}
+        onUseLocalAudioForSource={vi.fn()}
+        onUseLocalAudioForSong={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: /use lawful local audio/i }),
+    ).not.toBeInTheDocument();
+  });
+
   it('never starts a hover preview for a not-ready row', async () => {
     vi.useFakeTimers();
 

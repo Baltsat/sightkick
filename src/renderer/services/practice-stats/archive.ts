@@ -88,7 +88,11 @@ export interface PracticeRunDayArchive {
   chartRevisions?: Record<string, ArchivedChartRevisionEvidence>;
 }
 
-/** One compact archive per song. Day keys are sorted `YYYY-MM-DD` UTC keys. */
+/**
+ * One compact archive per song. Day keys are sorted `YYYY-MM-DD` strings in
+ * the player's local calendar day (see `archiveDayKey`/`localDateKey`) - not
+ * UTC - so they bucket a run under the same day the streak/XP store does.
+ */
 export interface PracticeRunArchive {
   schemaVersion: typeof PRACTICE_RUN_ARCHIVE_SCHEMA_VERSION;
   days: Record<string, PracticeRunDayArchive>;

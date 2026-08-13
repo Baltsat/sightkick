@@ -205,8 +205,8 @@ function SongSearchInner({
               className={cn(
                 'flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors',
                 index === activeIndex
-                  ? 'bg-accent-soft-bg'
-                  : 'hover:bg-accent-soft-bg',
+                  ? 'bg-[var(--dr-paper-low)]'
+                  : 'hover:bg-[var(--dr-paper-low)]',
               )}
               onMouseEnter={() => setActiveIndex(index)}
               onClick={() => select(result)}

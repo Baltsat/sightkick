@@ -657,11 +657,26 @@ export class Engine {
       : 0;
   }
 
+  // A key outside the fixed ELEMENT_TO_KEYS/KEY_TO_ELEMENT table (a
+  // malformed chart, or a five-lane/pro-drums flag mismatch between
+  // song.ini and how notes.chart was actually authored) can never become a
+  // hit, a live 'miss' judgement, or a deriveMisses() catch-up miss - every
+  // one of those paths already filters through isKitElement. totalNotes()
+  // must apply the same filter, or the raw {hitNotes, falseHits,
+  // totalNotes} tuple used for the on-screen score silently disagrees with
+  // the persisted RunSummary it's supposed to summarize.
   private totalNotes(): number {
     return this.measures
       .flatMap((measure) => measure.notes)
       .filter((note) => !note.isRest)
-      .reduce((sum, note) => sum + note.notes.length, 0);
+      .reduce(
+        (sum, note) =>
+          sum +
+          note.notes.filter((key) =>
+            isKitElement(KEY_TO_ELEMENT[keyPrefix(key)]),
+          ).length,
+        0,
+      );
   }
 
   /**

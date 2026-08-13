@@ -4,6 +4,13 @@
    replaces the practice canvas the way "done" replaces "playing" in the
    state table, instead of sitting on top of it. */
 
+/* The receipt sits on the same warm-paper field every other route sits on
+   (see AppShell.css's `.arena-shell::before`), not a bespoke flat fill -
+   it replaces "playing" the way "done" replaces "playing" in the state
+   table (visual-system-v3), so the room does not change under it. This
+   duplicates AppShell's default (non-home) gradient rather than reaching
+   into AppShell, because ScoreSummary portals to `document.body` and sits
+   outside the shell's own DOM subtree. */
 .drumroll-score-summary {
   position: fixed;
   inset: 0;
@@ -12,6 +19,36 @@
   overflow: hidden;
   background: var(--dr-canvas, var(--color-bg));
   font-family: var(--font-ui);
+  isolation: isolate;
+}
+
+.drumroll-score-summary::before {
+  position: absolute;
+  z-index: -1;
+  inset: -14%;
+  content: '';
+  pointer-events: none;
+  background:
+    radial-gradient(
+      70% 88% at 10% 10%,
+      color-mix(
+        in srgb,
+        var(--dr-field-ember, var(--dr-ember)) 36%,
+        transparent
+      ),
+      transparent 72%
+    ),
+    radial-gradient(
+      70% 90% at 94% 88%,
+      color-mix(in srgb, var(--dr-field-wine, var(--dr-wine)) 22%, transparent),
+      transparent 76%
+    ),
+    linear-gradient(
+      118deg,
+      var(--dr-field-base, var(--dr-canvas)) 0%,
+      var(--dr-canvas) 45%,
+      var(--dr-field-low, var(--dr-paper-low)) 100%
+    );
 }
 
 .drumroll-score-summary__header {

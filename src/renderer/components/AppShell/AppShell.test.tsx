@@ -33,6 +33,19 @@ describe('AppShell', () => {
     expect(screen.queryByTestId('view-wave')).not.toBeInTheDocument();
   });
 
+  it('publishes a home-only field-bleed hook under the rail', () => {
+    render(<ShellHarness />);
+
+    const bleed = screen.getByTestId('arena-shell-field-bleed');
+
+    // Present on every route (opacity is gated in CSS by
+    // `.arena-shell[data-view='home']`, not by mount/unmount), decorative
+    // only, and never in the way of rail keyboard/pointer interaction.
+    expect(bleed).toBeInTheDocument();
+    expect(bleed).toHaveAttribute('aria-hidden', 'true');
+    expect(bleed.parentElement).toHaveClass('arena-shell__rail');
+  });
+
   it('keeps the field mounted and marks a route change once', () => {
     vi.useFakeTimers();
     render(<ShellHarness />);

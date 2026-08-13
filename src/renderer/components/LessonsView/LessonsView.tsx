@@ -16,7 +16,6 @@ import {
 } from '../../hooks/useLessons';
 import { useInput } from '../../context/InputContext';
 import { useInputControls } from '../../hooks/useInputControls';
-import journeyStudio from '../../assets/daybreak/journey-studio.png';
 import { resolveJourneyControls } from './journey-controls';
 import '../LessonsJourney/JourneyV2.css';
 
@@ -310,9 +309,6 @@ export function LessonsView({
 
         <div
           className="daybreak-journey-stage journey-route__stage grow"
-          style={{
-            backgroundImage: `url(${journeyStudio})`,
-          }}
           data-testid="lesson-season-stage"
           data-selected-season-state={visibleState}
         >

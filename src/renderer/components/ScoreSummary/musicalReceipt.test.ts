@@ -170,4 +170,75 @@ describe('musicalReceipt', () => {
       changed: false,
     });
   });
+
+  it('never claims a per-drum improvement when the pass also got slower - a slower pass lands more notes on its own', () => {
+    const previous = {
+      ...multiLaneRunFixture(),
+      playbackSpeed: 1,
+      laneAccuracy: [
+        { element: 'kick' as const, hits: 6, misses: 4, accuracy: 0.6 },
+      ],
+    };
+    const summary = {
+      ...previous,
+      playbackSpeed: 0.7,
+      laneAccuracy: [
+        { element: 'kick' as const, hits: 8, misses: 2, accuracy: 0.8 },
+      ],
+    };
+
+    expect(musicalReceipt(summary, previous)).toMatchObject({
+      headline: 'This run is saved for comparison',
+      changed: false,
+    });
+  });
+
+  it('never claims a tightened timing bias when the pass also got slower', () => {
+    const previous = {
+      ...multiLaneRunFixture(),
+      playbackSpeed: 1,
+      timingBias: {
+        meanMs: 40,
+        medianMs: 40,
+        spreadMs: 10,
+        earlyCount: 0,
+        lateCount: 20,
+        onTimeCount: 0,
+        sampleCount: 20,
+      },
+    };
+    const summary = {
+      ...previous,
+      playbackSpeed: 0.7,
+      timingBias: { ...previous.timingBias, meanMs: 5, medianMs: 5 },
+    };
+
+    expect(musicalReceipt(summary, previous)).toMatchObject({
+      headline: 'This run is saved for comparison',
+      changed: false,
+    });
+  });
+
+  it('still credits a per-drum improvement reached at an equal or faster speed', () => {
+    const previous = {
+      ...multiLaneRunFixture(),
+      playbackSpeed: 0.7,
+      laneAccuracy: [
+        { element: 'kick' as const, hits: 6, misses: 4, accuracy: 0.6 },
+      ],
+    };
+    const summary = {
+      ...previous,
+      playbackSpeed: 1,
+      laneAccuracy: [
+        { element: 'kick' as const, hits: 8, misses: 2, accuracy: 0.8 },
+      ],
+    };
+
+    expect(musicalReceipt(summary, previous)).toMatchObject({
+      headline: 'Kick rose 20 points',
+      action: 'continue',
+      changed: true,
+    });
+  });
 });

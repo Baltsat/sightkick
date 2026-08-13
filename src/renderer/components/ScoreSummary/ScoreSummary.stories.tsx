@@ -161,6 +161,55 @@ export const NoAttemptsThisRun: Story = {
   },
 };
 
+/** Stress case for "keeps its continuation action visible without
+ * scrolling at 1024x700" (docs/design-acceptance-notes.md item 4): every
+ * optional footer row on at once - a saving-state banner, the auto-continue
+ * countdown, all three hands-free kit prompts, and the postcard export
+ * button - stacked above the primary action. The body's internal scroll
+ * (`.drumroll-score-summary__body { overflow-y: auto }`) is what keeps the
+ * footer itself pinned and fully visible regardless of body content. */
+export const WorstCaseFooter: Story = {
+  args: {
+    scoreData: undefined,
+    practiceSummary: receiptRun,
+    previousPracticeSummary: previousRun,
+    gamification,
+    persistenceState: 'saved',
+    autoContinueEnabled: true,
+    autoContinueSeconds: 8,
+    handsFreeControlsEnabled: true,
+    nextLabel: 'Continue My Wave',
+    lessonProgression: {
+      qualifies: false,
+      fullCoverage: true,
+      meetsLearningTempo: true,
+      atTargetSpeed: false,
+      meetsAccuracyTarget: false,
+      accuracy: 0.68,
+      starsEarned: 2,
+    },
+    runResult: {
+      xpEarned: 12,
+      goalCrossed: true,
+      streakCurrent: 5,
+      nudge: {
+        achievementId: 'week-one',
+        message: 'One more session keeps this week alive.',
+      },
+      newlyUnlocked: [
+        {
+          id: 'first-blood',
+          title: 'Retained skill',
+          description: 'A delayed skill check held after the first pass.',
+          hint: 'Save a retained skill check after its first acquisition.',
+          evidenceEvent: 'saved retention evidence',
+          proofRank: 1,
+        },
+      ],
+    },
+  },
+};
+
 export const SectionAudition: Story = {
   args: {
     scoreData: undefined,

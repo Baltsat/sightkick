@@ -1,310 +1,44 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { App } from 'antd';
-import { uniqBy } from 'es-toolkit';
+import { useCallback, useMemo } from 'react';
 import { Difficulty } from 'scan-chart';
+import type { IpcYoutubeSearchResult } from '../../types';
+import { rankAutoImportCandidates } from '../services/auto-import';
 import { OnlineSong } from '../types';
+import { useYoutubeSearch } from './useYoutubeSearch';
 
-type PageResult = { songs: OnlineSong[]; total: number | undefined };
-
-const PAGE_CACHE_LIMIT = 50;
-
-function cacheGet(
-  cache: Map<string, PageResult>,
-  key: string,
-): PageResult | undefined {
-  const value = cache.get(key);
-
-  if (value === undefined) {
-    return undefined;
-  }
-
-  cache.delete(key);
-  cache.set(key, value);
-
-  return value;
-}
-
-function cacheSet(
-  cache: Map<string, PageResult>,
-  key: string,
-  value: PageResult,
-) {
-  cache.delete(key);
-  cache.set(key, value);
-
-  while (cache.size > PAGE_CACHE_LIMIT) {
-    const oldest = cache.keys().next().value;
-
-    if (oldest === undefined) {
-      break;
-    }
-
-    cache.delete(oldest);
-  }
-}
-
-export function mapSongs(data: Record<string, unknown>[]): OnlineSong[] {
-  return uniqBy(
-    data.map(
-      (chart): OnlineSong => ({
-        source: 'online',
-        chartSource: 'chorus-encore',
-        reviewed: chart.drumsReviewed === true,
-        id: String(chart.md5),
-        downloadUrl: `https://files.enchor.us/${chart.md5}.sng`,
-        albumCover: chart.albumArtMd5
-          ? `https://files.enchor.us/${chart.albumArtMd5}.jpg`
-          : undefined,
-        name: String(chart.name ?? ''),
-        artist: String(chart.artist ?? ''),
-        charter: String(chart.charter ?? ''),
-        drumDifficulty:
-          typeof chart.diff_drums === 'number' ? chart.diff_drums : 0,
-        durationSeconds:
-          typeof chart.song_length === 'number'
-            ? chart.song_length > 10_000
-              ? chart.song_length / 1000
-              : chart.song_length
-            : undefined,
-      }),
-    ),
-    (song) => song.id,
-  );
-}
-
-async function fetchEnchorePage(
-  query: string,
-  page: number,
-  difficulty: Difficulty,
-  signal: AbortSignal,
-): Promise<PageResult> {
-  const res = await fetch('https://api.enchor.us/search', {
-    headers: {
-      accept: 'application/json, text/plain, */*',
-      'accept-language': 'en-US,en;q=0.9',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      search: query,
-      page,
-      instrument: 'drums',
-      drumType: 'fourLanePro',
-      difficulty,
-      source: 'website',
-      drumsReviewed: true,
+export function mapSongs(
+  results: readonly IpcYoutubeSearchResult[],
+): OnlineSong[] {
+  return results.map(
+    (result): OnlineSong => ({
+      source: 'online',
+      id: result.videoId,
+      downloadUrl: result.watchUrl,
+      albumCover: result.thumbnailUrl,
+      name: result.title,
+      artist: result.uploader ?? 'YouTube',
+      charter: 'YouTube',
+      drumDifficulty: 0,
+      durationSeconds: result.durationSeconds,
     }),
-    method: 'POST',
-    signal,
-  });
-
-  if (!res.ok) {
-    throw new Error(`Enchor search failed: ${res.status} ${res.statusText}`);
-  }
-
-  const json = await res.json();
-
-  return {
-    songs: mapSongs(json.data ?? []),
-    total: (json.found as number | undefined) ?? undefined,
-  };
+  );
 }
 
 export function useOnlineSearch(
   active: boolean,
   search: string,
-  difficulty: Difficulty,
+  _difficulty: Difficulty,
 ) {
-  const { notification } = App.useApp();
-  const [results, setResults] = useState<OnlineSong[]>([]);
-  const [total, setTotal] = useState<number | undefined>();
-  const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const pageRef = useRef(1);
-  const searchRef = useRef(search);
-  const difficultyRef = useRef(difficulty);
-  const resultsRef = useRef<OnlineSong[]>([]);
-  const cache = useRef<Map<string, PageResult>>(new Map());
-  const abortRef = useRef<AbortController | null>(null);
-  const applyResults = useCallback(
-    (
-      next: OnlineSong[],
-      nextTotal: number | undefined,
-      nextHasMore: boolean,
-    ) => {
-      resultsRef.current = next;
-      setResults(next);
-      setHasMore(nextHasMore);
-
-      if (nextTotal !== undefined) {
-        setTotal(nextTotal);
-      }
-    },
-    [],
+  const { results, loading } = useYoutubeSearch(active ? search : '');
+  const songs = useMemo(
+    () => mapSongs(rankAutoImportCandidates(search, results).candidates),
+    [results, search],
   );
-  const fetchPage = useCallback(
-    async (query: string, page: number, diff: Difficulty, append: boolean) => {
-      const cacheKey = `${query}:${diff}:${page}`;
-      const cached = cacheGet(cache.current, cacheKey);
+  const loadMore = useCallback(() => {}, []);
 
-      if (cached) {
-        const next = append
-          ? uniqBy([...resultsRef.current, ...cached.songs], (s) => s.id)
-          : cached.songs;
-
-        applyResults(
-          next,
-          cached.total,
-          cached.total !== undefined
-            ? next.length < cached.total
-            : cached.songs.length > 0,
-        );
-        setLoading(false);
-
-        return;
-      }
-
-      abortRef.current?.abort();
-
-      const controller = new AbortController();
-
-      abortRef.current = controller;
-
-      try {
-        const { songs, total: pageTotal } = await fetchEnchorePage(
-          query,
-          page,
-          diff,
-          controller.signal,
-        );
-
-        cacheSet(cache.current, cacheKey, { songs, total: pageTotal });
-
-        const next = append
-          ? uniqBy([...resultsRef.current, ...songs], (s) => s.id)
-          : songs;
-
-        applyResults(
-          next,
-          pageTotal,
-          pageTotal !== undefined ? next.length < pageTotal : songs.length > 0,
-        );
-        setLoading(false);
-      } catch {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        notification.error({
-          title: 'Search failed',
-          description:
-            'Unable to fetch songs from Encore. Please check your connection.',
-          placement: 'bottomRight',
-        });
-        setLoading(false);
-      }
-    },
-    [notification, applyResults],
-  );
-  const fetchFirstPages = useCallback(
-    async (query: string, diff: Difficulty) => {
-      abortRef.current?.abort();
-
-      const controller = new AbortController();
-
-      abortRef.current = controller;
-
-      const getOrFetch = async (page: number): Promise<PageResult> => {
-        const cacheKey = `${query}:${diff}:${page}`;
-        const cached = cacheGet(cache.current, cacheKey);
-
-        if (cached) {
-          return cached;
-        }
-
-        const r = await fetchEnchorePage(query, page, diff, controller.signal);
-
-        cacheSet(cache.current, cacheKey, r);
-
-        return r;
-      };
-
-      try {
-        const [p1, p2] = await Promise.all([getOrFetch(1), getOrFetch(2)]);
-
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        const combined = uniqBy([...p1.songs, ...p2.songs], (s) => s.id);
-        const pageTotal = p1.total ?? p2.total;
-
-        pageRef.current = 2;
-        applyResults(
-          combined,
-          pageTotal,
-          pageTotal !== undefined
-            ? combined.length < pageTotal
-            : p2.songs.length > 0,
-        );
-        setLoading(false);
-      } catch {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        notification.error({
-          title: 'Search failed',
-          description:
-            'Unable to fetch songs from Encore. Please check your connection.',
-          placement: 'bottomRight',
-        });
-        setLoading(false);
-      }
-    },
-    [notification, applyResults],
-  );
-  const searchKey = active ? `${search}:${difficulty}` : null;
-  const [prevSearchKey, setPrevSearchKey] = useState<string | null>(null);
-
-  if (searchKey !== prevSearchKey) {
-    setPrevSearchKey(searchKey);
-
-    if (searchKey !== null) {
-      setResults([]);
-      setTotal(undefined);
-      setHasMore(true);
-      setLoading(true);
-    } else {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!active) {
-      return;
-    }
-
-    searchRef.current = search;
-    difficultyRef.current = difficulty;
-
-    const timer = setTimeout(() => {
-      fetchFirstPages(search, difficulty);
-    }, 300);
-
-    return () => {
-      clearTimeout(timer);
-      abortRef.current?.abort();
-    };
-  }, [active, search, difficulty, fetchFirstPages]);
-
-  const loadMore = useCallback(() => {
-    if (loading || !hasMore) {
-      return;
-    }
-
-    pageRef.current += 1;
-    fetchPage(searchRef.current, pageRef.current, difficultyRef.current, true);
-  }, [loading, hasMore, fetchPage]);
-
-  return { results, total, loading, loadMore };
+  return {
+    results: songs,
+    total: songs.length,
+    loading,
+    loadMore,
+  };
 }

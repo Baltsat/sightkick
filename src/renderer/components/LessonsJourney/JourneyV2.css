@@ -281,32 +281,15 @@
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  background-color: var(--surface-studio);
-  background-position: center;
-  background-size: cover;
+  background: transparent;
   box-shadow: none;
   isolation: isolate;
 }
 
-.daybreak-journey-stage::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  content: '';
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--surface-studio) 88%, transparent) 0%,
-      color-mix(in srgb, var(--surface-studio) 54%, transparent) 33%,
-      transparent 70%
-    ),
-    linear-gradient(
-      0deg,
-      color-mix(in srgb, var(--surface-studio) 56%, transparent) 0%,
-      transparent 40%
-    );
-}
-
+/* The stage sits directly on the AppShell's persistent warm-paper field
+   (see AppShell.css) instead of a bespoke photographic backdrop - visual-
+   system-v3 "the canvas is continuous": journey is a choosing/planning
+   route, not a studio-dusk performance surface. */
 .journey-venue-plaque {
   position: absolute;
   z-index: 3;
@@ -318,13 +301,13 @@
   max-width: min(20rem, calc(100% - 2rem));
   padding: 0.15rem 0 0.15rem 0.7rem;
   border-left: 2px solid var(--signal-ember);
-  color: var(--surface-raised);
+  color: var(--ink-strong);
   background: transparent;
 }
 
 .journey-venue-plaque span,
 .journey-venue-plaque small {
-  color: color-mix(in srgb, var(--surface-raised) 68%, transparent);
+  color: var(--ink-muted);
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -400,10 +383,10 @@
   align-items: center;
   gap: 0.4rem;
   padding: 0.4rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--surface-raised) 30%, transparent);
+  border: 1px solid var(--line-soft);
   border-radius: 999px;
-  color: var(--surface-raised);
-  background: color-mix(in srgb, var(--surface-studio) 70%, transparent);
+  color: var(--ink-strong);
+  background: var(--surface-raised);
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
@@ -415,8 +398,8 @@
 }
 
 .daybreak-lesson-path__controls-toggle:hover {
-  border-color: color-mix(in srgb, var(--surface-raised) 52%, transparent);
-  background: color-mix(in srgb, var(--surface-studio) 88%, transparent);
+  border-color: var(--signal-wine);
+  background: var(--surface-raised);
 }
 
 .daybreak-lesson-path__controls-toggle svg {
@@ -442,9 +425,11 @@
   max-width: min(28rem, 60%);
   gap: 0.3rem;
   padding: 0.65rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--surface-raised) 26%, transparent);
-  color: var(--surface-raised);
-  background: color-mix(in srgb, var(--surface-studio) 84%, transparent);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  color: var(--ink-strong);
+  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  box-shadow: var(--shadow-paper-strong);
   opacity: 0;
   pointer-events: none;
   transform: translateY(0.35rem);
@@ -461,7 +446,7 @@
 
 .daybreak-lesson-path__kit-hint > span,
 .daybreak-lesson-path__kit-hint small {
-  color: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+  color: var(--ink-muted);
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -525,7 +510,7 @@
   height: 100%;
   object-fit: contain;
   filter: drop-shadow(
-    0 0.5rem 0.55rem color-mix(in srgb, var(--surface-studio) 48%, transparent)
+    0 0.5rem 0.55rem color-mix(in srgb, var(--ink-strong) 30%, transparent)
   );
 }
 

@@ -226,6 +226,39 @@ describe('savePracticeRun', () => {
     });
   });
 
+  it('keeps two runs completed in the same second as two distinct entries instead of colliding on their timestamp', () => {
+    // A quick "Play again"/retry loop, or two songs finished back-to-back,
+    // can genuinely complete within the same wall-clock second. Nothing in
+    // this store keys a run by its completedAt string - it's an ordinary
+    // array append - but that must stay true: any future change that turns
+    // completedAt into an identity/dedup key would silently drop one of two
+    // real, distinct runs.
+    storeHolder.current = makeStore({});
+
+    const event = makeEvent();
+    const first = fakeSummary(1, 'run-a');
+    const second: RunSummary = {
+      ...fakeSummary(0.5, 'run-b'),
+      completedAt: '2026-08-01T00:00:00.500Z',
+    };
+
+    savePracticeRun(event as never, { songId: 'song-1', summary: first });
+    savePracticeRun(event as never, { songId: 'song-1', summary: second });
+
+    expect(storeHolder.current.get('practiceRuns.song-1')).toEqual([
+      first,
+      second,
+    ]);
+    expect(practicePresence.recordPractice).toHaveBeenNthCalledWith(
+      1,
+      first.completedAt,
+    );
+    expect(practicePresence.recordPractice).toHaveBeenNthCalledWith(
+      2,
+      second.completedAt,
+    );
+  });
+
   it('stores compact hit records separately from the summary history', () => {
     storeHolder.current = makeStore({});
 
