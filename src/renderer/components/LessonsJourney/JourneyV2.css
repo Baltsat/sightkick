@@ -293,7 +293,8 @@
   z-index: -1;
   inset: 0;
   content: '';
-  background: linear-gradient(
+  background:
+    linear-gradient(
       90deg,
       color-mix(in srgb, var(--surface-studio) 88%, transparent) 0%,
       color-mix(in srgb, var(--surface-studio) 54%, transparent) 33%,
@@ -312,9 +313,9 @@
   top: 1rem;
   right: 1rem;
   display: grid;
-  width: fit-content;
+  width: max-content;
   gap: 0.15rem;
-  max-width: min(16rem, 34%);
+  max-width: min(20rem, calc(100% - 2rem));
   padding: 0.15rem 0 0.15rem 0.7rem;
   border-left: 2px solid var(--signal-ember);
   color: var(--surface-raised);
@@ -331,6 +332,8 @@
 }
 
 .journey-venue-plaque strong {
+  min-width: 0;
+  max-width: 100%;
   font-family: var(--font-display);
   font-size: clamp(1.1rem, 1.7vw, 1.5rem);
   font-weight: 620;

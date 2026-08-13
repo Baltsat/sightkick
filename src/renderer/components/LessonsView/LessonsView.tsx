@@ -326,7 +326,9 @@ export function LessonsView({
               <span>
                 Season {String(visibleSeasonIndex + 1).padStart(2, '0')}
               </span>
-              <strong>{visibleGroup.unit}</strong>
+              <strong data-testid="journey-world-title">
+                {visibleGroup.unit}
+              </strong>
               <small>{visibleStateLabel}</small>
             </div>
           )}

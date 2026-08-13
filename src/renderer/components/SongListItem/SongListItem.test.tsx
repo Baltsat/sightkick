@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import songArtPlaceholder from '../../../../assets/song-art-placeholder.svg';
 import { PlayabilityEvidence, Song } from '../../../types';
 import { OnlineSong } from '../../types';
 import { SongListItem } from './SongListItem';
@@ -60,6 +61,18 @@ function renderItem(
 }
 
 describe('SongListItem playability', () => {
+  it('uses neutral song art when a song has no album cover', () => {
+    renderItem(baseSong);
+
+    const artwork = screen.getByTestId('song-item-song-1').querySelector('img');
+
+    expect(artwork).toHaveAttribute('src', songArtPlaceholder);
+
+    fireEvent.error(artwork!);
+
+    expect(artwork).toHaveAttribute('src', songArtPlaceholder);
+  });
+
   it('is playable and clickable for an ordinary local song with audio and a chart', () => {
     const { onClick } = renderItem(baseSong);
     const row = screen.getByTestId('song-item-song-1');

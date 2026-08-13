@@ -291,6 +291,10 @@ export function SongView() {
   const [isExporting, setIsExporting] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isCoachOpen, setIsCoachOpen] = useState(false);
+  const [coachSpeedChange, setCoachSpeedChange] = useState<{
+    previous: number;
+    applied: number;
+  }>();
   const [isCoachLoading, setIsCoachLoading] = useState(false);
   const [songRuns, setSongRuns] = useState<RunSummary[]>();
   const [fullRuns, setFullRuns] = useState<StoredPracticeRun[]>();
@@ -641,6 +645,13 @@ export function SongView() {
       delaySeconds
     );
   }, [chart, parsedMidi, delaySeconds]);
+  const onExplicitSpeedChange = useCallback(
+    (speed: number) => {
+      setLearnerPlaybackSpeed(speed);
+      setCoachSpeedChange(undefined);
+    },
+    [setLearnerPlaybackSpeed],
+  );
   const {
     engine,
     isReady,
@@ -1262,7 +1273,7 @@ export function SongView() {
     isEnded,
     onExit: () => navigate('/'),
     initialPlaybackSpeed,
-    onExplicitSpeedChange: setLearnerPlaybackSpeed,
+    onExplicitSpeedChange,
     onPlay: playRun,
     onPlayFromTick: playRunFromTick,
   });
@@ -1289,6 +1300,11 @@ export function SongView() {
       }
 
       pause();
+      setCoachSpeedChange(
+        Math.abs(playbackSpeed - speed) > 0.001
+          ? { previous: playbackSpeed, applied: speed }
+          : undefined,
+      );
       setPlaybackSpeed(speed);
       setIsLooping(true);
       onPracticeRangeChange({ start, end });
@@ -1309,8 +1325,18 @@ export function SongView() {
       seekSeconds,
       setIsLooping,
       setPlaybackSpeed,
+      playbackSpeed,
     ],
   );
+  const keepLearnerPlaybackSpeed = useCallback(() => {
+    if (!coachSpeedChange) {
+      return;
+    }
+
+    setPlaybackSpeed(coachSpeedChange.previous);
+    setLearnerPlaybackSpeed(coachSpeedChange.previous);
+    setCoachSpeedChange(undefined);
+  }, [coachSpeedChange, setLearnerPlaybackSpeed, setPlaybackSpeed]);
   const appliedAuditionRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -2264,6 +2290,7 @@ export function SongView() {
 
               setPlaybackSpeed(newValue);
               setLearnerPlaybackSpeed(newValue);
+              setCoachSpeedChange(undefined);
             }}
             styles={{
               input: {
@@ -2957,6 +2984,14 @@ export function SongView() {
             recoveryCaption={recoveryCaption}
             displayState={tutorDisplayState}
             controlPrompt={kitControlPrompt}
+            speedChange={
+              coachSpeedChange
+                ? {
+                    ...coachSpeedChange,
+                    onKeepOwnSpeed: keepLearnerPlaybackSpeed,
+                  }
+                : undefined
+            }
           />
         )}
         {showLoopCaption && practiceRange && (
@@ -2975,6 +3010,23 @@ export function SongView() {
             <p className="drumroll-practice-edge-caption__detail">
               Kick to count in · clear it to return to the full song.
             </p>
+            {coachSpeedChange && (
+              <>
+                <span
+                  className="drumroll-practice-edge-caption__detail"
+                  data-testid="coach-speed-change"
+                >
+                  Coach set {coachSpeedChange.applied.toFixed(1)}× to rehearse
+                  this loop.
+                </span>
+                <Button
+                  data-testid="keep-learner-speed"
+                  onClick={keepLearnerPlaybackSpeed}
+                >
+                  Keep my {coachSpeedChange.previous.toFixed(1)}×
+                </Button>
+              </>
+            )}
             <Button data-testid="clear-loop" onClick={clearPracticeLoop}>
               Clear loop
             </Button>

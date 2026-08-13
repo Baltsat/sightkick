@@ -8,20 +8,18 @@ small end, and the winner shipped.
 
 ## the verdict
 
-**Winner: Candidate B, "Signal Disc."** See `comparison-grid.png` /
-`comparison-grid.html` for the decisive evidence — kb.5, the current
-(rejected) icon, and the winner, all three at their actual 16×16, 32×32, and
-128×128 shipped pixels, nearest-neighbor scaled so no cell hides behind
-smoothing.
+**Current production mark: kb.14 "Drum Mark."** See `comparison-grid.png` /
+`comparison-grid.html` for the decisive evidence — kb.5, the prior Signal
+Disc, and Drum Mark at 16×16, 32×32, 128×128, and 1024×1024. The revision
+uses the actual iconset slot files, so no cell hides behind a mock render.
 
-At 16 px the current icon is close to a plain black square with a barely
-visible cream oval — the exact failure the owner named. kb.5 is a warm,
-appealing blob at 1024 px but the photographic drum/stick/waveform detail
-collapses into an indistinct smear by 32 px. The winner is the only one of
-the three that stays a confident, legible shape — a dark ring around a warm
-ember spike — all the way down to 16 px, while also being the boldest, most
-premium mark at 1024 px. It is the only candidate that passes both halves of
-the brief's own test at once.
+At 16 px the rejected icon is close to a plain black square with a barely
+visible cream oval — the exact failure the owner named. Signal Disc corrected
+that small-slot failure, but its waveform made the large mark look like a
+generic audio app. kb.5 remains the more intricate full-size illustration.
+Drum Mark keeps the small-size dark ring and adds a legible crossed-stick X,
+so it wins the required trade: readable in a Dock and plainly drums at full
+size.
 
 ## the three candidates
 
@@ -31,11 +29,11 @@ the light values, `dr-ink` for the dark linework, `dr-ember` → `dr-count` for
 the signature glow). They are structurally different drawings, not three
 tints of one drawing:
 
-|                                                                             | composition                                                                                                                                                     | reads at 16px?                                                                                                        | reads at 1024px?                                                                                    |
-| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| **A — Ember Snare** (`candidates/candidate-a-ember-snare.svg`)              | literal 3/4-view snare, crossed sticks above, ember waveform across the head — the direct, properly-drawn restoration of the kb.5 idea                          | **no** — collapses into an ambiguous dark blob, and at 32–64px the crossed sticks read as TV antennae, not drumsticks | yes, charming, but the antenna misread is a real defect                                             |
-| **B — Signal Disc** (`candidates/candidate-b-signal-disc.svg`) — **winner** | the drumhead _is_ the whole icon: a thick dark rim with eight lug dots standing in for tension rods, and one ember-to-gold waveform spike as the signature mark | **yes** — a dark ring with a warm ember core is unambiguous at 16px                                                   | yes — bold, premium, poster-simple                                                                  |
-| C — Strike Impact (`candidates/candidate-c-strike-impact.svg`)              | no drum body at all: a single diagonal stick striking an ember burst, with concentric sound-ripple rings                                                        | **no** — rings and stick fade to a soft blob, the weakest of the three small                                          | yes — the most painterly/dynamic of the three at 1024px, but form is lost long before it gets there |
+|                                                                | composition                                                                                                                                                     | reads at 16px?                                                                                                        | reads at 1024px?                                                                                    |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **A — Ember Snare** (`candidates/candidate-a-ember-snare.svg`) | literal 3/4-view snare, crossed sticks above, ember waveform across the head — the direct, properly-drawn restoration of the kb.5 idea                          | **no** — collapses into an ambiguous dark blob, and at 32–64px the crossed sticks read as TV antennae, not drumsticks | yes, charming, but the antenna misread is a real defect                                             |
+| **B — Signal Disc** (`candidates/candidate-b-signal-disc.svg`) | the drumhead _is_ the whole icon: a thick dark rim with eight lug dots standing in for tension rods, and one ember-to-gold waveform spike as the signature mark | **yes** — a dark ring with a warm ember core is unambiguous at 16px                                                   | legible, but generic audio rather than explicitly drums                                             |
+| C — Strike Impact (`candidates/candidate-c-strike-impact.svg`) | no drum body at all: a single diagonal stick striking an ember burst, with concentric sound-ripple rings                                                        | **no** — rings and stick fade to a soft blob, the weakest of the three small                                          | yes — the most painterly/dynamic of the three at 1024px, but form is lost long before it gets there |
 
 Full 16/32/64/128/256/512/1024px renders of all three candidates are in
 `candidates/renders/`, generated straight from the SVGs with
@@ -48,21 +46,17 @@ ECG/heart-monitor "QRS complex" shape), which made the mark read as a
 medical pulse-oximeter icon rather than a struck drum. It was redrawn, in
 the same working session, as a single smooth flame-shaped spike entirely
 above the baseline — that redrawn version is the one in
-`candidates/candidate-b-signal-disc.svg` and the one shipped as
-`assets/icon.svg` (the two files are byte-identical; this copy exists so
-the losing candidates and the winner sit side by side and nothing here
-depends on the live `assets/` tree).
+`candidates/candidate-b-signal-disc.svg`. It was the kb.13 production source;
+kb.14 supersedes it with `assets/icon.svg` and `assets/icon-small.svg`.
 
 ## small-size handling
 
-`candidates/candidate-b-signal-disc-small.svg` is a hand-simplified variant
-of the winner used only for the 16px/32px iconset and `.ico` slots: the rim
-lugs and the thin gold hairline ring are dropped (both are sub-pixel noise
-below ~64px) and the ring/waveform strokes are thickened so the small icon
-stays a confident dark ring with a bright spike instead of thinning into a
-grey smear. This is normal professional icon practice — Apple's own iconset
+`assets/icon-small.svg` is the kb.14 hand-simplified source for the 16px/32px
+iconset and `.ico` slots. It keeps a bold rim and crossed-stick silhouette,
+drops the full lug ring, and enlarges the ember strike so the tiny mark stays
+readable. This is normal professional icon practice — Apple's own iconset
 format expects distinct per-size artwork, not one vector blindly scaled to
-every slot. Full rationale in `assets/ICON_PROVENANCE.md`.
+every slot. Full rationale is in `assets/ICON_PROVENANCE.md`.
 
 ## reference sources
 
@@ -93,8 +87,8 @@ content is sufficient and this task's file scope (`assets/**` plus the
 brand mark surface) is satisfied without touching shared shell code that
 other lanes are editing in parallel.
 
-## winner, exactly as shipped
+## kb.14, exactly as shipped
 
-`winner-shipped/{16,32,128,1024}.png` are copies of the actual production
+`kb14-drum-mark/{16,32,128,1024}.png` are copies of the actual production
 files from `assets/icon.iconset/` — not re-renders — so this folder proves
 what is really going into the notarized build, not an idealized version.

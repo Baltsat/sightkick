@@ -7,7 +7,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { faHeart } from '@fortawesome/free-regular-svg-icons';
 import { faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
-import appIcon from '../../../../assets/icon.png';
+import songArtPlaceholder from '../../../../assets/song-art-placeholder.svg';
 import { Song } from '../../../types';
 import { cn } from '../../cn';
 import { Button, Tooltip } from 'antd';
@@ -220,10 +220,10 @@ export function SongListItem({
       >
         <div className="flex min-w-0 items-center">
           <img
-            src={albumCover ?? appIcon}
+            src={albumCover ?? songArtPlaceholder}
             alt={albumCover ? `${name} album cover` : ''}
             onError={(e) => {
-              e.currentTarget.src = appIcon;
+              e.currentTarget.src = songArtPlaceholder;
             }}
             className="size-14 shrink-0 object-cover rounded-lg shadow-frame outline outline-1 -outline-offset-1 outline-white/10"
           />

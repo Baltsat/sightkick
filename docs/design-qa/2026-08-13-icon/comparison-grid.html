@@ -2,23 +2,25 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Drumroll app icon — kb.5 vs current vs winner</title>
+    <title>Drumroll icon comparison — kb.5, Signal Disc, kb.14 Drum Mark</title>
     <style>
       body {
         margin: 0;
         padding: 32px;
         background: #ffffff;
-        font-family: -apple-system, sans-serif;
         color: #1a1a1a;
+        font-family: -apple-system, sans-serif;
       }
       h1 {
-        font-size: 20px;
         margin: 0 0 4px;
+        font-size: 20px;
       }
-      p.sub {
-        font-size: 13px;
-        color: #666;
+      .sub {
+        max-width: 840px;
         margin: 0 0 28px;
+        color: #666;
+        font-size: 13px;
+        line-height: 1.45;
       }
       table {
         border-collapse: collapse;
@@ -26,44 +28,44 @@
       th,
       td {
         padding: 14px 22px;
+        border-bottom: 1px solid #eee;
         text-align: center;
         vertical-align: middle;
-        border-bottom: 1px solid #eee;
       }
       th {
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
         color: #888;
+        font-size: 12px;
         font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
       }
-      td.rowlabel {
+      .rowlabel {
         text-align: left;
         font-size: 13px;
         font-weight: 600;
         white-space: nowrap;
       }
-      td.rowsub {
+      .rowsub {
         display: block;
+        margin-top: 2px;
+        color: #888;
         font-size: 11px;
         font-weight: 400;
-        color: #888;
-        margin-top: 2px;
       }
       .cb {
         display: inline-block;
+        border-radius: 4px;
         background-image:
           linear-gradient(45deg, #ddd 25%, transparent 25%),
           linear-gradient(-45deg, #ddd 25%, transparent 25%),
           linear-gradient(45deg, transparent 75%, #ddd 75%),
           linear-gradient(-45deg, transparent 75%, #ddd 75%);
-        background-size: 8px 8px;
         background-position:
           0 0,
           0 4px,
           4px -4px,
-          -4px 0px;
-        border-radius: 4px;
+          -4px 0;
+        background-size: 8px 8px;
       }
       img {
         display: block;
@@ -75,73 +77,63 @@
     </style>
   </head>
   <body>
-    <h1>
-      Drumroll app icon — kb.5 vs current (kb.9) vs winner (kb.13 candidate B,
-      "Signal Disc")
-    </h1>
+    <h1>Drumroll app icon — kb.5, kb.13 Signal Disc, kb.14 Drum Mark</h1>
     <p class="sub">
-      Each cell is the actual shipped-resolution PNG, unscaled in the DOM, shown
-      at native pixel size against a checkerboard so corner transparency is
-      visible. Generated 2026-08-13.
+      Each cell uses the exact slot artwork at native pixel size. kb.14 keeps
+      Signal Disc’s small-size legibility, while crossed sticks and the lugged
+      snare head make the full-size mark read as drums rather than a generic
+      audio app. kb.5 remains the more intricate full-size illustration.
     </p>
     <table>
       <tr>
         <th></th>
-        <th>16 &times; 16</th>
-        <th>32 &times; 32</th>
-        <th>128 &times; 128</th>
+        <th>16 × 16</th>
+        <th>32 × 32</th>
+        <th>128 × 128</th>
+        <th>1024 × 1024</th>
       </tr>
       <tr>
         <td class="rowlabel">
-          kb.5<span class="rowsub"
-            >recovered: git show 025c384:assets/icon.png</span
-          >
+          kb.5<span class="rowsub">recovered original</span>
         </td>
         <td>
           <span class="cb"
-            ><img src="reference-sources/kb5-downscaled/kb5-16.png" width="16" height="16"
-          /></span>
-        </td>
-        <td>
-          <span class="cb"
-            ><img src="reference-sources/kb5-downscaled/kb5-32.png" width="32" height="32"
-          /></span>
-        </td>
-        <td>
-          <span class="cb"
-            ><img src="reference-sources/kb5-downscaled/kb5-128.png" width="128" height="128"
-          /></span>
-        </td>
-      </tr>
-      <tr>
-        <td class="rowlabel">
-          current (kb.9→kb.13)<span class="rowsub"
-            >shipped in 5abdfc4, the rejected icon</span
-          >
-        </td>
-        <td>
-          <span class="cb"
-            ><img src="reference-sources/current-downscaled/current-16.png" width="16" height="16"
-          /></span>
-        </td>
-        <td>
-          <span class="cb"
-            ><img src="reference-sources/current-downscaled/current-32.png" width="32" height="32"
+            ><img
+              src="reference-sources/kb5-downscaled/kb5-16.png"
+              width="16"
+              height="16"
           /></span>
         </td>
         <td>
           <span class="cb"
             ><img
-              src="reference-sources/current-downscaled/current-128.png"
+              src="reference-sources/kb5-downscaled/kb5-32.png"
+              width="32"
+              height="32"
+          /></span>
+        </td>
+        <td>
+          <span class="cb"
+            ><img
+              src="reference-sources/kb5-downscaled/kb5-128.png"
               width="128"
               height="128"
+          /></span>
+        </td>
+        <td>
+          <span class="cb"
+            ><img
+              class="smooth"
+              src="reference-sources/kb5-icon-1024.png"
+              width="256"
+              height="256"
           /></span>
         </td>
       </tr>
       <tr>
         <td class="rowlabel">
-          winner — shipped now<span class="rowsub"
-            >assets/icon.iconset, exact production files</span
+          kb.13 Signal Disc<span class="rowsub"
+            >best small-slot trade before this pass</span
           >
         </td>
         <td>
@@ -157,6 +149,44 @@
         <td>
           <span class="cb"
             ><img src="winner-shipped/128.png" width="128" height="128"
+          /></span>
+        </td>
+        <td>
+          <span class="cb"
+            ><img
+              class="smooth"
+              src="winner-shipped/1024.png"
+              width="256"
+              height="256"
+          /></span>
+        </td>
+      </tr>
+      <tr>
+        <td class="rowlabel">
+          kb.14 Drum Mark<span class="rowsub">production iconset revision</span>
+        </td>
+        <td>
+          <span class="cb"
+            ><img src="kb14-drum-mark/16.png" width="16" height="16"
+          /></span>
+        </td>
+        <td>
+          <span class="cb"
+            ><img src="kb14-drum-mark/32.png" width="32" height="32"
+          /></span>
+        </td>
+        <td>
+          <span class="cb"
+            ><img src="kb14-drum-mark/128.png" width="128" height="128"
+          /></span>
+        </td>
+        <td>
+          <span class="cb"
+            ><img
+              class="smooth"
+              src="kb14-drum-mark/1024.png"
+              width="256"
+              height="256"
           /></span>
         </td>
       </tr>

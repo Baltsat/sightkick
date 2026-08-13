@@ -54,7 +54,7 @@
 }
 
 .drumroll-score-summary__body {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   display: flex;
   flex-direction: column;
   gap: clamp(16px, 2.2vh, 24px);

@@ -44,32 +44,44 @@ for value in "${apple_id_credentials[@]}"; do
     [[ -n "$value" ]] || apple_id_complete=0
 done
 
+notarization_result=''
 if [[ "$api_key_complete" -eq 1 ]]; then
     if [[ ! -f "$APPLE_API_KEY" || ! -r "$APPLE_API_KEY" ]]; then
         echo "APPLE_API_KEY must point to a readable App Store Connect private key." >&2
         exit 1
     fi
-    xcrun notarytool submit "$dmg_path" \
+    notarization_result="$(xcrun notarytool submit "$dmg_path" \
         --key "$APPLE_API_KEY" \
         --key-id "$APPLE_API_KEY_ID" \
         --issuer "$APPLE_API_ISSUER" \
         --wait \
-        --timeout 30m
+        --timeout 30m \
+        --output-format json)"
 elif [[ "$apple_id_complete" -eq 1 ]]; then
     if [[ "$APPLE_TEAM_ID" != "$expected_team_id" ]]; then
         echo "APPLE_TEAM_ID does not match the expected Apple Developer team." >&2
         exit 1
     fi
-    xcrun notarytool submit "$dmg_path" \
+    notarization_result="$(xcrun notarytool submit "$dmg_path" \
         --apple-id "$APPLE_ID" \
         --password "$APPLE_APP_SPECIFIC_PASSWORD" \
         --team-id "$APPLE_TEAM_ID" \
         --wait \
-        --timeout 30m
+        --timeout 30m \
+        --output-format json)"
 else
     echo "Complete App Store Connect API key or Apple ID notarization credentials are required." >&2
     exit 1
 fi
+
+printf '%s\n' "$notarization_result"
+notarization_id="$(node -e 'const result = JSON.parse(process.argv[1]); process.stdout.write(result.id ?? "")' "$notarization_result")"
+notarization_status="$(node -e 'const result = JSON.parse(process.argv[1]); process.stdout.write(result.status ?? "")' "$notarization_result")"
+if [[ -z "$notarization_id" || "$notarization_status" != 'Accepted' ]]; then
+    echo "DMG notarization did not return an accepted submission ID." >&2
+    exit 1
+fi
+printf 'DMG notarization submission ID: %s\n' "$notarization_id"
 
 xcrun stapler staple "$dmg_path"
 codesign --verify --strict --verbose=2 "$dmg_path"

@@ -1,55 +1,37 @@
-<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <!--
-    Small-size variant of the "Signal Disc" mark, used only for the
-    16 px and 32 px iconset/ico slots. Same composition as the master,
-    hand-simplified so it survives a 16 px raster: rim lugs and the thin
-    gold hairline are dropped (both are sub-pixel noise below 64 px), the
-    drop shadow is removed (it just reads as haze at this size), and the
-    ring + waveform strokes are thickened so the silhouette stays a
-    confident dark ring with a bright ember spike instead of thinning
-    into a grey smear. See assets/ICON_PROVENANCE.md.
-  -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <clipPath id="squircleBS">
-      <rect x="0" y="0" width="1024" height="1024" rx="225" ry="225" />
-    </clipPath>
-
-    <radialGradient id="fieldBS" cx="40%" cy="32%" r="90%">
-      <stop offset="0%" stop-color="#fef6e6" />
-      <stop offset="48%" stop-color="#f3dda8" />
-      <stop offset="100%" stop-color="#cf9a4c" />
-    </radialGradient>
-
-    <radialGradient id="discFillBS" cx="46%" cy="36%" r="72%">
-      <stop offset="0%" stop-color="#fffdf7" />
-      <stop offset="100%" stop-color="#efddb6" />
-    </radialGradient>
-
-    <linearGradient id="waveGradBS" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#e85a36" />
-      <stop offset="40%" stop-color="#f0913f" />
-      <stop offset="50%" stop-color="#f9d84e" />
-      <stop offset="60%" stop-color="#f0913f" />
-      <stop offset="100%" stop-color="#e85a36" />
+    <linearGradient id="field" x1="130" y1="108" x2="888" y2="934" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff8eb"/>
+      <stop offset="1" stop-color="#e9bf78"/>
     </linearGradient>
+    <radialGradient id="head" cx="512" cy="450" r="400" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffdf6"/>
+      <stop offset=".8" stop-color="#f5dfb5"/>
+      <stop offset="1" stop-color="#d9954a"/>
+    </radialGradient>
+    <linearGradient id="stick" x1="340" y1="306" x2="684" y2="722" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffe4aa"/>
+      <stop offset=".5" stop-color="#d87835"/>
+      <stop offset="1" stop-color="#fff1cb"/>
+    </linearGradient>
+    <radialGradient id="ember" cx="512" cy="512" r="74" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff6cd"/>
+      <stop offset=".36" stop-color="#ffb948"/>
+      <stop offset="1" stop-color="#e65a24"/>
+    </radialGradient>
   </defs>
-
-  <g clip-path="url(#squircleBS)">
-    <rect x="0" y="0" width="1024" height="1024" fill="url(#fieldBS)" />
-
-    <circle cx="512" cy="512" r="400" fill="url(#discFillBS)" />
-    <circle cx="512" cy="512" r="400" fill="none" stroke="#241f19" stroke-width="72" />
-
-    <path d="M 210 512
-             L 400 512
-             C 432 512 440 400 468 350
-             C 488 314 500 300 512 296
-             C 524 300 536 314 556 350
-             C 584 400 592 512 624 512
-             L 814 512"
-          fill="none" stroke="url(#waveGradBS)" stroke-width="46"
-          stroke-linecap="round" stroke-linejoin="round" />
-
-    <circle cx="512" cy="296" r="24" fill="#fff8e6" />
+  <rect x="48" y="48" width="928" height="928" rx="226" fill="url(#field)"/>
+  <rect x="70" y="70" width="884" height="884" rx="206" fill="none" stroke="#fffaf0" stroke-opacity=".9" stroke-width="20"/>
+  <circle cx="512" cy="512" r="394" fill="#251d18"/>
+  <circle cx="512" cy="512" r="340" fill="url(#head)"/>
+  <circle cx="512" cy="512" r="306" fill="none" stroke="#fff8e8" stroke-opacity=".82" stroke-width="13"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 326 326 L 698 698" stroke="#39261b" stroke-width="88"/>
+    <path d="M 326 326 L 698 698" stroke="url(#stick)" stroke-width="46"/>
+    <path d="M 698 326 L 326 698" stroke="#39261b" stroke-width="88"/>
+    <path d="M 698 326 L 326 698" stroke="url(#stick)" stroke-width="46"/>
   </g>
+  <circle cx="512" cy="512" r="73" fill="#55281c"/>
+  <circle cx="512" cy="512" r="56" fill="url(#ember)"/>
+  <circle cx="512" cy="512" r="17" fill="#fff6cf"/>
 </svg>

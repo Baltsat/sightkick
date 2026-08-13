@@ -1,6 +1,6 @@
 # Drumroll app icon provenance
 
-## 2026-08-13 — "Signal Disc," hand-authored SVG (current)
+## 2026-08-13 — "Drum Mark," hand-authored SVG (current)
 
 Replaces the 2026-08-11 OpenAI-image-generation icon below. The owner's
 complaint: _"картинка что-то непонятная, раньше классная была"_ — the icon
@@ -27,13 +27,12 @@ model, no prompt, no non-determinism.
 
 ### design
 
-**"Signal Disc."** The drumhead _is_ the icon: a thick dark ring (standing in
-for the rim, with eight small gold lug dots for the tension rods) around a
-warm paper disc, crossed once by a single ember-to-gold waveform spike — the
-"struck" moment rendered as sound, not as a photograph of a drum. This is a
-deliberate application of the product's own design law
-(`docs/design-acceptance-notes.md`: _"one dominant object per screen"_) to
-the icon itself: one shape, one accent color, nothing competing with it.
+**"Drum Mark."** The icon is a front-on snare: a thick dark rim, eight gold
+lug dots, a warm drumhead, crossed wood sticks, and one ember strike at their
+intersection. The prior **"Signal Disc"** waveform was the right small-slot
+legibility trade, but at 1024px it read as generic audio software. The crossed
+sticks add the missing drum-specific silhouette without changing the warm
+cream-and-ember language.
 
 Colour is not invented for the icon — it is read directly from
 `docs/visual-system-v3.md`'s token table:
@@ -42,26 +41,23 @@ Colour is not invented for the icon — it is read directly from
 | ------------------------- | ---------------------------------------------------- | ---------------------------- |
 | field / disc light values | `dr-canvas`, `dr-paper` (deepened for icon contrast) | `#f4efe5` / `#fcf9f2` family |
 | ring, dark linework       | `dr-ink`                                             | `#241f19`                    |
-| waveform spike            | `dr-ember` → `dr-count`                              | `#e85a36` → `#f4bd3d`        |
+| crossed sticks / strike   | `dr-ember` → `dr-count`                              | `#e85a36` → `#f4bd3d`        |
 | lug dots                  | kit "hi-hat/tom1" lane                               | `#c99627`                    |
 
-Two other structurally distinct candidates were drawn and rejected after
-rendering all three at 16/32/64/128/256/512/1024px — see the QA folder for
-the full comparison and the specific reason each lost (candidate A's crossed
-sticks read as TV antennae by 32px; candidate C's impact ripples fade to a
-blob by 32px). The winning candidate went through one further revision after
-initial review: the waveform's first draft had a below-baseline undershoot
-that read as an ECG/heart-monitor trace rather than a struck drum; it was
-redrawn as a single smooth above-baseline spike.
+The first selection round favoured Signal Disc because its dark rim and ember
+spike stayed legible at 16px while the more illustrative candidates degraded.
+That did not make it more beautiful than kb.5 at 1024px; kb.5 remains the
+richer full-size illustration. The kb.14 revision keeps Signal Disc's compact
+ring while using a simplified crossed-stick silhouette that remains visible at
+16px and makes the large mark unmistakably drums.
 
 ### small-size handling
 
 `assets/icon-small.svg` is a hand-simplified variant used only for the 16px
-and 32px slots. The rim lugs and the thin inner gold hairline are dropped
-(sub-pixel noise below ~64px) and the ring/waveform stroke widths are
-increased so the icon stays a confident dark ring with a visible ember spike
-at 16px instead of thinning into anti-aliased grey. `assets/icon.svg` (the
-full master) is used for every slot 64px and larger.
+and 32px slots. The full lug ring is dropped as sub-pixel noise, while the
+sticks gain a heavier dark outline and a bright central strike. The result is
+a compact snare-and-sticks signal at 16px rather than a waveform or a blur.
+`assets/icon.svg` (the full master) is used for every slot 64px and larger.
 
 ### files and generation recipe
 
@@ -107,9 +103,10 @@ bash assets/make-icons.sh
   `docs/design-qa/2026-08-13-icon/sidebar-brand-mark-proof.html`, a
   self-contained page using the exact CSS from `AppShell.css` around the
   shipped `icon.png`.
-- `docs/design-qa/2026-08-13-icon/comparison-grid.png` puts kb.5, the
-  rejected current icon, and this icon side by side at their actual
-  16/32/128px shipped pixels.
+- `docs/design-qa/2026-08-13-icon/comparison-grid.png` compares kb.5, the
+  prior Signal Disc, and Drum Mark at 16/32/128/1024px. It records the real
+  trade: kb.5 retains more full-size illustration, while Drum Mark wins the
+  required combination of small-slot legibility and drum specificity.
 
 ---
 

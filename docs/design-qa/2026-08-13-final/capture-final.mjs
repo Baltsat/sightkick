@@ -71,9 +71,47 @@ async function captureLibrary(page) {
   await shootBoth(page, '02-library');
 }
 
+async function assertJourneyWorldTitleFits(page) {
+  for (const viewport of [wideViewport, compactViewport]) {
+    await page.setViewportSize(viewport);
+    await page.waitForTimeout(150);
+
+    const metrics = await page
+      .getByTestId('journey-world-title')
+      .evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const range = document.createRange();
+
+        range.selectNodeContents(element);
+
+        const text = range.getBoundingClientRect();
+
+        return {
+          boxRight: box.right,
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          text: element.textContent,
+          textRight: text.right,
+        };
+      });
+
+    notes.push(`journey title fit ${viewport.width}x${viewport.height}: ${JSON.stringify(metrics)}`);
+
+    if (
+      metrics.scrollWidth > metrics.clientWidth + 1 ||
+      metrics.textRight > metrics.boxRight + 1
+    ) {
+      throw new Error(
+        `Journey title clips at ${viewport.width}x${viewport.height}: ${JSON.stringify(metrics)}`,
+      );
+    }
+  }
+}
+
 async function captureJourney(page) {
   await page.getByTestId('view-lessons').click();
   await page.getByTestId('lessons-header-strip').waitFor({ timeout: 30_000 });
+  await assertJourneyWorldTitleFits(page);
   await shootBoth(page, '03-journey');
 }
 

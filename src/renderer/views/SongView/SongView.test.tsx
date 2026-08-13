@@ -1501,7 +1501,24 @@ describe('the score summary', () => {
       expect(screen.getByTestId('tutor-recovery-caption')).toHaveTextContent(
         'Coach loop armed',
       );
+      expect(screen.getByTestId('coach-speed-change')).toHaveTextContent(
+        'Coach set 0.7× to rehearse this loop.',
+      );
+      expect(screen.getByTestId('keep-learner-speed')).toHaveTextContent(
+        'Keep my 1.0×',
+      );
     });
+    fireEvent.click(screen.getByTestId('keep-learner-speed'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('practice-mode-indicator')).toHaveAttribute(
+        'data-speed',
+        '1.0',
+      );
+    });
+    expect(
+      window.localStorage.getItem('song.song-1.learnerPlaybackSpeed'),
+    ).toBe('1');
     expect(window.localStorage.getItem(TEST_REMEDIATION_STORAGE_KEY)).toContain(
       '"status":"active"',
     );

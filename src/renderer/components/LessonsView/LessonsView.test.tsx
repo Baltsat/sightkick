@@ -500,6 +500,12 @@ describe('LessonsView — seasons', () => {
     expect(screen.getByTestId('journey-world-marker')).toHaveTextContent(
       'Season 02ReadingCurrent stage',
     );
+    expect(screen.getByTestId('journey-world-title')).toHaveTextContent(
+      'Reading',
+    );
+    expect(screen.getByTestId('journey-world-title')).not.toHaveTextContent(
+      '…',
+    );
     expect(
       screen.getByTestId('season-rail-state-Foundations'),
     ).toHaveTextContent('Cleared');
@@ -527,6 +533,9 @@ describe('LessonsView — seasons', () => {
     );
     expect(screen.getByTestId('journey-world-marker')).toHaveTextContent(
       'Season 03GroovesVenue locked',
+    );
+    expect(screen.getByTestId('journey-world-title')).toHaveTextContent(
+      'Grooves',
     );
   });
 

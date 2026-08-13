@@ -1,4 +1,5 @@
 import { CSSProperties, useId, useMemo } from 'react';
+import { Button } from 'antd';
 import { TutorHudMessage } from '../../hooks/useTutorSession';
 import { TutorState } from '../../services/tutor';
 import {
@@ -26,6 +27,11 @@ interface TutorHudProps {
   recoveryCaption?: {
     title: string;
     detail: string;
+  };
+  speedChange?: {
+    previous: number;
+    applied: number;
+    onKeepOwnSpeed: () => void;
   };
 }
 
@@ -108,6 +114,7 @@ export function TutorHud({
   displayState,
   controlPrompt,
   recoveryCaption,
+  speedChange,
 }: TutorHudProps) {
   const titleId = useId();
   const detailId = useId();
@@ -121,7 +128,8 @@ export function TutorHud({
     state.phase === 'off' &&
     !displayState &&
     !controlPrompt &&
-    !recoveryCaption
+    !recoveryCaption &&
+    !speedChange
   ) {
     return null;
   }
@@ -176,6 +184,22 @@ export function TutorHud({
       <span id={detailId} className="drumroll-practice-edge-caption__detail">
         {caption.detail}
       </span>
+      {speedChange && (
+        <>
+          <span
+            className="drumroll-practice-edge-caption__detail"
+            data-testid="coach-speed-change"
+          >
+            Coach set {speedChange.applied.toFixed(1)}× to rehearse this loop.
+          </span>
+          <Button
+            data-testid="keep-learner-speed"
+            onClick={speedChange.onKeepOwnSpeed}
+          >
+            Keep my {speedChange.previous.toFixed(1)}×
+          </Button>
+        </>
+      )}
       {mistake && <TutorMistakeDisclosure mistake={mistake} />}
     </aside>
   );

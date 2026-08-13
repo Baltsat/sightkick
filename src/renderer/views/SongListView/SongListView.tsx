@@ -14,7 +14,7 @@ import {
   useOutlet,
   useSearchParams,
 } from 'react-router-dom';
-import appIcon from '../../../../assets/icon.png';
+import songArtPlaceholder from '../../../../assets/song-art-placeholder.svg';
 import {
   ControlMapping,
   IpcResolveLibraryCandidatesResponse,
@@ -1291,11 +1291,11 @@ export function SongListView() {
                     aria-labelledby="continue-practicing-title"
                   >
                     <img
-                      src={continuedSong.albumCover ?? appIcon}
+                      src={continuedSong.albumCover ?? songArtPlaceholder}
                       alt=""
                       className="size-14 shrink-0 rounded-lg object-cover outline outline-1 -outline-offset-1 outline-white/10"
                       onError={(event) => {
-                        event.currentTarget.src = appIcon;
+                        event.currentTarget.src = songArtPlaceholder;
                       }}
                     />
                     <div className="min-w-0 grow">
