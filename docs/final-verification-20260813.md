@@ -1,224 +1,258 @@
-# Final verification — 2026-08-13
+# final verification — 2026-08-14
 
-Checked at HEAD `1d8eaab` (tag `v1.2.0-kb.13`, installed build 1.2.13, notarized, DMG sha256 `c9ae38fa...84b75d4`), branch `feat/practice-loop`. Full suite: `corepack yarn vitest run` → **196 files / 1984 tests, all green** (matches the tree's own claim).
+checked release source `ac6f199a2ad7a884cba6e6c2afe8657366dc66e3` on
+`feat/practice-loop`. This replaces the earlier kb.13 snapshot in place because
+the filename is the historical audit handle.
 
-## Bottom line
+## release boundary
 
-The 29-defect bug hunt and the 53-ask fidelity map from 2026-08-12 drove five real commits since then. I re-derived every verdict from current source, not from commit messages. One commit claim did not hold up under a source read: 31dfeb0 says the tutor "never auto-reduces tempo," but `machine.ts:368-377` still decrements speed between recovery-loop attempts when a repetition isn't clean — a real, bounded, in-loop step-down, not the top-level "punished at 100% accuracy" collapse the commit was actually fixing (see U02).
+- `HEAD` is eight commits after `v1.2.0-kb.14` (`314159e`): `e883428`,
+  `7f4c2d4`, `8653fd5`, `1988493`, `d549699`, `190e765`, `88aa88c`, and
+  `ac6f199`.
+- a fresh run on the current checkout passed `205` test files and `2,099`
+  tests; `corepack yarn typecheck` also passed. That checkout includes active,
+  uncommitted automatic-import/search work, so this is a working-tree gate,
+  not proof of a kb.15 release artifact.
+- `package.json` still declares `1.2.0-kb.14` / build `1.2.14`. There is no
+  kb.15 tag, DMG, signing, notarization, installed-app capture, GitHub release,
+  or deployment.
+- the active dirty lane touches `src/main`, `src/library-sources`, `SongSearch`,
+  `LibraryCandidateList`, E2E fixtures, and automatic-import captures. Its
+  behavior is called out below, but none of it is described as shipped.
 
-- **Historical baseline:** 23 of 28 distinct bug-hunt findings were closed at the first pass; five remained open (a mid-song settings edge case, a UTC/local day split, an inert validator, a MIDI-teardown race, and a count-in clip). The remediation update below closes all five.
-- **The home screen finally matches the design bar.** The kb.12 rejection in `design-acceptance-notes.md` (kit as a framed card, faint zones, wrapped title, wrong XP chip) is closed — verified against the actual `2026-08-13-kb13-final` captures, not just the diff.
-- **The library is honest but still thin.** One real favourite (`Boulevard of Broken Dreams`) is proven playable end-to-end through the intended path. The other ~229 favourites and 13 drum rows are not bulk-converted — each still needs the same one-by-one manual "Use local audio" action. This is the one place the fidelity map's "ABSENT" verdict (M04) is still mostly accurate.
-- **Nothing in this pass was checked on a physical DTX.** Every capture and every automated proof in the repo runs on keyboard input in Electron/browser automation. Anything that depends on how a real kit feels — pedal timing, zone legibility from two metres, whether a loop actually feels forgiving — is marked **BLOCKED OUTSIDE** below, and that block is large. This is the honest ceiling of a source-only pass.
-- **One structural risk remains:** free-play song practice still does not write atomic-skill evidence. The UTC-vs-local day split is closed in the remediation update below.
+## scorecard
 
-## The ground moved during this audit
+| scope                                  | closed | partial | open | blocked outside | total |
+| -------------------------------------- | -----: | ------: | ---: | --------------: | ----: |
+| distinct 2026-08-12 bug-hunt defects   |     27 |       1 |    0 |               0 |    28 |
+| seven operator-facing remediation rows |      7 |       0 |    0 |               0 |     7 |
+| fidelity-map asks                      |     26 |      11 |    3 |              13 |    53 |
+| newly checked reliability cases        |      0 |       3 |    4 |               1 |     8 |
 
-Another lane is actively editing this checkout while this pass was running (expected — three lanes share this checkout). Two of the P1 bugs I traced as OPEN below (`useKitInactivityRecovery.ts`, `useTutorSession.ts`/`machine.ts`/`types.ts`) were rewritten, on disk, uncommitted, between when I first read them and when I closed this pass — timestamps 15:25–15:29, after my full-suite run (which started 15:15:20 and reflects the pre-edit tree). I re-checked both directly against the current working tree rather than leave a stale verdict:
+five remediation rows duplicate defects already counted in the 28-item hunt:
+Configure Input, inactivity MIDI parking, odd-meter count-in, local-day
+archiving, and artist validation. The historical defect total is therefore 28,
+not 35.
 
-- **Kit-inactivity idle gate (bug-hunt P1-12): now fixed, uncommitted.** `useKitInactivityRecovery.ts` gained a `playbackSpeed` param that scales `INACTIVITY_MIN_SECONDS`, and `SongView.tsx:1491` now passes the live `playbackSpeed` in. `useKitInactivityRecovery.test.ts` passes with this change.
-- **Tutor's frozen speed (bug-hunt P1-14): now fixed, uncommitted, more thoroughly than a patch — the tutor lost the capability entirely.** `useTutorSession.ts` no longer takes a `setPlaybackSpeed` prop and `executeCommand` no longer calls `engine.setPlaybackSpeed` anywhere; a new `speed-changed` event (`tutor/types.ts`) just keeps the reducer's bookkeeping honest against the player's own speed control. `useTutorSession.test.tsx` and `machine.test.ts` pass with this change.
-- **Not yet green:** the same working tree also carries a new `mistake-evidence.ts` service and a TutorHud "note-level why disclosure" (plausibly aimed at bug-hunt U06 — "what pad to hit, what fixes it"). Running the affected suite now (`corepack yarn vitest run` on the touched files) gives **135 tests, 134 passed, 1 failed** — `TutorHud.test.tsx`: "never displaces the resume instruction, and stays collapsed until opened" fails, expecting an element absent that is present. This part is mid-edit, not done.
+## what the earlier audit now gets wrong
 
-I've updated the two P1 verdicts below to CLOSED with this evidence, and left everything else exactly as read at HEAD. This is not a criticism of the other lane — it's the honest state of a shared checkout at the moment this report closed. **Whoever reads this next should run `corepack yarn vitest run` once more before trusting the P1 count** — the tree may have moved again since this paragraph was written.
+1. `P1 — 14 of 14 CLOSED` was too strong. Atomic skill evidence is written for
+   lesson runs only; free-play songs, imported favourites, and My Wave songs
+   without a lesson manifest still produce none. The correct historical P1
+   result is 13 closed and 1 partial.
+2. Tutor speed and speed-scaled inactivity timing were described as uncommitted
+   mid-audit work. They are committed in `6972568` and `7f4c2d4`.
+3. The temporary TutorHud failure is stale. `TutorHud.test.tsx` now passes
+   `10/10`; `mistake-evidence.ts` and `TutorHud` give expected drum, actual
+   drum, and a concrete correction after the player opens Why.
+4. The old `196 files / 1,984 tests` result belongs to `1d8eaab`, not this
+   tree. The current working-tree result is `205 / 2,099`.
+5. The launcher dossier's old shell-handoff warning is stale. `SongListView`
+   now passes `onOpenJourney`, `onFindNewMusic`, and `onStartSong` into
+   `HomeCockpit`; `kit-door-routing.test.tsx` covers every destination.
+6. The claim that every source row still requires Use local audio is stale for
+   the current dirty lane. The lane has moved toward verified YouTube fetch and
+   automatic import, but it is uncommitted and has the open failure cases in
+   [new reliability findings](#new-reliability-findings).
 
-## How this was checked
+## historical defect audit
 
-- Every bug-hunt file:line was re-read at current HEAD; verdicts below cite the exact lines that prove or disprove the fix, not the commit message that claims it.
-- `docs/design-qa/2026-08-13-kb13-final/` captures come from the _installed_ `/Applications/Drumroll.app`, but from a dedicated, isolated `.userdata/final-qa` profile with `settings.selectedDevice = keyboard` (see `capture-installed.mjs:11,34-37`). They prove the installed build renders correctly; they prove nothing about a real kit, and the library capture's "0 in library" reflects that isolated profile, not a regression in the real one (see M04 below).
-- "**BLOCKED OUTSIDE**" means the remaining proof requires his hands, his DTX, and a session at the kit — no amount of further source reading closes it.
+### P0 — 9 of 9 closed
 
-## Remediation update — 2026-08-13, current shared working tree
+| id  | defect                                                      | state  | proof                                                                   |
+| --- | ----------------------------------------------------------- | ------ | ----------------------------------------------------------------------- |
+| B01 | downloaded song accepted with no audio                      | closed | `downloadSong.ts`, `downloadSong.test.ts`, `47adacc`                    |
+| B02 | unscoreable false hit persisted as wrong evidence           | closed | `engine.ts`, `engine.test.ts`, `c4c60a3`                                |
+| B03 | rewind kept a stale miss under the same judgement id        | closed | `tutor/machine.ts`, `machine.test.ts`, `c4c60a3` / `6972568`            |
+| B04 | mid-song run fabricated pre-start misses                    | closed | `engine.ts`, `engine.test.ts`, `c4c60a3`                                |
+| B05 | Perform could leave before its save/reward reply            | closed | `SongView.tsx`, `ScoreSummary.test.tsx`, `SongView.test.tsx`, `47adacc` |
+| B06 | input latency ignored playback speed                        | closed | `judge.ts`, `judge.test.ts`, `engine.test.ts`, `3421a3b`                |
+| B07 | pause during a speed restart resumed audio behind paused UI | closed | `speed/player.ts`, `player.test.ts`, `c4c60a3`                          |
+| B08 | removing one default MIDI note blanked its full lane        | closed | `InputContext.tsx`, `InputContext.test.tsx`, `c4c60a3`                  |
+| B09 | remapped MIDI note stayed active on its default lane        | closed | `InputContext.tsx`, `InputContext.test.tsx`, `c4c60a3`                  |
 
-This follow-up closes all seven operator-facing findings supplied after the original audit. Each regression test below fails against the old behavior: it either exposed an invisible/misleading state, let a physical strike start a target, or observed the old implementation's missing guard.
+### P1 — 13 closed, 1 partial
 
-| finding                               | root cause and closure                                                                                                                                                                                                                                                              | fail-on-old regression proof                                                                                                                                                                                                 |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| visible kit state on Home             | Home hid the authoritative `inputReadiness` state in `sr-only` copy. `HomeCockpit` now renders a quiet `home-input-readiness` status from the real selected device and readiness state: connected plus device name, reconnecting plus remembered device name, or no MIDI kit found. | `HomeCockpit.test.tsx`: “shows the selected input visibly on the kit home,” “names a remembered kit while it reconnects instead of claiming it is ready,” and “shows that no kit is found when no input device is selected.” |
-| Configure Input during a run          | `input-bus` gives Learn capture exclusive ownership, so the correct safety boundary is before capture starts. `SettingsButton` calls `onBeforeInputConfigOpen`; `SongView` supplies `pause`, then the modal opens.                                                                  | `SongView.tutor.test.tsx`: “pauses before Configure Input can capture a live strike” starts playback, opens Learn, strikes the snare, and asserts the player remains paused.                                                 |
-| stray pad starts an armed Home target | Home treated every positive mapped input as start. It now resolves the same `confirm` controls as Songs/Journey and only that deliberate gesture starts the target; other pad strikes only pulse their zone.                                                                        | `HomeCockpit.test.tsx`: “requires the same confirm control as Songs before a physical kit starts the armed target.”                                                                                                          |
-| inactivity park reopens MIDI          | `parkForInactivity` is now limited to pausing and seeking the checkpoint; it does not tear down/reopen a still-live MIDI port.                                                                                                                                                      | `SongView.tutor.test.tsx`: “does not reopen MIDI when inactivity parks a run awaiting its resume strike” asserts no additional `midi-device-list` request while the resume veil appears.                                     |
-| odd-meter count-in clipping           | Count-in CSS columns were capped at four and the edge caption capped its height. Columns now follow the actual beat count and the height cap is gone.                                                                                                                               | `CountIn.test.tsx` parameterizes the assertion across five-, six-, and seven-beat measures.                                                                                                                                  |
-| archive/streak day split              | Archive keys were derived from UTC text while streaks use `localDateKey`. Archive writes now use that same local-day function. Existing aggregate-only archive records cannot be relocated exactly because they retain no run timestamp.                                            | `archive.test.ts`: “uses the same local day as the streak for a Bali early-morning run” asserts that `2026-08-12T18:30:00.000Z` records as `2026-08-13` in UTC+8.                                                            |
-| inert artist validation               | Mapping artist values preserved array length, so the old guard could never detect a blank or non-string artist. Validation now rejects any normalized falsy artist.                                                                                                                 | `provenance.test.ts`: “rejects every blank or non-string artist instead of casting it through.”                                                                                                                              |
+| id  | defect                                                | state   | proof or residual                                                                                                                    |
+| --- | ----------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| B10 | local row claimed playable without audio/chart        | closed  | `SongListItem.tsx`, `SongListItem.test.tsx`, `c4c60a3`                                                                               |
+| B11 | loop wrap restarted count-in                          | closed  | `transport.ts`, `transport.test.ts`, `c4c60a3`                                                                                       |
+| B12 | shared MIDI control credited the wrong lane           | closed  | `judge.ts`, `judge.test.ts`, `c4c60a3`                                                                                               |
+| B13 | velocity-failed note became both wrong and miss       | closed  | `judge.ts`, `engine.test.ts`, `6972568`                                                                                              |
+| B14 | checkpoint hits vanished after resume                 | closed  | `practiceStats.ts`, `SongView.practice-run.test.tsx`, `47adacc`                                                                      |
+| B15 | completed runs never wrote atomic skill evidence      | partial | lesson writes are covered by `SongView.practice-run.test.tsx`; `SongView.tsx:769-795` skips free-play runs without `songData.lesson` |
+| B16 | near-perfect Perform run read Perfect                 | closed  | `ScoreSummary.tsx`, `ScoreSummary.test.tsx`, `6972568`                                                                               |
+| B17 | dismissed inactivity veil left no caption             | closed  | `SongView.tutor.test.tsx`, `6972568`                                                                                                 |
+| B18 | atomic evidence vanished after the 50-run summary cap | closed  | `practiceStats.ts`, `practiceStats.test.ts`, `47adacc`                                                                               |
+| B19 | failed download stranded a folder and blocked retry   | closed  | `downloadSong.ts`, `downloadSong.test.ts`, `47adacc`                                                                                 |
+| B20 | zero-chart song became a My Wave practice candidate   | closed  | `SongListView.tsx`, `SongListView.test.tsx`, `c4c60a3`                                                                               |
+| B21 | inactivity timing used scaled song time               | closed  | `useKitInactivityRecovery.test.ts`, `6972568`                                                                                        |
+| B22 | opening Learn mid-run swallowed a real strike         | closed  | `SettingsButton.tsx`, `SongView.tutor.test.tsx`, `7f4c2d4`                                                                           |
+| B23 | tutor overwrote a manual tempo change                 | closed  | `useTutorSession.test.tsx`, `machine.ts`, `6972568`                                                                                  |
 
-Focused proof: the five touched regression files pass **55/55**; `corepack yarn typecheck` passes. The full-suite and lint claims from the original audit are not repeated as current proof: concurrent, uncommitted work elsewhere in this shared checkout keeps both global gates red. No build or package command was run, per the no-build instruction for this pass.
+### P2 — 5 of 5 closed
 
-## Part 1 — bug hunt (`docs/bug-hunt-20260812.md`)
+| id  | defect                                                    | state  | proof                                            |
+| --- | --------------------------------------------------------- | ------ | ------------------------------------------------ |
+| B24 | artist validation was a duplicated structural no-op       | closed | `provenance.ts`, `provenance.test.ts`, `7f4c2d4` |
+| B25 | inactivity parking reopened MIDI before the resume strike | closed | `SongView.tutor.test.tsx`, `7f4c2d4`             |
+| B26 | Profile no-scroll test never executed its assertion       | closed | `no-outer-scroll.test.tsx`, `c4c60a3`            |
+| B27 | five-plus beat count-ins clipped                          | closed | `CountIn.tsx`, `CountIn.test.tsx`, `7f4c2d4`     |
+| B28 | archive and streak used different calendar days           | closed | `archive.ts`, `archive.test.ts`, `7f4c2d4`       |
 
-The doc states "29 defects confirmed" but lists the provenance no-op twice (`provenance.ts:49`, entries "normalizeLibrarySourceProvenance's artist-validity check..." and "Source provenance validator's artist-shape check..." are the same defect). **28 distinct findings.**
+### operator-facing remediation — 7 of 7 closed
 
-### P0 — 9 of 9 CLOSED
+| row                                          | state  | proof                                                                   |
+| -------------------------------------------- | ------ | ----------------------------------------------------------------------- |
+| visible Home connection state                | closed | `HomeCockpit.test.tsx` covers connected, reconnecting, and absent input |
+| pause before Configure Input learns a strike | closed | B22 / `SongView.tutor.test.tsx`                                         |
+| only confirm starts an armed Home door       | closed | `HomeCockpit.test.tsx` and `kit-door-routing.test.tsx`                  |
+| inactivity park leaves MIDI live             | closed | B25 / `SongView.tutor.test.tsx`                                         |
+| odd-meter count-in has every beat            | closed | B27 / `CountIn.test.tsx`                                                |
+| archive uses the player's local day          | closed | B28 / `archive.test.ts` crosses the UTC+8 boundary                      |
+| malformed source artist is rejected          | closed | B24 / `provenance.test.ts`                                              |
 
-| #   | finding                                                                 | proof it's fixed                                                                                                                                                                                                          |
-| --- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `downloadSong.ts` skipped the audio gate                                | `downloadSong.ts:151-153` now throws on `audio.length === 0`; `:174` `rmSync`s the partial folder on any failure (also closes the P1 orphaned-folder bug below)                                                           |
-| 2   | Unscoreable false hits persisted as scored 'wrong'                      | `engine.ts:193` — `onFalseHit` now checks `record.scoreable` before pushing a HitRecord                                                                                                                                   |
-| 3   | Tutor evidence never invalidated by rewind, stale miss permanent        | `machine.ts:125-139` — `recordJudgement` now replaces the judgement at the same id instead of ignoring the second arrival (`machine.test.ts:120` "replaces a stale judgement when a rewind re-resolves the same note id") |
-| 4   | `deriveMisses()` fabricates misses before the attempt's real start tick | `engine.ts:92,130-133,690,694` — new `minReachedTick` tracked from the first position ever reached, `deriveMisses()` skips `note.tick < minReachedTick`                                                                   |
-| 5   | Perform-mode Continue/Play-again not gated on in-flight save            | `SongView.tsx:805-807,1090,1119` — `practicePersistenceState` and both gates dropped the `gameMode === 'practice' &&` prefix; now blocks in both modes                                                                    |
-| 6   | Input-latency compensation ignored playback speed                       | `judge.ts:373` — `rawTimeS - (this.latencyMs/1000) * this.playbackSpeed`                                                                                                                                                  |
-| 7   | Pause after a speed change resumed audio behind a paused UI             | `speed/player.ts:352` — explicit `pause()` now bumps `epoch`, closing the race window the in-flight `start()` call could resume through                                                                                   |
-| 8   | Removing one default-mapped MIDI note wiped the whole lane              | `InputContext.tsx:397-427` — `removeControl` now subtracts from the lane's _effective_ list (stored-or-default), never persists a blank override for a never-configured lane                                              |
-| 9   | Remapping a note left it silently active on its old default lane        | `InputContext.tsx:118-142` — `assignInto` now strips the moved controlId out of any other lane still relying on `DEFAULT_MIDI_INPUT_MAPPING`, not just out of explicitly-stored lanes                                     |
+## fidelity map — 53 asks rescored
 
-### P1 — 14 of 14 CLOSED
-
-| finding                                                                               | verdict                                                                   | proof                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SongListItem` `playable` flag ignored missing audio/chart                            | CLOSED                                                                    | `SongListItem.tsx:63-72` — `playable` now requires `hasAudio && hasChart && (...)`                                                                                                                                                                                                                                                                                                                                          |
-| Loop-region wrap re-triggered a full count-in every rep                               | CLOSED                                                                    | `transport.ts:538` — natural wrap now calls `playFromTick(..., 'skip', true)` instead of `'inherit'`                                                                                                                                                                                                                                                                                                                        |
-| Correctly-hit note attributed to wrong lane on shared MIDI control                    | CLOSED                                                                    | `judge.ts:597` — hit path now derives `element` from `KEY_TO_ELEMENT[newPrefixes[0]]`, not the ambiguous `resolveElement(controlId)`                                                                                                                                                                                                                                                                                        |
-| Velocity-failed accent/ghost strike double-scored (wrong + miss)                      | CLOSED                                                                    | `judge.ts:164-166,310` — new `velocityFailedKeys`/`isVelocityFailed`, checked in both `resolveUntil` and `deriveMisses` (`engine.ts:703`)                                                                                                                                                                                                                                                                                   |
-| Interrupted checkpoint's hits deleted on resume                                       | CLOSED                                                                    | `practiceStats.ts:656-667` — `mergeOrphanedCheckpointEvidence` folds the checkpoint's records into the finalized run                                                                                                                                                                                                                                                                                                        |
-| Atomic per-item skill evidence never written                                          | CLOSED, scoped                                                            | `SongView.tsx:760-778` now calls `deriveAtomicSkillEvidence` and stamps `atomicSkillEvidence` — **but only when `songData?.lesson` exists** (`:760-762`). Free-play (non-lesson) song runs still write nothing to the Bayesian mastery/spaced-review system. Flagged again below.                                                                                                                                           |
-| Near-100% Perform run mislabeled "Perfect"                                            | CLOSED                                                                    | `ScoreSummary.tsx:170-179` — `isPerfect` now compares unrounded `hitNotes/totalNotes`, not the 2-decimal display value                                                                                                                                                                                                                                                                                                      |
-| Inactivity-pause caption had no fallback once the veil stepped aside                  | CLOSED                                                                    | `SongView.tsx:2547` — `showTutorCaption` now includes `practicePresentationPhase === 'inactivity-paused'`                                                                                                                                                                                                                                                                                                                   |
-| `atomicSkillEvidence` discarded past the 50-run cap                                   | CLOSED                                                                    | `practiceStats.ts:683-693,914-923` — separate `atomicSkillEvidenceArchive`, folded from every evicted summary                                                                                                                                                                                                                                                                                                               |
-| Failed/partial download left an orphaned folder blocking re-download                  | CLOSED                                                                    | same fix as P0 #1, `downloadSong.ts:174`                                                                                                                                                                                                                                                                                                                                                                                    |
-| Song grid/My Wave fabricated a playable difficulty for zero-chart songs               | CLOSED                                                                    | `SongListView.tsx:122-134` — `candidateDifficulty` now returns `undefined` when `drumDifficulties` is empty, with the bug-hunt doc cited in the comment                                                                                                                                                                                                                                                                     |
-| Kit-inactivity idle gate measured in speed-scaled song time, not wall-clock           | **CLOSED — uncommitted, landed mid-audit**                                | `useKitInactivityRecovery.ts` now scales `INACTIVITY_MIN_SECONDS * playbackSpeedRef.current`; `SongView.tsx:1491` passes the live speed in; `useKitInactivityRecovery.test.ts` passes. See "The ground moved during this audit" above.                                                                                                                                                                                      |
-| Opening Configure Input mid-song and clicking Learn drops every real strike, no pause | **CLOSED**                                                                | Capture still owns the Learn strike by design, but `SettingsButton.tsx` now invokes `onBeforeInputConfigOpen` and `SongView.tsx` passes `pause` before the input panel opens. `SongView.tutor.test.tsx` proves a live run pauses before a captured snare strike.                                                                                                                                                            |
-| Tutor's frozen internal speed overrides a mid-run manual tempo change                 | **CLOSED — uncommitted, landed mid-audit, more thorough than a gate fix** | `useTutorSession.ts` no longer accepts a `setPlaybackSpeed` prop and `executeCommand` no longer calls `engine.setPlaybackSpeed` anywhere — the tutor is now structurally unable to change tempo. A new `speed-changed` event (`tutor/types.ts`) keeps the reducer's bookkeeping honest without resetting judgements. `useTutorSession.test.tsx` and `machine.test.ts` pass. See "The ground moved during this audit" above. |
-
-### P2 — 5 of 5 distinct CLOSED
-
-| finding                                                                                                            | verdict    | proof                                                                                                                                                                                                                                                 |
-| ------------------------------------------------------------------------------------------------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Profile/Insights no-scroll test never ran its check                                                                | CLOSED     | `no-outer-scroll.test.tsx:46-53` rewritten to `emit('load-goals', ...)` and to assert on the shell's own contract (`open-profile-button` + `aria-current`) instead of `ProfileView`'s copy; all viewport/route combinations pass in the 1984-test run |
-| `normalizeLibrarySourceProvenance`'s artist-validity check is a structural no-op (listed twice)                    | **CLOSED** | `provenance.ts` now rejects any empty normalized artist instead of comparing two arrays that must have the same length. `provenance.test.ts` covers blank and non-string artist entries.                                                              |
-| Auto-pausing for inactivity forces a full MIDI teardown/reopen at the moment a resume strike is expected           | **CLOSED** | `SongView.tsx` parks through `pause()` and `seekSeconds()` without `reconnectMidi()`. `SongView.tutor.test.tsx` proves the MIDI device list is not re-requested during the park.                                                                      |
-| Count-in beat row clipped for any measure with more than 4 beats                                                   | **CLOSED** | `CountIn.tsx` uses the full `beatCount` for CSS columns and `PracticeEdgeCaption.css` no longer caps height. `CountIn.test.tsx` covers 5, 6, and 7 beats.                                                                                             |
-| Practice-day bucketing disagrees between the streak store (local day) and the archive/longitudinal store (UTC day) | **CLOSED** | `archive.ts` now delegates to the same `localDateKey` used by streaks. `archive.test.ts` crosses the UTC+8 boundary and receives `2026-08-13` on both paths.                                                                                          |
-
-## Part 2 — fidelity map (`docs/fidelity-map-20260812.md`) and closure order (`docs/fidelity-closure-order-20260812.md`)
-
-Closure-order rank shown where the row was in the "first ten." Verdicts are CLOSED / OPEN / PARTIAL (real, verified progress with a real residual) / BLOCKED OUTSIDE (the only remaining proof needs his hands on a real kit).
+`closed` means current source plus a regression test or current visual proof.
+`partial` means a concrete remaining product/code gap. `blocked outside` means
+the remaining deciding evidence requires Konstantin on the DTX; it is not a
+request for more source-only work.
 
 ### sitting down and starting
 
-| id  | rank | verdict    | evidence                                                                                                                                                                                                                                       |
-| --- | ---- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| S01 | 4    | OPEN       | Kit-only mapped-pad launch works once a target is armed (`HomeCockpit.tsx:448-459`), but the session still opens through a desktop Home screen and manifest before any strike does anything. Physical first-ten-minutes proof BLOCKED OUTSIDE. |
-| S02 | 6    | **CLOSED** | Home now shows a quiet, visible status from `inputReadiness`: connected plus device name, reconnecting plus remembered device name, or no MIDI kit found. `HomeCockpit.test.tsx` covers all three real states.                                 |
-| S03 | 7    | PARTIAL    | Kit path confirmed to skip the mode/difficulty picker entirely (`SongListView.tsx:853-864,1108-1120`) and launch straight into Practice. Pedal-specific path and real-kit proof BLOCKED OUTSIDE.                                               |
-| S04 | 16   | CLOSED     | Lesson entries from Home and from a kit strike in the library both go straight to Practice with no mode fork (`SongListView.tsx:853-864` comment states this explicitly, citing the seated-player rationale).                                  |
-| S05 | 15   | **CLOSED** | Home now resolves the same `confirm` mapping as Songs/Journey; non-confirm pad strikes only flash their zone. `HomeCockpit.test.tsx` proves a stray pad does not start the armed target and the confirm control does.                          |
-| S06 | 17   | PARTIAL    | Count-in, reversed-stick asset, and zone-flash-on-hit all present and visually much cleaner (kb.13 captures). "Readable from two metres at the kit" is BLOCKED OUTSIDE — every capture is keyboard input.                                      |
-| S07 | 18   | CLOSED     | `no-outer-scroll.test.tsx` covers Home/Songs/My Wave/Journey/Profile at both laptop sizes, all passing; `01-home` captures confirm one continuous field, no scroll hunting.                                                                    |
+| id  | state           | current evidence or remaining proof                                                                                                         |
+| --- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| S01 | blocked outside | every drum is a labelled door and `kit-door-routing.test.tsx` covers it; only a real first ten minutes at the kit can settle hands-free use |
+| S02 | closed          | Home visibly names connected, reconnecting, and absent input; late connection and remembered-device tests cover the state machine           |
+| S03 | blocked outside | the deliberate strike-then-confirm path is wired; pedal path and actual seated launch remain DTX proof                                      |
+| S04 | closed          | lesson launch goes straight to Practice without a mode/difficulty fork; `SongListView.test.tsx` covers it                                   |
+| S05 | closed          | a labelled pad selects a door and only confirm starts it; stray-strike regression is in `HomeCockpit.test.tsx`                              |
+| S06 | blocked outside | count-in, reversed-stick treatment, and zone flare have source/capture proof; legibility at playing distance needs the real kit             |
+| S07 | closed          | `no-outer-scroll.test.tsx` and 1024×700 / 1225×768 captures cover the field routes                                                          |
 
 ### playing and being judged
 
-| id  | rank | verdict            | evidence                                                                                                                                                                                                                                                                                                                                 |
-| --- | ---- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P01 | 1    | PARTIAL            | The specific implausible-count class (deriveMisses fabrication, unscoreable false hits, checkpoint-record loss) is fixed and verified in Part 1. One real favourite's full chain is proven end-to-end once (`2026-08-13-favourite/README.md`). Re-running the exact original installed contradiction needs a live DTX — BLOCKED OUTSIDE. |
-| P02 | 19   | BLOCKED OUTSIDE    | `boulevard-regression.test.ts` still exists and passes; no fresh full-chart visual replay beyond the existing regression test was found.                                                                                                                                                                                                 |
-| P03 | 5    | CLOSED (automated) | 31dfeb0 portaled the Flow playhead out of the CSS-zoomed tree and added tests asserting time/tick/bar-beat/x/playhead agreement at 0.5×, pause, 0.7× resume, 1.0×, and after rewind. Live audio-synced physical capture BLOCKED OUTSIDE.                                                                                                 |
-| P04 | 20   | CLOSED             | `04-practice` captures show one calm top transport line (back / title / mode·speed·input / Inspector), not a dense side panel.                                                                                                                                                                                                           |
-| P05 | 21   | CLOSED             | kb.13 commit: "Flow auto-zoom restores four large readable beats per bar" — confirmed in `04-practice` captures (4 clear beats, large noteheads).                                                                                                                                                                                        |
-| P06 | 11   | PARTIAL            | Trigger threshold hardened (see U01/U02 below); mode-policy split (`SongView.tsx:661-725`) still stores Practice/Perform differently. Felt permissiveness BLOCKED OUTSIDE.                                                                                                                                                               |
-| P07 | —    | CLOSED             | Inactivity parking no longer reopens MIDI before the expected resume strike. `SongView.tutor.test.tsx` proves no second MIDI device-list request occurs when the inactivity veil appears.                                                                                                                                                |
-| P08 | —    | CLOSED             | Pointer release wiring for the inactivity veil confirmed still present and wired to the whole practice `<Layout>`.                                                                                                                                                                                                                       |
-| P09 | —    | CLOSED             | Drag-to-loop-select still present in `SheetMusic.tsx`.                                                                                                                                                                                                                                                                                   |
-| P10 | —    | CLOSED             | 500 ms notation glossary hover still present and wired.                                                                                                                                                                                                                                                                                  |
-| P11 | 23   | **CLOSED**         | kb.13 commit: "every kit zone reads as light on a drum, tom 1 included, with a contrast test that rejects a fill too close to its own backdrop." Visually confirmed — `01-home` captures show 8 distinctly saturated zone colours, a direct fix of the `design-acceptance-notes.md` rejection.                                           |
-| P12 | 24   | PARTIAL            | State captions consolidated into one edge-caption rail (4b8feec). Whether note→pad→correction reads as one system to an actual learner is a felt judgment, BLOCKED OUTSIDE.                                                                                                                                                              |
-| P13 | 13   | PARTIAL, improving | `LoopEscapeRunwayModel` still present. The frozen-tutor-speed bug (P1-14) that let a manual tempo change mid-loop be silently overridden was fixed on disk mid-audit (uncommitted — see note above); the residual is felt legibility of the loop-escape itself, BLOCKED OUTSIDE.                                                         |
-| P14 | 10.5 | CLOSED             | `challengeLivesEnabled` now defaults `false` and is a labeled, player-toggleable setting (`SongView.tsx:331-333`).                                                                                                                                                                                                                       |
+| id  | state           | current evidence or remaining proof                                                                                                           |
+| --- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| P01 | blocked outside | score persistence defects are closed and Kit Signal exposes received/mapped/saved evidence; a real strike-to-saved-run proof remains DTX-only |
+| P02 | blocked outside | `boulevard-regression.test.ts` protects the renderer path; a complete Classic replay on real audio remains unobserved                         |
+| P03 | blocked outside | Flow timing has speed/seek regression coverage; audible playhead synchrony needs real audio and hands                                         |
+| P04 | closed          | `2026-08-13-teach` shows the quiet top transport and full notation field                                                                      |
+| P05 | closed          | current Flow captures show readable measures; repeated figures are now rendered as repeats                                                    |
+| P06 | blocked outside | practice/Perform data policies and tutor guardrails are tested; beginner forgiveness at a slow physical tempo is a feel check                 |
+| P07 | blocked outside | parking no longer reopens MIDI and pointer release remains wired; musical checkpoint and one-pad resume need DTX proof                        |
+| P08 | closed          | veil pointer-down, move, and wheel release are retained and tested                                                                            |
+| P09 | closed          | paused-score drag selection and loop wiring remain covered by `SongView.test.tsx`                                                             |
+| P10 | closed          | the 500 ms notation glossary path is wired and covered; current Why disclosure is deliberate rather than hover-only                           |
+| P11 | blocked outside | lane colours, labels, contrast checks, and captures are present; two-metre physical readability is outside automation                         |
+| P12 | partial         | note, lane colour, kit key, and Why correction now join; a free-play atomic-evidence gap still breaks the complete feedback-to-next-work loop |
+| P13 | blocked outside | loop escape and player-owned tempo are in source; whether a real recovery feels finite and useful needs a DTX run                             |
+| P14 | closed          | challenge lives default off and remain an explicit player setting                                                                             |
 
 ### understanding a mistake
 
-| id  | rank | verdict                           | evidence                                                                                                                                                                                                                                                                                                                                                                                               |
-| --- | ---- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| U01 | 2    | PARTIAL                           | Detection threshold raised from 12 to 16 resolved events and now tolerates 2–3 stray pads before intervening (`tutor/types.ts:86`, commit 31dfeb0) — the specific "punished at 100% accuracy" failure class is closed. Felt tolerance at a real slow beginner pace BLOCKED OUTSIDE.                                                                                                                    |
-| U02 | 3    | PARTIAL, improving                | Same threshold fix stops involuntary intervention on a clean run. The tutor's ability to silently override a live manual speed change was removed on disk mid-audit (uncommitted — see note above); the residual is `machine.ts`'s in-loop speed step-down once a recovery is genuinely entered, which is a bounded, legible part of the recovery model rather than an involuntary top-level collapse. |
-| U03 | 4    | **CLOSED**                        | Default post-run action for an unqualified lesson pass is "Replay this loop" / "One more learning pass," staying on the same lesson (`ScoreSummary.tsx:442-457`); confirmed in `05-result` capture. "Continue My Wave" is now a secondary link, not the default outcome.                                                                                                                               |
-| U04 | 12   | PARTIAL                           | Deferral/max-attempt machinery unchanged structurally. Felt legibility of the terminal state BLOCKED OUTSIDE.                                                                                                                                                                                                                                                                                          |
-| U05 | 25   | OPEN / not independently verified | `deriveAtomicSkillEvidence` now writes real evidence (Part 1), but I did not trace a UI surface that shows the causal chain from one hit to one skill to the next exercise. Treat as unresolved.                                                                                                                                                                                                       |
-| U06 | 26   | OPEN, unchanged                   | `NotationGlossary` still explains a glyph in isolation; no joined note→pad→corrective-action surface found.                                                                                                                                                                                                                                                                                            |
-| U07 | 27   | **CLOSED**                        | The specific instance (0-hit/7-miss run coexisting with a wrong XP/streak chip) is root-caused to bugs now fixed in Part 1 (deriveMisses, checkpoint merge, reward-write gating). Separately, the header XP/streak chip on Home no longer renders at all (see Part 3) — it cannot contradict anything because nothing is shown.                                                                        |
+| id  | state           | current evidence or remaining proof                                                                                 |
+| --- | --------------- | ------------------------------------------------------------------------------------------------------------------- |
+| U01 | blocked outside | the detector threshold and scoring repairs are covered; real slow-beginner tolerance needs physical play            |
+| U02 | closed          | tutor no longer sets engine speed; `useTutorSession.test.tsx` proves a manual speed survives tutor activity         |
+| U03 | closed          | unqualified lesson pass defaults to replaying the current loop, with My Wave secondary                              |
+| U04 | blocked outside | deferral and max-attempt paths are present; terminal-state legibility needs a real recovery session                 |
+| U05 | partial         | atomic model and recommendations exist, but B15 leaves free-play practice invisible to it                           |
+| U06 | closed          | `mistake-evidence.test.ts` and `TutorHud.test.tsx` prove expected drum, actual drum, and concrete correction in Why |
+| U07 | closed          | score, persistence, and result-receipt fixes now agree under their regression tests                                 |
 
 ### seeing progress
 
-| id  | rank | verdict                           | evidence                                                                                                                                                                                                                                                                                                                          |
-| --- | ---- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| G01 | 28   | PARTIAL                           | Real per-run atomic-skill evidence now exists and archives past the 50-run cap (Part 1). "Compact, interpretable, shaped around a musician's question" not independently re-scored.                                                                                                                                               |
-| G02 | 29   | **CLOSED**                        | `05-result` captures show a full-width receipt, not a side drawer or a generic centered modal.                                                                                                                                                                                                                                    |
-| G03 | 10   | **CLOSED**                        | No XP chip renders on Home at all (Part 3 — the wiring is dead, not merely quiet). `01-home` captures confirm.                                                                                                                                                                                                                    |
-| G04 | 30   | PARTIAL                           | Home shelf now says "Building toward your next song / Clean reps here move a favourite-song section into range" — a musical-payoff frame, not raw XP. It does **not name the favourite song** — `design-acceptance-notes.md` item 5 explicitly asked for the real song title to read as a low shelf; the current text is generic. |
-| G05 | 31   | PARTIAL                           | Session-details disclosure shows a reasoned next step ("Based on: Current acquire block · Build the next layer at the selected scaffold"). Same residual as G04 — no named favourite song.                                                                                                                                        |
-| G06 | 42   | ABSENT, BLOCKED OUTSIDE by nature | No month-scale outcome model exists; this needs a month of real practice to even define, let alone prove.                                                                                                                                                                                                                         |
-| G07 | 43   | PARTIAL                           | No single named regression gate binds map rows to release. In practice, the 1984-test suite plus dated `design-qa/` folders function as a de facto net, and I independently reconfirmed several previously-reported failure classes are now closed at source. The formal artifact the ask describes does not exist.               |
+| id  | state   | current evidence or remaining proof                                                                           |
+| --- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| G01 | partial | full-window history and atomic evidence exist; free-play evidence does not enter the same model               |
+| G02 | closed  | result and statistics are full-window receipts in `2026-08-13-push` captures                                  |
+| G03 | closed  | the Home XP strip is no longer rendered; Profile owns detailed figures                                        |
+| G04 | partial | Home frames work as musical progress, but it does not consistently name the favourite-song payoff             |
+| G05 | partial | the receipt and Why surface explain a next step; causal bridge to a named favourite remains thin              |
+| G06 | open    | no month-scale outcome model or longitudinal learner evidence exists                                          |
+| G07 | partial | broad regression tests and visual dossiers exist, but no single named gate binds every owner ask to a release |
 
 ### choosing music
 
-| id  | rank | verdict                           | evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| --- | ---- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| M01 | 32   | OPEN / not independently verified | `my-wave.ts` (1377 lines) and its 438-line test exist (fa5b9ca); I did not trace a live recommendation end to end.                                                                                                                                                                                                                                                                                                                                                                                                        |
-| M02 | 33   | OPEN / unclear                    | Session-details capture shows a reason string, not a clearly named shared skill + difficulty delta between two specific songs.                                                                                                                                                                                                                                                                                                                                                                                            |
-| M03 | 34   | PARTIAL                           | Lesson starting speed is now computed from `bpmStart/bpmTarget`, clamped 0.7–1.0 (`SongListView.tsx:857-861`), and a broader `suggestedSpeed` pipeline (`next-practice/recommend.ts`) feeds Home launch — a real transparent selection, not purely reactive-after-failure. No on-screen "why this speed" copy was found for the player.                                                                                                                                                                                   |
-| M10 | 34.5 | OPEN                              | Same residual as G04/G05 — no named favourite-song payoff visible in the shelf or session-details text.                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| M04 | 44   | PARTIAL, was ABSENT               | One real favourite (`Boulevard of Broken Dreams`) proven playable end-to-end through the intended path (`2026-08-13-favourite/README.md`, five gates all green, judged hit recorded). This is a proof of the _path_, not bulk conversion — the other ~229 favourites and 13 drum rows still need the identical one-by-one manual action; `02-library` capture's "0 in library · 0 ready · 243 to add" reflects an isolated fresh QA profile, not a regression, but the real library is genuinely still 1-of-230-ish deep. |
-| M05 | 35   | **CLOSED**                        | `02-library` capture: one list, sort/filter chips, no separate local/drums/favourites/online source tabs.                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| M06 | 45   | OPEN, unchanged                   | Rows still say "Not in your library yet" / "Can't verify this one yet"; no automatic candidate→playable pipeline found.                                                                                                                                                                                                                                                                                                                                                                                                   |
-| M07 | 36   | PARTIAL                           | Hover-preview algorithm unchanged (source only, correct in isolation); still only exercisable on the one now-playable favourite, not the bulk catalogue (M06).                                                                                                                                                                                                                                                                                                                                                            |
-| M08 | —    | **CLOSED**                        | Capture confirms honest labels, no false Play affordance.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| M09 | —    | **CLOSED**                        | Zero occurrences of "Support project" anywhere in `src/`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| id  | state   | current evidence or remaining proof                                                                                  |
+| --- | ------- | -------------------------------------------------------------------------------------------------------------------- |
+| M01 | closed  | snare starts My Wave; `my-wave.test.ts` and `recommend.test.ts` cover favourites, replays, reachability, and reasons |
+| M02 | closed  | My Wave receipts carry shared musical features and learner-relative difficulty change                                |
+| M03 | closed  | suggested starting speed comes from song/profile evidence and tutor no longer overwrites it                          |
+| M04 | partial | one favourite path is proven; the bulk source library is still not a bulk playable library                           |
+| M05 | closed  | Songs is one field/list with honest source states rather than separate library destinations                          |
+| M06 | open    | automatic import at HEAD is renderer-only; the fuller current lane is uncommitted and has open interruption cases    |
+| M07 | partial | drum-peak preview works for playable local songs, while most source rows remain unplayable                           |
+| M08 | closed  | rows remain honest about missing audio/chart evidence and do not present false Play actions                          |
+| M09 | closed  | the Support project CTA remains absent from source                                                                   |
+| M10 | partial | My Wave uses affection and fit, but the Home payoff is not consistently a named favourite song                       |
 
 ### the feel of the room
 
-| id  | rank | verdict        | evidence                                                                                                                                                                                       |
-| --- | ---- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| F01 | 8    | **CLOSED**     | `01-home` captures: kit is edge-to-edge, one continuous field, not a framed card in a column.                                                                                                  |
-| F02 | 9    | **CLOSED**     | Same captures — zones legible, single-line title with a quiet lesson-number kicker.                                                                                                            |
-| F03 | 37   | **CLOSED**     | No XP/status card competes on Home (see G03, Part 3).                                                                                                                                          |
-| F04 | 38   | PARTIAL        | Captures show a materially closer match to the Yandex reference on Home/Songs/Journey/Results; not exhaustively diffed route-by-route against every card/rail/widget instance in the codebase. |
-| F05 | 39   | **CLOSED**     | Rail shows exactly Home / My Wave / Songs / Journey (`01-home` capture) — no separate Coach nav item.                                                                                          |
-| F06 | 40   | OPEN / unclear | `03-journey` capture shows a hover "NEXT UP" callout on a node; whether the motion is event-specific vs. arbitrary was not traced in source.                                                   |
-| F07 | 41   | **CLOSED**     | Zero occurrences of "Daybreak Arena" or "Learn the motion. Own the room." anywhere in `src/`.                                                                                                  |
-| F08 | 46   | PARTIAL        | A signed, notarized, installed build exists and the kb13-final captures run against it — but on keyboard input only. The real "can I actually play?" answer on a DTX kit is BLOCKED OUTSIDE.   |
+| id  | state           | current evidence or remaining proof                                                                                     |
+| --- | --------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| F01 | closed          | `2026-08-13-wave-field` proves one shell/field and reduced-motion readability                                           |
+| F02 | blocked outside | current launcher captures show the kit owning Home; physical two-metre readability is a DTX check                       |
+| F03 | closed          | first view has no XP strip or competing dashboard card                                                                  |
+| F04 | partial         | current warm-field captures are materially closer; aesthetic acceptance beyond the captured routes is a human judgement |
+| F05 | closed          | rail is Home, Songs, Journey, and Profile; My Wave is the snare and Coach is no longer a destination                    |
+| F06 | partial         | route-change motion has transition/reduced-motion proof; Journey hover's musical event semantics remain untraced        |
+| F07 | closed          | obsolete Daybreak Arena and slogan copy are absent from `src/`                                                          |
+| F08 | open            | no kb.15 package or installed verification exists yet; physical play then remains DTX-only                              |
 
-## Part 3 — what nobody checked
+## blocked outside — DTX session only
 
-### A dead prop is quietly doing the "remove the XP chip" work
+these are not code defects to chase in this audit:
 
-`SongListView.tsx:1147-1160` still instantiates `GamificationHeaderStrip` (calls the gamification hook, computes streak/XP/goal state) and passes it to `AppShell` as a `statusSlot` prop. **`AppShell.tsx` declares `statusSlot?: ReactNode` in its props interface but never renders it anywhere in the component body.** The XP chip is gone from Home not because someone decided where progress belongs and moved it there — it's dead-wired and silently dropped. The good news: this means F03/G03 are genuinely closed (nothing can render a wrong number if nothing renders). The bad news: it's wasted computation on every SongListView render, and it will confuse the next person who tries to "wire the XP chip back in" by editing `statusSlot` and wondering why nothing appears. Streak/XP data is correctly surfaced instead on the Profile route via its own `gamification` hook (`ProfileView.tsx:654-655`), which is the right home per the design doc — but that appears to be incidental, not the result of someone deleting the dead prop.
+1. sit down from a cold-ish start, select each labelled Home door with the DTX,
+   confirm it, and confirm kick/pedal behavior feels intentional.
+2. use Kit Signal to verify every physical zone arrives, maps to the intended
+   lane, and ends in a saved run. The one-minute protocol is in
+   [`kit-test-drill.md`](kit-test-drill.md).
+3. read labels and lane colours from playing distance, run count-in, and check
+   Flow against audible audio at at least one slow and one normal tempo.
+4. deliberately trigger inactivity/recovery and a tutor loop; judge whether
+   the checkpoint, tempo, and exit feel fair.
 
-### atomic skill evidence is written for lesson runs only
+## new reliability findings
 
-Confirmed in Part 1: `SongView.tsx:760-778` only calls `deriveAtomicSkillEvidence` when `songData?.lesson` is set. A free-play song practiced outside the curriculum (which the app explicitly supports — Songs, My Wave "Play" items, imported favourites) writes **zero** atomic skill evidence. The Bayesian mastery/spaced-review system that M01/U05/G01 all depend on is real and wired, but it is fed exclusively by curriculum-lesson runs. If he spends a session drilling a favourite song outside the lesson path, that practice teaches the mastery model nothing.
+| rank | finding                                                                                                      | state           | evidence and smallest missing proof                                                                                                               |
+| ---: | ------------------------------------------------------------------------------------------------------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+|    1 | a non-zero `yt-dlp` search exit can return parsed partial stdout as success and drop `stderr`                | open            | current dirty `searchYoutube.ts:546-564`; tests cover non-zero with zero results, not non-zero with partial results                               |
+|    2 | import failure after preparation and app shutdown during `importing` have no complete cleanup/readback proof | open            | current dirty `autoChart.ts:1471-1475,1574-1642`; inject `importSong` failure and shutdown, then prove no temp dir/row remains and retry is clean |
+|    3 | quit/relaunch checkpoint recovery is synthetic-event coverage, not a real Electron lifecycle proof           | open            | checkpoint unit/view tests exist; run an actual close/relaunch with the same user data before claiming durable interruption recovery              |
+|    4 | full-disk save handling uses an injected store failure, not a real `ENOSPC` boundary                         | partial         | existing-save preservation and error receipt are tested; force/read back a true filesystem failure if this claim matters                          |
+|    5 | missing/malformed chart handling lacks a list-then-disappears end-to-end test                                | partial         | row, loader, and notation fallback paths are individually covered                                                                                 |
+|    6 | first launch is covered in pieces, not as a packaged clean-profile journey                                   | open            | bootstrap, folder selection, and E2E seedless state exist; no packaged first Home → Journey → relaunch proof                                      |
+|    7 | archive/streak UTC+8 storage is correct, but an app mounted across midnight has no rerender proof            | partial         | `archive.test.ts` crosses UTC+8; this is a low-risk display gap                                                                                   |
+|    8 | actual DTX signal, mapping, latency, and kit feel cannot be established by synthetic MIDI                    | blocked outside | current tests simulate MIDI; perform the one-minute kit drill                                                                                     |
 
-### archive and streak now share the player's local day
+## ranked open list
 
-`archiveDayKey` now calls `localDateKey`, matching the streak store. A run at `2026-08-12T18:30:00.000Z` is correctly filed as `2026-08-13` in UTC+8 by both paths. This only changes future/current writes; older aggregate-only day buckets cannot be moved precisely because they do not retain the original timestamp.
+1. make a non-zero partial `yt-dlp` result visibly fail or explicitly surface
+   incompleteness; do not let automatic search look complete when its process
+   failed.
+2. prove automatic-import cleanup for import-stage failure and quit/shutdown,
+   then commit the lane before calling one-name import a release feature.
+3. run a real Electron quit/relaunch checkpoint recovery proof.
+4. let free-play songs write atomic skill evidence, or state that the mastery
+   model only learns from curriculum lessons.
+5. package and install kb.15 only after the first four items and the DTX feel
+   verdict; current manifest/artifact state is still kb.14.
+6. turn more than one source favourite into a playable song; M04 cannot close
+   on catalogue metadata alone.
+7. decide whether a named favourite payoff is required on Home. The present
+   wording has motivation, but its musical object is often implicit.
 
-### promises on screen with no test behind them
+## release claims that are not yet supportable
 
-Cross-referencing the untested code paths found in Part 1 against what the UI claims:
-
-- **"your target stays armed" / kit reconnect honesty (S02)** — `HomeCockpit.test.tsx` now verifies the visible connected, reconnecting, and not-found states sourced from `inputReadiness`.
-- **"Configure Input" mid-song** — `SongView.tutor.test.tsx` now starts a live run, opens Learn, sends a strike, and verifies the run was already paused.
-- **Tutor mid-run speed changes and inactivity idle timing at non-1.0× speed** — at the start of this pass, neither `useTutorSession.test.ts` nor `useKitInactivityRecovery.test.ts` covered these paths, and both bugs were open. Both gained coverage and a fix while this audit was running (see "the ground moved during this audit") — the general pattern held even as the specific instance closed.
-- **Odd-meter count-in (5/4, 7/8, 7/4)** — `CountIn.test.tsx` now exercises 5, 6, and 7 beats and asserts one rendered cell and one CSS column per beat.
-
-In every case above, the untested path and the still-open (or just-closed) bug are the same path. The 1984 green tests from the start of this pass are a real, wide net — the bugs that survived it survived specifically because nothing exercised that exact combination of state, and closing one usually meant writing that test first.
-
-### what would break on his machine but not in a test
-
-- **First launch / no practice history** — the `02-home-session-details-open` capture (a first-lesson, no-history state) shows the "Warm up" and "Build" stops in the session-details popover carrying the **identical title** ("Alternating Singles Warm-Up" for both). This is very plausibly correct behavior for a genuinely fresh profile with nothing else earned yet — but it means the very first thing he'd see from that disclosure looks like a copy-paste bug, not a deliberate "there's only one thing to build toward yet" state. Worth a distinct empty-state copy before he opens it on day one.
-- **Day boundary** — closed for future/current archive writes; the UTC+8 boundary regression is covered above. Legacy aggregate-only buckets remain immutable without per-run timestamps.
-- **Disconnected kit** — Home now shows the real reconnecting state and remembered device name rather than hiding it in `sr-only` copy.
-- **Song with no chart** — handled gracefully: `useSheetMusic.ts:69` shows a "Chart parse failed" notification rather than crashing, and the fix to `candidateDifficulty` (Part 1) means My Wave should no longer auto-launch into this state in the first place.
-- **Full disk** — `savePracticeRun` (`practiceStats.ts:605-609` onward) is wrapped in a top-level `try/catch` that replies with `{error}` on any write failure (ENOSPC included), and `SongView.tsx:848-855` surfaces "Practice history was not saved... Your existing history is unchanged" on that reply. This is handled reasonably; the one inaccuracy is that "unchanged" is asserted rather than re-verified, which is a minor honesty gap, not a crash risk.
-- **Coach link naming** — the result receipt (`ScoreSummary.tsx:705-712`) has both a "See the evidence" disclosure and a separate "Coach" button that opens the same kind of evidence drawer. Cosmetic duplication, not a defect.
-
-## Part 4 — the shortest list that's actually left
-
-1. **The seven code findings in the remediation update are CLOSED.** This includes Configure Input, MIDI parking, odd-meter count-ins, local-day archive bucketing, provenance validation, visible readiness, and deliberate Home confirmation.
-2. **The library is honest, not full**: one favourite is genuinely playable end to end; the other ~242 rows still need the same manual one-by-one action before "one clear music shelf" becomes "a shelf with music on it."
-3. **Free-play song practice doesn't feed the mastery model** — only curriculum lesson runs write atomic skill evidence, so My Wave's "zone of proximal development" logic is blind to anything he plays outside the lesson path.
-4. **No named favourite song appears on Home, the shelf, or session-details** — the payoff framing exists ("Building toward your next song," "Build the next layer at the selected scaffold") but never names the actual song, which `design-acceptance-notes.md` explicitly asked for.
-
-### BLOCKED OUTSIDE — DTX session required
-
-No source read, unit test, keyboard capture, or installed keyboard-profile build can settle zone legibility at two metres, pedal-path launch, felt tutor forgiveness at a real slow tempo, Flow playhead sync against audible sound, or whether a full lesson run on the actual DTX feels finite and fair. Those require Konstantin's hands and his DTX.
+- a signed, notarized, installed, or public kb.15 build;
+- a final DMG checksum or release URL;
+- source-linked automatic import as a completed/reliable release feature;
+- bulk playable Yandex favourite/drum coverage;
+- durable crash/quit recovery under a real Electron lifecycle;
+- physical Yamaha DTX402 reliability, pedal feel, two-metre legibility, audible
+  Flow sync, tutor fairness, retention, transfer, or month-scale learning
+  outcomes.

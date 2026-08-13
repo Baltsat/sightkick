@@ -208,8 +208,7 @@ describe('LibraryCandidateList — song rows', () => {
     fireEvent.pointerLeave(row);
   });
 
-  it('offers the one fix action for a not-ready song already linked to a source track', () => {
-    const onUseLocalAudioForSong = vi.fn();
+  it('does not expose local-audio import from a not-ready source-linked song row', () => {
     const linked = makeListSong('linked-song', {
       name: 'Linked Song',
       audio: [],
@@ -239,17 +238,12 @@ describe('LibraryCandidateList — song rows', () => {
         onPlaySong={vi.fn()}
         onResolveSource={vi.fn()}
         onUseLocalAudioForSource={vi.fn()}
-        onUseLocalAudioForSong={onUseLocalAudioForSong}
       />,
     );
 
-    const fix = screen.getByRole('button', {
-      name: /use lawful local audio for linked song/i,
-    });
-
-    expect(fix).toBeEnabled();
-    fireEvent.click(fix);
-    expect(onUseLocalAudioForSong).toHaveBeenCalledWith(linked);
+    expect(
+      screen.queryByRole('button', { name: /local audio/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('offers no fix action for a not-ready song with no source provenance', () => {
@@ -340,9 +334,8 @@ describe('LibraryCandidateList — source rows', () => {
     ).toHaveAttribute('src', songArtPlaceholder);
   });
 
-  it('renders an honest Drums row and wires check-charts / use-local-audio to the exact track', () => {
+  it('renders an honest Drums row and wires only chart lookup to the exact track', () => {
     const onResolveSource = vi.fn();
-    const onUseLocalAudioForSource = vi.fn();
     const track = sourceTrack('source-1', 'Natural Villain');
     const entries = build_unified_library({
       songs: [],
@@ -357,7 +350,7 @@ describe('LibraryCandidateList — source rows', () => {
         canUseLocalAudio
         onPlaySong={vi.fn()}
         onResolveSource={onResolveSource}
-        onUseLocalAudioForSource={onUseLocalAudioForSource}
+        onUseLocalAudioForSource={vi.fn()}
       />,
     );
 
@@ -372,15 +365,12 @@ describe('LibraryCandidateList — source rows', () => {
     );
     expect(onResolveSource).toHaveBeenCalledWith(track);
 
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: /use lawful local audio for natural villain/i,
-      }),
-    );
-    expect(onUseLocalAudioForSource).toHaveBeenCalledWith(track);
+    expect(
+      screen.queryByRole('button', { name: /local audio/i }),
+    ).not.toBeInTheDocument();
   });
 
-  it('disables use-local-audio when no folder is selected and shows a resolved chart label', () => {
+  it('shows the resolved chart label without exposing local-audio import', () => {
     const track = sourceTrack('source-2', 'Loyal');
     const entries = build_unified_library({
       songs: [],
@@ -409,13 +399,13 @@ describe('LibraryCandidateList — source rows', () => {
 
     expect(
       screen.getByTestId('library-candidate-state-Drums-1'),
-    ).toHaveTextContent('Chart found · needs your audio');
+    ).toHaveTextContent('Chart found · search to add');
     expect(
-      screen.getByRole('button', { name: /use lawful local audio for loyal/i }),
-    ).toBeDisabled();
+      screen.queryByRole('button', { name: /local audio/i }),
+    ).not.toBeInTheDocument();
   });
 
-  it('keeps the check-charts / use-local-audio pair out of the resting row and reveals them only when the row is focused', () => {
+  it('keeps chart lookup out of the resting row and reveals it only when the row is focused', () => {
     const track = sourceTrack('source-3', 'Wantchya');
     const entries = build_unified_library({
       songs: [],

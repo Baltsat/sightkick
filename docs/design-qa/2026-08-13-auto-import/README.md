@@ -1,45 +1,52 @@
 # automatic import proof receipt
 
-## current state
+## delivered desktop path
 
-The renderer-side automatic-import contract is implemented in this checkout.
-It ranks YouTube candidates, rejects accidental variants, maps honest queue
-states, and routes the legacy online/download adapter to `create-auto-chart`.
-The main-process patch in [../../auto-import-handoff.md](../../auto-import-handoff.md)
-is still required before a source-linked YouTube result can receive retained
-fetched-audio evidence. Until that patch lands, an end-to-end capture would
-misrepresent the feature: the current main process correctly rejects that exact
-case, and the source-row UI remains owned by a parallel lane that still exposes
-its separate local-audio action.
+typing a title in Song Search now returns ranked YouTube candidates. Choosing a
+candidate creates an automatic chart job; no song-row local-audio action is
+offered as the entry path.
 
-## evidence already obtained
+the desktop main process owns the trust boundary. It resolves the pinned
+transcriber-venv `yt-dlp`, re-inspects the selected canonical URL before
+downloading, and requires an exact video id/title/artist match, a duration
+delta of at most eight seconds, and no unrequested live, cover, karaoke,
+tribute, instrumental, remix, acoustic, sped-up, slowed, or nightcore variant.
 
-| proof               | result                                                                                                                               |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| local tools         | `/opt/homebrew/bin/yt-dlp` (`2026.03.17`) and ffmpeg (`8.1`) are present; the shipped sidecar uses its own pinned `yt-dlp==2026.7.4` |
-| renderer contract   | selected candidate, canonical URL, and source provenance are preserved for main-process verification                                 |
-| candidate ranking   | exact title, artist, ±8-second duration, and requested-variant checks; live/cover impostors do not reach selection                   |
-| queue state         | queued → fetch → chart → scan → import → playable, plus terminal failure and one-click retry                                         |
-| focused state tests | `4` files / `8` tests passed (`identity`, queue state, YouTube mapping, failure/retry hook)                                          |
-| typecheck           | `corepack yarn typecheck` passed after the renderer contract change                                                                  |
-| lint                | `corepack yarn lint` passed before the final documentation-only update; scoped automatic-import ESLint passed after it               |
-| production build    | `corepack yarn build` passed after the final renderer contract change                                                                |
-| full Vitest run     | `204` files / `2,086` tests passed                                                                                                   |
+only a verified fetched recording may produce `youtube-fetched` audio
+provenance. Import still requires real hashed audio, a generated chart,
+scan-chart drums, and a headless-load proof. A job failure or cancellation
+removes its fresh attempt directory; Retry creates a new job and directory.
 
-The web surface was intentionally unchanged. Its deployment disables keyword
-search and automatic chart creation until a transcriber connection is
-configured; adding a browser-only workaround would be a second, unverified
-path rather than this desktop flow.
+## captured Electron run
 
-## required visual capture once the handoff is applied
+the deterministic smoke test runs the actual desktop app, IPC queue, ranking,
+main-process identity check, import, library scan, song view, and player. Its
+`yt-dlp` and transcriber executables are deterministic fixtures, so this is not
+a claim of a public-network YouTube transfer. The shipped path separately
+verified the pinned real venv executable at
+`~/Library/Application Support/sight-kick/transcriber/.venv/bin/yt-dlp` as
+`2026.07.04`.
 
-1. choose a title absent from the seeded library;
-2. type it in the one search field and capture the small ranked candidate list;
-3. select the exact recording, with `dialog.showOpenDialog` rigged to throw;
-4. capture the queue surface during download/transcription and after import;
-5. open the imported song and capture the loaded playable chart;
-6. repeat a forced fetch failure, press Retry once, and confirm a new job uses a
-   fresh working directory.
+the test installs a throwing `dialog.showOpenDialog` handler before search. A
+file picker would therefore fail the run instead of being hidden by the
+capture.
 
-The final screenshots belong here only after the IPC handoff is implemented and
-the test has completed. No placeholder screenshot is included.
+| capture                                            | observed result                                                                                            |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [01-search-progress.png](01-search-progress.png)   | exact Mokita recording selected; live and cover decoys are absent; the actual queue reports fetch progress |
+| [02-launched-playing.png](02-launched-playing.png) | imported song opens a rendered drum chart; count-in/play has started                                       |
+| [03-forced-failure.png](03-forced-failure.png)     | injected sidecar failure presents its precise error and one-click Retry                                    |
+| [04-retry-imported.png](04-retry-imported.png)     | retry imports successfully, shows one ready song, and replaces the old failure card                        |
+
+## checks
+
+| command                    | result                        |
+| -------------------------- | ----------------------------- |
+| `corepack yarn vitest run` | 205 files, 2,100 tests passed |
+| `corepack yarn typecheck`  | passed                        |
+| `corepack yarn lint`       | passed                        |
+| `corepack yarn build`      | passed                        |
+
+the focused coverage includes main-side identity re-validation, complete and
+forged fetched-audio provenance, cleanup after failure, a fresh retry, and the
+renderer replacement of a failed job with its retry successor.

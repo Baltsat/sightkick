@@ -20,7 +20,7 @@ export function libraryCandidateState(
   }
 
   if (resolution?.status === 'exact-reviewed-chart') {
-    return 'Chart found · needs your audio';
+    return 'Chart found · search to add';
   }
 
   if (resolution?.status === 'identity-incomplete') {
@@ -28,7 +28,7 @@ export function libraryCandidateState(
   }
 
   if (resolution?.status === 'no-exact-reviewed-chart') {
-    return 'No chart yet · could be charted from audio';
+    return 'Search to add this song';
   }
 
   if (

@@ -3,6 +3,7 @@ import ini from 'ini';
 import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { IpcYoutubeCandidate } from '../../types';
 
 // None of the existing tests below exercise real app.*/dialog.* (every
 // path that would is overridden through the AutoChartQueue's injected
@@ -106,6 +107,9 @@ interface HarnessOptions {
   audioPaths?: string[];
   backends?: { sightkick: boolean; remote?: boolean; octave: boolean };
   resolveMetadata?: typeof fetchOfficialYoutubeMetadata;
+  inspectYoutubeCandidate?: (
+    canonicalUrl: string,
+  ) => Promise<IpcYoutubeCandidate>;
 }
 
 function createHarness(options: HarnessOptions = {}) {
@@ -115,6 +119,8 @@ function createHarness(options: HarnessOptions = {}) {
   const octaveRuns: OctaveRun[] = [];
   const skRuns: SkRun[] = [];
   const remoteRuns: RemoteRun[] = [];
+  const inspectedUrls: string[] = [];
+  const createdTempDirs: string[] = [];
   let audioIndex = 0;
   let jobIndex = 0;
   let selectAudioCalls = 0;
@@ -185,8 +191,30 @@ function createHarness(options: HarnessOptions = {}) {
     },
     resolveMetadata: options.resolveMetadata ?? (async () => undefined),
     validateAudio: validateLocalAudioFile,
-    createTempDir: async (id: string) =>
-      fs.promises.mkdtemp(path.join(root, `${id}-`)),
+    inspectYoutubeCandidate: async (canonicalUrl: string) => {
+      inspectedUrls.push(canonicalUrl);
+
+      if (options.inspectYoutubeCandidate) {
+        return options.inspectYoutubeCandidate(canonicalUrl);
+      }
+
+      const videoId = new URL(canonicalUrl).searchParams.get('v')!;
+
+      return {
+        videoId,
+        title: 'Artist - Track',
+        uploader: 'Artist',
+        durationSeconds: 200,
+        watchUrl: canonicalUrl,
+      };
+    },
+    createTempDir: async (id: string) => {
+      const tempDir = await fs.promises.mkdtemp(path.join(root, `${id}-`));
+
+      createdTempDirs.push(tempDir);
+
+      return tempDir;
+    },
     detectBackends: () => backends,
     preflightOctave: () =>
       ({
@@ -249,6 +277,8 @@ function createHarness(options: HarnessOptions = {}) {
     octaveRuns,
     skRuns,
     remoteRuns,
+    inspectedUrls,
+    createdTempDirs,
     queue,
     importSong,
     applyMetadata,
@@ -972,7 +1002,90 @@ describe('auto-chart queue — sightkick backend', () => {
     harness.skRuns[0].finish();
   });
 
-  it('rejects source-linked YouTube requests before any download or audio prompt', async () => {
+  it('automatically imports a verified source-linked YouTube recording without opening a file dialog', async () => {
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+      inspectYoutubeCandidate: async (canonicalUrl) => ({
+        videoId: 'abcdefghijk',
+        title: 'Mokita - Natural Villain (Official Audio)',
+        uploader: 'Mokita',
+        durationSeconds: 199,
+        watchUrl: canonicalUrl,
+      }),
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+    const sourceProvenance = {
+      provider: 'yandex-music' as const,
+      collectionId: 'drums-playlist',
+      collectionName: 'drums',
+      trackId: 'yandex:drums-playlist:2',
+      title: 'Natural Villain',
+      artists: ['Mokita'],
+      durationSeconds: 199,
+    };
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+      autoImport: true,
+      sourceProvenance,
+      youtubeCandidate: {
+        videoId: 'abcdefghijk',
+        title: 'Mokita - Natural Villain (Official Audio)',
+        uploader: 'Mokita',
+        durationSeconds: 199,
+        watchUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+      },
+    });
+
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+    expect(harness.selectAudioCalls).toBe(0);
+    expect(harness.inspectedUrls).toEqual([
+      'https://www.youtube.com/watch?v=abcdefghijk',
+    ]);
+
+    const songDir = path.join(harness.skRuns[0].input.tempDir, 'prepared');
+
+    fs.mkdirSync(songDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(songDir, 'song.ini'),
+      `[song]\nname = Natural Villain\nartist = Mokita\nsk_source_provider = yandex-music\nsk_source_collection_id = drums-playlist\nsk_source_collection_name = drums\nsk_source_track_id = yandex:drums-playlist:2\nsk_source_title = Natural Villain\nsk_source_artists = ["Mokita"]\nsk_source_duration = 199\n`,
+    );
+    fs.writeFileSync(
+      path.join(songDir, 'notes.chart'),
+      '[Song]\n{\n  Resolution = 192\n}\n[ExpertDrums]\n{\n  0 = N 0 0\n}\n',
+    );
+    fs.writeFileSync(path.join(songDir, 'song.mp3'), 'fetched audio');
+
+    const preparedRealPath = fs.realpathSync(songDir);
+
+    harness.skRuns[0].emit({ kind: 'complete', success: true, songDir });
+
+    await vi.waitFor(() =>
+      expect(latestJob(event)).toMatchObject({ stage: 'imported' }),
+    );
+    expect(harness.importSong).toHaveBeenCalledWith(
+      preparedRealPath,
+      undefined,
+      expect.objectContaining({
+        audio: expect.objectContaining({
+          source: 'youtube-fetched',
+          youtube: expect.objectContaining({
+            videoId: 'abcdefghijk',
+            downloader: 'yt-dlp',
+            downloaderVersion: '2026.7.4',
+          }),
+        }),
+      }),
+    );
+    expect(fs.existsSync(harness.createdTempDirs[0])).toBe(false);
+
+    harness.skRuns[0].finish();
+  });
+
+  it('rejects a forged source-linked YouTube candidate before creating a temp directory', async () => {
     const harness = createHarness({
       backends: { sightkick: true, octave: false },
     });
@@ -992,14 +1105,142 @@ describe('auto-chart queue — sightkick backend', () => {
         artists: ['Mokita'],
         durationSeconds: 199,
       },
+      youtubeCandidate: {
+        videoId: 'wrong000001',
+        title: 'Mokita - Natural Villain',
+        durationSeconds: 199,
+        watchUrl: 'https://www.youtube.com/watch?v=wrong000001',
+      },
     });
 
     expect(harness.skRuns).toHaveLength(0);
     expect(harness.selectAudioCalls).toBe(0);
+    expect(harness.createdTempDirs).toEqual([]);
     expect(latestJob(event)).toMatchObject({
       stage: 'failed',
-      error: expect.stringContaining('lawful local audio'),
+      error: expect.stringContaining('invalid identity'),
     });
+  });
+
+  it('rejects a changed YouTube identity before the sidecar can download it', async () => {
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+      inspectYoutubeCandidate: async (canonicalUrl) => ({
+        videoId: 'abcdefghijk',
+        title: 'Mokita - A Different Recording',
+        uploader: 'Mokita',
+        durationSeconds: 199,
+        watchUrl: canonicalUrl,
+      }),
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+      sourceProvenance: {
+        provider: 'yandex-music',
+        collectionId: 'drums-playlist',
+        collectionName: 'drums',
+        trackId: 'yandex:drums-playlist:2',
+        title: 'Natural Villain',
+        artists: ['Mokita'],
+        durationSeconds: 199,
+      },
+      youtubeCandidate: {
+        videoId: 'abcdefghijk',
+        title: 'Mokita - Natural Villain (Official Audio)',
+        uploader: 'Mokita',
+        durationSeconds: 199,
+        watchUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+      },
+    });
+
+    expect(harness.inspectedUrls).toEqual([
+      'https://www.youtube.com/watch?v=abcdefghijk',
+    ]);
+    expect(harness.skRuns).toHaveLength(0);
+    expect(harness.createdTempDirs).toEqual([]);
+    expect(latestJob(event)).toMatchObject({
+      stage: 'failed',
+      error: expect.stringContaining('title changed'),
+    });
+  });
+
+  it('cleans a failed source-linked fetch and re-verifies the retry in a fresh temp directory', async () => {
+    const inspect = vi.fn(async (canonicalUrl: string) => ({
+      videoId: 'abcdefghijk',
+      title: 'Mokita - Natural Villain (Official Audio)',
+      uploader: 'Mokita',
+      durationSeconds: 199,
+      watchUrl: canonicalUrl,
+    }));
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+      inspectYoutubeCandidate: inspect,
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+    const request = {
+      youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+      sourceProvenance: {
+        provider: 'yandex-music' as const,
+        collectionId: 'drums-playlist',
+        collectionName: 'drums',
+        trackId: 'yandex:drums-playlist:2',
+        title: 'Natural Villain',
+        artists: ['Mokita'],
+        durationSeconds: 199,
+      },
+      youtubeCandidate: {
+        videoId: 'abcdefghijk',
+        title: 'Mokita - Natural Villain (Official Audio)',
+        uploader: 'Mokita',
+        durationSeconds: 199,
+        watchUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+      },
+    };
+
+    await harness.queue.create(event as never, request);
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+
+    const firstTempDir = harness.skRuns[0].input.tempDir;
+    const failedId = latestJob(event).id;
+
+    harness.skRuns[0].emit({
+      kind: 'error',
+      message: 'The selected recording could not be fetched',
+    });
+    harness.skRuns[0].finish();
+
+    await vi.waitFor(() =>
+      expect(latestJob(event)).toMatchObject({ stage: 'failed' }),
+    );
+    expect(fs.existsSync(firstTempDir)).toBe(false);
+
+    await harness.queue.retry(event as never, failedId);
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(2));
+
+    const retryTempDir = harness.skRuns[1].input.tempDir;
+
+    expect(retryTempDir).not.toBe(firstTempDir);
+    expect(fs.existsSync(retryTempDir)).toBe(true);
+    expect(harness.selectAudioCalls).toBe(0);
+    expect(inspect).toHaveBeenCalledTimes(2);
+    expect(harness.inspectedUrls).toEqual([
+      'https://www.youtube.com/watch?v=abcdefghijk',
+      'https://www.youtube.com/watch?v=abcdefghijk',
+    ]);
+
+    await harness.queue.cancel(latestJob(event).id);
+    harness.skRuns[1].finish();
+    await vi.waitFor(() =>
+      expect(latestJob(event)).toMatchObject({ stage: 'cancelled' }),
+    );
   });
 
   it('downloads audio automatically from a pasted YouTube URL without prompting for a local file', async () => {

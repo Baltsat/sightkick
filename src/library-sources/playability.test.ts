@@ -77,6 +77,40 @@ describe('playable song contract', () => {
   it('accepts a fully evidenced local chart', () => {
     expect(isPlayableEvidence(evidence)).toBe(true);
   });
+
+  it('accepts only a complete, canonical YouTube fetched-audio record', () => {
+    const fetched: PlayabilityEvidence = {
+      ...evidence,
+      audio: {
+        source: 'youtube-fetched',
+        sha256: evidence.audio.sha256,
+        youtube: {
+          provider: 'youtube',
+          videoId: 'abcdefghijk',
+          watchUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+          title: 'Jonas Blue, Theresa Rex - What I Like About You',
+          uploader: 'Jonas Blue',
+          durationSeconds: 220,
+          downloader: 'yt-dlp',
+          downloaderVersion: '2026.7.4',
+          fetchedAt: '2026-08-13T00:00:00.000Z',
+        },
+      },
+    };
+
+    expect(isPlayableEvidence(fetched)).toBe(true);
+
+    const partial = structuredClone(fetched);
+
+    partial.audio.youtube!.title = '';
+    expect(playabilityBlockers(partial)).toContain('lawful-audio');
+
+    const forged = structuredClone(fetched);
+
+    forged.audio.youtube!.watchUrl =
+      'https://www.youtube.com/watch?v=wrong000001';
+    expect(playabilityBlockers(forged)).toContain('lawful-audio');
+  });
 });
 
 describe('exact public chart resolution', () => {

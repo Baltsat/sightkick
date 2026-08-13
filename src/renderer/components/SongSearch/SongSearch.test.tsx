@@ -61,6 +61,7 @@ const yandexProvenance = {
   trackId: 'yandex:f37c90e8-ddab-5270-9379-4a72d66e0cac:2',
   title: 'Natural Villain',
   artists: ['Mokita'],
+  durationSeconds: 199,
   sourceUrl: 'https://music.yandex.ru/album/123/track/456',
 };
 
@@ -172,12 +173,19 @@ describe('SongSearch', () => {
         {
           youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
           autoImport: true,
+          youtubeCandidate: {
+            videoId: 'abcdefghijk',
+            title: 'Some Great Drum Song',
+            uploader: 'Some Channel',
+            durationSeconds: 125,
+            watchUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+          },
         },
       ],
     });
   });
 
-  it('rejects a YouTube match for a source-linked row', () => {
+  it('accepts only the exact source-linked recording and sends its candidate identity', () => {
     renderSongSearch(false, {
       id: 3,
       query: 'Natural Villain Mokita',
@@ -185,19 +193,74 @@ describe('SongSearch', () => {
     });
     flushDebounce();
 
+    const exact = {
+      videoId: 'abcdefghijk',
+      title: 'Mokita - Natural Villain (Official Audio)',
+      uploader: 'Mokita',
+      durationSeconds: 199,
+      watchUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+    };
+
     act(() => {
-      ipc.emit('search-youtube', { results: sampleResults });
+      ipc.emit('search-youtube', {
+        results: [
+          exact,
+          {
+            ...exact,
+            videoId: 'live0000001',
+            title: 'Mokita - Natural Villain (Live)',
+            durationSeconds: 200,
+            watchUrl: 'https://www.youtube.com/watch?v=live0000001',
+          },
+          {
+            ...exact,
+            videoId: 'cover000001',
+            title: 'Natural Villain cover',
+            uploader: 'A different channel',
+            watchUrl: 'https://www.youtube.com/watch?v=cover000001',
+          },
+          {
+            ...exact,
+            videoId: 'artist000001',
+            title: 'Other Artist - Natural Villain',
+            uploader: 'Other Artist',
+            watchUrl: 'https://www.youtube.com/watch?v=artist000001',
+          },
+          {
+            ...exact,
+            videoId: 'duration001',
+            durationSeconds: 208,
+            watchUrl: 'https://www.youtube.com/watch?v=duration001',
+          },
+        ],
+      });
     });
 
     expect(screen.getByTestId('song-search-provenance')).toHaveTextContent(
       'Reviewing matches for Natural Villain from drums',
     );
 
+    expect(
+      screen.getByTestId('song-search-result-abcdefghijk'),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('song-search-result-live0000001')).toBeNull();
+    expect(screen.queryByTestId('song-search-result-cover000001')).toBeNull();
+    expect(screen.queryByTestId('song-search-result-artist000001')).toBeNull();
+    expect(screen.queryByTestId('song-search-result-duration001')).toBeNull();
+
     fireEvent.click(screen.getByTestId('song-search-result-abcdefghijk'));
 
-    expect(
-      ipc.sent.some((message) => message.channel === 'create-auto-chart'),
-    ).toBe(false);
+    expect(ipc.sent).toContainEqual({
+      channel: 'create-auto-chart',
+      args: [
+        {
+          youtubeUrl: exact.watchUrl,
+          autoImport: true,
+          youtubeCandidate: exact,
+          sourceProvenance: yandexProvenance,
+        },
+      ],
+    });
   });
 
   it('drops source linkage when the reviewed query is edited', () => {
@@ -207,7 +270,7 @@ describe('SongSearch', () => {
       sourceProvenance: yandexProvenance,
     });
 
-    typeQuery('A different song');
+    typeQuery('some song');
     flushDebounce();
 
     act(() => {
@@ -226,6 +289,13 @@ describe('SongSearch', () => {
         {
           youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
           autoImport: true,
+          youtubeCandidate: {
+            videoId: 'abcdefghijk',
+            title: 'Some Great Drum Song',
+            uploader: 'Some Channel',
+            durationSeconds: 125,
+            watchUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+          },
         },
       ],
     });
@@ -253,6 +323,13 @@ describe('SongSearch', () => {
         {
           youtubeUrl: 'https://www.youtube.com/watch?v=11111111111',
           autoImport: true,
+          youtubeCandidate: {
+            videoId: '11111111111',
+            title: 'Another Song',
+            uploader: 'Another Channel',
+            durationSeconds: 200,
+            watchUrl: 'https://www.youtube.com/watch?v=11111111111',
+          },
         },
       ],
     });

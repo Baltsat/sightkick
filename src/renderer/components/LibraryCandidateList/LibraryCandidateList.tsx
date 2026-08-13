@@ -34,12 +34,6 @@ export interface LibraryCandidateListProps {
   onPlaySong: (songId: string) => void;
   onResolveSource: (track: YandexPlaylistCandidate) => void;
   onUseLocalAudioForSource: (track: YandexPlaylistCandidate) => void;
-  /**
-   * A row that cannot be played says so once, quietly, and offers the one
-   * action that would fix it. For a song already source-linked to a
-   * playlist track, that fix is the same one the matching source row
-   * offers — only present once the song actually carries that provenance.
-   */
   onUseLocalAudioForSong?: (song: Song) => void;
   /**
    * Songs whose difficulty parse has settled with no learner-relative
@@ -77,12 +71,10 @@ interface SongRowProps {
   difficulty: Difficulty;
   focused: boolean;
   preview: SongHoverPreviewState | undefined;
-  canUseLocalAudio: boolean;
   unrated: boolean;
   onPlay: () => void;
   onPreviewStart: () => void;
   onPreviewEnd: () => void;
-  onUseLocalAudio?: () => void;
 }
 
 function SongRow({
@@ -91,12 +83,10 @@ function SongRow({
   difficulty,
   focused,
   preview,
-  canUseLocalAudio,
   unrated,
   onPlay,
   onPreviewStart,
   onPreviewEnd,
-  onUseLocalAudio,
 }: SongRowProps) {
   const score = song.scoreData?.[difficulty];
   const accuracy = score ? calculateAccuracy(score) : undefined;
@@ -105,12 +95,6 @@ function SongRow({
     accuracy !== undefined
       ? `Best score: ${Math.round(accuracy * 100)}% accuracy`
       : 'No best score yet. Play once to earn stars';
-  // The one action that would fix an unplayable row — only real when this
-  // song is already linked to a source track, mirroring the same action a
-  // matching, not-yet-downloaded source row offers.
-  const offersLocalAudioFix = !entry.ready && Boolean(onUseLocalAudio);
-  const canAutoChart =
-    canUseLocalAudio && song.sourceProvenance?.durationSeconds !== undefined;
 
   return (
     <div
@@ -229,31 +213,6 @@ function SongRow({
             >
               {entry.stateLabel}
             </span>
-            {offersLocalAudioFix && (
-              <div
-                className={cn(
-                  'flex shrink-0 opacity-0 transition-opacity duration-[120ms] ease-out focus-within:opacity-100 group-hover:opacity-100',
-                  { 'opacity-100': focused },
-                )}
-              >
-                <Tooltip
-                  title={
-                    canAutoChart
-                      ? 'Choose audio you own or are allowed to process; Drumroll will chart it locally'
-                      : 'Select a local library folder first'
-                  }
-                >
-                  <Button
-                    size="small"
-                    disabled={!canAutoChart}
-                    aria-label={`Use lawful local audio for ${entry.title}`}
-                    onClick={onUseLocalAudio}
-                  >
-                    Use local audio
-                  </Button>
-                </Tooltip>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -267,9 +226,7 @@ interface SourceRowProps {
   focused: boolean;
   resolution?: LibraryCandidateResolution;
   resolving: boolean;
-  canUseLocalAudio: boolean;
   onResolve: () => void;
-  onUseLocalAudio: () => void;
 }
 
 function sourceStateClassName(state: UnifiedLibraryEntry['state']): string {
@@ -293,13 +250,10 @@ function SourceRow({
   focused,
   resolution,
   resolving,
-  canUseLocalAudio,
   onResolve,
-  onUseLocalAudio,
 }: SourceRowProps) {
   const duration = durationLabel(track.durationSeconds);
   const label = libraryCandidateState(track, false, resolution);
-  const canAutoChart = canUseLocalAudio && track.durationSeconds !== null;
   // `ordinal` is only unique within its own source collection — Drums and
   // Favorites both start counting at 1 — so the merged shelf must key the
   // testid by source too, or a Drums row and a Favorites row collide.
@@ -356,13 +310,6 @@ function SourceRow({
         >
           {label}
         </span>
-        {/* These are operational tools (chart lookup, local audio) — not
-            the visual start point of a row that was never played. They stay
-            out of the resting row and reveal only on the row the player is
-            actually pointing at: pointer hover, keyboard focus landing on
-            either button, or kit-driven row focus. See
-            docs/visual-system-v3.md's "lists and rows" and
-            docs/design-qa/2026-08-13-finish/critique.md, Songs finding 1. */}
         <div
           data-testid={`library-candidate-actions-${testIdSuffix}`}
           className={cn(
@@ -370,30 +317,6 @@ function SourceRow({
             { 'opacity-100': focused },
           )}
         >
-          {/* One offered fix, not two equal buttons: "Use local audio" is
-              the row's real single action. "Check charts" stays reachable
-              as a quiet subordinate link, not a sibling of equal weight —
-              see docs/visual-system-v3.md's "lists and rows". */}
-          <Tooltip
-            title={
-              track.durationSeconds === null
-                ? "This song is missing a length, so it can't be safely identified yet"
-                : canUseLocalAudio
-                ? 'Choose audio you own or are allowed to process; Drumroll will chart it locally'
-                : 'Select a local library folder first'
-            }
-          >
-            <Button
-              size="small"
-              disabled={!canAutoChart}
-              aria-label={`Use lawful local audio for ${
-                track.title
-              } by ${track.artists.join(', ')}`}
-              onClick={onUseLocalAudio}
-            >
-              Use local audio
-            </Button>
-          </Tooltip>
           <Tooltip title="Check Chorus Encore and RhythmVerse for an exact reviewed drum chart">
             <Button
               type="text"
@@ -427,11 +350,8 @@ export function LibraryCandidateList({
   scrollKey,
   resolutions,
   resolvingTrackIds,
-  canUseLocalAudio,
   onPlaySong,
   onResolveSource,
-  onUseLocalAudioForSource,
-  onUseLocalAudioForSong,
   unratedSongIds,
 }: LibraryCandidateListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
@@ -495,17 +415,10 @@ export function LibraryCandidateList({
                   preview={
                     preview?.songId === entry.song.id ? preview : undefined
                   }
-                  canUseLocalAudio={canUseLocalAudio}
                   unrated={unratedSongIds?.has(entry.song.id) ?? false}
                   onPlay={() => onPlaySong(entry.song!.id)}
                   onPreviewStart={() => startPreview(entry.song!)}
                   onPreviewEnd={() => stopPreview(entry.song!.id)}
-                  {...(onUseLocalAudioForSong && entry.song.sourceProvenance
-                    ? {
-                        onUseLocalAudio: () =>
-                          onUseLocalAudioForSong(entry.song!),
-                      }
-                    : {})}
                 />
               ) : entry.sourceRow ? (
                 <SourceRow
@@ -516,11 +429,7 @@ export function LibraryCandidateList({
                   resolving={
                     resolvingTrackIds?.has(entry.sourceRow.id) ?? false
                   }
-                  canUseLocalAudio={canUseLocalAudio}
                   onResolve={() => onResolveSource(entry.sourceRow!)}
-                  onUseLocalAudio={() =>
-                    onUseLocalAudioForSource(entry.sourceRow!)
-                  }
                 />
               ) : null}
             </div>

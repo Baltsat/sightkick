@@ -12,6 +12,11 @@ import { cn } from '../../cn';
 import { popoverStyles } from '../../overlayStyles';
 import { Tooltip } from '../Tooltip';
 import { useYoutubeSearch } from '../../hooks/useYoutubeSearch';
+import {
+  createAutoImportRequest,
+  rankAutoImportCandidates,
+} from '../../services/auto-import';
+import type { AutoImportCandidate } from '../../services/auto-import';
 
 export interface SongSearchRequest {
   id: number;
@@ -91,6 +96,11 @@ function SongSearchInner({
   // this both saves the network call and stops a misleading "no YouTube
   // results" flash while local matches are on screen.
   const { results, loading, error } = useYoutubeSearch(active ? query : '');
+  const candidates = rankAutoImportCandidates(
+    query,
+    results,
+    sourceProvenance,
+  ).candidates;
   const [prevResults, setPrevResults] = useState(results);
 
   if (results !== prevResults) {
@@ -98,21 +108,9 @@ function SongSearchInner({
     setActiveIndex(-1);
   }
 
-  const select = (result: IpcYoutubeSearchResult) => {
-    if (sourceProvenance) {
-      notification.warning({
-        title: 'Use lawful local audio',
-        description:
-          'A source-linked row cannot use a YouTube match as its audio proof.',
-        placement: 'bottomRight',
-      });
-
-      return;
-    }
-
+  const select = (result: AutoImportCandidate) => {
     window.electron.ipcRenderer.sendMessage('create-auto-chart', {
-      youtubeUrl: result.watchUrl,
-      autoImport: true,
+      ...createAutoImportRequest(result, sourceProvenance),
     });
     notification.info({
       title: 'Adding to your library',
@@ -132,27 +130,29 @@ function SongSearchInner({
       return;
     }
 
-    if (!open || results.length === 0) {
+    if (!open || candidates.length === 0) {
       return;
     }
 
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      setActiveIndex((index) => (index + 1) % results.length);
+      setActiveIndex((index) => (index + 1) % candidates.length);
 
       return;
     }
 
     if (event.key === 'ArrowUp') {
       event.preventDefault();
-      setActiveIndex((index) => (index <= 0 ? results.length - 1 : index - 1));
+      setActiveIndex((index) =>
+        index <= 0 ? candidates.length - 1 : index - 1,
+      );
 
       return;
     }
 
     if (event.key === 'Enter') {
       event.preventDefault();
-      select(results[activeIndex >= 0 ? activeIndex : 0]);
+      select(candidates[activeIndex >= 0 ? activeIndex : 0]);
     }
   };
   const showPanel = open && Boolean(trimmed) && active;
@@ -177,16 +177,20 @@ function SongSearchInner({
         </div>
       )}
 
-      {!loading && !error && results.length === 0 && (
+      {!loading && !error && candidates.length === 0 && (
         <div className="p-3" data-testid="song-search-empty">
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={`No YouTube results for "${trimmed}"`}
+            description={
+              sourceProvenance && results.length > 0
+                ? `No exact recording found for "${sourceProvenance.title}"`
+                : `No YouTube results for "${trimmed}"`
+            }
           />
         </div>
       )}
 
-      {!loading && !error && results.length > 0 && (
+      {!loading && !error && candidates.length > 0 && (
         <div
           role="listbox"
           id="song-search-listbox"
@@ -194,7 +198,7 @@ function SongSearchInner({
           data-testid="song-search-results"
           className="flex max-h-96 flex-col gap-1 overflow-y-auto"
         >
-          {results.map((result, index) => (
+          {candidates.map((result, index) => (
             <button
               key={result.videoId}
               type="button"
@@ -235,7 +239,7 @@ function SongSearchInner({
         </div>
       )}
 
-      {!loading && results.length > 0 && (
+      {!loading && candidates.length > 0 && (
         <div
           className="border-t border-border-soft px-3 py-2 text-xs text-text-faint"
           data-testid="song-search-provenance"
