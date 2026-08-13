@@ -319,6 +319,10 @@ export function SongView() {
     'settings.practiceNotationLayout',
     'flow',
   );
+  const [notationKitKeyVisible, setNotationKitKeyVisible] = usePersisted(
+    'settings.notationKitKeyVisible',
+    false,
+  );
   const [adaptiveTutorEnabled, setAdaptiveTutorEnabled] = usePersisted<boolean>(
     'settings.adaptiveTutorEnabled',
     true,
@@ -2865,6 +2869,21 @@ export function SongView() {
             {practiceInputStatus.shortLabel}
           </span>
         </div>
+        <Button
+          type="text"
+          size="small"
+          data-testid="notation-kit-key-toggle"
+          aria-expanded={notationKitKeyVisible}
+          aria-controls="notation-kit-key"
+          aria-label={
+            notationKitKeyVisible
+              ? 'Hide drum kit notation key'
+              : 'Show drum kit notation key'
+          }
+          onClick={() => setNotationKitKeyVisible((visible) => !visible)}
+        >
+          Kit key
+        </Button>
         <SettingsButton
           page="song-view"
           label="Inspector"
@@ -2950,7 +2969,7 @@ export function SongView() {
             />
           )}
         </Content>
-        <NotationKitKey layout={notationLayout} />
+        {notationKitKeyVisible && <NotationKitKey layout={notationLayout} />}
         {showInactivityCaption && (
           <InactivityPauseVeil
             visible={inactivityPauseVeil.visible}

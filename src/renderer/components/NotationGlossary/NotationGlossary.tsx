@@ -62,6 +62,7 @@ const POSITION_MARK: Record<
 export function NotationKitKey({ layout }: { layout: 'classic' | 'flow' }) {
   return (
     <aside
+      id="notation-kit-key"
       className="drumroll-notation-key"
       data-testid="notation-kit-key"
       data-layout={layout}
