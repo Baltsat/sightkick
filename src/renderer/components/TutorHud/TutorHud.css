@@ -12,6 +12,16 @@
   color: var(--edge-caption-signal);
 }
 
+.drumroll-tutor-hud__reason {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dr-ink-muted, var(--color-text-muted));
+  font-size: clamp(0.72rem, 0.94vw, 0.82rem);
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /*
  * The per-note "why" disclosure. It lives inside the same quiet caption row
  * as the resume instruction — collapsed by default, native <details>, no
@@ -117,6 +127,11 @@
 }
 
 @media (max-width: 720px) {
+  .drumroll-tutor-hud__reason {
+    display: block;
+    flex: 1 1 auto;
+  }
+
   .drumroll-tutor-hud__mistake-summary-title {
     display: none;
   }

@@ -340,24 +340,29 @@ describe('tutor machine', () => {
 
   it('requires two clean repetitions before resuming the main song', () => {
     let { state } = beginFailedSession();
-    const region = state.recovery?.region;
+    const anchor = state.recovery?.region;
     const recoveryId = state.recovery?.id;
 
-    expect(region).toBeDefined();
+    expect(anchor).toBeDefined();
     state = addCleanRegion(
       state,
-      region?.startMeasure ?? 0,
-      region?.endMeasure ?? 0,
+      anchor?.startMeasure ?? 0,
+      anchor?.endMeasure ?? 0,
     );
 
     const first = dispatch(state, {
       type: 'measure-complete',
-      measureIndex: region?.endMeasure ?? 0,
+      measureIndex: anchor?.endMeasure ?? 0,
     });
 
     expect(first.state.phase).toBe('recovering');
     expect(first.state.recovery?.cleanRepetitions).toBe(1);
+    expect(first.state.recovery).toMatchObject({
+      approach: 'return-context',
+      region: { startMeasure: 0, endMeasure: 3 },
+    });
     expect(first.commands[0].type).toBe('repeat-recovery');
+    expect(first.state.recoveryAttempts[0].approach).toBe('anchor');
     expect(first.state.recoveryAttempts[0].judgements).toHaveLength(12);
     expect(Object.isFrozen(first.state.recoveryAttempts[0].judgements)).toBe(
       true,
@@ -366,15 +371,17 @@ describe('tutor machine', () => {
       Object.isFrozen(first.state.recoveryAttempts[0].judgements?.[0]),
     ).toBe(true);
 
+    const returnContext = first.state.recovery?.region;
+
     state = addCleanRegion(
       first.state,
-      region?.startMeasure ?? 0,
-      region?.endMeasure ?? 0,
+      returnContext?.startMeasure ?? 0,
+      returnContext?.endMeasure ?? 0,
     );
 
     const second = dispatch(state, {
       type: 'measure-complete',
-      measureIndex: region?.endMeasure ?? 0,
+      measureIndex: returnContext?.endMeasure ?? 0,
     });
 
     expect(second.state.phase).toBe('observing');
@@ -382,15 +389,18 @@ describe('tutor machine', () => {
       type: 'resume-main',
       speed: 1,
       reason: 'clean-repetitions',
-      resumeMeasure: 3,
-      resumeTick: 300,
+      resumeMeasure: 4,
+      resumeTick: 400,
     });
-    expect(second.state.recoveryAttempts).toHaveLength(2);
+    expect(second.state.recoveryAttempts).toEqual([
+      expect.objectContaining({ approach: 'anchor' }),
+      expect.objectContaining({ approach: 'return-context' }),
+    ]);
     expect(second.state.lastRecoveryOutcome).toEqual({
       recoveryId,
       status: 'mastered',
-      startMeasure: region?.startMeasure,
-      endMeasure: region?.endMeasure,
+      startMeasure: anchor?.startMeasure,
+      endMeasure: returnContext?.endMeasure,
       cleanRepetitions: 2,
       qualityProgress: 2,
       bestQuality: 1,
@@ -408,15 +418,17 @@ describe('tutor machine', () => {
       measureIndex: region.endMeasure,
     }).state;
 
+    const returnContext = state.recovery!.region;
+
     for (
-      let measure = region.startMeasure;
-      measure <= region.endMeasure;
+      let measure = returnContext.startMeasure;
+      measure <= returnContext.endMeasure;
       measure += 1
     ) {
       state = addMeasure(
         state,
         measure,
-        measure === region.endMeasure
+        measure === returnContext.endMeasure
           ? ['hit', 'hit', 'miss', 'miss']
           : ['hit', 'hit', 'hit', 'hit'],
       );
@@ -424,7 +436,7 @@ describe('tutor machine', () => {
 
     const nearMiss = dispatch(state, {
       type: 'measure-complete',
-      measureIndex: region.endMeasure,
+      measureIndex: returnContext.endMeasure,
     });
 
     expect(nearMiss.state.phase).toBe('recovering');
@@ -439,9 +451,9 @@ describe('tutor machine', () => {
       minimumResolvedEvents: 8,
       minimumDistinctErrors: 3,
     });
-    const region = state.recovery!.region;
-
     for (let repetition = 0; repetition < 2; repetition += 1) {
+      const region = state.recovery!.region;
+
       for (
         let measure = region.startMeasure;
         measure <= region.endMeasure;
@@ -532,10 +544,12 @@ describe('tutor machine', () => {
     state = failed.state;
 
     for (let repetition = 0; repetition < 2; repetition += 1) {
-      state = addCleanRegion(state, start, end);
+      const recovery = state.recovery!.region;
+
+      state = addCleanRegion(state, recovery.startMeasure, recovery.endMeasure);
       state = dispatch(state, {
         type: 'measure-complete',
-        measureIndex: end,
+        measureIndex: recovery.endMeasure,
       }).state;
     }
 

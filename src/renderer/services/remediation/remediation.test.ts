@@ -11,6 +11,7 @@ import {
   recordRemediationPass,
   remediationQueueStorageKey,
   remediationQueueSlotKey,
+  remediationTaskWhy,
   restoreRemediationQueue,
   serializeRemediationQueue,
 } from './index';
@@ -80,6 +81,7 @@ describe('remediation queue', () => {
         barEnd: 5,
         minimumResolvedNotes: 7,
         playbackSpeed: 0.7,
+        approach: 'anchor',
         status: 'active',
         findings: [
           expect.objectContaining({ id: 'same-bars-a' }),
@@ -230,6 +232,54 @@ describe('remediation queue', () => {
       }),
     ]);
     expect(isRemediationComplete(firstClean)).toBe(true);
+  });
+
+  it('uses one controlled tempo variation after a clean anchor', () => {
+    const queue = createQueue();
+
+    expect(queue).not.toBeNull();
+    expect(remediationTaskWhy(queue!.tasks[0])).toBe(
+      'Build timing in this phrase first; one clean anchor earns a nearby-tempo return.',
+    );
+
+    const anchor = recordRemediationPass(queue!, {
+      completedAt: '2026-08-10T09:32:00.000Z',
+      resolvedNotes: 6,
+      misses: 0,
+      wrongHits: 0,
+    });
+    const varied = getActiveRemediationTask(anchor);
+
+    expect(varied).toMatchObject({
+      id: 'bars:4-5:tempo',
+      approach: 'tempo-variation',
+      playbackSpeed: 0.8,
+      consecutiveCleanPasses: 1,
+      attempts: [expect.objectContaining({ approach: 'anchor' })],
+    });
+    expect(remediationTaskWhy(varied!)).toBe(
+      'The anchor is in. Keep timing through this phrase at 0.8× so it holds when the song moves on.',
+    );
+
+    const complete = recordRemediationPass(anchor, {
+      completedAt: '2026-08-10T09:33:00.000Z',
+      resolvedNotes: 6,
+      misses: 0,
+      wrongHits: 0,
+    });
+
+    expect(complete.tasks[0]).toMatchObject({
+      id: 'bars:4-5:tempo',
+      approach: 'tempo-variation',
+      status: 'completed',
+      attempts: [
+        expect.objectContaining({ approach: 'anchor' }),
+        expect.objectContaining({ approach: 'tempo-variation' }),
+      ],
+    });
+    expect(
+      deserializeRemediationQueue(serializeRemediationQueue(complete)),
+    ).toEqual(complete);
   });
 
   it('advances through multiple phrases only after each phrase is mastered', () => {

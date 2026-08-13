@@ -1,6 +1,6 @@
 import { clamp } from 'es-toolkit';
 import { ResolvedJudgement } from '../engine';
-import { planRecoveryRegion } from './checkpoints';
+import { planRecoveryRegion, planRecoveryReturnContext } from './checkpoints';
 import {
   detectTutorTrigger,
   isCleanRecovery,
@@ -261,6 +261,7 @@ function beginRecovery(
     ),
     trigger,
     region,
+    approach: 'anchor',
     repetition: 1,
     cleanRepetitions: 0,
     qualityProgress: 0,
@@ -342,6 +343,7 @@ function finishRecoveryAttempt(
     id: nextId(state, 'attempt'),
     recoveryId: recovery.id,
     repetition: recovery.repetition,
+    approach: recovery.approach ?? 'anchor',
     speed: state.currentSpeed,
     result: clean ? 'clean' : shouldDefer ? 'deferred' : 'retry',
     qualityScore,
@@ -389,11 +391,11 @@ function finishRecoveryAttempt(
       shouldDefer
         ? nextSpeed
         : canPromoteTempo
-        ? Math.min(
-            state.targetSpeed,
-            state.currentSpeed + state.settings.speedStep,
-          )
-        : state.currentSpeed,
+          ? Math.min(
+              state.targetSpeed,
+              state.currentSpeed + state.settings.speedStep,
+            )
+          : state.currentSpeed,
     );
     const nextState: TutorState = {
       ...state,
@@ -453,8 +455,15 @@ function finishRecoveryAttempt(
     };
   }
 
+  const returnContext =
+    clean && (recovery.approach ?? 'anchor') === 'anchor'
+      ? planRecoveryReturnContext(chart, recovery.region)
+      : undefined;
   const nextRecovery: TutorRecovery = {
     ...recovery,
+    ...(returnContext
+      ? { region: returnContext, approach: 'return-context' as const }
+      : {}),
     repetition: recovery.repetition + 1,
     cleanRepetitions,
     qualityProgress,

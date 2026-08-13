@@ -103,6 +103,31 @@ function normalizedPlaybackSpeed(value: number | undefined): number {
     : DEFAULT_REMEDIATION_SPEED;
 }
 
+function variedPlaybackSpeed(value: number): number {
+  const current = normalizedPlaybackSpeed(value);
+  const varied = current < 1 ? current + 0.1 : current - 0.1;
+
+  return Math.round(normalizedPlaybackSpeed(varied) * 10) / 10;
+}
+
+function skillLabel(task: RemediationTask): string {
+  const labels = [
+    ...new Set(
+      task.findings.map(({ skillTag }) => skillTag.replaceAll('-', ' ')),
+    ),
+  ];
+
+  return labels.length === 1 ? labels[0] : 'this phrase';
+}
+
+export function remediationTaskWhy(task: RemediationTask): string {
+  const skill = skillLabel(task);
+
+  return task.approach === 'tempo-variation'
+    ? `The anchor is in. Keep ${skill} through this phrase at ${task.playbackSpeed.toFixed(1)}× so it holds when the song moves on.`
+    : `Build ${skill} in this phrase first; one clean anchor earns a nearby-tempo return.`;
+}
+
 /**
  * Creates one deterministic task per distinct bar range. Multiple Coach cards
  * about the same phrase deliberately become one loop, with every card id kept
@@ -159,6 +184,7 @@ export function createRemediationQueue(
                 (finding) => finding.evidence.slowSpeed !== undefined,
               )?.evidence.slowSpeed,
           ),
+          approach: 'anchor' as const,
           status: 'pending' as const,
           consecutiveCleanPasses: 0,
           attempts: [],
@@ -194,7 +220,7 @@ export function getActiveRemediationTask(
   queue: RemediationQueue,
 ): RemediationTask | null {
   return queue.status === 'active'
-    ? queue.tasks[queue.activeTaskIndex] ?? null
+    ? (queue.tasks[queue.activeTaskIndex] ?? null)
     : null;
 }
 
@@ -256,11 +282,12 @@ function makeAttempt(
   const progressAfter = qualifiesAsCleanPass
     ? task.consecutiveCleanPasses + 1
     : nearMiss
-    ? task.consecutiveCleanPasses
-    : Math.max(0, task.consecutiveCleanPasses - 1);
+      ? task.consecutiveCleanPasses
+      : Math.max(0, task.consecutiveCleanPasses - 1);
 
   return {
     ...input,
+    approach: task.approach ?? 'anchor',
     isErrorFree,
     hasSufficientCoverage,
     qualifiesAsCleanPass,
@@ -287,6 +314,11 @@ export function recordRemediationPass(
   const attempt = makeAttempt(activeTask, input);
   const taskCompleted =
     attempt.consecutiveCleanPassesAfter >= REQUIRED_CONSECUTIVE_CLEAN_PASSES;
+  const shouldVary =
+    attempt.qualifiesAsCleanPass &&
+    activeTask.consecutiveCleanPasses === 0 &&
+    !taskCompleted &&
+    activeTask.approach !== 'tempo-variation';
   const nextActiveTaskIndex = taskCompleted
     ? queue.activeTaskIndex + 1
     : queue.activeTaskIndex;
@@ -297,6 +329,13 @@ export function recordRemediationPass(
         ...task,
         attempts: [...task.attempts, attempt],
         consecutiveCleanPasses: attempt.consecutiveCleanPassesAfter,
+        ...(shouldVary
+          ? {
+              id: `${task.id}:tempo`,
+              approach: 'tempo-variation' as const,
+              playbackSpeed: variedPlaybackSpeed(task.playbackSpeed),
+            }
+          : {}),
         ...(taskCompleted
           ? { status: 'completed' as const, completedAt: input.completedAt }
           : {}),
@@ -382,6 +421,14 @@ function isAttempt(
     return false;
   }
 
+  if (
+    value.approach !== undefined &&
+    value.approach !== 'anchor' &&
+    value.approach !== 'tempo-variation'
+  ) {
+    return false;
+  }
+
   const isErrorFree = value.misses === 0 && value.wrongHits === 0;
   const assessment = assessRemediationPass(minimumResolvedNotes, {
     resolvedNotes: value.resolvedNotes,
@@ -447,6 +494,14 @@ function isTask(value: unknown): value is RemediationTask {
   }
 
   if (
+    value.approach !== undefined &&
+    value.approach !== 'anchor' &&
+    value.approach !== 'tempo-variation'
+  ) {
+    return false;
+  }
+
+  if (
     !value.attempts.every((attempt) => isAttempt(attempt, minimumResolvedNotes))
   ) {
     return false;
@@ -460,8 +515,8 @@ function isTask(value: unknown): value is RemediationTask {
     expectedCleanPasses = attempt.qualifiesAsCleanPass
       ? expectedCleanPasses + 1
       : assessment.nearMiss
-      ? expectedCleanPasses
-      : Math.max(0, expectedCleanPasses - 1);
+        ? expectedCleanPasses
+        : Math.max(0, expectedCleanPasses - 1);
 
     if (attempt.consecutiveCleanPassesAfter !== expectedCleanPasses) {
       // v1 queues created before retained progress reset a near miss to zero.

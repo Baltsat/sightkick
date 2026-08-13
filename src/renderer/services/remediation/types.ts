@@ -47,9 +47,12 @@ export interface RemediationFindingReference {
 
 export type RemediationTaskStatus = 'pending' | 'active' | 'completed';
 
+export type RemediationTaskApproach = 'anchor' | 'tempo-variation';
+
 /** One observed loop pass, including failed evidence rather than only wins. */
 export interface RemediationAttempt {
   completedAt: string;
+  approach?: RemediationTaskApproach;
   resolvedNotes: number;
   misses: number;
   wrongHits: number;
@@ -71,6 +74,7 @@ export interface RemediationTask {
   minimumResolvedNotes: number;
   /** Persisted so a reopened task resumes at the same authored tempo. */
   playbackSpeed: number;
+  approach?: RemediationTaskApproach;
   status: RemediationTaskStatus;
   /** Legacy field name; represents retained good-pass progress. */
   consecutiveCleanPasses: number;

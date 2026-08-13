@@ -171,10 +171,13 @@ export type TutorRecoveryDeferralReason = 'maximum-failed-attempts';
 
 export type TutorRecoveryAttemptResult = 'clean' | 'retry' | 'deferred';
 
+export type TutorRecoveryApproach = 'anchor' | 'return-context';
+
 export interface TutorRecoveryAttempt {
   id: string;
   recoveryId: string;
   repetition: number;
+  approach?: TutorRecoveryApproach;
   speed: number;
   result: TutorRecoveryAttemptResult;
   /** Continuous 0..1 phrase quality used by the adaptive release UI. */
@@ -189,6 +192,7 @@ export interface TutorRecovery {
   id: string;
   trigger: TutorTrigger;
   region: TutorRecoveryRegion;
+  approach?: TutorRecoveryApproach;
   repetition: number;
   cleanRepetitions: number;
   /** Continuous retained progress toward `requiredCleanRepetitions`. */

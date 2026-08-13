@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planRecoveryRegion } from './checkpoints';
+import { planRecoveryRegion, planRecoveryReturnContext } from './checkpoints';
 import { DEFAULT_TUTOR_SETTINGS, TutorChartPlan } from './types';
 
 function chart(sectionStarts: number[] = []): TutorChartPlan {
@@ -46,5 +46,26 @@ describe('planRecoveryRegion', () => {
       resumeMeasure: undefined,
       resumeTick: undefined,
     });
+  });
+
+  it('adds one real return-context bar after a clean anchor', () => {
+    const anchor = planRecoveryRegion(chart(), 4, 4, DEFAULT_TUTOR_SETTINGS);
+
+    expect(anchor).toMatchObject({ startMeasure: 3, endMeasure: 5 });
+    expect(planRecoveryReturnContext(chart(), anchor!)).toEqual({
+      startMeasure: 3,
+      endMeasure: 6,
+      startTick: 5760,
+      endTick: 13440,
+      resumeMeasure: 7,
+      resumeTick: 13440,
+    });
+  });
+
+  it('does not invent a return context beyond the chart', () => {
+    const anchor = planRecoveryRegion(chart([0]), 8, 8, DEFAULT_TUTOR_SETTINGS);
+
+    expect(anchor).toMatchObject({ startMeasure: 7, endMeasure: 9 });
+    expect(planRecoveryReturnContext(chart([0]), anchor!)).toBeUndefined();
   });
 });

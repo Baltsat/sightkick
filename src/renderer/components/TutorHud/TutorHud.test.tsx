@@ -104,6 +104,89 @@ describe('TutorHud', () => {
     );
   });
 
+  it('puts the recovery reason beside the next teacher action', () => {
+    render(
+      <TutorHud
+        state={{
+          ...createTutorState(),
+          phase: 'recovering',
+          recovery: {
+            id: 'recovery:1',
+            trigger: {
+              id: 'trigger:1',
+              reason: 'repeated-wrong-pad-pair',
+              stats: {
+                startMeasure: 1,
+                endMeasure: 2,
+                expected: 8,
+                resolved: 8,
+                hits: 6,
+                misses: 2,
+                wrong: 0,
+                distinctErrorIds: ['note:1', 'note:2'],
+                timingSampleCount: 0,
+                timingSpreadMs: 0,
+                timingOutlierCount: 0,
+                wrongPadPairs: [],
+                accuracy: 0.75,
+                distinctMissIds: ['note:1', 'note:2'],
+              },
+              wrongPadPair: {
+                actualElement: 'tom1',
+                expectedElement: 'snare',
+                count: 2,
+              },
+            },
+            region: {
+              startMeasure: 0,
+              endMeasure: 3,
+              startTick: 0,
+              endTick: 400,
+              resumeMeasure: 4,
+              resumeTick: 400,
+            },
+            approach: 'return-context',
+            repetition: 2,
+            cleanRepetitions: 1,
+            qualityProgress: 1,
+            bestQuality: 1,
+          },
+        }}
+        message={{
+          title: 'Phrase needs one more pass',
+          detail: 'Repeat the phrase once at this speed.',
+          tone: 'recovery',
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('tutor-next-reason')).toHaveTextContent(
+      'Build snare placement: the tom 1 → snare switch repeated; carry it through one more bar so it survives the return to the song.',
+    );
+  });
+
+  it('explains the Coach tempo variation in the live caption', () => {
+    render(
+      <TutorHud
+        state={createTutorState({ enabled: false })}
+        displayState="remediation"
+        recoveryCaption={{
+          title: 'First anchor acquired',
+          detail: '1.0 of 2 passes remains banked.',
+        }}
+        message={{
+          title: 'Coach loop',
+          detail: 'Keep playing.',
+          tone: 'recovery',
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('tutor-next-reason')).toHaveTextContent(
+      'The anchor is in. Take the same phrase one small tempo step so it holds after the loop.',
+    );
+  });
+
   describe('the note-level "why" disclosure', () => {
     it('stays absent when the tutor has no judged evidence yet', () => {
       render(

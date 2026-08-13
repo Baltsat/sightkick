@@ -570,6 +570,21 @@ core map items 1–7 are implemented as the `services/pedagogy` layer.
 
 the named proof lives in `atomic skill graph and curriculum manifests`, `atomic skill-state replay`, `graph-aware ZPD frontier`, `intent-aware session composer`, `favourite-song goal paths`, `favourite-song prerequisite paths`, `practice-stats atomic evidence persistence`, and the atomic Coach/deadline cases in `recommendNextPractice`. UI, library ingestion, and main-process IPC remain intentionally unchanged for the next surface-integration wave.
 
+### teaching-loop continuation — 2026-08-14
+
+the local practice loop now uses one bounded variation after an earned anchor instead of asking for an identical second pass by default.
+
+- Tutor records whether a recovery pass was an `anchor` or `return-context` approach. After one clean anchor, it expands the same recovery into exactly one subsequent chart bar when that bar exists, then requires the next clean pass there before returning to the song. At a chart boundary it keeps the anchor rather than inventing context.
+- Coach remediation keeps its two quality-pass gate, then changes the active task after the first clean anchor to one nearby 0.1× tempo step. The task id and recorded attempt approach change together, so the existing active-loop handoff reapplies the new tempo and gives the drummer a deliberate fresh start for the varied pass rather than silently counting a duplicate. It does not randomize phrases or add an unrelated drill.
+- A simulated-day policy test proves that a day-old assessed skill is scheduled for its next-day return and wins `smart_start` over a higher-value new frontier when the review is due. Later stages retain the existing expanding review intervals.
+- The Tutor HUD now renders one short reason beside the action: the observed musical target, why this loop was selected, and whether the next pass is the anchor or the return-to-song context. Coach loops explain when a clean anchor earns the controlled tempo variation. Existing SongView selection reasons remain visible at the chosen practice target.
+
+these policies implement bounded contextual interference and desirable difficulty: first stabilize the specific pattern, then test it in a deliberately nearby musical or tempo context. The full research basis remains [Czyż, Wójcik, and Solarská (2024)](https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2024.1377122/full) and [de Bruin et al. (2023)](https://link.springer.com/article/10.1007/s10648-023-09766-w); the product rule is narrower than either paper’s aggregate result.
+
+focused proof: `tutor/checkpoints.test.ts`, `tutor/machine.test.ts`, `remediation/remediation.test.ts`, `mastery/spaced-return.test.ts`, and `TutorHud.test.tsx` cover the anchor-to-context policy, the no-fake-context boundary, the controlled tempo return, simulated-day review selection, and the visible teacher reason.
+
+integration note: `SongView.practice-run.test.tsx` still expects the second Coach pass to auto-start at the original tempo after a natural loop wrap. The new policy intentionally pauses at the variation boundary so the drummer can start the changed pass with the one-line reason visible; the SongView owner should update that journey assertion to initiate the second pass at the changed tempo. This slice leaves the shared controller untouched.
+
 ## my wave — skill-similar continuation
 
 status: the deterministic service layer is implemented in `services/pedagogy/my-wave.ts`. it is re-exported through `services/next-practice` for the continuation surface; this slice intentionally does not alter the live song, lesson, or score screens.

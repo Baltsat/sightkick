@@ -9,7 +9,7 @@ import {
   describeMistake,
   lastScoreableMistake,
 } from '../../services/pedagogy';
-import { KitElement } from '../../services/practice-stats';
+import type { KitElement } from '../../services/practice-stats';
 import { KitCommandPromptModel } from '../KitCommandPrompt';
 import '../PracticeEdgeCaption/PracticeEdgeCaption.css';
 import './TutorHud.css';
@@ -86,7 +86,7 @@ function TutorMistakeDisclosure({ mistake }: { mistake: MistakeEvidence }) {
         {mistake.expectedElement && (
           <ElementChip
             element={mistake.expectedElement}
-            roleLabel="Score called for"
+            roleLabel="Chart calls for"
           />
         )}
         {mistake.actualElement && (
@@ -101,14 +101,74 @@ function TutorMistakeDisclosure({ mistake }: { mistake: MistakeEvidence }) {
 
 function labelForPhase(phase: TutorState['phase']) {
   if (phase === 'recovering') {
-    return 'Focused recovery';
+    return 'One focused repair';
   }
 
   if (phase === 'complete') {
-    return 'Session complete';
+    return 'Phrase complete';
   }
 
-  return 'Adaptive tutor';
+  return 'Practice guide';
+}
+
+function kitLabel(value: string | undefined): string | undefined {
+  return value !== undefined && value in KIT_ELEMENT_LABEL
+    ? KIT_ELEMENT_LABEL[value as KitElement]
+    : undefined;
+}
+
+function tutorNextReason(
+  state: TutorState,
+  displayState: TutorHudProps['displayState'],
+  recoveryCaption: TutorHudProps['recoveryCaption'],
+): string | undefined {
+  const recovery = state.recovery;
+
+  if (recovery) {
+    const pair = recovery.trigger.wrongPadPair;
+    const expected = kitLabel(pair?.expectedElement)?.toLowerCase();
+    const actual = kitLabel(pair?.actualElement)?.toLowerCase();
+    const skill =
+      recovery.trigger.reason === 'repeated-wrong-pad-pair'
+        ? expected
+          ? `${expected} placement`
+          : 'the intended drum placement'
+        : recovery.trigger.reason === 'timing-spread'
+          ? 'a steadier pulse'
+          : 'the phrase handoff';
+    const observation =
+      recovery.trigger.reason === 'repeated-wrong-pad-pair' &&
+      actual &&
+      expected
+        ? `the ${actual} → ${expected} switch repeated`
+        : recovery.trigger.reason === 'timing-spread'
+          ? 'the pulse spread across this phrase'
+          : 'this phrase needs a smaller, musical return';
+    const nextAction =
+      recovery.approach === 'return-context'
+        ? 'carry it through one more bar so it survives the return to the song.'
+        : 'settle the anchor phrase, then carry it into the next bar.';
+
+    return `Build ${skill}: ${observation}; ${nextAction}`;
+  }
+
+  if (displayState === 'remediation') {
+    if (recoveryCaption?.title === 'First anchor acquired') {
+      return 'The anchor is in. Take the same phrase one small tempo step so it holds after the loop.';
+    }
+
+    if (recoveryCaption?.title === 'Near-clean quality retained') {
+      return 'The phrase is close. Keep the same target and settle one full pass.';
+    }
+
+    if (recoveryCaption?.title === 'Loop released') {
+      return 'Take this phrase back into the song now; the next context is the useful proof.';
+    }
+
+    return 'Settle this observed phrase first. One clean anchor earns a nearby-tempo return.';
+  }
+
+  return undefined;
 }
 
 export function TutorHud({
@@ -150,25 +210,26 @@ export function TutorHud({
         : message.title,
     detail:
       displayState === 'kit-paused'
-        ? controlPrompt?.label ?? 'Use Play to count in again.'
+        ? (controlPrompt?.label ?? 'Use Play to count in again.')
         : message.detail,
   };
+  const nextReason = tutorNextReason(state, displayState, recoveryCaption);
   const kicker =
     displayState === 'remediation'
       ? 'Coach loop'
       : displayState === 'recovery-explain' || recoveryCaption
-      ? 'Recovery'
-      : displayState === 'kit-paused' || displayState === 'inactivity-paused'
-      ? 'Paused'
-      : labelForPhase(state.phase);
+        ? 'Recovery'
+        : displayState === 'kit-paused' || displayState === 'inactivity-paused'
+          ? 'Paused'
+          : labelForPhase(state.phase);
   const tone =
     message.tone === 'success'
       ? 'earned'
       : message.tone === 'warning'
-      ? 'warning'
-      : message.tone === 'recovery'
-      ? 'recovery'
-      : 'neutral';
+        ? 'warning'
+        : message.tone === 'recovery'
+          ? 'recovery'
+          : 'neutral';
 
   return (
     <aside
@@ -193,13 +254,22 @@ export function TutorHud({
       <span id={detailId} className="drumroll-practice-edge-caption__detail">
         {caption.detail}
       </span>
+      {nextReason && (
+        <span
+          className="drumroll-tutor-hud__reason"
+          data-testid="tutor-next-reason"
+        >
+          {nextReason}
+        </span>
+      )}
       {speedChange && (
         <>
           <span
             className="drumroll-practice-edge-caption__detail"
             data-testid="coach-speed-change"
           >
-            Coach set {speedChange.applied.toFixed(1)}× to rehearse this loop.
+            Try this loop at {speedChange.applied.toFixed(1)}×; keep your own
+            speed if it feels right.
           </span>
           <Button
             data-testid="keep-learner-speed"
