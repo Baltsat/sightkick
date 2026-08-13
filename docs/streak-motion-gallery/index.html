@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Interactive Drumroll streak motion direction gallery"
+    />
+    <title>Drumroll — Streak Motion Gallery</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=Newsreader:opsz,wght@6..72,400..700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"
+    ></script>
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <div class="app-shell" id="app" data-direction="aurora">
+      <aside class="direction-rail" aria-label="Streak direction selector">
+        <div class="brand-lockup">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>DRUMROLL</span>
+        </div>
+
+        <div class="rail-heading">
+          <h1>Streak direction</h1>
+          <p>Six live motion systems. One musical event.</p>
+        </div>
+
+        <nav class="direction-list" id="directionList">
+          <button
+            class="direction-option is-active"
+            type="button"
+            data-direction="aurora"
+            aria-pressed="true"
+          >
+            <span class="direction-number">01</span>
+            <span class="direction-preview preview-aurora" aria-hidden="true">
+              <i></i><i></i><i></i>
+            </span>
+            <span class="direction-name">Aurora<br />Current</span>
+            <span class="selection-dot" aria-hidden="true"></span>
+          </button>
+          <button
+            class="direction-option"
+            type="button"
+            data-direction="resonance"
+            aria-pressed="false"
+          >
+            <span class="direction-number">02</span>
+            <span
+              class="direction-preview preview-resonance"
+              aria-hidden="true"
+            >
+              <i></i><i></i><i></i>
+            </span>
+            <span class="direction-name">Drumhead<br />Resonance</span>
+            <span class="selection-dot" aria-hidden="true"></span>
+          </button>
+          <button
+            class="direction-option"
+            type="button"
+            data-direction="chrome"
+            aria-pressed="false"
+          >
+            <span class="direction-number">03</span>
+            <span class="direction-preview preview-chrome" aria-hidden="true">
+              <i></i><i></i><i></i>
+            </span>
+            <span class="direction-name">Liquid<br />Chrome</span>
+            <span class="selection-dot" aria-hidden="true"></span>
+          </button>
+          <button
+            class="direction-option"
+            type="button"
+            data-direction="print"
+            aria-pressed="false"
+          >
+            <span class="direction-number">04</span>
+            <span class="direction-preview preview-print" aria-hidden="true">
+              <i></i><i></i><i></i>
+            </span>
+            <span class="direction-name">Kinetic<br />Print</span>
+            <span class="selection-dot" aria-hidden="true"></span>
+          </button>
+          <button
+            class="direction-option"
+            type="button"
+            data-direction="stage"
+            aria-pressed="false"
+          >
+            <span class="direction-number">05</span>
+            <span class="direction-preview preview-stage" aria-hidden="true">
+              <i></i><i></i><i></i>
+            </span>
+            <span class="direction-name">Stage<br />Bloom</span>
+            <span class="selection-dot" aria-hidden="true"></span>
+          </button>
+          <button
+            class="direction-option"
+            type="button"
+            data-direction="orbit"
+            aria-pressed="false"
+          >
+            <span class="direction-number">06</span>
+            <span class="direction-preview preview-orbit" aria-hidden="true">
+              <i></i><i></i><i></i>
+            </span>
+            <span class="direction-name">Spectral<br />Orbit</span>
+            <span class="selection-dot" aria-hidden="true"></span>
+          </button>
+        </nav>
+
+        <button class="preview-all" id="previewAll" type="button">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M7 4.5 14 10l-7 5.5Z" />
+          </svg>
+          Preview all
+        </button>
+
+        <p class="keyboard-help">
+          <span>1–6 select</span><span>Space replay</span><span>M miss</span>
+        </p>
+      </aside>
+
+      <main class="gallery-main">
+        <header class="practice-header">
+          <button
+            class="icon-button back-button"
+            type="button"
+            aria-label="Back"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m14.5 6-6 6 6 6" />
+            </svg>
+          </button>
+          <button class="play-button" type="button" aria-label="Play">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m9 7 8 5-8 5Z" />
+            </svg>
+          </button>
+          <div class="song-meta">
+            <span>Practice mode</span>
+            <strong>Californication</strong>
+            <small>Red Hot Chili Peppers · Medium</small>
+          </div>
+          <div
+            class="song-progress"
+            aria-label="22 seconds of 5 minutes 22 seconds"
+          >
+            <span>00:22</span>
+            <div><i></i></div>
+            <span>05:22</span>
+          </div>
+          <div class="mode-switch" aria-label="Practice view">
+            <span class="is-selected">Flow</span><span>Classic</span>
+          </div>
+          <div class="speed-control">
+            <span>Speed</span><strong>0.8×</strong>
+          </div>
+          <div class="header-actions" aria-label="Practice controls">
+            <button class="icon-button" type="button" aria-label="Settings">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z" />
+                <path
+                  d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1A8 8 0 0 0 14.8 6l-.3-2.5h-4L10.2 6a8 8 0 0 0-1.7 1.1l-2.4-1-2 3.4L6.1 11A7 7 0 0 0 6 12c0 .4 0 .7.1 1l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 1.7 1.1l.3 2.5h4l.3-2.5a8 8 0 0 0 1.7-1.1l2.4 1 2-3.4-2-1.5c.1-.3.1-.6.1-1Z"
+                />
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <section class="notation-surface" aria-label="Continuous drum notation">
+          <div class="notation-heading">
+            <div>
+              <strong>Californication</strong><span>Continuous score</span>
+            </div>
+            <small>Flow follows the chart clock</small>
+          </div>
+          <svg
+            class="notation"
+            viewBox="0 0 1200 162"
+            role="img"
+            aria-label="Drum notation phrase"
+          >
+            <g class="staff-lines">
+              <path d="M0 45H1200M0 62H1200M0 79H1200M0 96H1200M0 113H1200" />
+              <path
+                d="M0 28v102M240 28v102M480 28v102M720 28v102M960 28v102M1199 28v102"
+              />
+            </g>
+            <g class="note-stems">
+              <path
+                d="M38 42v69M118 42v69M198 42v69M278 42v69M358 42v69M438 42v69M518 42v69M598 42v69M678 42v69M758 42v69M838 42v69M918 42v69M998 42v69M1078 42v69M1158 42v69"
+              />
+            </g>
+            <g class="hihat-notes">
+              <path
+                d="m31 35 14 14m0-14L31 49m80-14 14 14m0-14-14 14m80-14 14 14m0-14-14 14m80-14 14 14m0-14-14 14m80-14 14 14m0-14-14 14m80-14 14 14m0-14-14 14m80-14 14 14m0-14-14 14m80-14 14 14m0-14-14 14m80-14 14 14m0-14-14 14m80-14 14 14m0-14-14 14m80-14 14 14m0-14-14 14m80-14 14 14m0-14-14 14m80-14 14 14m0-14-14 14m80-14 14 14m0-14-14 14m80-14 14 14m0-14-14 14"
+              />
+            </g>
+            <g class="snare-notes">
+              <circle cx="118" cy="79" r="8" />
+              <circle cx="278" cy="79" r="8" />
+              <circle cx="438" cy="79" r="8" />
+              <circle cx="598" cy="79" r="8" />
+              <circle cx="758" cy="79" r="8" />
+              <circle cx="918" cy="79" r="8" />
+              <circle cx="1078" cy="79" r="8" />
+            </g>
+            <g class="kick-notes">
+              <circle cx="38" cy="113" r="8" />
+              <circle cx="198" cy="113" r="8" />
+              <circle cx="358" cy="113" r="8" />
+              <circle cx="518" cy="113" r="8" />
+              <circle cx="678" cy="113" r="8" />
+              <circle cx="838" cy="113" r="8" />
+              <circle cx="998" cy="113" r="8" />
+              <circle cx="1158" cy="113" r="8" />
+            </g>
+          </svg>
+          <div class="lane-legend" aria-hidden="true">
+            <span><i class="lane-cyan"></i>Hi-Hat</span>
+            <span><i class="lane-blue"></i>Ride</span>
+            <span><i class="lane-green"></i>Crash</span>
+            <span><i class="lane-pink"></i>Snare</span>
+            <span><i class="lane-amber"></i>Tom 1</span>
+            <span><i class="lane-coral"></i>Kick</span>
+          </div>
+        </section>
+
+        <section class="motion-section">
+          <div
+            class="motion-frame"
+            id="motionFrame"
+            role="button"
+            tabindex="0"
+            aria-label="Replay selected streak animation"
+          >
+            <canvas id="motionCanvas" aria-hidden="true"></canvas>
+            <div class="paper-grain" aria-hidden="true"></div>
+            <div class="frame-vignette" aria-hidden="true"></div>
+            <div class="frame-copy" id="frameCopy">
+              <span class="stage-kicker" id="stageKicker">DRUMROLL!</span>
+              <strong class="stage-count" id="stageCount">100</strong>
+              <span class="stage-proof" id="stageProof">100 CLEAN HITS</span>
+              <span class="stage-timing" id="stageTiming">±18 ms TIMING</span>
+            </div>
+            <div class="miss-copy" id="missCopy" aria-hidden="true">
+              <span>Streak reset</span><strong>BEST 100</strong
+              ><small>Timing evidence saved</small>
+            </div>
+            <div class="compact-chip" id="compactChip">
+              <span class="chip-wave" aria-hidden="true"
+                ><i></i><i></i><i></i><i></i><i></i
+              ></span>
+              <strong>100</strong><span>DRUMROLL!</span>
+            </div>
+            <span class="replay-hint">Click or press Space to replay</span>
+          </div>
+
+          <aside class="motion-controls" aria-label="Animation controls">
+            <button id="replayButton" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 8V4m0 0h4M5 4l3.2 3.2A7 7 0 1 1 5 12" />
+              </svg>
+              <span><strong>Replay</strong><small>Peak sequence</small></span>
+            </button>
+            <button id="tourButton" type="button" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path d="m10 8 6 4-6 4Z" />
+              </svg>
+              <span
+                ><strong>Auto tour</strong><small>Every 5 seconds</small></span
+              >
+            </button>
+            <button id="missButton" type="button" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8" stroke-dasharray="2 3" />
+                <path d="m9 9 6 6m0-6-6 6" />
+              </svg>
+              <span><strong>Miss state</strong><small>Soft reset</small></span>
+            </button>
+            <button id="motionButton" type="button" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M3 7c3-4 5 4 8 0s5 4 10 0M3 12c3-4 5 4 8 0s5 4 10 0M3 17c3-4 5 4 8 0s5 4 10 0"
+                />
+              </svg>
+              <span
+                ><strong>Reduced motion</strong
+                ><small>Static proof</small></span
+              >
+            </button>
+          </aside>
+        </section>
+
+        <section class="motion-timeline" aria-label="Animation timeline">
+          <div class="timeline-heading">
+            <span
+              ><strong id="timelineName">Aurora Current</strong> — peak
+              sequence</span
+            >
+            <span><b>2.2 s</b><i></i>live</span>
+          </div>
+          <div class="timeline-track" id="timelineTrack">
+            <span><b>Strike</b></span
+            ><span><b>Expand</b></span
+            ><span><b>Resonate</b></span
+            ><span><b>Peak</b></span
+            ><span><b>Settle</b></span>
+            <i class="timeline-marker" id="timelineMarker"></i>
+          </div>
+        </section>
+
+        <section class="evidence-strip">
+          <div class="coach-proof">
+            <div class="coach-orb" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <div>
+              <span>AI Coach</span>
+              <p>You held the <em>pocket</em><br />through the whole chorus.</p>
+            </div>
+          </div>
+          <div class="score-proof">
+            <span>Continuous score</span>
+            <svg viewBox="0 0 330 62" aria-hidden="true">
+              <path
+                class="score-area"
+                d="M0 55 0 43 12 39 24 46 36 35 48 40 60 30 72 37 84 24 96 30 108 18 120 27 132 21 144 25 156 13 168 20 180 16 192 22 204 12 216 19 228 10 240 15 252 8 264 14 276 7 288 12 300 5 312 10 330 4V62H0Z"
+              />
+              <path
+                class="score-line"
+                d="M0 43 12 39 24 46 36 35 48 40 60 30 72 37 84 24 96 30 108 18 120 27 132 21 144 25 156 13 168 20 180 16 192 22 204 12 216 19 228 10 240 15 252 8 264 14 276 7 288 12 300 5 312 10 330 4"
+              />
+            </svg>
+          </div>
+          <div class="metric-proof">
+            <strong>100</strong><span>clean hits</span>
+          </div>
+          <div class="metric-proof">
+            <strong>±18 ms</strong><span>avg timing</span>
+          </div>
+          <div class="metric-proof">
+            <strong>100%</strong><span>accuracy</span>
+          </div>
+        </section>
+
+        <footer class="transport-bar">
+          <button type="button" aria-label="Previous">
+            <svg viewBox="0 0 24 24"><path d="M6 5v14M18 6l-9 6 9 6Z" /></svg>
+          </button>
+          <button class="transport-play" type="button" aria-label="Play">
+            <svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5Z" /></svg>
+          </button>
+          <button type="button" aria-label="Next">
+            <svg viewBox="0 0 24 24"><path d="M18 5v14M6 6l9 6-9 6Z" /></svg>
+          </button>
+          <span>00:22</span>
+          <div class="transport-progress"><i></i><b></b></div>
+          <span>05:22</span>
+          <button type="button" aria-label="Volume">
+            <svg viewBox="0 0 24 24">
+              <path d="M5 10v4h4l5 4V6L9 10H5Zm12-1a5 5 0 0 1 0 6" />
+            </svg>
+          </button>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

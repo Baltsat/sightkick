@@ -1136,6 +1136,7 @@ export class AutoChartQueue {
       backend: 'sightkick',
       event,
       cancelled: false,
+      autoImport: request?.autoImport === true,
     };
 
     try {
@@ -1266,6 +1267,7 @@ export class AutoChartQueue {
       youtubeUrl: previous.youtubeUrl,
       sourceName: previous.sourceName,
       metadata: previous.metadata,
+      autoImport: previous.autoImport,
       sourceProvenance: previous.sourceProvenance
         ? {
             ...previous.sourceProvenance,
@@ -1720,9 +1722,15 @@ export class AutoChartQueue {
     this.transition(
       job,
       'preview-ready',
-      'Chart is ready to review before adding it to your library',
+      job.autoImport
+        ? 'Chart checked. Adding it to your library'
+        : 'Chart is ready to review before adding it to your library',
       100,
     );
+
+    if (job.autoImport) {
+      await this.import(job.id);
+    }
   }
 
   private validOctavePreparedDir(

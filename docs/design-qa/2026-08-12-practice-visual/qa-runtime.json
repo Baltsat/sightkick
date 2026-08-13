@@ -1,0 +1,371 @@
+{
+  "compactViewport": {
+    "width": 1024,
+    "height": 700
+  },
+  "failedProofs": [],
+  "pageErrors": [],
+  "proofs": [
+    {
+      "caption": {
+        "count": 1,
+        "height": 52,
+        "kinds": [
+          "ready"
+        ],
+        "testId": "practice-readiness-cue"
+      },
+      "label": "01-idle",
+      "outerScroll": {
+        "body": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        },
+        "document": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        }
+      },
+      "phase": "ready",
+      "rawMidi": false,
+      "score": {
+        "ancestorEffects": [],
+        "filter": "none",
+        "notationHeight": 0,
+        "noteheadSurfaceCount": 0,
+        "opacity": "1"
+      },
+      "scoreModal": false,
+      "sliderValue": null,
+      "viewport": {
+        "height": 768,
+        "width": 1225
+      }
+    },
+    {
+      "caption": {
+        "count": 1,
+        "height": 52,
+        "kinds": [
+          "ready"
+        ],
+        "testId": "practice-readiness-cue"
+      },
+      "label": "02-armed",
+      "outerScroll": {
+        "body": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        },
+        "document": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        }
+      },
+      "phase": "ready",
+      "rawMidi": false,
+      "score": {
+        "ancestorEffects": [],
+        "filter": "none",
+        "notationHeight": 865,
+        "noteheadSurfaceCount": 1,
+        "opacity": "1"
+      },
+      "scoreModal": false,
+      "sliderValue": "0",
+      "viewport": {
+        "height": 768,
+        "width": 1225
+      }
+    },
+    {
+      "caption": {
+        "count": 1,
+        "height": 52,
+        "kinds": [
+          "ready"
+        ],
+        "testId": "practice-readiness-cue"
+      },
+      "label": "03-armed-1024x700",
+      "outerScroll": {
+        "body": {
+          "height": 700,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1024
+        },
+        "document": {
+          "height": 700,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1024
+        }
+      },
+      "phase": "ready",
+      "rawMidi": false,
+      "score": {
+        "ancestorEffects": [],
+        "filter": "none",
+        "notationHeight": 787,
+        "noteheadSurfaceCount": 1,
+        "opacity": "1"
+      },
+      "scoreModal": false,
+      "sliderValue": "0",
+      "viewport": {
+        "height": 700,
+        "width": 1024
+      }
+    },
+    {
+      "caption": {
+        "count": 1,
+        "height": 52,
+        "kinds": [
+          "ready"
+        ],
+        "testId": "practice-readiness-cue"
+      },
+      "label": "04-armed-inspector",
+      "outerScroll": {
+        "body": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        },
+        "document": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        }
+      },
+      "phase": "ready",
+      "rawMidi": false,
+      "score": {
+        "ancestorEffects": [],
+        "filter": "none",
+        "notationHeight": 865,
+        "noteheadSurfaceCount": 1,
+        "opacity": "1"
+      },
+      "scoreModal": false,
+      "sliderValue": "0",
+      "viewport": {
+        "height": 768,
+        "width": 1225
+      }
+    },
+    {
+      "caption": {
+        "count": 1,
+        "height": 52,
+        "kinds": [
+          "count-in"
+        ],
+        "testId": "count-in"
+      },
+      "label": "05-counting-in",
+      "outerScroll": {
+        "body": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        },
+        "document": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        }
+      },
+      "phase": "counting-in",
+      "rawMidi": false,
+      "score": {
+        "ancestorEffects": [],
+        "filter": "none",
+        "notationHeight": 865,
+        "noteheadSurfaceCount": 1,
+        "opacity": "1"
+      },
+      "scoreModal": false,
+      "sliderValue": "0",
+      "viewport": {
+        "height": 768,
+        "width": 1225
+      }
+    },
+    {
+      "caption": {
+        "count": 0,
+        "height": null,
+        "kinds": [],
+        "testId": null
+      },
+      "label": "06-playing",
+      "outerScroll": {
+        "body": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        },
+        "document": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        }
+      },
+      "phase": "playing",
+      "rawMidi": false,
+      "score": {
+        "ancestorEffects": [],
+        "filter": "none",
+        "notationHeight": 865,
+        "noteheadSurfaceCount": 1,
+        "opacity": "1"
+      },
+      "scoreModal": false,
+      "sliderValue": "2",
+      "viewport": {
+        "height": 768,
+        "width": 1225
+      }
+    },
+    {
+      "caption": {
+        "count": 1,
+        "height": 52,
+        "kinds": [
+          "tutor"
+        ],
+        "testId": "tutor-hud"
+      },
+      "label": "07-paused",
+      "outerScroll": {
+        "body": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        },
+        "document": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        }
+      },
+      "phase": "paused",
+      "rawMidi": false,
+      "score": {
+        "ancestorEffects": [],
+        "filter": "none",
+        "notationHeight": 865,
+        "noteheadSurfaceCount": 1,
+        "opacity": "1"
+      },
+      "scoreModal": false,
+      "sliderValue": "2",
+      "viewport": {
+        "height": 768,
+        "width": 1225
+      }
+    },
+    {
+      "caption": {
+        "count": 1,
+        "height": 52,
+        "kinds": [
+          "inactivity-paused"
+        ],
+        "testId": "inactivity-pause-veil"
+      },
+      "label": "08-recovering",
+      "outerScroll": {
+        "body": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        },
+        "document": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        }
+      },
+      "phase": "inactivity-paused",
+      "rawMidi": false,
+      "score": {
+        "ancestorEffects": [],
+        "filter": "none",
+        "notationHeight": 865,
+        "noteheadSurfaceCount": 1,
+        "opacity": "1"
+      },
+      "scoreModal": false,
+      "sliderValue": "0",
+      "viewport": {
+        "height": 768,
+        "width": 1225
+      }
+    },
+    {
+      "caption": {
+        "count": 0,
+        "height": null,
+        "kinds": [],
+        "testId": null
+      },
+      "label": "09-done",
+      "outerScroll": {
+        "body": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        },
+        "document": {
+          "height": 768,
+          "horizontal": false,
+          "vertical": false,
+          "width": 1225
+        }
+      },
+      "phase": "result",
+      "rawMidi": false,
+      "score": {
+        "ancestorEffects": [],
+        "filter": "none",
+        "notationHeight": 865,
+        "noteheadSurfaceCount": 1,
+        "opacity": "1"
+      },
+      "scoreModal": true,
+      "sliderValue": "0",
+      "viewport": {
+        "height": 768,
+        "width": 1225
+      }
+    }
+  ],
+  "source": "production Electron build with final QA lesson fixture",
+  "wideViewport": {
+    "width": 1225,
+    "height": 768
+  }
+}

@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import '../PracticeEdgeCaption/PracticeEdgeCaption.css';
 import './InactivityPauseVeil.css';
 
 export function useInactivityPauseVeil(pauseEpoch: number | undefined) {
@@ -28,19 +29,20 @@ export function InactivityPauseVeil({
 
   return (
     <aside
-      className="drumroll-inactivity-pause-veil"
+      className="drumroll-practice-edge-caption drumroll-inactivity-pause-veil"
       data-testid="inactivity-pause-veil"
+      data-edge-caption="inactivity-paused"
+      data-tone="warning"
       role="status"
       aria-live="polite"
     >
-      <div className="drumroll-inactivity-pause-veil__card">
-        <span>practice paused</span>
-        <strong>Waiting for kit input</strong>
-        <p>
-          Drumroll held your place at bar {checkpointMeasure + 1}. Move or click
-          to use the screen; hit any pad to return with a count-in.
-        </p>
-      </div>
+      <span className="drumroll-practice-edge-caption__kicker">Paused</span>
+      <strong className="drumroll-practice-edge-caption__title">
+        Bar {checkpointMeasure + 1} is held
+      </strong>
+      <p className="drumroll-practice-edge-caption__detail">
+        Hit any pad to return with a count-in.
+      </p>
     </aside>
   );
 }

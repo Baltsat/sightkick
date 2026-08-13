@@ -94,7 +94,6 @@ import {
   PracticeReadinessCue,
   PracticeReadinessPhase,
 } from '../../components/PracticeReadinessCue';
-import { KitCommandPrompt } from '../../components/KitCommandPrompt';
 import {
   InactivityPauseVeil,
   useInactivityPauseVeil,
@@ -276,7 +275,6 @@ export function SongView() {
     showBarNumbers,
     showTempo,
     countIn,
-    showReference,
     zoom,
   } = useSongViewSettings();
   const { notification, message } = App.useApp();
@@ -2263,6 +2261,16 @@ export function SongView() {
           }))}
         />
       </div>
+      {midiTelemetry && (
+        <p
+          className="drumroll-practice-input-telemetry"
+          data-testid="practice-midi-telemetry"
+        >
+          MIDI {midiTelemetry.rawMessageCount} · last {lastMidiTime} · port E
+          {midiTelemetry.selectedPortEpoch} ·{' '}
+          {midiTelemetry.lastMappedLane ?? 'unmapped'}
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <Button
           icon={<FontAwesomeIcon icon={faWandMagicSparkles} />}
@@ -2460,11 +2468,50 @@ export function SongView() {
     : practicePresentationPhase === 'ready'
     ? 'ready'
     : 'playing';
-  const showTutorHud =
-    gameMode === 'practice' &&
+  const showInactivityCaption =
+    gameMode === 'practice' && inactivityPauseVeil.visible;
+  const showCountInCaption = !showInactivityCaption && isCounting;
+  const showTransportCaption =
+    Boolean(transportIndicator) &&
+    !isScoreModalOpen &&
+    !showInactivityCaption &&
+    !showCountInCaption &&
+    practicePresentationPhase !== 'result';
+  const showTutorCaption =
     !isLoading &&
-    practicePresentationPhase !== 'ready' &&
-    practicePresentationPhase !== 'counting-in';
+    !showInactivityCaption &&
+    !showCountInCaption &&
+    !showTransportCaption &&
+    (practicePresentationPhase === 'paused' ||
+      (gameMode === 'practice' &&
+        (practicePresentationPhase === 'recovery-explain' ||
+          Boolean(remediationSession.activeTask) ||
+          Boolean(loopEscape))));
+  const showLoopCaption =
+    gameMode === 'practice' &&
+    isLooping &&
+    Boolean(practiceRange) &&
+    !loopEscape &&
+    !showInactivityCaption &&
+    !showCountInCaption &&
+    !showTransportCaption &&
+    !showTutorCaption;
+  const showReadinessCaption =
+    gameMode === 'practice' &&
+    !showInactivityCaption &&
+    !showCountInCaption &&
+    !showTransportCaption &&
+    !showTutorCaption &&
+    !showLoopCaption &&
+    practicePresentationPhase !== 'result' &&
+    practiceReadinessPhase !== 'playing';
+  const showPerformCaption =
+    gameMode !== 'practice' &&
+    Boolean(kitControlPrompt) &&
+    practicePresentationPhase !== 'playing' &&
+    !showCountInCaption &&
+    !showTransportCaption &&
+    !showTutorCaption;
 
   return (
     <Layout
@@ -2475,14 +2522,6 @@ export function SongView() {
       onPointerMoveCapture={inactivityPauseVeil.release}
       onWheelCapture={inactivityPauseVeil.release}
     >
-      <InactivityPauseVeil
-        visible={inactivityPauseVeil.visible}
-        checkpointMeasure={
-          inactivityRecovery.phase === 'parked'
-            ? inactivityRecovery.checkpointMeasure
-            : 0
-        }
-      />
       <ScoreSummary
         isOpen={isScoreModalOpen}
         onNextSong={onNextSong}
@@ -2684,7 +2723,6 @@ export function SongView() {
         >
           <span>{gameMode === 'practice' ? 'Practice' : 'Perform'}</span>
           <span>{notationLayout}</span>
-          <span>{difficulty}</span>
           {policy.speedControl && <span>{playbackSpeed.toFixed(1)}×</span>}
           {isLooping && <span>Loop</span>}
           <span
@@ -2697,21 +2735,6 @@ export function SongView() {
             <span aria-hidden="true" />
             {practiceInputStatus.shortLabel}
           </span>
-          {midiTelemetry && (
-            <span
-              className="drumroll-practice-input-telemetry"
-              data-testid="practice-midi-telemetry"
-              title={`MIDI ${
-                midiTelemetry.rawMessageCount
-              }; last message: ${lastMidiTime}; selected port epoch ${
-                midiTelemetry.selectedPortEpoch
-              }; last mapped lane: ${midiTelemetry.lastMappedLane ?? 'none'}`}
-            >
-              MIDI {midiTelemetry.rawMessageCount} · last {lastMidiTime} · E
-              {midiTelemetry.selectedPortEpoch} ·{' '}
-              {midiTelemetry.lastMappedLane ?? 'unmapped'}
-            </span>
-          )}
         </div>
         <SettingsButton
           page="song-view"
@@ -2760,43 +2783,6 @@ export function SongView() {
               delaySeconds={delaySeconds}
             />
           )}
-          {notationLayout === 'flow' && songData && (
-            <div className="drumroll-flow-hud-anchor">
-              <section
-                className="drumroll-flow-hud"
-                data-testid="flow-viewport-hud"
-                data-mode={gameMode === 'practice' ? 'practice' : 'perform'}
-                aria-label={`${
-                  gameMode === 'practice' ? 'Practice' : 'Perform'
-                } flow: ${songData.name} by ${songData.artist}`}
-              >
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <h2
-                      className="drumroll-flow-hud__title truncate"
-                      title={songData.name}
-                    >
-                      {songData.name}
-                    </h2>
-                    <span className="drumroll-flow-hud__mode shrink-0">
-                      {gameMode === 'practice'
-                        ? 'Practice flow'
-                        : 'Perform flow'}
-                    </span>
-                  </div>
-                  <p
-                    className="drumroll-flow-hud__artist truncate"
-                    title={songData.artist}
-                  >
-                    {songData.artist}
-                  </p>
-                </div>
-                <span className="drumroll-flow-hud__status shrink-0">
-                  Continuous score
-                </span>
-              </section>
-            </div>
-          )}
           {songData && chart && parsedMidi && (
             <SheetMusic
               engine={engine}
@@ -2806,7 +2792,6 @@ export function SongView() {
               focusIndex={focusIndex}
               onPracticeRangeChange={onPracticeRangeChange}
               onLoopRangeSelect={selectPracticeLoop}
-              onClearLoop={clearPracticeLoop}
               gameMode={gameMode}
               songData={songData}
               isDev={isDev}
@@ -2816,8 +2801,6 @@ export function SongView() {
               chart={chart}
               delaySeconds={delaySeconds}
               loopEscape={loopEscape}
-              enableColors={notationColorsEnabled}
-              showReference={showReference}
               vexflowContainerRef={vexflowContainerRef}
               onSelectMeasure={(measure, event) => {
                 if ((event.ctrlKey || event.metaKey) && chart) {
@@ -2837,7 +2820,17 @@ export function SongView() {
             />
           )}
         </Content>
-        {gameMode === 'practice' && (
+        {showInactivityCaption && (
+          <InactivityPauseVeil
+            visible={inactivityPauseVeil.visible}
+            checkpointMeasure={
+              inactivityRecovery.phase === 'parked'
+                ? inactivityRecovery.checkpointMeasure
+                : 0
+            }
+          />
+        )}
+        {showReadinessCaption && (
           <PracticeReadinessCue
             phase={practiceReadinessPhase}
             resumeMeasure={
@@ -2850,56 +2843,86 @@ export function SongView() {
             }
           />
         )}
-        {showTutorHud && (
+        {showTutorCaption && (
           <TutorHud
             state={tutorSession.state}
             message={tutorHudMessage}
-            midiTelemetry={midiTelemetry}
             recoveryCaption={recoveryCaption}
             displayState={tutorDisplayState}
             controlPrompt={kitControlPrompt}
-            controlPromptCompact={practicePresentationPhase === 'playing'}
-            timingWindowMs={adaptiveTiming.timingWindowMs}
-            timingWindowReason={adaptiveTiming.reason}
-            remediation={
-              remediationSession.activeTask && remediationProgress
-                ? {
-                    currentTask: remediationSession.queue!.activeTaskIndex + 1,
-                    totalTasks: remediationProgress.totalTasks,
-                    cleanRepetitions:
-                      remediationSession.activeTask.consecutiveCleanPasses,
-                    requiredCleanRepetitions: REQUIRED_CONSECUTIVE_CLEAN_PASSES,
-                  }
-                : undefined
-            }
           />
         )}
-        {gameMode !== 'practice' && kitControlPrompt && (
-          <div
-            className="drumroll-perform-kit-prompt"
-            data-testid="perform-kit-control-prompt"
+        {showLoopCaption && practiceRange && (
+          <aside
+            className="drumroll-practice-edge-caption drumroll-loop-caption"
+            data-edge-caption="loop"
+            data-testid="practice-loop-caption"
+            data-tone="recovery"
+            role="status"
+            aria-live="polite"
           >
-            <KitCommandPrompt
-              model={kitControlPrompt}
-              compact={practicePresentationPhase === 'playing'}
-            />
-          </div>
+            <span className="drumroll-practice-edge-caption__kicker">Loop</span>
+            <strong className="drumroll-practice-edge-caption__title">
+              Bars {practiceRange.start + 1}–{practiceRange.end + 1}
+            </strong>
+            <p className="drumroll-practice-edge-caption__detail">
+              Kick to count in · clear it to return to the full song.
+            </p>
+            <Button data-testid="clear-loop" onClick={clearPracticeLoop}>
+              Clear loop
+            </Button>
+          </aside>
         )}
-        <CountIn
-          count={countInBeat}
-          total={countInBeats}
-          beatMs={countInBeatMs}
-        />
-        <StreakMeter ui={streakUi} className="drumroll-practice-streak" />
-        {transportIndicator && (
-          <div
-            data-testid="transport-indicator"
-            className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+        {showPerformCaption && kitControlPrompt && (
+          <aside
+            className="drumroll-practice-edge-caption drumroll-perform-caption"
+            data-edge-caption="perform-command"
+            data-testid="perform-kit-control-prompt"
+            data-tone="recovery"
+            role="status"
+            aria-live="polite"
           >
-            <div className="rounded-full bg-bg/85 px-6 py-3 font-ui text-xl font-semibold text-text shadow-paper-strong">
+            <span className="drumroll-practice-edge-caption__kicker">
+              Kit control
+            </span>
+            <strong className="drumroll-practice-edge-caption__title">
+              {kitControlPrompt.label}
+            </strong>
+            <p className="drumroll-practice-edge-caption__detail">
+              {kitControlPrompt.steps
+                .map((step) =>
+                  step === 'any'
+                    ? 'Any pad'
+                    : `${step.charAt(0).toUpperCase()}${step.slice(1)}`,
+                )
+                .join(' → ')}
+            </p>
+          </aside>
+        )}
+        {showCountInCaption && (
+          <CountIn
+            count={countInBeat}
+            total={countInBeats}
+            beatMs={countInBeatMs}
+          />
+        )}
+        <StreakMeter ui={streakUi} className="drumroll-practice-streak" />
+        {showTransportCaption && transportIndicator && (
+          <aside
+            data-testid="transport-indicator"
+            className="drumroll-practice-edge-caption drumroll-transport-caption"
+            data-edge-caption="transport"
+            data-tone="neutral"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="drumroll-practice-edge-caption__kicker">
+              Transport
+            </span>
+            <strong className="drumroll-practice-edge-caption__title">
               {transportIndicator.label}
-            </div>
-          </div>
+            </strong>
+          </aside>
         )}
       </div>
     </Layout>

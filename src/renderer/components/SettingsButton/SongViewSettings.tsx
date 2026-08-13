@@ -47,8 +47,6 @@ export function SongViewSettings({
     setShowBarNumbers,
     showTempo,
     setShowTempo,
-    showReference,
-    setShowReference,
     countIn,
     setCountIn,
     zoom,
@@ -182,25 +180,6 @@ export function SongViewSettings({
                 </div>
 
                 <Divider />
-
-                {enableColors && (
-                  <>
-                    <div className="flex items-center justify-between gap-3">
-                      <SettingLabel
-                        label="Show reference"
-                        tooltip="Pop a little cheat sheet at the bottom showing which color is which drum."
-                      />
-                      <Switch
-                        size="small"
-                        data-testid="setting-reference"
-                        checked={showReference}
-                        onChange={setShowReference}
-                      />
-                    </div>
-
-                    <Divider />
-                  </>
-                )}
 
                 <div className="flex items-center justify-between gap-3">
                   <SettingLabel

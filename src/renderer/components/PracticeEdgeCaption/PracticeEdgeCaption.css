@@ -1,0 +1,94 @@
+.drumroll-practice-edge-caption {
+  --edge-caption-signal: var(--dr-ember, var(--color-coral));
+  position: absolute;
+  z-index: 18;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  min-height: 3.25rem;
+  max-height: 4rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.5rem clamp(1rem, 2.4vw, 2rem);
+  overflow: hidden;
+  border-top: 1px solid var(--dr-line, rgb(36 31 25 / 16%));
+  color: var(--dr-ink, var(--color-ink));
+  background: var(--dr-paper, var(--color-paper-light));
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.drumroll-practice-edge-caption[data-tone='count'] {
+  --edge-caption-signal: var(--dr-count, var(--color-yellow));
+}
+
+.drumroll-practice-edge-caption[data-tone='warning'] {
+  --edge-caption-signal: var(--dr-warning, var(--color-amber));
+}
+
+.drumroll-practice-edge-caption[data-tone='recovery'] {
+  --edge-caption-signal: var(--dr-ember, var(--color-coral));
+}
+
+.drumroll-practice-edge-caption[data-tone='earned'] {
+  --edge-caption-signal: var(--dr-earned, var(--color-green));
+}
+
+.drumroll-practice-edge-caption__kicker {
+  flex: 0 0 auto;
+  color: var(--edge-caption-signal);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.drumroll-practice-edge-caption__title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dr-ink, var(--color-ink));
+  font-size: clamp(0.88rem, 1.1vw, 1rem);
+  font-weight: 720;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drumroll-practice-edge-caption__detail {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dr-ink-muted, var(--color-text-muted));
+  font-size: clamp(0.72rem, 0.94vw, 0.82rem);
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drumroll-practice-edge-caption .ant-btn {
+  min-height: 2rem;
+  border-color: transparent;
+  border-radius: 6px;
+  color: var(--dr-ink, var(--color-ink));
+  background: transparent;
+  box-shadow: none;
+  pointer-events: auto;
+}
+
+.drumroll-practice-edge-caption .ant-btn:hover {
+  color: var(--dr-ink, var(--color-ink));
+  background: var(--dr-paper-low, var(--color-paper));
+}
+
+@media (max-width: 720px) {
+  .drumroll-practice-edge-caption {
+    justify-content: flex-start;
+    gap: 0.55rem;
+  }
+
+  .drumroll-practice-edge-caption__detail {
+    display: none;
+  }
+}

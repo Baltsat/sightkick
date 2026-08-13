@@ -40,7 +40,7 @@ function resultSubtitle(result: IpcYoutubeSearchResult): string {
 
 function SongSearchInner({ disabled, requestedSearch }: Props) {
   const { notification } = App.useApp();
-  const requestedQuery = disabled ? '' : requestedSearch?.query.trim() ?? '';
+  const requestedQuery = disabled ? '' : (requestedSearch?.query.trim() ?? '');
   const [query, setQuery] = useState(requestedQuery);
   const [open, setOpen] = useState(Boolean(requestedQuery));
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -79,9 +79,10 @@ function SongSearchInner({ disabled, requestedSearch }: Props) {
 
     window.electron.ipcRenderer.sendMessage('create-auto-chart', {
       youtubeUrl: result.watchUrl,
+      autoImport: true,
     });
     notification.info({
-      title: 'Creating a chart',
+      title: 'Adding to your library',
       description: `Finding drums for "${result.title}"…`,
       placement: 'bottomRight',
     });

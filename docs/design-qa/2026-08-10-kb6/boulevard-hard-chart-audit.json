@@ -1,0 +1,389 @@
+{
+  "chartPath": "/Users/konstantinbaltsat/Music/SightKick/Green Day - Boulevard of Broken Dreams (Harmonix)/notes.mid",
+  "difficulty": "hard",
+  "resolution": 480,
+  "rawGroups": 628,
+  "rawEvents": 1078,
+  "parsedOnsets": 628,
+  "parsedDrumSymbols": 1078,
+  "firstRawGroups": [
+    {
+      "tick": 15360,
+      "types": [
+        13,
+        17
+      ],
+      "flags": [
+        0,
+        32
+      ]
+    },
+    {
+      "tick": 15600,
+      "types": [
+        15
+      ],
+      "flags": [
+        32
+      ]
+    },
+    {
+      "tick": 15840,
+      "types": [
+        14,
+        15
+      ],
+      "flags": [
+        16,
+        32
+      ]
+    },
+    {
+      "tick": 16080,
+      "types": [
+        15
+      ],
+      "flags": [
+        32
+      ]
+    },
+    {
+      "tick": 16320,
+      "types": [
+        13,
+        15
+      ],
+      "flags": [
+        0,
+        32
+      ]
+    },
+    {
+      "tick": 16560,
+      "types": [
+        13,
+        15
+      ],
+      "flags": [
+        0,
+        32
+      ]
+    },
+    {
+      "tick": 16800,
+      "types": [
+        14,
+        15
+      ],
+      "flags": [
+        16,
+        32
+      ]
+    },
+    {
+      "tick": 17040,
+      "types": [
+        15
+      ],
+      "flags": [
+        32
+      ]
+    },
+    {
+      "tick": 17280,
+      "types": [
+        13,
+        15
+      ],
+      "flags": [
+        0,
+        32
+      ]
+    },
+    {
+      "tick": 17520,
+      "types": [
+        15
+      ],
+      "flags": [
+        32
+      ]
+    },
+    {
+      "tick": 17760,
+      "types": [
+        14,
+        15
+      ],
+      "flags": [
+        16,
+        32
+      ]
+    },
+    {
+      "tick": 18000,
+      "types": [
+        15
+      ],
+      "flags": [
+        32
+      ]
+    },
+    {
+      "tick": 18240,
+      "types": [
+        13,
+        15
+      ],
+      "flags": [
+        0,
+        32
+      ]
+    },
+    {
+      "tick": 18480,
+      "types": [
+        13,
+        15
+      ],
+      "flags": [
+        0,
+        32
+      ]
+    },
+    {
+      "tick": 18720,
+      "types": [
+        14,
+        15
+      ],
+      "flags": [
+        16,
+        32
+      ]
+    },
+    {
+      "tick": 18960,
+      "types": [
+        15
+      ],
+      "flags": [
+        32
+      ]
+    },
+    {
+      "tick": 19200,
+      "types": [
+        13,
+        15
+      ],
+      "flags": [
+        0,
+        32
+      ]
+    },
+    {
+      "tick": 19440,
+      "types": [
+        15
+      ],
+      "flags": [
+        32
+      ]
+    },
+    {
+      "tick": 19680,
+      "types": [
+        14,
+        15
+      ],
+      "flags": [
+        16,
+        32
+      ]
+    },
+    {
+      "tick": 19920,
+      "types": [
+        15
+      ],
+      "flags": [
+        32
+      ]
+    },
+    {
+      "tick": 20160,
+      "types": [
+        13,
+        15
+      ],
+      "flags": [
+        0,
+        32
+      ]
+    },
+    {
+      "tick": 20400,
+      "types": [
+        13,
+        15
+      ],
+      "flags": [
+        0,
+        32
+      ]
+    },
+    {
+      "tick": 20640,
+      "types": [
+        14,
+        15
+      ],
+      "flags": [
+        16,
+        32
+      ]
+    },
+    {
+      "tick": 20880,
+      "types": [
+        15
+      ],
+      "flags": [
+        32
+      ]
+    },
+    {
+      "tick": 21120,
+      "types": [
+        13,
+        15
+      ],
+      "flags": [
+        0,
+        32
+      ]
+    },
+    {
+      "tick": 21360,
+      "types": [
+        15
+      ],
+      "flags": [
+        32
+      ]
+    },
+    {
+      "tick": 21600,
+      "types": [
+        14,
+        15
+      ],
+      "flags": [
+        16,
+        32
+      ]
+    },
+    {
+      "tick": 21840,
+      "types": [
+        15
+      ],
+      "flags": [
+        32
+      ]
+    },
+    {
+      "tick": 22080,
+      "types": [
+        13,
+        15
+      ],
+      "flags": [
+        0,
+        32
+      ]
+    },
+    {
+      "tick": 22320,
+      "types": [
+        13,
+        15
+      ],
+      "flags": [
+        0,
+        32
+      ]
+    },
+    {
+      "tick": 22560,
+      "types": [
+        14,
+        15
+      ],
+      "flags": [
+        16,
+        32
+      ]
+    },
+    {
+      "tick": 22800,
+      "types": [
+        15
+      ],
+      "flags": [
+        32
+      ]
+    }
+  ],
+  "firstMeasures": [
+    {
+      "index": 0,
+      "startTick": 0,
+      "endTick": 1920,
+      "notes": []
+    },
+    {
+      "index": 1,
+      "startTick": 1920,
+      "endTick": 3840,
+      "notes": []
+    },
+    {
+      "index": 2,
+      "startTick": 3840,
+      "endTick": 5760,
+      "notes": []
+    },
+    {
+      "index": 3,
+      "startTick": 5760,
+      "endTick": 7680,
+      "notes": []
+    },
+    {
+      "index": 4,
+      "startTick": 7680,
+      "endTick": 9600,
+      "notes": []
+    },
+    {
+      "index": 5,
+      "startTick": 9600,
+      "endTick": 11520,
+      "notes": []
+    },
+    {
+      "index": 6,
+      "startTick": 11520,
+      "endTick": 13440,
+      "notes": []
+    },
+    {
+      "index": 7,
+      "startTick": 13440,
+      "endTick": 15360,
+      "notes": []
+    }
+  ]
+}

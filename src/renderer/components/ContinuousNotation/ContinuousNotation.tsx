@@ -508,7 +508,7 @@ export function ContinuousNotationCamera({
       const stageRect = stage.getBoundingClientRect();
       const notationRect = notation.getBoundingClientRect();
       const anchor = flowPlayheadOffset(viewport.clientWidth);
-      const scoreTop = Math.max(stageRect.top + 82, notationRect.top - 32);
+      const scoreTop = Math.max(stageRect.top + 32, notationRect.top - 20);
       const scoreBottom = Math.min(
         stageRect.bottom - 20,
         notationRect.bottom + 48,

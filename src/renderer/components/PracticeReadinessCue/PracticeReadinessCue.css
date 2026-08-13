@@ -1,66 +1,15 @@
 .drumroll-practice-readiness {
-  position: absolute;
-  z-index: 12;
-  right: clamp(0.75rem, 2vw, 1.5rem);
-  bottom: clamp(0.75rem, 2vw, 1.25rem);
-  left: clamp(0.75rem, 2vw, 1.5rem);
-  display: flex;
-  min-height: 3.25rem;
-  align-items: center;
   justify-content: center;
-  gap: clamp(0.45rem, 1vw, 0.8rem);
-  padding: 0.5rem 0.8rem;
-  border: 1px solid color-mix(in srgb, var(--color-coral) 26%, white);
-  border-radius: 8px;
-  color: var(--color-ink);
-  background: color-mix(in srgb, var(--color-paper-light) 92%, #f8d8b7);
-  box-shadow: 0 12px 24px -22px rgb(17 23 34 / 34%);
-  font-family: var(--font-ui);
-  pointer-events: none;
-}
-
-.drumroll-practice-readiness__kick {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.28rem;
-  color: var(--color-coral);
-  font-size: 0.75rem;
-  font-weight: 760;
 }
 
 .drumroll-practice-readiness__eyebrow {
-  color: var(--color-text-muted);
-  font-size: 0.68rem;
-  font-weight: 760;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  color: var(--edge-caption-signal);
 }
 
 .drumroll-practice-readiness__instruction {
-  min-width: 0;
-  overflow: hidden;
-  font-size: clamp(0.84rem, 1.1vw, 0.96rem);
-  font-weight: 720;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 0 1 auto;
 }
 
 .drumroll-practice-readiness__detail {
-  overflow: hidden;
-  color: var(--color-text-muted);
-  font-size: clamp(0.72rem, 0.95vw, 0.82rem);
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@media (max-width: 620px) {
-  .drumroll-practice-readiness {
-    justify-content: flex-start;
-  }
-
-  .drumroll-practice-readiness__detail {
-    display: none;
-  }
+  flex: 0 1 auto;
 }

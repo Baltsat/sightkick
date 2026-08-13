@@ -953,6 +953,7 @@ describe('auto-chart queue — sightkick backend', () => {
     const songDir = path.join(harness.skRuns[0].input.tempDir, 'prepared');
 
     fs.mkdirSync(songDir, { recursive: true });
+
     harness.skRuns[0].emit({ kind: 'complete', success: true, songDir });
 
     await vi.waitFor(() =>
@@ -1077,6 +1078,43 @@ describe('auto-chart queue — sightkick backend', () => {
       undefined,
     );
     expect(latestJob(event)).toMatchObject({ stage: 'imported' });
+  });
+
+  it('adds a one-click YouTube result only after the chart is prepared', async () => {
+    const harness = createHarness({
+      backends: { sightkick: true, octave: false },
+    });
+
+    cleanup.push(harness.root);
+
+    const event = makeEvent();
+
+    await harness.queue.create(event as never, {
+      youtubeUrl: 'https://youtu.be/abcdefghijk',
+      autoImport: true,
+    });
+    await vi.waitFor(() => expect(harness.skRuns).toHaveLength(1));
+
+    const songDir = path.join(harness.skRuns[0].input.tempDir, 'prepared');
+
+    fs.mkdirSync(songDir, { recursive: true });
+
+    const preparedRealPath = fs.realpathSync(songDir);
+
+    harness.skRuns[0].emit({ kind: 'complete', success: true, songDir });
+
+    await vi.waitFor(() =>
+      expect(latestJob(event)).toMatchObject({
+        stage: 'imported',
+        autoImport: true,
+      }),
+    );
+    expect(harness.importSong).toHaveBeenCalledWith(
+      preparedRealPath,
+      undefined,
+    );
+
+    harness.skRuns[0].finish();
   });
 
   it('still supports choosing a local audio file with the sightkick backend', async () => {

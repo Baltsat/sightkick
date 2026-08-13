@@ -282,8 +282,8 @@ export function AutoChart({ disabled, onImported }: Props) {
           disabled
             ? 'Select a library folder first'
             : active
-            ? 'Finish or cancel the current chart first'
-            : 'Turn a YouTube video into a playable drum chart'
+              ? 'Finish or cancel the current chart first'
+              : 'Turn a YouTube video into a playable drum chart'
         }
       >
         <Button
@@ -561,23 +561,25 @@ export function AutoChart({ disabled, onImported }: Props) {
         </div>
       )}
 
-      <SongImportReview
-        preview={job?.stage === 'preview-ready' ? job.preview : undefined}
-        importing={job?.stage === 'importing'}
-        artworkUrl={artworkUrl}
-        title="Add this song to your library"
-        allowArtworkUrl={false}
-        onArtworkUrlChange={setArtworkUrl}
-        onConfirm={() => {
-          if (job) {
-            window.electron.ipcRenderer.sendMessage(
-              'import-auto-chart',
-              job.id,
-            );
-          }
-        }}
-        onCancel={dismiss}
-      />
+      {!job?.autoImport && (
+        <SongImportReview
+          preview={job?.stage === 'preview-ready' ? job.preview : undefined}
+          importing={job?.stage === 'importing'}
+          artworkUrl={artworkUrl}
+          title="Add this song to your library"
+          allowArtworkUrl={false}
+          onArtworkUrlChange={setArtworkUrl}
+          onConfirm={() => {
+            if (job) {
+              window.electron.ipcRenderer.sendMessage(
+                'import-auto-chart',
+                job.id,
+              );
+            }
+          }}
+          onCancel={dismiss}
+        />
+      )}
     </>
   );
 }

@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Drumroll borderless in-game streak VFX comparison"
+    />
+    <title>Drumroll — Borderless Streak VFX</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..800&family=Newsreader:opsz,wght@6..72,400..700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./plaques.css" />
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"
+    ></script>
+    <script defer src="./plaques.js"></script>
+  </head>
+  <body>
+    <div class="vfx-app" id="vfxApp" data-vfx="warmup" data-intensity="1">
+      <header class="practice-toolbar">
+        <div class="brand"><span aria-hidden="true"></span>DRUMROLL</div>
+        <button class="back" type="button" aria-label="Back">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m14.5 6-6 6 6 6" />
+          </svg>
+        </button>
+        <button class="play" type="button" aria-label="Play">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m9 7 8 5-8 5Z" />
+          </svg>
+        </button>
+        <div class="song">
+          <span>Practice mode</span>
+          <strong>Californication</strong>
+          <small>Red Hot Chili Peppers · Medium</small>
+        </div>
+        <div class="progress" aria-label="22 seconds of 5 minutes 22 seconds">
+          <span>00:22</span><i><b></b></i><span>05:22</span>
+        </div>
+        <div class="mode"><b>Flow</b><span>Classic</span></div>
+        <div class="speed">Speed <strong>0.8×</strong></div>
+        <button class="settings" type="button" aria-label="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.3" />
+            <path
+              d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1A8 8 0 0 0 14.8 6l-.3-2.5h-4L10.2 6a8 8 0 0 0-1.7 1.1l-2.4-1-2 3.4L6.1 11A7 7 0 0 0 6 12c0 .4 0 .7.1 1l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 1.7 1.1l.3 2.5h4l.3-2.5a8 8 0 0 0 1.7-1.1l2.4 1 2-3.4-2-1.5c.1-.3.1-.6.1-1Z"
+            />
+          </svg>
+        </button>
+      </header>
+
+      <main>
+        <section
+          class="performance-field"
+          aria-label="Live notation with borderless streak VFX"
+        >
+          <div class="field-heading">
+            <div>
+              <strong>Californication</strong>
+              <span>Continuous score</span>
+            </div>
+            <small>Eyes stay on the notes</small>
+          </div>
+
+          <div
+            class="streak-vfx"
+            id="streakVfx"
+            role="button"
+            tabindex="0"
+            aria-label="8 hit streak, Warm-Up. Activate to replay."
+          >
+            <canvas id="vfxCanvas" aria-hidden="true"></canvas>
+            <span class="dom-flare" aria-hidden="true"></span>
+            <span class="dom-ring" aria-hidden="true"><i></i></span>
+            <span class="dom-slash" aria-hidden="true"><i></i><i></i></span>
+            <div class="vfx-copy" id="vfxCopy">
+              <strong class="vfx-title" id="vfxLabel">WARM-UP</strong>
+              <span class="vfx-proof" id="vfxProof">
+                <small id="vfxMeta">STREAK</small>
+                <b id="vfxCount">8</b>
+                <small>HITS</small>
+              </span>
+            </div>
+          </div>
+          <p class="sr-only" id="vfxStatus" aria-live="polite"></p>
+
+          <svg
+            class="notation"
+            viewBox="0 0 1500 220"
+            role="img"
+            aria-label="Drum notation remains the primary focus"
+          >
+            <g class="staff">
+              <path d="M0 60H1500M0 82H1500M0 104H1500M0 126H1500M0 148H1500" />
+              <path
+                d="M0 42v128M300 42v128M600 42v128M900 42v128M1200 42v128M1499 42v128"
+              />
+            </g>
+            <g class="stems">
+              <path
+                d="M40 56v94M120 56v94M200 56v94M280 56v94M360 56v94M440 56v94M520 56v94M600 56v94M680 56v94M760 56v94M840 56v94M920 56v94M1000 56v94M1080 56v94M1160 56v94M1240 56v94M1320 56v94M1400 56v94M1480 56v94"
+              />
+            </g>
+            <g class="hat">
+              <path
+                d="m32 48 16 16m0-16L32 64m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16m80-16 16 16m0-16-16 16"
+              />
+            </g>
+            <g class="snare">
+              <circle cx="120" cy="104" r="9" />
+              <circle cx="280" cy="104" r="9" />
+              <circle cx="440" cy="104" r="9" />
+              <circle cx="600" cy="104" r="9" />
+              <circle cx="760" cy="104" r="9" />
+              <circle cx="920" cy="104" r="9" />
+              <circle cx="1080" cy="104" r="9" />
+              <circle cx="1240" cy="104" r="9" />
+              <circle cx="1400" cy="104" r="9" />
+            </g>
+            <g class="kick">
+              <circle cx="40" cy="148" r="9" />
+              <circle cx="200" cy="148" r="9" />
+              <circle cx="360" cy="148" r="9" />
+              <circle cx="520" cy="148" r="9" />
+              <circle cx="680" cy="148" r="9" />
+              <circle cx="840" cy="148" r="9" />
+              <circle cx="1000" cy="148" r="9" />
+              <circle cx="1160" cy="148" r="9" />
+              <circle cx="1320" cy="148" r="9" />
+              <circle cx="1480" cy="148" r="9" />
+            </g>
+          </svg>
+
+          <div class="legend" aria-hidden="true">
+            <span><i class="cyan"></i>Hi-Hat</span>
+            <span><i class="blue"></i>Ride</span>
+            <span><i class="green"></i>Crash</span>
+            <span><i class="pink"></i>Snare</span>
+            <span><i class="amber"></i>Tom 1</span>
+            <span><i class="coral"></i>Kick</span>
+          </div>
+        </section>
+
+        <section class="vfx-lab">
+          <header>
+            <div>
+              <h1>Borderless game streak VFX</h1>
+              <p>No card. No pill. Tier name leads; count lands as proof.</p>
+            </div>
+            <div class="attention-budget">
+              <span>Tier power</span>
+              <b><i id="attentionBudgetFill"></i></b>
+              <strong id="attentionLabel">1 / 6</strong>
+            </div>
+          </header>
+
+          <div class="lab-grid">
+            <div class="vfx-options" id="vfxOptions">
+              <button
+                class="vfx-option is-active"
+                data-vfx="warmup"
+                type="button"
+                aria-pressed="true"
+              >
+                <span class="mini-vfx mini-tier-1"><b>8</b><i></i></span>
+                <strong>Warm-Up</strong><small>Tier 1 · 280 ms</small>
+              </button>
+              <button
+                class="vfx-option"
+                data-vfx="groove"
+                type="button"
+                aria-pressed="false"
+              >
+                <span class="mini-vfx mini-tier-2"><b>32</b><i></i></span>
+                <strong>Groove Machine</strong><small>Tier 2 · 450 ms</small>
+              </button>
+              <button
+                class="vfx-option"
+                data-vfx="wizard"
+                type="button"
+                aria-pressed="false"
+              >
+                <span class="mini-vfx mini-tier-3"><b>75</b><i></i></span>
+                <strong>Fill Wizard</strong><small>Tier 3 · 620 ms</small>
+              </button>
+              <button
+                class="vfx-option"
+                data-vfx="drumroll"
+                type="button"
+                aria-pressed="false"
+              >
+                <span class="mini-vfx mini-tier-4"><b>100</b><i></i></span>
+                <strong>DRUMROLL!</strong><small>Tier 4 · 780 ms</small>
+              </button>
+              <button
+                class="vfx-option"
+                data-vfx="deity"
+                type="button"
+                aria-pressed="false"
+              >
+                <span class="mini-vfx mini-tier-5"><b>200</b><i></i></span>
+                <strong>Rhythm Deity</strong><small>Tier 5 · 950 ms</small>
+              </button>
+              <button
+                class="vfx-option"
+                data-vfx="legendary"
+                type="button"
+                aria-pressed="false"
+              >
+                <span class="mini-vfx mini-tier-6"><b>500</b><i></i></span>
+                <strong>Buzz Roll Berserker</strong
+                ><small>Legendary · 1,180 ms</small>
+              </button>
+            </div>
+
+            <div class="motion-story">
+              <div class="story-heading">
+                <strong id="storyName">Warm-Up</strong>
+                <span id="storyTier">Tier 1 · Foundation</span>
+              </div>
+              <div class="story-frames">
+                <div>
+                  <span class="story-state is-faint" id="storyBefore">7</span>
+                  <b>Hit</b><small>0 ms</small>
+                </div>
+                <i aria-hidden="true"></i>
+                <div class="is-peak">
+                  <span class="story-state" id="storyPeak">8</span>
+                  <b>Tier up</b><small id="storyPeakTime">110 ms</small>
+                </div>
+                <i aria-hidden="true"></i>
+                <div>
+                  <span class="story-state is-faint" id="storyAfter">8</span>
+                  <b>Dissolve</b><small id="storyDuration">280 ms</small>
+                </div>
+              </div>
+              <div class="layer-stack" id="layerStack" aria-label="VFX layers">
+                <span>TYPE</span><span>GLOW</span>
+              </div>
+            </div>
+          </div>
+
+          <footer class="lab-controls">
+            <button id="replayButton" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 8V4m0 0h4M5 4l3.2 3.2A7 7 0 1 1 5 12" />
+              </svg>
+              Replay tier-up
+            </button>
+            <button id="hitButton" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8" />
+                <path d="m10 8 6 4-6 4Z" />
+              </svg>
+              Simulate hit
+            </button>
+            <button id="missButton" type="button" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8" stroke-dasharray="2 3" />
+                <path d="m9 9 6 6m0-6-6 6" />
+              </svg>
+              Miss state
+            </button>
+            <button
+              id="motionButton"
+              class="motion-toggle"
+              type="button"
+              aria-pressed="false"
+            >
+              <span>
+                <strong>Reduced motion</strong>
+                <small>Crossfade only</small>
+              </span>
+              <i aria-hidden="true"><b></b></i>
+            </button>
+          </footer>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

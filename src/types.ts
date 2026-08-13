@@ -404,6 +404,7 @@ export interface IpcCreateAutoChartRequest {
   youtubeUrl?: string;
   localFile?: boolean;
   backend?: AutoChartBackend;
+  autoImport?: boolean;
   sourceProvenance?: LibrarySourceTrackProvenance;
 }
 
@@ -427,6 +428,21 @@ export interface IpcSaveAutoChartRemoteSettingsRequest {
 export interface IpcAutoChartRemoteTestResponse {
   ok: boolean;
   message: string;
+}
+
+export type LibraryMirrorSyncState = 'disabled' | 'synced' | 'queued';
+
+export interface IpcLibraryMirrorSettings {
+  endpoint: string;
+  tokenConfigured: boolean;
+  state: LibraryMirrorSyncState;
+  pendingCount: number;
+  error?: string;
+}
+
+export interface IpcSaveLibraryMirrorSettingsRequest {
+  endpoint: string;
+  token?: string;
 }
 
 export interface IpcAutoChartMetadata {
@@ -455,6 +471,7 @@ export interface IpcAutoChartJob {
   // can recognize its own in-flight jobs by watch URL without a separate
   // lookup channel.
   youtubeUrl?: string;
+  autoImport?: boolean;
   /** Reviewed discovery row that this generated chart will resolve. */
   sourceProvenance?: LibrarySourceTrackProvenance;
   // A snapshot of every currently non-terminal job the queue knows about —

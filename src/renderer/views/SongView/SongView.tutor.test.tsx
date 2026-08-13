@@ -118,7 +118,7 @@ describe('adaptive tutor surfaces', () => {
 });
 
 describe('safe hands-free run intent', () => {
-  it('keeps the active-play pause command visible without a full-size prompt', async () => {
+  it('keeps active play focused on notation instead of a persistent tutor prompt', async () => {
     const view = setupSongView({
       route: '/song-1?gameMode=practice',
       settings: { countIn: false },
@@ -133,14 +133,11 @@ describe('safe hands-free run intent', () => {
     await view.loadSong();
     await view.pressKey('KeyK');
 
-    const prompt = within(screen.getByTestId('tutor-hud')).getByTestId(
-      'kit-command-prompt',
+    expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+      'aria-label',
+      'Pause',
     );
-
-    expect(prompt).toHaveAccessibleName(
-      'Pause from the kit: Kick, then Crash, then Kick, then Crash',
-    );
-    expect(prompt).toHaveAttribute('data-compact', 'true');
+    expect(screen.queryByTestId('tutor-hud')).not.toBeInTheDocument();
   });
 
   it('surfaces an interrupted attempt and resumes it from the kit with a fresh count-in', async () => {
@@ -274,9 +271,9 @@ describe('safe hands-free run intent', () => {
     expect((screen.getByRole('spinbutton') as HTMLInputElement).value).toBe(
       '0.7',
     );
-    expect(
-      within(screen.getByTestId('tutor-hud')).getByText('0.7×'),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('practice-mode-indicator')).toHaveTextContent(
+      '0.7×',
+    );
   });
 
   it('stamps the run start at first playback rather than component mount', async () => {
@@ -422,6 +419,11 @@ describe('safe hands-free run intent', () => {
       await strikeCommand(view, clock, ['KeyK', 'KeyC', 'KeyK', 'KeyC']);
 
       expect(view.audio.state).toBe('suspended');
+      expect(screen.getByTestId('tutor-hud')).toHaveAttribute(
+        'data-edge-caption',
+        'tutor',
+      );
+      expect(document.querySelectorAll('[data-edge-caption]')).toHaveLength(1);
 
       clock.advance(1200);
       await strikeCommand(view, clock, ['KeyK', 'KeyC', 'KeyK', 'KeyC']);
@@ -431,6 +433,11 @@ describe('safe hands-free run intent', () => {
 
     expect(view.audio.state).toBe('running');
     expect(screen.queryByTestId('song-list-stub')).not.toBeInTheDocument();
+    expect(screen.getByTestId('count-in')).toHaveAttribute(
+      'data-edge-caption',
+      'count-in',
+    );
+    expect(document.querySelectorAll('[data-edge-caption]')).toHaveLength(1);
   });
 
   it('gives kit gestures sole ownership when a pad also has a transport mapping', async () => {

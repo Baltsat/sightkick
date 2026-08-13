@@ -1,4 +1,5 @@
 import { CSSProperties } from 'react';
+import '../PracticeEdgeCaption/PracticeEdgeCaption.css';
 import './CountIn.css';
 
 interface CountInProps {
@@ -27,38 +28,35 @@ export function CountIn({
 
   return (
     <div
-      className="drumroll-count-in"
+      className="drumroll-practice-edge-caption drumroll-count-in"
       data-animated={animated}
+      data-tone="count"
       data-testid="count-in"
+      data-edge-caption="count-in"
       aria-live="assertive"
       aria-label={`Count in ${count} of ${beatCount}`}
       style={style}
     >
-      <div className="drumroll-count-in__surface">
-        <p>Count in</p>
-        <ol className="drumroll-count-in__beats" aria-hidden="true">
-          {Array.from({ length: beatCount }, (_, index) => {
-            const beat = index + 1;
+      <p className="drumroll-count-in__label">Count in</p>
+      <ol className="drumroll-count-in__beats" aria-hidden="true">
+        {Array.from({ length: beatCount }, (_, index) => {
+          const beat = index + 1;
 
-            return (
-              <li
-                key={beat}
-                className="drumroll-count-in__beat"
-                data-state={
-                  beat === count ? 'active' : beat < count ? 'passed' : 'next'
-                }
-              >
-                <span key={beat === count ? `${beat}-${count}` : beat}>
-                  {beat}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-        <div className="drumroll-count-in__progress" aria-hidden="true">
-          <span />
-        </div>
-      </div>
+          return (
+            <li
+              key={beat}
+              className="drumroll-count-in__beat"
+              data-state={
+                beat === count ? 'active' : beat < count ? 'passed' : 'next'
+              }
+            >
+              <span key={beat === count ? `${beat}-${count}` : beat}>
+                {beat}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }

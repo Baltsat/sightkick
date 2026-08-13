@@ -168,7 +168,12 @@ describe('SongSearch', () => {
 
     expect(ipc.sent).toContainEqual({
       channel: 'create-auto-chart',
-      args: [{ youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk' }],
+      args: [
+        {
+          youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+          autoImport: true,
+        },
+      ],
     });
   });
 
@@ -217,7 +222,12 @@ describe('SongSearch', () => {
 
     expect(ipc.sent).toContainEqual({
       channel: 'create-auto-chart',
-      args: [{ youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk' }],
+      args: [
+        {
+          youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+          autoImport: true,
+        },
+      ],
     });
   });
 
@@ -239,7 +249,12 @@ describe('SongSearch', () => {
 
     expect(ipc.sent).toContainEqual({
       channel: 'create-auto-chart',
-      args: [{ youtubeUrl: 'https://www.youtube.com/watch?v=11111111111' }],
+      args: [
+        {
+          youtubeUrl: 'https://www.youtube.com/watch?v=11111111111',
+          autoImport: true,
+        },
+      ],
     });
   });
 

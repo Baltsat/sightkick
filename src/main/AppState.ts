@@ -12,7 +12,12 @@ import {
 import Store from 'electron-store';
 import { StorageSchema } from '../types';
 import MenuBuilder from './menu';
-import { ASSET_PROTOCOL, resolveAssetFilePath, resolveHtmlPath } from './util';
+import {
+  ASSET_PROTOCOL,
+  resolveAssetFilePath,
+  resolveHtmlPath,
+  toSong,
+} from './util';
 import { AppUpdater } from './AppUpdater';
 import { PracticePresenceController } from './practicePresence';
 import { loadSong } from './ipc/loadSong';
@@ -41,6 +46,12 @@ import {
   getRemoteAutoChartSettings,
   saveAndTestRemoteAutoChart,
 } from './ipc/remoteAutoChart';
+import {
+  configureLibraryMirror,
+  getLibraryMirrorSettings,
+  saveLibraryMirrorSettings,
+  syncLibraryMirror,
+} from './libraryMirror';
 import { searchYoutube } from './ipc/searchYoutube';
 import { fetchMyMusic } from './ipc/myMusic';
 import { loadLibraryCandidates } from './ipc/loadLibraryCandidates';
@@ -165,6 +176,10 @@ class AppState {
 
     configureRemoteAutoChartStore(this.store);
     configureCoachStore(this.store);
+    configureLibraryMirror(
+      this.store,
+      path.join(app.getPath('userData'), 'library-mirror-outbox'),
+    );
 
     ipcMain.on('load-song', loadSong);
     ipcMain.on('load-song-list', loadSongList);
@@ -180,6 +195,15 @@ class AppState {
     ipcMain.on('import-auto-chart', importAutoChart);
     ipcMain.on('get-auto-chart-remote-settings', getRemoteAutoChartSettings);
     ipcMain.on('save-test-auto-chart-remote', saveAndTestRemoteAutoChart);
+    ipcMain.on('get-library-mirror-settings', getLibraryMirrorSettings);
+    ipcMain.on('save-library-mirror-settings', saveLibraryMirrorSettings);
+    ipcMain.on('sync-library-mirror', (event) => {
+      const songs = Object.values(
+        this.store.get('songs') as StorageSchema['songs'],
+      ).map(toSong);
+
+      void syncLibraryMirror(event, songs);
+    });
     ipcMain.on('search-youtube', searchYoutube);
     ipcMain.on('my-music-fetch', fetchMyMusic);
     ipcMain.on('load-library-candidates', (event) => {
@@ -315,10 +339,10 @@ class AppState {
         process.platform === 'win32'
           ? getAssetPath('icon.ico')
           : process.platform === 'linux'
-          ? getAssetPath('icons', '512x512.png')
-          : process.platform === 'darwin'
-          ? getAssetPath('icon.icns')
-          : getAssetPath('icon.png'),
+            ? getAssetPath('icons', '512x512.png')
+            : process.platform === 'darwin'
+              ? getAssetPath('icon.icns')
+              : getAssetPath('icon.png'),
       webPreferences: {
         preload: path.join(__dirname, '../preload/index.js'),
         backgroundThrottling: false,

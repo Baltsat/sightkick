@@ -16,11 +16,7 @@ import { SheetMusicLayout } from '../../../chart-parser/renderer';
 import { Engine } from '../../services/engine';
 import { TimeStore } from '../../services/time-store';
 import { Song } from '../../../types';
-import { Reference } from './Reference';
 import { GameMode, PracticeRange } from '../../types';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRepeat, faXmark } from '@fortawesome/free-solid-svg-icons';
-import { IconButton } from '../IconButton';
 import { getScrollParent } from '../../services/engine/helpers';
 import { autoScrollSpeed } from './helpers';
 import {
@@ -46,10 +42,7 @@ export interface SheetMusicProps {
   isLooping?: boolean;
   onPracticeRangeChange?: (range?: PracticeRange) => void;
   onLoopRangeSelect?: (range: PracticeRange) => void;
-  onClearLoop?: () => void;
   onSelectMeasure: (measure: Measure, event: MouseEvent) => void;
-  enableColors: boolean;
-  showReference: boolean;
   zoom: number;
   layout?: SheetMusicLayout;
   timeStore?: TimeStore;
@@ -70,10 +63,7 @@ export function SheetMusic({
   isLooping,
   onPracticeRangeChange,
   onLoopRangeSelect,
-  onClearLoop,
   onSelectMeasure,
-  showReference,
-  enableColors,
   zoom,
   layout = 'classic',
   timeStore,
@@ -363,17 +353,15 @@ export function SheetMusic({
             height: stave.getHeight() + 30,
           }}
           className={cn(
-            'absolute z-[-3] rounded-[11px] border-0 bg-transparent',
+            'drumroll-measure-overlay',
             {
-              'bg-accent-soft-bg-solid border-2! border-accent-bright!':
-                selected,
-              'border-l-0! rounded-l-none': mergeLeft,
-              'border-r-0! rounded-r-none': mergeRight,
-              'bg-accent-medium-bg shadow-accent-soft border border-accent-soft-border z-[-1]!':
-                focused,
+              'drumroll-measure-overlay--selected': selected,
+              'drumroll-measure-overlay--merge-left': mergeLeft,
+              'drumroll-measure-overlay--merge-right': mergeRight,
+              'drumroll-measure-overlay--focused': focused,
             },
             (isDev || gameMode === 'practice') &&
-              'cursor-pointer touch-none hover:bg-accent-medium-bg hover:shadow-accent-soft hover:border hover:border-accent-soft-border hover:z-[-1]',
+              'drumroll-measure-overlay--selectable',
           )}
           onMouseDown={() => handleMeasureMouseDown(index)}
           onPointerDown={(event) => {
@@ -456,48 +444,16 @@ export function SheetMusic({
         (typeof document === 'undefined'
           ? flowPlayhead
           : createPortal(flowPlayhead, document.body))}
-      {gameMode === 'practice' &&
-        isLooping &&
-        practiceRange &&
-        !(isFlow && loopEscape) && (
-          <div className="fixed top-35 ml-10 bg-bg rounded-md z-100 px-4 py-3 flex items-center gap-2">
-            <div className="text-accent bg-accent-soft-bg p-2 border border-accent-soft-border rounded-md w-10 h-10 flex items-center justify-center">
-              <FontAwesomeIcon icon={faRepeat} />
-            </div>
-            <div>
-              <div className="text-[16px] font-semibold">Looping Section</div>
-              <div className="text-xs text-text-muted">
-                Measure{' '}
-                {practiceRange.start === practiceRange.end
-                  ? practiceRange.start + 1
-                  : `${practiceRange.start + 1} - ${practiceRange.end + 1}`}
-              </div>
-            </div>
-            <IconButton
-              icon={faXmark}
-              data-testid="clear-loop"
-              onClick={() => {
-                if (onClearLoop) {
-                  onClearLoop();
-
-                  return;
-                }
-
-                onPracticeRangeChange?.(undefined);
-              }}
-            />
-          </div>
-        )}
       <div
         ref={flowStageRef}
         className={cn(
-          'flex flex-col items-center min-w-max',
+          'drumroll-score-surface',
           isFlow
             ? cn(
                 'drumroll-flow-stage',
                 loopEscape && 'drumroll-flow-stage--loop-escape',
               )
-            : 'bg-paper rounded-[11px] p-10',
+            : 'drumroll-classic-score',
         )}
       >
         {!isFlow && (
@@ -550,17 +506,6 @@ export function SheetMusic({
           />
         </div>
       </div>
-
-      {enableColors && showReference && (
-        <Reference
-          className={cn(
-            'fixed left-1/2 -translate-x-1/2',
-            gameMode === 'practice'
-              ? 'drumroll-reference--above-tutor'
-              : 'bottom-10',
-          )}
-        />
-      )}
     </div>
   );
 }
