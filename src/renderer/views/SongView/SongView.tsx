@@ -34,6 +34,7 @@ import { useInput } from '../../context/InputContext';
 import { useSongViewSettings } from '../../context/SongViewSettingsContext';
 import { ClickControls } from '../../components/ClickControls';
 import { usePersisted } from '../../hooks/usePersisted';
+import { useLearnerPlaybackSpeed } from '../../hooks/useLearnerPlaybackSpeed';
 import { useSongLoader } from '../../hooks/useSongLoader';
 import { useEngine } from '../../hooks/useEngine';
 import { useVolumeControls } from '../../hooks/useVolumeControls';
@@ -270,7 +271,6 @@ export function SongView() {
     inputReadiness,
     midiPortEpoch,
     inputLatencyMs,
-    reconnectMidi,
   } = useInput();
   const {
     playheadStyle,
@@ -375,6 +375,13 @@ export function SongView() {
       ? Math.min(2, Math.max(0.3, value))
       : 1;
   }, [gameMode, searchParams]);
+  // Learner-owned tempo, "and the next session": see useLearnerPlaybackSpeed
+  // for why this is not usePersisted (SongView does not remount on a
+  // same-route song change, so a naive key-based persisted value would
+  // cross-write song A's speed onto song B).
+  const [learnerPlaybackSpeed, setLearnerPlaybackSpeed] =
+    useLearnerPlaybackSpeed(id);
+  const initialPlaybackSpeed = learnerPlaybackSpeed ?? requestedPracticeSpeed;
   const practiceCardEvidence = useMemo(
     () => parsePracticeCardEvidence(searchParams, id),
     [id, searchParams],
@@ -1254,7 +1261,8 @@ export function SongView() {
     delaySeconds,
     isEnded,
     onExit: () => navigate('/'),
-    initialPlaybackSpeed: requestedPracticeSpeed,
+    initialPlaybackSpeed,
+    onExplicitSpeedChange: setLearnerPlaybackSpeed,
     onPlay: playRun,
     onPlayFromTick: playRunFromTick,
   });
@@ -1436,7 +1444,11 @@ export function SongView() {
         return;
       }
 
-      reconnectMidi();
+      // No reconnectMidi() here: the device was never actually lost, and
+      // forcing a native MIDI port teardown/reopen on every park opens a
+      // race where the very first resume strike - the one the player is
+      // about to make, right now, to un-pause - lands in the gap and is
+      // silently dropped. See useKitInactivityRecovery's parked contract.
       pause();
       seekSeconds(
         ticksToSeconds(
@@ -1446,7 +1458,7 @@ export function SongView() {
         ) + delaySeconds,
       );
     },
-    [chart, delaySeconds, pause, reconnectMidi, seekSeconds],
+    [chart, delaySeconds, pause, seekSeconds],
   );
   const resumeAfterInactivity = useCallback(
     (checkpoint: InactivityCheckpoint) => {
@@ -1470,6 +1482,7 @@ export function SongView() {
     timeStore,
     onPark: parkForInactivity,
     onResume: resumeAfterInactivity,
+    playbackSpeed,
   });
   const inactivityPauseVeil = useInactivityPauseVeil(
     gameMode === 'practice' && inactivityRecovery.phase === 'parked'
@@ -1489,7 +1502,14 @@ export function SongView() {
       return;
     }
 
-    if (Math.abs(playbackSpeed - requestedPracticeSpeed) > 0.001) {
+    // Learner-owned tempo: a My Wave/practiceSpeed recommendation may only
+    // pre-fill a song he has never set a speed on himself. Once he has (a
+    // persisted `learnerPlaybackSpeed`), a fresh recommendation must not
+    // silently override it on this or any later launch.
+    if (
+      learnerPlaybackSpeed === null &&
+      Math.abs(playbackSpeed - requestedPracticeSpeed) > 0.001
+    ) {
       setPlaybackSpeed(requestedPracticeSpeed);
       engine?.setPlaybackSpeed(requestedPracticeSpeed);
 
@@ -1511,6 +1531,7 @@ export function SongView() {
     isPlaying,
     isReady,
     isStarted,
+    learnerPlaybackSpeed,
     playbackSpeed,
     playRun,
     requestedPracticeSpeed,
@@ -1542,7 +1563,6 @@ export function SongView() {
       inactivityRecovery.phase === 'parked' ||
       remediationSession.queue?.status === 'active',
     targetSpeed: playbackSpeed,
-    setPlaybackSpeed,
     onTutorTakeover,
     onStateChange: onTutorStateChange,
     settings: {
@@ -1603,8 +1623,12 @@ export function SongView() {
         qualityProgress: recovery.qualityProgress,
         requiredCleanPasses:
           tutorSession.state.settings.requiredCleanRepetitions,
-        currentSpeed: tutorSession.state.currentSpeed,
-        targetSpeed: tutorSession.state.targetSpeed,
+        // Learner-owned tempo: recovery never changes playback speed, so the
+        // only truthful number here is the player's own live speed - never
+        // the tutor's internal (recommendation-only) currentSpeed/targetSpeed,
+        // which can go stale the moment the player moves the slider mid-run.
+        currentSpeed: playbackSpeed,
+        targetSpeed: playbackSpeed,
         retainedQuality:
           lastAttempt?.result === 'retry' && recovery.qualityProgress > 0,
       };
@@ -1619,8 +1643,10 @@ export function SongView() {
         qualityProgress: outcome.qualityProgress,
         requiredCleanPasses:
           tutorSession.state.settings.requiredCleanRepetitions,
-        currentSpeed: outcome.resumeSpeed,
-        targetSpeed: tutorSession.state.targetSpeed,
+        // Same reasoning as above: outcome.resumeSpeed is the tutor's
+        // internal record, not necessarily what is actually playing now.
+        currentSpeed: playbackSpeed,
+        targetSpeed: playbackSpeed,
         phase: 'release',
       };
     }
@@ -1783,15 +1809,15 @@ export function SongView() {
       const kitName =
         selectedDevice?.sourceId === 'midi' ? selectedDevice.name : undefined;
 
+      // parkForInactivity no longer reconnects the MIDI port on park (that
+      // teardown/reopen raced the very resume strike this caption asks for
+      // - see the comment there), so this copy must not claim a reopen that
+      // never happens.
       return {
-        title: kitName
-          ? 'Paused — checking kit input'
-          : 'Paused — no hits detected',
-        detail: `Rewound to bar ${inactivityRecovery.checkpointMeasure + 1}.${
-          kitName
-            ? ` Reopening ${kitName}; hit any pad to count in and resume.`
-            : ' Hit any pad to count in and resume.'
-        }`,
+        title: kitName ? `Paused — ${kitName}` : 'Paused — no hits detected',
+        detail: `Rewound to bar ${
+          inactivityRecovery.checkpointMeasure + 1
+        }. Hit any pad to count in and resume.`,
         tone: 'warning' as const,
       };
     }
@@ -2237,6 +2263,7 @@ export function SongView() {
               }
 
               setPlaybackSpeed(newValue);
+              setLearnerPlaybackSpeed(newValue);
             }}
             styles={{
               input: {

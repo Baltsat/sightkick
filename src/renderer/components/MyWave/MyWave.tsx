@@ -21,8 +21,47 @@ const SESSION_STEPS = [
   ['Play', 'payoff'],
 ] as const;
 
-function formatSpeed(speed: number) {
-  return `${speed.toFixed(1)}× speed`;
+function formatSpeed(speed: number, slowerOnPurpose: boolean) {
+  return slowerOnPurpose
+    ? `${speed.toFixed(1)}× speed — starts slower on purpose`
+    : `${speed.toFixed(1)}× speed`;
+}
+
+/**
+ * A receipt without a `candidateId` is next-practice's own honest fallback
+ * copy (see `home-session.ts`'s `payoffReceipt`/`focusReceipt`/`buildReceipt`
+ * — the literal strings live there, out of this component's scope), not a
+ * ranked recommendation. It must never share the numbered, achievement-style
+ * treatment of a real step — see the acceptance rule against a dead-end
+ * claim ("no musical payoff yet") dressed up as a payoff.
+ */
+function isPlaceholderReceipt(receipt: { candidateId?: string }): boolean {
+  return receipt.candidateId === undefined;
+}
+
+/**
+ * True when the launch's own evidence says this recommendation is thin —
+ * either the ranker's own confidence is low, or every scoring factor
+ * contributed nothing (the exact shape of `recommend.ts`'s generic
+ * fallback reason, "the highest-scoring available option"). Both are
+ * read straight off `RankedPracticeCandidate`; nothing here is guessed.
+ */
+function thinEvidenceDetail(
+  launch: OneKickHomeSession['launch'],
+): string | undefined {
+  const confidence = launch.confidence;
+
+  if (!confidence) {
+    return undefined;
+  }
+
+  const noPositiveFactor =
+    launch.factors !== undefined &&
+    !launch.factors.some((factor) => factor.contribution > 0);
+
+  return confidence.level === 'low' || noPositiveFactor
+    ? confidence.detail
+    : undefined;
 }
 
 export function MyWave({
@@ -66,6 +105,10 @@ export function MyWave({
 
   const launchKind =
     session.launch.candidate.kind === 'lesson' ? 'Lesson' : 'Song';
+  const slowerOnPurpose = Boolean(
+    session.launch.decisionReceipt?.scaffold.steps.includes('slower_tempo'),
+  );
+  const honestyDetail = thinEvidenceDetail(session.launch);
 
   return (
     <section
@@ -81,22 +124,33 @@ export function MyWave({
         </p>
         <h1 id="my-wave-title">{session.launch.candidate.title}</h1>
         <p className="my-wave__meta">
-          {launchKind} · {formatSpeed(session.launchSpeed)}
+          {launchKind} · {formatSpeed(session.launchSpeed, slowerOnPurpose)}
         </p>
       </header>
 
       <section className="my-wave__reason" aria-label="Why this is next">
         <p>Why this now</p>
         <strong data-testid="my-wave-reason">{session.reason}</strong>
+        {honestyDetail && (
+          <small
+            className="my-wave__honesty"
+            data-testid="my-wave-thin-evidence"
+          >
+            {honestyDetail}
+          </small>
+        )}
       </section>
 
       <ol className="my-wave__path" aria-label="This session">
         {SESSION_STEPS.map(([label, key], index) => {
           const receipt = session[key];
+          const placeholder = isPlaceholderReceipt(receipt);
 
           return (
-            <li key={key}>
-              <span>{String(index + 1).padStart(2, '0')}</span>
+            <li key={key} data-placeholder={placeholder || undefined}>
+              <span>
+                {placeholder ? '—' : String(index + 1).padStart(2, '0')}
+              </span>
               <div>
                 <small>{label}</small>
                 <strong>{receipt.title}</strong>

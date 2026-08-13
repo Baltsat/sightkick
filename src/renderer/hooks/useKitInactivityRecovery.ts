@@ -36,6 +36,16 @@ interface UseKitInactivityRecoveryParams {
   timeStore: TimeStore;
   onPark: (checkpoint: InactivityCheckpoint) => void;
   onResume: (checkpoint: InactivityCheckpoint) => void;
+  /**
+   * `timeStore` reports song time, which advances at `playbackSpeed` times
+   * real wall-clock time (see SpeedAudioPlayer.currentTime). Scaling the
+   * threshold by the same factor is what makes the "real time" the doc
+   * comment above promises actually real: at a beginner's 0.7x, waiting for
+   * 2.25s of *song* time to elapse takes ~3.2 real seconds, doubling the
+   * pause-by-stopping response exactly in the practice-speed range this app
+   * steers beginners toward. Defaults to 1 (unscaled) for existing callers.
+   */
+  playbackSpeed?: number;
 }
 
 export function expectedHeadsBetween(
@@ -107,6 +117,7 @@ export function useKitInactivityRecovery({
   timeStore,
   onPark,
   onResume,
+  playbackSpeed = 1,
 }: UseKitInactivityRecoveryParams): KitInactivityState {
   const listening = { phase: 'listening' } as const;
   const [stateSnapshot, setStateSnapshot] = useState<InactivityStateSnapshot>(
@@ -116,6 +127,12 @@ export function useKitInactivityRecovery({
     stateSnapshot.enabled === enabled ? stateSnapshot.state : listening;
   const stateRef = useRef<KitInactivityState>(state);
   const isPlayingRef = useRef(isPlaying);
+  const playbackSpeedRef = useRef(playbackSpeed);
+
+  useEffect(() => {
+    playbackSpeedRef.current = playbackSpeed;
+  }, [playbackSpeed]);
+
   const lastActivitySecondsRef = useRef(0);
   const lastActivityTickRef = useRef(0);
   const parkedEpochRef = useRef(0);
@@ -254,9 +271,13 @@ export function useKitInactivityRecovery({
         return;
       }
 
+      // currentSeconds/lastActivitySecondsRef are song time (speed-scaled);
+      // scale the real-time threshold by the same factor so the gate fires
+      // after INACTIVITY_MIN_SECONDS of actual wall-clock silence at any
+      // practice speed, not just at 1x.
       if (
         currentSeconds - lastActivitySecondsRef.current <
-        INACTIVITY_MIN_SECONDS
+        INACTIVITY_MIN_SECONDS * playbackSpeedRef.current
       ) {
         return;
       }

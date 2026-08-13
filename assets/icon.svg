@@ -1,0 +1,107 @@
+<!--
+  Drumroll app icon — master source, 1024x1024.
+
+  "Signal Disc": a warm cream-to-gold field, a thick dark ring standing in
+  for a drum rim with its tension-rod lugs, and one ember-to-gold waveform
+  spike as the signature mark. Colour tokens are lifted directly from
+  docs/visual-system-v3.md (dr-ember #e85a36, dr-count #f4bd3d,
+  dr-ink #241f19, dr-canvas / dr-paper family for the field/disc) so
+  the icon and the in-app palette are provably the same system.
+
+  Render this file at any size with rsvg-convert; for the 16px/32px
+  iconset and .ico slots use assets/icon-small.svg instead — see
+  assets/ICON_PROVENANCE.md for the full generation recipe and rationale.
+-->
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="squircleB">
+      <rect x="0" y="0" width="1024" height="1024" rx="225" ry="225" />
+    </clipPath>
+
+    <radialGradient id="fieldB" cx="40%" cy="32%" r="90%">
+      <stop offset="0%" stop-color="#fef6e6" />
+      <stop offset="48%" stop-color="#f3dda8" />
+      <stop offset="100%" stop-color="#cf9a4c" />
+    </radialGradient>
+
+    <linearGradient id="topGlossB" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18" />
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+
+    <linearGradient id="bottomVignetteB" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="66%" stop-color="#241f19" stop-opacity="0" />
+      <stop offset="100%" stop-color="#241f19" stop-opacity="0.16" />
+    </linearGradient>
+
+    <radialGradient id="discFillB" cx="46%" cy="36%" r="72%">
+      <stop offset="0%" stop-color="#fffdf7" />
+      <stop offset="100%" stop-color="#efddb6" />
+    </radialGradient>
+
+    <linearGradient id="waveGradB" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#e85a36" />
+      <stop offset="40%" stop-color="#f0913f" />
+      <stop offset="50%" stop-color="#f9d84e" />
+      <stop offset="60%" stop-color="#f0913f" />
+      <stop offset="100%" stop-color="#e85a36" />
+    </linearGradient>
+
+    <radialGradient id="sparkGlowB" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff6dc" stop-opacity="1" />
+      <stop offset="42%" stop-color="#f9d84e" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#f9d84e" stop-opacity="0" />
+    </radialGradient>
+
+    <filter id="discShadowB" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#241f19" flood-opacity="0.28" />
+    </filter>
+  </defs>
+
+  <g clip-path="url(#squircleB)">
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#fieldB)" />
+
+    <g filter="url(#discShadowB)">
+      <circle cx="512" cy="512" r="400" fill="url(#discFillB)" />
+    </g>
+
+    <circle cx="512" cy="512" r="400" fill="none" stroke="#241f19" stroke-width="58" />
+    <circle cx="512" cy="512" r="360" fill="none" stroke="#f4bd3d" stroke-width="6" stroke-opacity="0.45" />
+
+    <!-- rim lugs: the tension-rod cue that says "drum", not just "signal" -->
+    <g fill="#c9962c">
+      <circle cx="512" cy="112" r="19" />
+      <circle cx="795" cy="229" r="19" />
+      <circle cx="912" cy="512" r="19" />
+      <circle cx="795" cy="795" r="19" />
+      <circle cx="512" cy="912" r="19" />
+      <circle cx="229" cy="795" r="19" />
+      <circle cx="112" cy="512" r="19" />
+      <circle cx="229" cy="229" r="19" />
+    </g>
+
+    <!-- ember waveform: a struck transient, not a cardiac trace — the
+         baseline rises into one smooth flame-shaped spike, everything
+         above the line, so it reads as a sound hit, never a heart-monitor
+         blip -->
+    <path d="M 140 512
+             C 200 512 230 500 268 508
+             C 300 516 322 512 356 512
+             L 400 512
+             C 432 512 440 400 468 350
+             C 488 314 500 300 512 296
+             C 524 300 536 314 556 350
+             C 584 400 592 512 624 512
+             L 668 512
+             C 700 512 722 508 754 512
+             C 786 516 808 512 884 512"
+          fill="none" stroke="url(#waveGradB)" stroke-width="34"
+          stroke-linecap="round" stroke-linejoin="round" />
+
+    <circle cx="512" cy="296" r="60" fill="url(#sparkGlowB)" />
+    <circle cx="512" cy="296" r="17" fill="#fff8e6" />
+
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#topGlossB)" />
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#bottomVignetteB)" />
+  </g>
+</svg>

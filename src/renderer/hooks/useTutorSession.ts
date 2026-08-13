@@ -40,8 +40,12 @@ interface UseTutorSessionParams {
   enabled: boolean;
   /** Temporarily stop observing without resetting accumulated tutor evidence. */
   suspended?: boolean;
+  /**
+   * The learner's own live speed, mirrored into the reducer for honest
+   * messaging/evidence only. The tutor has no speed setter at all - it is
+   * structurally unable to change playback speed; see `executeCommand`.
+   */
   targetSpeed: number;
-  setPlaybackSpeed: (speed: number) => void;
   onTutorTakeover?: () => void;
   /** Synchronous evidence handoff used by SongView's end-of-run callback. */
   onStateChange?: (state: TutorState) => void;
@@ -172,17 +176,19 @@ export function messageForTutorCommand(
         type: 'material-failure',
         trigger: command.recovery.trigger,
         livesRemaining: 0,
-      })} ${checkpointReason} Replay ends at bar ${recoveryEnd}; first pass stays at ${percent(
-        command.speed,
-      )} to confirm the pattern before any slowdown. Take a breath, then listen for the count-in before playing.`,
+      })} ${checkpointReason} Replay ends at bar ${recoveryEnd}, played at your own speed - nothing changes your tempo automatically. Take a breath, then listen for the count-in before playing.`,
       tone: 'recovery',
     };
   }
 
   if (command.type === 'repeat-recovery') {
     const qualityPass = command.attempt.result === 'clean';
-    const previousSpeed = percent(command.attempt.speed);
-    const nextSpeed = percent(command.speed);
+    const heldSpeed = percent(command.attempt.speed);
+    // command.speed is the tutor's own recommendation, never applied - the
+    // player's speed control is the only thing that changes tempo. Offer it
+    // as a one-line suggestion only when it actually differs from what they
+    // are already playing.
+    const suggestedSpeed = percent(command.speed);
     const stats = command.attempt.stats;
     const attemptEvidence = `${stats.resolved} resolved notes, ${percent(
       stats.accuracy,
@@ -194,31 +200,27 @@ export function messageForTutorCommand(
       settings.requiredCleanRepetitions,
       command.recovery.qualityProgress,
     );
-    const speedChanged =
+    const suggestionDiffers =
       Math.abs(command.speed - command.attempt.speed) > 0.001;
 
     return {
-      title: qualityPass
-        ? 'Quality pass saved'
-        : speedChanged
-        ? 'Tempo adjusted'
-        : 'One more focused pass',
+      title: qualityPass ? 'Quality pass saved' : 'One more focused pass',
       detail: qualityPass
         ? `${retainedProgress.toFixed(1)} of ${
             settings.requiredCleanRepetitions
           } pattern progress; this pass met ${qualityPredicate(settings)}. ${
-            command.speed > command.attempt.speed
-              ? `Raise from ${previousSpeed} to ${nextSpeed} for the next controlled step.`
-              : `Hold ${nextSpeed}; one useful repetition remains.`
+            suggestionDiffers
+              ? `${suggestedSpeed} could suit the next repetition - your speed control, your call.`
+              : `Holding ${heldSpeed}; one useful repetition remains.`
           }`
         : `This pass was close, not erased: ${retainedProgress.toFixed(1)} of ${
             settings.requiredCleanRepetitions
           } progress remains (${attemptEvidence}; a quality pass is ${qualityPredicate(
             settings,
           )}). ${
-            speedChanged
-              ? `Lower from ${previousSpeed} to ${nextSpeed} for a playable next lead-in.`
-              : `Hold ${nextSpeed} for one focused pass, then continue.`
+            suggestionDiffers
+              ? `Try ${suggestedSpeed} on the next pass if ${heldSpeed} feels rushed - your call.`
+              : `Holding ${heldSpeed} for one focused pass, then continue.`
           }`,
       tone: 'recovery',
     };
@@ -233,9 +235,7 @@ export function messageForTutorCommand(
         title: 'Phrase saved for focus work',
         detail: `${failedAttempts} failed recovery ${
           failedAttempts === 1 ? 'attempt reached' : 'attempts reached'
-        } the configured ${maximumFailedAttempts}-attempt safety limit. Continuing at ${percent(
-          command.speed,
-        )} without trapping you here.${
+        } the configured ${maximumFailedAttempts}-attempt safety limit. Continuing at your own speed without trapping you here.${
           settings.livesEnabled
             ? ` Checkpoint lives refilled to ${settings.startingLives}.`
             : ''
@@ -250,9 +250,7 @@ export function messageForTutorCommand(
         settings.requiredCleanRepetitions
       } quality passes met the learning rule (${qualityPredicate(
         settings,
-      )}). Continuing from the next musical bar at ${percent(
-        command.speed,
-      )}; tempo only rises one step after strong evidence.`,
+      )}). Continuing from the next musical bar at your own speed.`,
       tone: 'success',
     };
   }
@@ -287,30 +285,47 @@ class TutorSessionStore {
     this.snapshot = { state, message: INITIAL_MESSAGE };
   }
 
+  /**
+   * Keeps the reducer's speed bookkeeping honest against the learner's own
+   * speed control. The first call per session seeds the run (`start`, which
+   * also resets evidence - correct exactly once, before any judgement
+   * exists). Every later call - including a mid-run manual speed change -
+   * only refreshes the number via the lightweight `speed-changed` event,
+   * which never resets judgements/interventions/recoveryAttempts. The tutor
+   * itself never calls this to change speed; it only ever reflects what the
+   * player already set (see useTutorSession.executeCommand).
+   */
   syncTargetSpeed(targetSpeed: number): boolean {
-    const state = this.snapshot.state;
     const normalizedTarget =
       Math.round(Math.min(2, Math.max(0.3, targetSpeed)) * 10) / 10;
-    const canRetargetUnplayedRun =
-      state.phase === 'observing' &&
-      state.lastCompletedMeasure < 0 &&
-      Object.keys(state.judgementsByMeasure).length === 0 &&
-      state.interventions.length === 0 &&
-      state.recoveryAttempts.length === 0;
+
+    if (!this.started) {
+      this.started = true;
+      this.snapshot = {
+        ...this.snapshot,
+        state: transitionTutor(
+          this.snapshot.state,
+          { type: 'start', targetSpeed: normalizedTarget },
+          this.chartPlan,
+        ).state,
+      };
+      this.listeners.forEach((listener) => listener());
+
+      return true;
+    }
 
     if (
-      this.started &&
-      (!canRetargetUnplayedRun || state.targetSpeed === normalizedTarget)
+      this.snapshot.state.currentSpeed === normalizedTarget &&
+      this.snapshot.state.targetSpeed === normalizedTarget
     ) {
       return false;
     }
 
-    this.started = true;
     this.snapshot = {
       ...this.snapshot,
       state: transitionTutor(
         this.snapshot.state,
-        { type: 'start', targetSpeed: normalizedTarget },
+        { type: 'speed-changed', speed: normalizedTarget },
         this.chartPlan,
       ).state,
     };
@@ -362,7 +377,6 @@ export function useTutorSession({
   enabled,
   suspended = false,
   targetSpeed,
-  setPlaybackSpeed,
   onTutorTakeover,
   onStateChange,
   settings = {},
@@ -432,11 +446,14 @@ export function useTutorSession({
         command.type === 'begin-recovery' ||
         command.type === 'repeat-recovery'
       ) {
+        // Learner-owned tempo: recovery only ever moves the playhead. It
+        // must never call engine.setPlaybackSpeed - whatever speed the
+        // player is already at (theirs to set, on the transport controls)
+        // is exactly the speed the replay plays at. `command.speed` remains
+        // available to messageForTutorCommand as a recommendation only.
         onTutorTakeover?.();
         engine.pause();
         engine.setLoopRegion(undefined);
-        engine.setPlaybackSpeed(command.speed);
-        setPlaybackSpeed(command.speed);
         window.clearTimeout(recoveryTimerRef.current);
         recoveryTimerRef.current = window.setTimeout(() => {
           recoveryTimerRef.current = undefined;
@@ -451,8 +468,6 @@ export function useTutorSession({
         recoveryTimerRef.current = undefined;
         engine.pause();
         engine.setLoopRegion(undefined);
-        engine.setPlaybackSpeed(command.speed);
-        setPlaybackSpeed(command.speed);
 
         // A recovery that reaches the final bar has nowhere else to resume.
         // The synchronous run-ending handshake will commit Results after the
@@ -463,7 +478,7 @@ export function useTutorSession({
         }
       }
     },
-    [engine, onTutorTakeover, setPlaybackSpeed],
+    [engine, onTutorTakeover],
   );
   const send = useCallback(
     (event: TutorEvent) => {

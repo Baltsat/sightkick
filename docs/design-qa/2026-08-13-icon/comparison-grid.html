@@ -1,0 +1,165 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Drumroll app icon — kb.5 vs current vs winner</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #ffffff;
+        font-family: -apple-system, sans-serif;
+        color: #1a1a1a;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 4px;
+      }
+      p.sub {
+        font-size: 13px;
+        color: #666;
+        margin: 0 0 28px;
+      }
+      table {
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        padding: 14px 22px;
+        text-align: center;
+        vertical-align: middle;
+        border-bottom: 1px solid #eee;
+      }
+      th {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #888;
+        font-weight: 600;
+      }
+      td.rowlabel {
+        text-align: left;
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      td.rowsub {
+        display: block;
+        font-size: 11px;
+        font-weight: 400;
+        color: #888;
+        margin-top: 2px;
+      }
+      .cb {
+        display: inline-block;
+        background-image:
+          linear-gradient(45deg, #ddd 25%, transparent 25%),
+          linear-gradient(-45deg, #ddd 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, #ddd 75%),
+          linear-gradient(-45deg, transparent 75%, #ddd 75%);
+        background-size: 8px 8px;
+        background-position:
+          0 0,
+          0 4px,
+          4px -4px,
+          -4px 0px;
+        border-radius: 4px;
+      }
+      img {
+        display: block;
+        image-rendering: pixelated;
+      }
+      img.smooth {
+        image-rendering: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>
+      Drumroll app icon — kb.5 vs current (kb.9) vs winner (kb.13 candidate B,
+      "Signal Disc")
+    </h1>
+    <p class="sub">
+      Each cell is the actual shipped-resolution PNG, unscaled in the DOM, shown
+      at native pixel size against a checkerboard so corner transparency is
+      visible. Generated 2026-08-13.
+    </p>
+    <table>
+      <tr>
+        <th></th>
+        <th>16 &times; 16</th>
+        <th>32 &times; 32</th>
+        <th>128 &times; 128</th>
+      </tr>
+      <tr>
+        <td class="rowlabel">
+          kb.5<span class="rowsub"
+            >recovered: git show 025c384:assets/icon.png</span
+          >
+        </td>
+        <td>
+          <span class="cb"
+            ><img src="reference-sources/kb5-downscaled/kb5-16.png" width="16" height="16"
+          /></span>
+        </td>
+        <td>
+          <span class="cb"
+            ><img src="reference-sources/kb5-downscaled/kb5-32.png" width="32" height="32"
+          /></span>
+        </td>
+        <td>
+          <span class="cb"
+            ><img src="reference-sources/kb5-downscaled/kb5-128.png" width="128" height="128"
+          /></span>
+        </td>
+      </tr>
+      <tr>
+        <td class="rowlabel">
+          current (kb.9→kb.13)<span class="rowsub"
+            >shipped in 5abdfc4, the rejected icon</span
+          >
+        </td>
+        <td>
+          <span class="cb"
+            ><img src="reference-sources/current-downscaled/current-16.png" width="16" height="16"
+          /></span>
+        </td>
+        <td>
+          <span class="cb"
+            ><img src="reference-sources/current-downscaled/current-32.png" width="32" height="32"
+          /></span>
+        </td>
+        <td>
+          <span class="cb"
+            ><img
+              src="reference-sources/current-downscaled/current-128.png"
+              width="128"
+              height="128"
+          /></span>
+        </td>
+      </tr>
+      <tr>
+        <td class="rowlabel">
+          winner — shipped now<span class="rowsub"
+            >assets/icon.iconset, exact production files</span
+          >
+        </td>
+        <td>
+          <span class="cb"
+            ><img src="winner-shipped/16.png" width="16" height="16"
+          /></span>
+        </td>
+        <td>
+          <span class="cb"
+            ><img src="winner-shipped/32.png" width="32" height="32"
+          /></span>
+        </td>
+        <td>
+          <span class="cb"
+            ><img src="winner-shipped/128.png" width="128" height="128"
+          /></span>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

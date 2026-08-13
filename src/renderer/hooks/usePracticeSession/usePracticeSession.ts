@@ -35,6 +35,13 @@ interface UsePracticeSessionParams {
   initialPlaybackSpeed?: number;
   onPlay?: () => void;
   onPlayFromTick?: (tick: number) => void;
+  /**
+   * Fired only for a genuine learner-driven speed change (the speed control
+   * or the faster/slower shortcut) - never for a programmatic pre-fill or
+   * recommendation apply. The caller uses this to persist "his" speed, per
+   * the learner-owned-tempo rule: it stays until *he* changes it.
+   */
+  onExplicitSpeedChange?: (speed: number) => void;
 }
 
 interface UsePracticeSessionResult {
@@ -61,6 +68,7 @@ export function usePracticeSession({
   initialPlaybackSpeed = 1,
   onPlay,
   onPlayFromTick,
+  onExplicitSpeedChange,
 }: UsePracticeSessionParams): UsePracticeSessionResult {
   const [focusIndex, setFocusIndex] = useState<number>();
   const [loopAnchor, setLoopAnchor] = useState<number>();
@@ -222,15 +230,22 @@ export function usePracticeSession({
       engine?.pause();
     }
   };
-  const stepSpeed = useCallback((direction: 1 | -1) => {
-    setPlaybackSpeed((speed) =>
-      clamp(
-        Math.round((speed + direction * SPEED_STEP) * 10) / 10,
-        MIN_SPEED,
-        MAX_SPEED,
-      ),
-    );
-  }, []);
+  const stepSpeed = useCallback(
+    (direction: 1 | -1) => {
+      setPlaybackSpeed((speed) => {
+        const next = clamp(
+          Math.round((speed + direction * SPEED_STEP) * 10) / 10,
+          MIN_SPEED,
+          MAX_SPEED,
+        );
+
+        onExplicitSpeedChange?.(next);
+
+        return next;
+      });
+    },
+    [onExplicitSpeedChange],
+  );
   const controlHandlers: InputControlHandlers = {
     up: () => moveFocus('up'),
     down: () => moveFocus('down'),

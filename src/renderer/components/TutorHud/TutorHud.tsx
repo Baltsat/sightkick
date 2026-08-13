@@ -1,6 +1,14 @@
-import { useId } from 'react';
+import { CSSProperties, useId, useMemo } from 'react';
 import { TutorHudMessage } from '../../hooks/useTutorSession';
 import { TutorState } from '../../services/tutor';
+import {
+  KIT_ELEMENT_COLOR_VAR,
+  KIT_ELEMENT_LABEL,
+  MistakeEvidence,
+  describeMistake,
+  lastScoreableMistake,
+} from '../../services/pedagogy';
+import { KitElement } from '../../services/practice-stats';
 import { KitCommandPromptModel } from '../KitCommandPrompt';
 import '../PracticeEdgeCaption/PracticeEdgeCaption.css';
 import './TutorHud.css';
@@ -19,6 +27,67 @@ interface TutorHudProps {
     title: string;
     detail: string;
   };
+}
+
+function ElementChip({
+  element,
+  roleLabel,
+}: {
+  element: KitElement;
+  roleLabel: string;
+}) {
+  return (
+    <span className="drumroll-tutor-hud__mistake-chip">
+      <span
+        className="drumroll-tutor-hud__mistake-swatch"
+        style={
+          {
+            '--mistake-swatch-color': KIT_ELEMENT_COLOR_VAR[element],
+          } as CSSProperties
+        }
+        aria-hidden="true"
+      />
+      <span className="drumroll-tutor-hud__mistake-chip-role">{roleLabel}</span>
+      <strong>{KIT_ELEMENT_LABEL[element]}</strong>
+    </span>
+  );
+}
+
+/**
+ * The player's own resume/correction instruction is the primary message and
+ * must never be displaced. This disclosure is deliberately quiet and
+ * collapsed by default — see the design acceptance rule "detail is
+ * reachable, never preloaded". It only renders once real, judged evidence
+ * exists (`describeMistake` returning undefined means Judge itself couldn't
+ * say anything truthful about the strike).
+ */
+function TutorMistakeDisclosure({ mistake }: { mistake: MistakeEvidence }) {
+  return (
+    <details
+      className="drumroll-tutor-hud__mistake"
+      data-testid="tutor-mistake"
+    >
+      <summary data-testid="tutor-mistake-summary">
+        <span className="drumroll-tutor-hud__mistake-summary-label">Why</span>
+        <span className="drumroll-tutor-hud__mistake-summary-title">
+          {mistake.title}
+        </span>
+      </summary>
+      <div className="drumroll-tutor-hud__mistake-body">
+        {mistake.expectedElement && (
+          <ElementChip
+            element={mistake.expectedElement}
+            roleLabel="Score called for"
+          />
+        )}
+        {mistake.actualElement && (
+          <ElementChip element={mistake.actualElement} roleLabel="You hit" />
+        )}
+        <p>{mistake.detail}</p>
+        <p className="drumroll-tutor-hud__mistake-check">{mistake.check}</p>
+      </div>
+    </details>
+  );
 }
 
 function labelForPhase(phase: TutorState['phase']) {
@@ -42,6 +111,11 @@ export function TutorHud({
 }: TutorHudProps) {
   const titleId = useId();
   const detailId = useId();
+  const mistake = useMemo(() => {
+    const judgement = lastScoreableMistake(state.judgementsByMeasure);
+
+    return judgement ? describeMistake(judgement) : undefined;
+  }, [state.judgementsByMeasure]);
 
   if (
     state.phase === 'off' &&
@@ -102,6 +176,7 @@ export function TutorHud({
       <span id={detailId} className="drumroll-practice-edge-caption__detail">
         {caption.detail}
       </span>
+      {mistake && <TutorMistakeDisclosure mistake={mistake} />}
     </aside>
   );
 }

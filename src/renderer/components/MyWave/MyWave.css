@@ -89,6 +89,18 @@
   line-height: 1.15;
 }
 
+/* Honest evidence disclosure — shown only when the recommendation's own
+   confidence is low or no scoring factor actually contributed. Quiet by
+   design: it never competes with the reason above it. */
+.my-wave__honesty {
+  display: block;
+  margin-top: 0.4rem;
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+  font-style: italic;
+  line-height: 1.35;
+}
+
 .my-wave__path {
   display: grid;
   min-width: 0;
@@ -116,6 +128,26 @@
   font-size: 0.68rem;
   font-weight: 850;
   letter-spacing: 0.08em;
+}
+
+/* A placeholder receipt (no ranked candidateId behind it — see
+   `isPlaceholderReceipt` in MyWave.tsx) is a truthful neutral state, not an
+   achievement. It must not read as an equal, numbered step: no wine
+   accent, no raised shadow, a dashed edge instead of a solid one. */
+.my-wave__path li[data-placeholder] {
+  border-left-color: var(--line-soft);
+  border-left-style: dashed;
+  background: transparent;
+  box-shadow: none;
+}
+
+.my-wave__path li[data-placeholder] > span {
+  color: var(--ink-muted);
+}
+
+.my-wave__path li[data-placeholder] strong {
+  color: var(--ink-muted);
+  font-weight: 550;
 }
 
 .my-wave__path li div {

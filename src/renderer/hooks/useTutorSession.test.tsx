@@ -97,7 +97,6 @@ function emitPass(engine: TutorEngineProbe, verdict: 'hit' | 'miss') {
 describe('useTutorSession run-ending handshake', () => {
   it('leaves an identical failed run untouched when the tutor is disabled', () => {
     const probe = new TutorEngineProbe();
-    const setPlaybackSpeed = vi.fn();
     const { result } = renderHook(() =>
       useTutorSession({
         engine: probe as unknown as Engine,
@@ -107,7 +106,6 @@ describe('useTutorSession run-ending handshake', () => {
         delaySeconds: 0,
         enabled: false,
         targetSpeed: 1,
-        setPlaybackSpeed,
       }),
     );
     let mayCommit = false;
@@ -122,7 +120,7 @@ describe('useTutorSession run-ending handshake', () => {
     expect(probe.pause).not.toHaveBeenCalled();
     expect(probe.setLoopRegion).not.toHaveBeenCalled();
     expect(probe.playFromTick).not.toHaveBeenCalled();
-    expect(setPlaybackSpeed).not.toHaveBeenCalled();
+    expect(probe.setPlaybackSpeed).not.toHaveBeenCalled();
   });
 
   it('retargets an unplayed run before accepting the first judgement', async () => {
@@ -137,7 +135,6 @@ describe('useTutorSession run-ending handshake', () => {
           delaySeconds: 0,
           enabled: true,
           targetSpeed,
-          setPlaybackSpeed: vi.fn(),
         }),
       { initialProps: { targetSpeed: 1 } },
     );
@@ -153,11 +150,10 @@ describe('useTutorSession run-ending handshake', () => {
     });
   });
 
-  it('recovers a final-bar failure, repeats cleanly, and commits Results exactly once after release', () => {
+  it('recovers a final-bar failure, repeats cleanly, and commits Results exactly once after release - without ever touching playback speed', () => {
     vi.useFakeTimers();
 
     const probe = new TutorEngineProbe();
-    const setPlaybackSpeed = vi.fn();
     const { result } = renderHook(() =>
       useTutorSession({
         engine: probe as unknown as Engine,
@@ -167,7 +163,6 @@ describe('useTutorSession run-ending handshake', () => {
         delaySeconds: 0,
         enabled: true,
         targetSpeed: 1,
-        setPlaybackSpeed,
       }),
     );
     let firstCommit = true;
@@ -210,7 +205,80 @@ describe('useTutorSession run-ending handshake', () => {
     expect(releasedCommit).toBe(true);
     expect(result.current.state.phase).toBe('complete');
     expect(probe.playFromTick).toHaveBeenCalledTimes(2);
-    expect(setPlaybackSpeed).toHaveBeenLastCalledWith(1);
+    // Learner-owned tempo: material-failure, begin-recovery, repeat-recovery
+    // and resume-main all fired across this run, and none of them may ever
+    // command the engine's playback speed.
+    expect(probe.setPlaybackSpeed).not.toHaveBeenCalled();
+  });
+
+  it('drives a full failing-and-recovering run at a learner-chosen 0.7x and never moves the speed on its own, including a mid-run manual change', () => {
+    vi.useFakeTimers();
+
+    const probe = new TutorEngineProbe();
+    const { result, rerender } = renderHook(
+      ({ targetSpeed }) =>
+        useTutorSession({
+          engine: probe as unknown as Engine,
+          runKey: 'learner-owned-tempo',
+          chart,
+          measures,
+          delaySeconds: 0,
+          enabled: true,
+          targetSpeed,
+        }),
+      { initialProps: { targetSpeed: 0.7 } },
+    );
+
+    expect(result.current.state.currentSpeed).toBe(0.7);
+
+    // Fail the first phrase: material-failure -> begin-recovery.
+    act(() => {
+      emitPass(probe, 'miss');
+      probe.finish();
+    });
+
+    expect(result.current.state.phase).toBe('recovering');
+    act(() => vi.advanceTimersByTime(RECOVERY_PREVIEW_MS));
+    expect(probe.playFromTick).toHaveBeenCalledTimes(1);
+
+    // Mid-run: he reaches over and slows down further himself, on the real
+    // speed control - not through the tutor. His choice must land and stick.
+    rerender({ targetSpeed: 0.5 });
+    expect(result.current.state.currentSpeed).toBe(0.5);
+
+    // First recovery attempt fails again -> repeat-recovery.
+    act(() => {
+      emitPass(probe, 'miss');
+      probe.finish();
+    });
+
+    expect(result.current.state.phase).toBe('recovering');
+    act(() => vi.advanceTimersByTime(RECOVERY_PREVIEW_MS));
+    expect(probe.playFromTick).toHaveBeenCalledTimes(2);
+
+    // Two clean passes release him back to the song (resume-main), then the
+    // song completes.
+    act(() => {
+      emitPass(probe, 'hit');
+      probe.finish();
+    });
+    act(() => vi.advanceTimersByTime(RECOVERY_PREVIEW_MS));
+
+    let finalCommit = false;
+
+    act(() => {
+      emitPass(probe, 'hit');
+      finalCommit = probe.finish();
+    });
+
+    expect(finalCommit).toBe(true);
+    expect(result.current.state.phase).toBe('complete');
+    // The whole run failed, recovered twice, and released - and his speed
+    // control (mocked here as the `rerender`d targetSpeed prop) is the only
+    // thing that ever moved. The engine's own setPlaybackSpeed must never
+    // have been called by any of it.
+    expect(probe.setPlaybackSpeed).not.toHaveBeenCalled();
+    expect(result.current.state.currentSpeed).toBe(0.5);
   });
 
   it('replaces a completed run store after commit without updating state during render', async () => {
@@ -225,7 +293,6 @@ describe('useTutorSession run-ending handshake', () => {
           delaySeconds: 0,
           enabled: true,
           targetSpeed: 1,
-          setPlaybackSpeed: vi.fn(),
         }),
       {
         initialProps: { runKey: 'first-run' },
@@ -265,7 +332,6 @@ describe('useTutorSession run-ending handshake', () => {
         delaySeconds: 0,
         enabled: true,
         targetSpeed: 1,
-        setPlaybackSpeed: vi.fn(),
       }),
     );
 
@@ -319,7 +385,7 @@ describe('Tutor HUD evidence messages', () => {
     bestQuality: 0.9,
   };
 
-  it('names the trigger counts, checkpoint, lead-in, and first-pass speed rationale', () => {
+  it('names the trigger counts and checkpoint lead-in, and never claims an automatic speed change', () => {
     const material: TutorCommand = {
       type: 'material-failure',
       trigger,
@@ -345,7 +411,10 @@ describe('Tutor HUD evidence messages', () => {
     ).toContain('Checkpoint bar 3 gives 1 lead-in bar before failed bars 4–5');
     expect(
       messageForTutorCommand(rewind, DEFAULT_TUTOR_SETTINGS)?.detail,
-    ).toContain('first pass stays at 80% to confirm the pattern');
+    ).toContain('played at your own speed');
+    expect(
+      messageForTutorCommand(rewind, DEFAULT_TUTOR_SETTINGS)?.detail,
+    ).not.toMatch(/80%/);
     expect(
       messageForTutorCommand(rewind, DEFAULT_TUTOR_SETTINGS)?.detail,
     ).toContain('listen for the count-in before playing');

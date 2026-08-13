@@ -1,4 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  KIT_ELEMENT_COLOR_VAR,
+  KIT_ELEMENT_LABEL,
+} from '../../services/pedagogy';
+import type { KitElement } from '../../services/practice-stats';
 import './NotationGlossary.css';
 
 export const NOTATION_GLOSSARY_DELAY_MS = 500;
@@ -18,10 +23,38 @@ export const NOTATION_KINDS = [
 
 export type NotationKind = (typeof NOTATION_KINDS)[number];
 
+/**
+ * Optional per-hover identity for a `colored-head` glyph. When a caller
+ * marks the hovered note head with `data-notation-element="snare"` (any
+ * `KitElement` value), the glossary names that exact drum and its kit
+ * colour instead of the generic "color names the drum lane" copy. This is
+ * currently a producer-less contract: no renderer sets the attribute yet,
+ * so every existing hover keeps its unchanged generic behaviour. It exists
+ * so a lane that owns note-head rendering (`SheetMusic`/`ContinuousNotation`,
+ * outside this component's scope) can wire mistake-specific guidance onto a
+ * judged-wrong note head without needing to touch this file.
+ */
+function isKitElement(value: string): value is KitElement {
+  return value in KIT_ELEMENT_LABEL;
+}
+
+function elementForTarget(target: EventTarget | null): KitElement | undefined {
+  if (!(target instanceof Element)) {
+    return undefined;
+  }
+
+  const raw = target
+    .closest('[data-notation-element]')
+    ?.getAttribute('data-notation-element');
+
+  return raw && isKitElement(raw) ? raw : undefined;
+}
+
 export interface NotationGlossaryIntent {
   kind: NotationKind;
   x: number;
   y: number;
+  element?: KitElement;
 }
 
 const notationCopy: Record<NotationKind, { title: string; detail: string }> = {
@@ -145,13 +178,17 @@ export function useNotationGlossaryIntent(
         return;
       }
 
-      if (intent?.kind === kind || pendingRef.current?.kind === kind) {
+      const element = elementForTarget(target);
+      const sameAsCurrent = (candidate: NotationGlossaryIntent | undefined) =>
+        candidate?.kind === kind && candidate.element === element;
+
+      if (sameAsCurrent(intent) || sameAsCurrent(pendingRef.current)) {
         return;
       }
 
       clear();
 
-      const next = { kind, x, y };
+      const next = { kind, x, y, ...(element ? { element } : {}) };
 
       pendingRef.current = next;
       timerRef.current = window.setTimeout(() => {
@@ -160,7 +197,7 @@ export function useNotationGlossaryIntent(
         setIntent(next);
       }, delayMs);
     },
-    [clear, delayMs, intent?.kind],
+    [clear, delayMs, intent],
   );
 
   useEffect(() => clear, [clear]);
@@ -168,7 +205,13 @@ export function useNotationGlossaryIntent(
   return { intent, observe, dismiss: clear };
 }
 
-function NotationGlyph({ kind }: { kind: NotationKind }) {
+function NotationGlyph({
+  kind,
+  element,
+}: {
+  kind: NotationKind;
+  element?: KitElement;
+}) {
   if (kind === 'accent') {
     return (
       <svg viewBox="0 0 96 64" aria-hidden="true">
@@ -237,6 +280,17 @@ function NotationGlyph({ kind }: { kind: NotationKind }) {
   const dot = kind === 'dot';
   const colors = kind === 'colored-head';
   const grace = kind === 'grace';
+  // A known element paints the exact kit lane colour instead of the
+  // generic accent placeholder — the same colour the player memorises at
+  // the kit (KIT_ELEMENT_COLOR_VAR is shared with TutorHud's mistake
+  // disclosure so the two surfaces never disagree on what a lane looks like).
+  const laneStyle =
+    colors && element
+      ? ({
+          fill: KIT_ELEMENT_COLOR_VAR[element],
+          stroke: KIT_ELEMENT_COLOR_VAR[element],
+        } as CSSProperties)
+      : undefined;
 
   return (
     <svg viewBox="0 0 96 64" aria-hidden="true">
@@ -264,6 +318,7 @@ function NotationGlyph({ kind }: { kind: NotationKind }) {
         ry="7"
         transform="rotate(-20 42 47)"
         className={colors ? 'drumroll-notation-glyph__lane' : undefined}
+        style={laneStyle}
       />
       {beams.map((y) => (
         <path key={y} d={`M68 ${y}h20`} />
@@ -282,10 +337,26 @@ function NotationGlyph({ kind }: { kind: NotationKind }) {
           cy="45"
           r="6"
           className="drumroll-notation-glyph__lane"
+          style={laneStyle}
         />
       )}
     </svg>
   );
+}
+
+/** The generic 'colored-head' copy, specialised to the exact drum when
+ * `intent.element` is known — see `NotationGlossaryIntent`'s doc comment. */
+function coloredHeadCopy(element: KitElement | undefined) {
+  if (!element) {
+    return notationCopy['colored-head'];
+  }
+
+  const label = KIT_ELEMENT_LABEL[element];
+
+  return {
+    title: `${label} note head`,
+    detail: `This colour is the ${label.toLowerCase()} lane. Match it to the ${label.toLowerCase()} zone on the kit, then hit that voice.`,
+  };
 }
 
 export function NotationGlossary({
@@ -297,7 +368,10 @@ export function NotationGlossary({
     return null;
   }
 
-  const copy = notationCopy[intent.kind];
+  const copy =
+    intent.kind === 'colored-head'
+      ? coloredHeadCopy(intent.element)
+      : notationCopy[intent.kind];
 
   return (
     <aside
@@ -306,7 +380,7 @@ export function NotationGlossary({
       role="tooltip"
       style={{ left: intent.x + 18, top: intent.y + 18 }}
     >
-      <NotationGlyph kind={intent.kind} />
+      <NotationGlyph kind={intent.kind} element={intent.element} />
       <div>
         <span className="drumroll-notation-glossary__eyebrow">
           notation guide

@@ -512,6 +512,21 @@ export function transitionTutor(
     };
   }
 
+  if (event.type === 'speed-changed') {
+    // The learner's own speed control is the single source of truth for
+    // tempo. This only refreshes the reducer's bookkeeping value so later
+    // messaging/evidence (e.g. a recovery attempt's recorded `speed`) never
+    // contradicts what is actually playing - it never resets progress and
+    // never itself commands the engine (see useTutorSession.executeCommand,
+    // which no longer applies any tutor-computed speed to playback).
+    const speed = speedToTenth(clamp(event.speed, 0.3, 2));
+
+    return {
+      state: { ...state, currentSpeed: speed, targetSpeed: speed },
+      commands: [],
+    };
+  }
+
   if (state.phase === 'off') {
     return { state, commands: [] };
   }

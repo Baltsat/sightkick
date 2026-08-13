@@ -126,6 +126,70 @@ describe('kit inactivity recovery', () => {
     expect(result.current).toEqual({ phase: 'listening' });
   });
 
+  it('parks after real wall-clock silence, not raw song time - the same silence that does not yet park at 1x parks at a slower practice speed', () => {
+    // resolution 192 @ 120bpm = 384 ticks/second of *song* time. timeStore
+    // reports song time, which is speed-scaled wall-clock time (see
+    // SpeedAudioPlayer.currentTime); INACTIVITY_MIN_SECONDS must therefore
+    // be scaled by playbackSpeed, not compared to raw song-time deltas.
+    const chart = {
+      resolution: 192,
+      tempos: [{ tick: 0, beatsPerMinute: 120, msTime: 0 }],
+    } as unknown as ParsedChart;
+    const denseMeasures = [
+      measure(0, [note(40), note(140), note(240), note(340)]),
+    ];
+    const elapsedSongSeconds = 1.2; // < 2.25s, so unscaled would never park.
+
+    vi.spyOn(inputBus, 'subscribe').mockImplementation(() => () => {});
+
+    const unscaledTimeStore = new TimeStore();
+    const unscaledOnPark = vi.fn();
+    const unscaledHook = renderHook(() =>
+      useKitInactivityRecovery({
+        enabled: true,
+        isPlaying: true,
+        chart,
+        measures: denseMeasures,
+        delaySeconds: 0,
+        mapping: { snare: ['midi:38'] },
+        timeStore: unscaledTimeStore,
+        onPark: unscaledOnPark,
+        onResume: vi.fn(),
+        // playbackSpeed omitted - defaults to 1x, the pre-fix behaviour.
+      }),
+    );
+
+    act(() => unscaledTimeStore.set(elapsedSongSeconds));
+
+    expect(unscaledHook.result.current).toEqual({ phase: 'listening' });
+    expect(unscaledOnPark).not.toHaveBeenCalled();
+
+    const scaledTimeStore = new TimeStore();
+    const scaledOnPark = vi.fn();
+    const scaledHook = renderHook(() =>
+      useKitInactivityRecovery({
+        enabled: true,
+        isPlaying: true,
+        chart,
+        measures: denseMeasures,
+        delaySeconds: 0,
+        mapping: { snare: ['midi:38'] },
+        timeStore: scaledTimeStore,
+        onPark: scaledOnPark,
+        onResume: vi.fn(),
+        playbackSpeed: 0.5,
+      }),
+    );
+
+    // The exact same amount of *song* time (1.2s) is now enough, because at
+    // 0.5x it corresponds to 2.4 real seconds of silence - past the real
+    // 2.25s threshold - where at 1x it was still short of it.
+    act(() => scaledTimeStore.set(elapsedSongSeconds));
+
+    expect(scaledHook.result.current).toMatchObject({ phase: 'parked' });
+    expect(scaledOnPark).toHaveBeenCalledTimes(1);
+  });
+
   it('does not park across a real authored rest', () => {
     const chart = {
       resolution: 192,

@@ -11,3 +11,113 @@
 .drumroll-tutor-hud__kicker {
   color: var(--edge-caption-signal);
 }
+
+/*
+ * The per-note "why" disclosure. It lives inside the same quiet caption row
+ * as the resume instruction — collapsed by default, native <details>, no
+ * motion — and never displaces that instruction (design law: "the resume
+ * instruction stays visible"). Kit lane colour is used only on the small
+ * drum swatches; the surrounding chrome stays neutral ink/paper, never
+ * error-red, so a wrong note keeps its local notation treatment instead of
+ * reading as a dashboard alert.
+ */
+.drumroll-tutor-hud__mistake {
+  flex: 0 0 auto;
+  pointer-events: auto;
+}
+
+.drumroll-tutor-hud__mistake > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.6rem;
+  border: 1px solid var(--dr-line, rgb(36 31 25 / 16%));
+  border-radius: 999px;
+  color: var(--dr-ink-muted, var(--color-text-muted));
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+  cursor: pointer;
+  list-style: none;
+}
+
+.drumroll-tutor-hud__mistake > summary::-webkit-details-marker {
+  display: none;
+}
+
+.drumroll-tutor-hud__mistake > summary:hover,
+.drumroll-tutor-hud__mistake > summary:focus-visible,
+.drumroll-tutor-hud__mistake[open] > summary {
+  color: var(--dr-ink, var(--color-ink));
+  border-color: var(--dr-ink-muted, var(--color-text-muted));
+}
+
+.drumroll-tutor-hud__mistake-summary-label {
+  color: var(--dr-focus, var(--color-blue));
+  font-weight: 800;
+}
+
+.drumroll-tutor-hud__mistake-summary-title {
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* position: fixed intentionally escapes the caption's own
+   `overflow: hidden; max-height: 4rem` — see PracticeEdgeCaption.css. */
+.drumroll-tutor-hud__mistake-body {
+  position: fixed;
+  right: clamp(1rem, 2.4vw, 2rem);
+  bottom: 4.75rem;
+  z-index: 19;
+  display: grid;
+  width: min(20rem, calc(100vw - 2rem));
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--dr-line, rgb(36 31 25 / 16%));
+  border-radius: 12px;
+  color: var(--dr-ink, var(--color-ink));
+  background: var(--dr-paper, var(--color-paper-light));
+  box-shadow: 0 12px 28px -20px rgb(36 31 25 / 28%);
+  font-family: var(--font-ui);
+}
+
+.drumroll-tutor-hud__mistake-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+}
+
+.drumroll-tutor-hud__mistake-chip-role {
+  color: var(--dr-ink-muted, var(--color-text-muted));
+}
+
+.drumroll-tutor-hud__mistake-swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--mistake-swatch-color);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 22%);
+}
+
+.drumroll-tutor-hud__mistake-body p {
+  margin: 0;
+  color: var(--dr-ink-muted, var(--color-text-muted));
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.drumroll-tutor-hud__mistake-check {
+  color: var(--dr-ink, var(--color-ink)) !important;
+  font-weight: 620;
+}
+
+@media (max-width: 720px) {
+  .drumroll-tutor-hud__mistake-summary-title {
+    display: none;
+  }
+}

@@ -245,6 +245,14 @@ export interface TutorState {
 
 export type TutorEvent =
   | { type: 'start'; targetSpeed: number }
+  /**
+   * The learner moved the speed control themselves, mid-run. Unlike `start`,
+   * this must never wipe judgements/interventions/recoveryAttempts - it only
+   * keeps the reducer's notion of "the real speed right now" honest so
+   * messaging and evidence never contradict what is actually playing. See
+   * useTutorSession's TutorSessionStore.syncTargetSpeed.
+   */
+  | { type: 'speed-changed'; speed: number }
   | { type: 'judgement'; judgement: ResolvedJudgement }
   | { type: 'measure-complete'; measureIndex: number }
   | { type: 'song-complete' }
