@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  archiveDayKey,
   archiveRunSummaries,
   emptyPracticeRunArchive,
   historicalDetailState,
@@ -8,6 +9,7 @@ import {
   readPracticeRunArchive,
 } from './archive';
 import { RunSummary } from './types';
+import { localDateKey } from '../streaks';
 
 function run(overrides: Partial<RunSummary> = {}): RunSummary {
   return {
@@ -33,6 +35,30 @@ function run(overrides: Partial<RunSummary> = {}): RunSummary {
 }
 
 describe('practice archive learning evidence', () => {
+  it('uses the same local day as the streak for a Bali early-morning run', () => {
+    const priorTimeZone = process.env.TZ;
+
+    process.env.TZ = 'Asia/Makassar';
+
+    try {
+      const completedAt = '2026-08-12T18:30:00.000Z';
+      const localDay = localDateKey(new Date(completedAt));
+      const archive = archiveRunSummaries(emptyPracticeRunArchive(), [
+        run({ completedAt }),
+      ]);
+
+      expect(localDay).toBe('2026-08-13');
+      expect(archiveDayKey(completedAt)).toBe(localDay);
+      expect(archive.days[localDay]).toMatchObject({ runCount: 1 });
+    } finally {
+      if (priorTimeZone === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = priorTimeZone;
+      }
+    }
+  });
+
   it('keeps trouble and recovery evidence separate by chart revision', () => {
     const archive = archiveRunSummaries(emptyPracticeRunArchive(), [
       run({

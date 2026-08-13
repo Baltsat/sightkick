@@ -124,6 +124,33 @@ describe('adaptive tutor surfaces', () => {
 });
 
 describe('safe hands-free run intent', () => {
+  it('pauses before Configure Input can capture a live strike', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      settings: { countIn: false },
+      keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+    });
+
+    await view.loadSong();
+    view.clickPlay();
+
+    expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+      'aria-label',
+      'Pause',
+    );
+
+    view.openSettings();
+    fireEvent.click(screen.getByTestId('setup-input'));
+    fireEvent.click(screen.getByTestId('learn-snare'));
+    await view.pressKey('KeyJ');
+
+    expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+      'aria-label',
+      'Play',
+    );
+    expect(view.audio.state).toBe('suspended');
+  });
+
   it('keeps active play focused on notation instead of a persistent tutor prompt', async () => {
     const view = setupSongView({
       route: '/song-1?gameMode=practice',
@@ -488,6 +515,52 @@ describe('safe hands-free run intent', () => {
       expect(hud).toHaveAttribute('data-display-state', 'inactivity-paused');
       expect(hud).toHaveTextContent('Paused — input check');
       expect(document.querySelectorAll('[data-edge-caption]')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 30000);
+
+  it('does not reopen MIDI when inactivity parks a run awaiting its resume strike', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice',
+        settings: {
+          countIn: false,
+          handsFreeControlsEnabled: true,
+          selectedDevice: {
+            id: 'midi:Yamaha DTX402',
+            name: 'Yamaha DTX402',
+            sourceId: 'midi',
+            port: 0,
+          },
+          inputMappings: {
+            'midi:Yamaha DTX402': { kick: ['midi:36'] },
+          },
+        },
+      });
+
+      await view.loadSong();
+
+      const requestsBeforePark = view.ipc.sent.filter(
+        ({ channel }) => channel === 'midi-device-list',
+      ).length;
+
+      view.clickPlay();
+
+      for (let index = 0; index < 6; index += 1) {
+        view.audio.currentTime += 0.5;
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(150);
+        });
+      }
+
+      expect(screen.getByTestId('inactivity-pause-veil')).toBeInTheDocument();
+      expect(
+        view.ipc.sent.filter(({ channel }) => channel === 'midi-device-list'),
+      ).toHaveLength(requestsBeforePark);
     } finally {
       vi.useRealTimers();
     }

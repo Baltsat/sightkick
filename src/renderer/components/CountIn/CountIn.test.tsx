@@ -32,6 +32,20 @@ describe('CountIn', () => {
     ).toHaveLength(2);
   });
 
+  it.each([5, 6, 7])('keeps all %i beats in one visible row', (total) => {
+    render(
+      <CountIn count={total} total={total} beatMs={500} animated={false} />,
+    );
+
+    const overlay = screen.getByTestId('count-in');
+
+    expect(overlay).toHaveAccessibleName(`Count in ${total} of ${total}`);
+    expect(overlay).toHaveStyle({ '--count-in-columns': String(total) });
+    expect(overlay.querySelectorAll('.drumroll-count-in__beat')).toHaveLength(
+      total,
+    );
+  });
+
   it('stays absent outside an active count-in', () => {
     render(<CountIn count={undefined} total={4} beatMs={500} />);
 

@@ -181,7 +181,89 @@ describe('HomeCockpit kit home', () => {
     );
   });
 
-  it('starts the same selected practice target from every mapped physical pad', () => {
+  it('shows the selected input visibly on the kit home', () => {
+    window.localStorage.setItem(
+      'settings.selectedDevice',
+      JSON.stringify({
+        id: 'keyboard',
+        name: 'Keyboard',
+        sourceId: 'keyboard',
+      }),
+    );
+
+    render(
+      <InputProvider>
+        <HomeCockpit
+          songList={[song]}
+          gamification={gamification}
+          recommendation={recommendation}
+          onStartRecommended={vi.fn()}
+          onOpenSongs={vi.fn()}
+          onOpenProfile={vi.fn()}
+        />
+      </InputProvider>,
+    );
+
+    const readiness = screen.getByTestId('home-input-readiness');
+
+    expect(readiness).toHaveAttribute('data-state', 'connected');
+    expect(readiness).toHaveTextContent('Connected · Keyboard');
+    expect(readiness).not.toHaveClass('sr-only');
+  });
+
+  it('names a remembered kit while it reconnects instead of claiming it is ready', () => {
+    window.localStorage.setItem(
+      'settings.selectedDevice',
+      JSON.stringify({
+        id: 'midi:Yamaha DTX402',
+        name: 'Yamaha DTX402',
+        sourceId: 'midi',
+        port: 0,
+      }),
+    );
+
+    render(
+      <InputProvider>
+        <HomeCockpit
+          songList={[song]}
+          gamification={gamification}
+          recommendation={recommendation}
+          onStartRecommended={vi.fn()}
+          onOpenSongs={vi.fn()}
+          onOpenProfile={vi.fn()}
+        />
+      </InputProvider>,
+    );
+
+    const readiness = screen.getByTestId('home-input-readiness');
+
+    expect(readiness).toHaveAttribute('data-state', 'reconnecting');
+    expect(readiness).toHaveTextContent('Reconnecting · Yamaha DTX402');
+    expect(readiness).not.toHaveClass('sr-only');
+  });
+
+  it('shows that no kit is found when no input device is selected', () => {
+    render(
+      <InputProvider>
+        <HomeCockpit
+          songList={[song]}
+          gamification={gamification}
+          recommendation={recommendation}
+          onStartRecommended={vi.fn()}
+          onOpenSongs={vi.fn()}
+          onOpenProfile={vi.fn()}
+        />
+      </InputProvider>,
+    );
+
+    const readiness = screen.getByTestId('home-input-readiness');
+
+    expect(readiness).toHaveAttribute('data-state', 'waiting');
+    expect(readiness).toHaveTextContent('No MIDI kit found');
+    expect(readiness).not.toHaveClass('sr-only');
+  });
+
+  it('requires the same confirm control as Songs before a physical kit starts the armed target', () => {
     window.localStorage.setItem(
       'settings.selectedDevice',
       JSON.stringify({
@@ -221,11 +303,14 @@ describe('HomeCockpit kit home', () => {
       </InputProvider>,
     );
 
-    ['KeyA', 'KeyB', 'KeyC', 'KeyD', 'KeyE', 'KeyF', 'KeyG', 'KeyH'].forEach(
-      (code) => fireEvent.keyDown(window, { code }),
-    );
+    fireEvent.keyDown(window, { code: 'KeyA' });
 
-    expect(onStartRecommended).toHaveBeenCalledTimes(8);
+    expect(onStartRecommended).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { code: 'KeyB' });
+    fireEvent.keyDown(window, { code: 'KeyH' });
+
+    expect(onStartRecommended).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('home-session-status')).toHaveTextContent(
       'Count-in for Practice song',
     );

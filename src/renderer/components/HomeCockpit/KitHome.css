@@ -58,11 +58,13 @@
 .kit-home__title-band {
   box-sizing: border-box;
   display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   padding: clamp(0.7rem, 2.1vh, 1.15rem) clamp(1.25rem, 3vw, 2.75rem);
   overflow: hidden;
-  background:
-    linear-gradient(
+  background: linear-gradient(
       100deg,
       color-mix(in srgb, var(--surface-studio) 82%, transparent) 0%,
       color-mix(in srgb, var(--surface-studio) 58%, transparent) 40%,
@@ -125,6 +127,31 @@
   -webkit-box-orient: vertical;
 }
 
+.kit-home__input-readiness {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  margin: 0;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid rgb(255 248 237 / 28%);
+  border-radius: 999px;
+  color: var(--kit-home-studio-ink);
+  background: rgb(10 8 5 / 42%);
+  box-shadow: 0 0.2rem 0.7rem rgb(10 8 5 / 32%);
+  font-family: var(--font-ui);
+  font-size: clamp(0.68rem, 0.82vw, 0.78rem);
+  font-weight: 680;
+  line-height: 1;
+}
+
+.kit-home__input-readiness[data-state='reconnecting'] {
+  color: var(--color-yellow);
+}
+
+.kit-home__input-readiness[data-state='waiting'] {
+  color: var(--kit-home-studio-ink-muted);
+}
+
 /*
  * The primary action and the payoff shelf share the low band - the
  * "floor, rug" the critique named - the same way the reference's own
@@ -140,8 +167,7 @@
   display: flex;
   align-items: center;
   gap: clamp(1rem, 2vw, 1.75rem);
-  background:
-    linear-gradient(
+  background: linear-gradient(
       100deg,
       color-mix(in srgb, var(--surface-studio) 76%, transparent) 0%,
       color-mix(in srgb, var(--surface-studio) 46%, transparent) 44%,

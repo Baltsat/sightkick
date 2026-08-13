@@ -22,7 +22,7 @@ export function CountIn({
   const beatCount = Math.max(count, total ?? 4);
   const style = {
     '--count-in-beat-duration': `${Math.max(180, beatMs ?? 800)}ms`,
-    '--count-in-columns': Math.min(beatCount, 4),
+    '--count-in-columns': beatCount,
     '--count-in-progress': count / beatCount,
   } as CSSProperties;
 

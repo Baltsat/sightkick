@@ -43,6 +43,7 @@ import {
   HOME_KIT_ZONE_MAP,
 } from './kit-zone-map';
 import { computeKitTextSafeBands } from './kit-text-safe-bands';
+import { resolveLibraryControls } from '../../views/SongListView/library-controls';
 import './KitHome.css';
 
 interface HomeCockpitProps {
@@ -220,7 +221,8 @@ export function HomeCockpit({
   onStartPracticeCard,
   onOpenSongs,
 }: HomeCockpitProps) {
-  const { inputMapping, inputReadiness, selectedDevice } = useInput();
+  const { inputMapping, controlMapping, inputReadiness, selectedDevice } =
+    useInput();
   const [activeLane, setActiveLane] = useState<KitElement>();
   const [pointerStrikeLane, setPointerStrikeLane] = useState<KitElement>();
   const [sessionState, setSessionState] = useState<'armed' | 'count-in'>(
@@ -395,6 +397,25 @@ export function HomeCockpit({
 
     return map;
   }, [inputMapping]);
+  const homeControls = useMemo(
+    () => resolveLibraryControls(controlMapping, inputMapping),
+    [controlMapping, inputMapping],
+  );
+  const homeConfirmControls = useMemo(
+    () => homeControls.mapping.confirm ?? [],
+    [homeControls.mapping.confirm],
+  );
+  const inputStatus =
+    inputReadiness === 'connected'
+      ? `Connected · ${selectedDevice?.name ?? 'Input device'}`
+      : inputReadiness === 'reconnecting'
+      ? `Reconnecting · ${selectedDevice?.name ?? 'MIDI kit'}`
+      : 'No MIDI kit found';
+  const homeStartHint = homeControls.kitActions.includes('confirm')
+    ? 'Strike snare to start.'
+    : homeConfirmControls.length > 0
+    ? 'Use your confirm control to start.'
+    : 'Set a confirm control in Configure input to start from the kit.';
   const pulseLane = useCallback((element: KitElement) => {
     window.clearTimeout(clearPulseRef.current);
     setActiveLane(element);
@@ -449,12 +470,18 @@ export function HomeCockpit({
     const unsubscribe = inputBus.subscribe((event) => {
       const element = elementByControlId.get(event.controlId);
 
-      if (element && event.value > 0) {
-        if (hasPracticeTarget) {
-          startCurrentPractice(element);
-        } else {
-          pulseLane(element);
-        }
+      if (event.value <= 0) {
+        return;
+      }
+
+      if (hasPracticeTarget && homeConfirmControls.includes(event.controlId)) {
+        startCurrentPractice(element ?? 'snare');
+
+        return;
+      }
+
+      if (element) {
+        pulseLane(element);
       }
     });
 
@@ -463,7 +490,13 @@ export function HomeCockpit({
       window.clearTimeout(clearPulseRef.current);
       window.clearTimeout(clearPointerStrikeRef.current);
     };
-  }, [elementByControlId, hasPracticeTarget, pulseLane, startCurrentPractice]);
+  }, [
+    elementByControlId,
+    hasPracticeTarget,
+    homeConfirmControls,
+    pulseLane,
+    startCurrentPractice,
+  ]);
 
   const rootStyle = {
     '--drumstick-cursor': `url(${drumstickCursor}) 6 6`,
@@ -491,18 +524,6 @@ export function HomeCockpit({
           src={homeKitStudio}
           alt="A pearl drum kit in a sunlit studio"
         />
-
-        <p
-          className="sr-only"
-          data-testid="home-input-readiness"
-          data-state={inputReadiness}
-        >
-          {inputReadiness === 'connected'
-            ? `${selectedDevice?.name ?? 'MIDI kit'} mapped · ready`
-            : inputReadiness === 'reconnecting'
-            ? 'Kit reconnecting · your target stays armed'
-            : 'Mouse works now · connect MIDI when ready'}
-        </p>
 
         <div className="kit-home__pads" role="group" aria-label="Practice kit">
           {KIT_HOTSPOTS.map((hotspot) => {
@@ -596,6 +617,14 @@ export function HomeCockpit({
           {heroEyebrow ? ' ' : null}
           <span className="kit-home__hero-name">{heroTitle}</span>
         </h1>
+        <p
+          className="kit-home__input-readiness"
+          data-testid="home-input-readiness"
+          data-state={inputReadiness}
+          role="status"
+        >
+          {inputStatus}
+        </p>
       </div>
 
       <div
@@ -666,8 +695,8 @@ export function HomeCockpit({
           : hasPracticeTarget && targetRecommendation
           ? `${practiceTarget?.name} is armed at ${(
               homeSession?.launchSpeed ?? targetRecommendation.suggestedSpeed
-            ).toFixed(1)} times speed. Any mapped pad starts it.`
-          : 'Choose a song to arm a practice target. Any mapped drum then starts it.'}
+            ).toFixed(1)} times speed. ${homeStartHint}`
+          : 'Choose a song to arm a practice target.'}
       </p>
     </section>
   );

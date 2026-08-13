@@ -25,6 +25,7 @@ interface Props {
   label?: string;
   hoverPreviewEnabled?: boolean;
   onHoverPreviewEnabledChange?: (enabled: boolean) => void;
+  onBeforeInputConfigOpen?: () => void;
 }
 
 export const SettingsButton = memo(function Settings({
@@ -41,6 +42,7 @@ export const SettingsButton = memo(function Settings({
   label,
   hoverPreviewEnabled,
   onHoverPreviewEnabledChange,
+  onBeforeInputConfigOpen,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [inputConfigOpen, setInputConfigOpen] = useState(false);
@@ -52,7 +54,10 @@ export const SettingsButton = memo(function Settings({
     setIsOpen(false);
   }, [pathname]);
 
-  const openInput = () => setInputConfigOpen(true);
+  const openInput = () => {
+    onBeforeInputConfigOpen?.();
+    setInputConfigOpen(true);
+  };
 
   return (
     <>

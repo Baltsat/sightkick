@@ -24,4 +24,17 @@ describe('library source provenance', () => {
       }),
     ).toThrow('invalid metadata shape');
   });
+
+  it('rejects every blank or non-string artist instead of casting it through', () => {
+    expect(() =>
+      normalizeLibrarySourceProvenance({
+        provider: 'yandex-music',
+        collectionId: 'drums',
+        collectionName: 'Drums',
+        trackId: 'track-1',
+        title: 'Track',
+        artists: ['A real artist', '   ', 42],
+      }),
+    ).toThrow('invalid metadata shape');
+  });
 });

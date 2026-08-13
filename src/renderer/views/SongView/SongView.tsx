@@ -2897,6 +2897,7 @@ export function SongView() {
           }
           onExportPdf={onExportPdf}
           isExporting={isExporting}
+          onBeforeInputConfigOpen={pause}
         />
       </header>
 
