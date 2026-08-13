@@ -5,8 +5,10 @@ import {
   createRef,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
+  useState,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../../cn';
@@ -18,7 +20,11 @@ import { TimeStore } from '../../services/time-store';
 import { Song } from '../../../types';
 import { GameMode, PracticeRange } from '../../types';
 import { getScrollParent } from '../../services/engine/helpers';
-import { autoScrollSpeed } from './helpers';
+import {
+  autoScrollSpeed,
+  flowAutoZoomMultiplier,
+  FLOW_AUTO_ZOOM_MIN_MULTIPLIER,
+} from './helpers';
 import {
   ContinuousNotationCamera,
   FlowMeter,
@@ -414,12 +420,58 @@ export function SheetMusic({
       <span className="drumroll-flow-fixed-playhead__beat" />
     </div>
   );
-  // Both layouts use the exact same canonical VexFlow glyph scale. Flow
-  // changes only the camera and viewport; switching modes must never make
-  // the score subtly smaller or force the drummer to relearn its proportions.
-  // `zoom` remains the player's multiplier; the shared 1.15 baseline makes
-  // 1.0 readable from the drum throne without taking that control away.
-  const presentationZoom = zoom * 1.15;
+  const [flowAutoZoom, setFlowAutoZoom] = useState(
+    FLOW_AUTO_ZOOM_MIN_MULTIPLIER,
+  );
+
+  // Flow deliberately renders larger than Classic's fixed browsing scale:
+  // notation is the one dominant object on the practice screen (see
+  // visual-system-v3's "one dominant object" rule - the score earns at
+  // least 58-65% of the usable area, not roughly a third of a mostly-empty
+  // canvas), so it claims a deliberate share of its own real viewport
+  // height instead of sitting small in a big empty room. Classic keeps the
+  // stable, always-1.15x reference scale - it's a full-page browsable
+  // sheet, not a live single-row performance stage, so there is no
+  // "relearn the size when the mode changes" hazard between the two.
+  useLayoutEffect(() => {
+    if (!isFlow) {
+      return undefined;
+    }
+
+    const viewport = wrapperRef.current?.parentElement;
+    const notation = vexflowContainerRef.current;
+
+    if (!viewport || !notation) {
+      return undefined;
+    }
+
+    const recompute = () => {
+      // notation.offsetHeight is in local, pre-zoom units (Chromium's
+      // non-standard `zoom` does not change a descendant's own offsetWidth/
+      // offsetHeight, only its on-screen size - see the visualScale ratio
+      // ContinuousNotationCamera already relies on for the same reason) -
+      // so measuring it here while some presentationZoom is already
+      // applied is not circular with the value this effect produces.
+      setFlowAutoZoom(
+        flowAutoZoomMultiplier(notation.offsetHeight, viewport.clientHeight),
+      );
+    };
+
+    recompute();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return undefined;
+    }
+
+    const observer = new ResizeObserver(recompute);
+
+    observer.observe(viewport);
+    observer.observe(notation);
+
+    return () => observer.disconnect();
+  }, [isFlow, renderData, vexflowContainerRef]);
+
+  const presentationZoom = isFlow ? flowAutoZoom * zoom : zoom * 1.15;
 
   return (
     <div

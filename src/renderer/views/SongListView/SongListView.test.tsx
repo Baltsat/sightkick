@@ -575,6 +575,30 @@ describe('SongListView — loading the library', () => {
     ).toBeInTheDocument();
   });
 
+  it('never counts lesson songs in the header — they never appear on this shelf', () => {
+    // Regression for docs/design-qa/2026-08-13-finish/critique.md, Songs
+    // finding 2: the default shelf hides every lesson song (Journey owns
+    // the curriculum), so counting them into "N in your library · M ready
+    // to play" makes a claim this screen can never back up. A library
+    // whose only songs are lessons must read as empty here, not "170
+    // ready to play" over a shelf that shows none of them.
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeLessonSong('lesson-1', { id: '01.01', title: 'Warm-Up Groove' }),
+      makeLessonSong('lesson-2', { id: '01.02', title: 'Second Lesson' }),
+    ]);
+
+    expect(
+      screen.getByText('0 in your library · 0 ready to play'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Build your practice library')).toBeInTheDocument();
+    expect(screen.queryByText('Warm-Up Groove')).not.toBeInTheDocument();
+
+    view.search('Warm-Up Groove');
+    expect(screen.getByText('Warm-Up Groove')).toBeInTheDocument();
+  });
+
   it('merges Drums and Favorites into the same shelf as local songs, labelled by source', () => {
     const view = setupSongListView();
     const drums = parseYandexPlaylistCandidates(yandexSource);
@@ -593,13 +617,35 @@ describe('SongListView — loading the library', () => {
     expect(screen.getByText('Master of Puppets')).toBeInTheDocument();
     expect(
       screen.getByTestId('library-candidate-state-Drums-1'),
-    ).toHaveTextContent('Needs proof · local audio + reviewed chart');
+    ).toHaveTextContent('Not in your library yet');
     expect(screen.getByTestId('library-candidate-Drums-1')).toHaveTextContent(
       'From Drums',
     );
     expect(
       screen.getByTestId('library-candidate-Favorites-1'),
     ).toHaveTextContent('From Favorites');
+  });
+
+  it("never counts an unresolved suggestion as 'in your library' — the header must not argue with its own rows", () => {
+    // Regression: naming every row "Not in your library yet" while the
+    // header folded those same rows into "N in your library" was a second,
+    // freshly introduced version of critique finding 2 (docs/design-qa/
+    // 2026-08-13-finish/critique.md) — fixing the row order/copy must not
+    // trade one header/row contradiction for another.
+    const view = setupSongListView();
+    const drums = parseYandexPlaylistCandidates(yandexSource);
+    const favorites = parseYandexPlaylistCandidates(yandexFavoritesSource);
+
+    view.loadSongs([makeListSong('a', { name: 'Master of Puppets' })]);
+    view.loadLibraryCandidates({ yandex: { drums, favorites } });
+
+    const suggestionCount = drums.tracks.length + favorites.tracks.length;
+
+    expect(
+      screen.getByText(
+        `1 in your library · 1 ready to play · ${suggestionCount} to add from your playlists`,
+      ),
+    ).toBeInTheDocument();
   });
 
   it('selects all 13 Drums candidates with honest metadata-only states', () => {
@@ -650,12 +696,12 @@ describe('SongListView — loading the library', () => {
     });
     expect(
       drumsRows.filter((row) =>
-        within(row).queryByText('Needs proof · local audio + reviewed chart'),
+        within(row).queryByText('Not in your library yet'),
       ),
     ).toHaveLength(11);
     expect(
       within(screen.getByTestId('library-candidate-Drums-6')).getByText(
-        'Unavailable · reference only',
+        'No longer available',
       ),
     ).toBeInTheDocument();
     expect(screen.getByTestId('library-candidate-Drums-6')).toHaveAttribute(
@@ -777,9 +823,7 @@ describe('SongListView — loading the library', () => {
       screen.getByTestId(`library-candidate-Drums-${unresolvedTrack.ordinal}`),
     );
 
-    expect(
-      unresolvedRow.getByText('Needs proof · local audio + reviewed chart'),
-    ).toBeVisible();
+    expect(unresolvedRow.getByText('Not in your library yet')).toBeVisible();
     expect(
       screen.getByTestId(`library-candidate-Drums-${unresolvedTrack.ordinal}`),
     ).toHaveAttribute('data-practice-status', 'needs-local-chart');
@@ -851,7 +895,7 @@ describe('SongListView — loading the library', () => {
     );
 
     expect(row.getByText(privateTrack.title)).toBeInTheDocument();
-    expect(row.getByText('Private · metadata only')).toBeInTheDocument();
+    expect(row.getByText('Private on Yandex')).toBeInTheDocument();
 
     const checkButton = row.getByRole('button', {
       name: /check reviewed public drum charts/i,
@@ -1142,6 +1186,51 @@ describe('SongListView — filtering and sorting', () => {
       .map((el) => el.textContent);
 
     expect(rendered).toEqual(['Newer Add', 'Older Add']);
+  });
+
+  it('puts every playable song ahead of not-ready rows under the default Difficulty sort, not alphabetical order', () => {
+    // Regression for docs/design-qa/2026-08-13-finish/critique.md, Songs
+    // finding 2: with no per-song chart fed into the shelf, every entry's
+    // computed difficulty ties, so the 'Difficulty' sort used to fall back
+    // to pure alphabetical order regardless of whether a row could play —
+    // a header that says "N ready to play" while the very first rows are
+    // all unplayable. Pick titles where honest readiness and alphabetical
+    // order disagree, so this only passes if readiness actually wins.
+    const view = setupSongListView();
+    const drums = parseYandexPlaylistCandidates(yandexSource);
+
+    view.loadSongs([
+      makeListSong('unready', {
+        name: 'Aardvark Waits',
+        audio: [],
+        drumDifficulties: undefined,
+      }),
+      makeListSong('ready', { name: 'Zzyzx Road' }),
+    ]);
+    view.loadLibraryCandidates({
+      yandex: {
+        drums,
+        favorites: parseYandexPlaylistCandidates(yandexFavoritesSource),
+      },
+    });
+
+    const readyRow = screen.getByTestId('song-item-ready');
+    const unreadyRow = screen.getByTestId('song-item-unready');
+    const firstCandidateRow = screen.getByTestId(
+      `library-candidate-Drums-${drums.tracks[0].ordinal}`,
+    );
+
+    expect(readyRow).toHaveAttribute('aria-label', 'Play Zzyzx Road');
+    // Node.compareDocumentPosition: bit 4 (0x04, DOCUMENT_POSITION_FOLLOWING)
+    // set on the argument means `readyRow` precedes it in the DOM.
+    expect(
+      readyRow.compareDocumentPosition(unreadyRow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      readyRow.compareDocumentPosition(firstCandidateRow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });
 
@@ -1594,6 +1683,30 @@ describe('SongListView — keyboard navigation', () => {
 });
 
 describe('SongListView — fresh-profile kit navigation', () => {
+  it('says nothing about unmapped navigation, instead of the raw config string, before any control is mapped', () => {
+    // Regression for docs/design-qa/2026-08-13-finish/critique.md, Songs
+    // finding 3: "Navigation unavailable · Set library controls in
+    // Configure input" is a debug string about missing settings, not
+    // something he would ever say, and it must never reach the primary
+    // library view. The real fact belongs in Settings, one intentional
+    // action away — the library route says nothing at all instead.
+    const view = setupSongListView({
+      freshProfile: true,
+      settings: { controlMappings: {} },
+    });
+
+    view.loadSongs([makeListSong('a')]);
+    view.selectView('songs');
+
+    expect(
+      screen.queryByTestId('library-control-legend'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Navigation unavailable/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Configure input/i)).not.toBeInTheDocument();
+  });
+
   it('auto-connects a DTX, moves focus, filters, and launches the chosen song directly in Practice', async () => {
     const view = setupSongListView({
       freshProfile: true,

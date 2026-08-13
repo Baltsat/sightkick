@@ -1,4 +1,6 @@
 import { useMemo } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faChevronUp } from '@fortawesome/free-solid-svg-icons';
 import { LessonEntry, LessonProgress } from '../../hooks/useLessons';
 import { LessonNode } from './LessonNode';
 import { nodeState } from './journey';
@@ -54,6 +56,7 @@ export interface LessonPathProps {
   kitActions: Array<'up' | 'down' | 'left' | 'right' | 'confirm' | 'back'>;
   controlsVisible: boolean;
   onRevealControls: () => void;
+  onToggleControls: () => void;
   onPlay: (entry: LessonEntry) => void;
   onLockedClick: (entry: LessonEntry) => void;
 }
@@ -74,6 +77,7 @@ export function LessonPath({
   kitActions,
   controlsVisible,
   onRevealControls,
+  onToggleControls,
   onPlay,
   onLockedClick,
 }: LessonPathProps) {
@@ -166,9 +170,13 @@ export function LessonPath({
         className="daybreak-lesson-path__controls-toggle"
         data-testid="journey-controls-toggle"
         aria-expanded={controlsVisible}
-        onClick={onRevealControls}
+        aria-label={
+          controlsVisible ? 'Hide journey controls' : 'Show journey controls'
+        }
+        onClick={onToggleControls}
       >
         Controls
+        <FontAwesomeIcon icon={faChevronUp} aria-hidden="true" />
       </button>
 
       <div
@@ -227,7 +235,16 @@ export function LessonPath({
             )}
           </div>
         ) : (
-          <strong>{controlLegend}</strong>
+          // With no kit or keyboard control mapped at all, there is nothing
+          // honest to say here - "Set Journey controls in Configure input"
+          // is a debug string about missing settings, not something he
+          // would ever say himself (matches the same defect class fixed in
+          // SongListView for the library route - see
+          // docs/design-qa/2026-08-13-finish/critique.md, Songs finding 3).
+          // Mouse and Tab/Enter still work with no legend at all; the real
+          // fact - no kit control mapped - belongs in Settings, one
+          // intentional action away.
+          controlSource !== 'unavailable' && <strong>{controlLegend}</strong>
         )}
         {(controlSource === 'kit-lanes' || controlSource === 'mixed') && (
           <strong className="sr-only">{controlLegend}</strong>

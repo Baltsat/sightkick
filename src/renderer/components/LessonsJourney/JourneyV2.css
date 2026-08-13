@@ -10,6 +10,9 @@
   display: grid;
   height: 100%;
   width: 100%;
+  /* Ported from the retired daybreak-journey.css (`.daybreak-journey-shell`)
+   * so an ultra-wide window doesn't stretch the season stage unbounded. */
+  max-width: 1680px;
   min-height: 0;
   min-width: 0;
   grid-template-columns: minmax(10.5rem, 14rem) minmax(0, 1fr);
@@ -181,6 +184,13 @@
 }
 
 .daybreak-season-tab__number {
+  /* Flex items shrink by default even with nowrap content - without this,
+   * the row's squeeze at compact widths clips the two-digit badge itself
+   * ("02" -> "0.") instead of only the label truncating. It never needs to
+   * shrink; it is always exactly two characters. Ported from the retired
+   * daybreak-journey.css, whose equivalent rule already documented and
+   * fixed this. */
+  flex: none;
   overflow: hidden;
   color: var(--ink-muted);
   font-size: 0.68rem;
@@ -351,19 +361,53 @@
   filter: none;
 }
 
+/*
+ * A real chip, not bare text over the photograph - unstyled it read as
+ * leftover debug copy, not a control (2026-08-13 critique, journey item
+ * 3/15). The icon rotates and the fill switches to wine when the hint
+ * panel is open, so the button carries its own expanded/collapsed state
+ * instead of relying on the reader to notice the panel above it.
+ */
 .daybreak-lesson-path__controls-toggle {
   position: absolute;
   right: 1rem;
   bottom: 0.9rem;
   z-index: 6;
-  padding: 0;
-  border: 0;
-  color: color-mix(in srgb, var(--surface-raised) 78%, transparent);
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--surface-raised) 30%, transparent);
+  border-radius: 999px;
+  color: var(--surface-raised);
+  background: color-mix(in srgb, var(--surface-studio) 70%, transparent);
   font: inherit;
-  font-size: 0.76rem;
-  font-weight: 680;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.daybreak-lesson-path__controls-toggle:hover {
+  border-color: color-mix(in srgb, var(--surface-raised) 52%, transparent);
+  background: color-mix(in srgb, var(--surface-studio) 88%, transparent);
+}
+
+.daybreak-lesson-path__controls-toggle svg {
+  transition: transform 160ms ease;
+}
+
+.daybreak-lesson-path__controls-toggle[aria-expanded='true'] {
+  border-color: var(--signal-wine);
+  color: var(--surface-raised);
+  background: var(--signal-wine);
+}
+
+.daybreak-lesson-path__controls-toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
 }
 
 .daybreak-lesson-path__kit-hint {
@@ -504,9 +548,31 @@
   border-radius: 4px;
   color: var(--ink-strong);
   background: var(--surface-raised);
+  /*
+   * Quiet until the node is the kit-selected target or the pointer/keyboard
+   * focus is on it - visual-system-v3's "node labels show title... lock
+   * metadata... reveal on focus/selection." Four plaques floating over the
+   * scene at once read as a second dashboard inside the map (2026-08-13
+   * critique, journey item 1/7); the badge on the instrument (number, lock,
+   * or check) still gives every off-window node a baseline identity, and
+   * the full aria-label carries the whole sentence regardless of opacity.
+   */
+  opacity: 0;
+  transform: translateY(0.3rem);
+  pointer-events: none;
   transition:
+    opacity 160ms ease,
+    transform 160ms ease,
     border-color 140ms ease,
     background-color 140ms ease;
+}
+
+.daybreak-lesson-node[data-kit-focused='true'] .daybreak-lesson-node__plaque,
+.daybreak-lesson-node:hover .daybreak-lesson-node__plaque,
+.daybreak-lesson-node:focus-visible .daybreak-lesson-node__plaque {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .daybreak-lesson-node__meta {
@@ -727,7 +793,10 @@
 @media (prefers-reduced-motion: reduce) {
   .daybreak-season-tab,
   .daybreak-lesson-node,
+  .daybreak-lesson-node__plaque,
   .daybreak-lesson-path__kit-hint,
+  .daybreak-lesson-path__controls-toggle,
+  .daybreak-lesson-path__controls-toggle svg,
   .daybreak-lesson-node__strike-stick {
     transition: none;
     animation: none;

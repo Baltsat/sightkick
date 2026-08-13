@@ -265,9 +265,26 @@ describe('LessonsView — chain progress header', () => {
       'overflow-hidden',
     );
     expect(screen.getByTestId('lesson-season-stage')).toHaveClass('grow');
-    expect(screen.getAllByTestId('journey-kit-controls')[0]).toHaveTextContent(
-      'Set Journey controls in Configure input',
+  });
+
+  it('says nothing about unmapped navigation, instead of the raw config string, when no control is mapped', () => {
+    // Regression for docs/design-qa/2026-08-13-finish/critique.md, Songs
+    // finding 3, which is the same defect class on this route: "Set Journey
+    // controls in Configure input" is a debug string about missing
+    // settings, not something he would ever say, and it must never reach
+    // the primary Journey view. The real fact belongs in Settings, one
+    // intentional action away — the hint panel says nothing at all instead.
+    const progress = makeMixedProgress();
+
+    render(
+      <LessonsView progress={progress} onPlay={vi.fn()} onRescan={vi.fn()} />,
+      { wrapper },
     );
+
+    expect(
+      screen.getAllByTestId('journey-kit-controls')[0],
+    ).not.toHaveTextContent('Set Journey controls in Configure input');
+    expect(screen.queryByText(/Configure input/i)).not.toBeInTheDocument();
   });
 
   it('shows a continue card for the furthest uncleared unlocked lesson', () => {

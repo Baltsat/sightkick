@@ -1,8 +1,102 @@
 import { describe, expect, it } from 'vitest';
-import { multiLaneRunFixture } from '../PracticeStats/test-fixtures';
+import {
+  emptyRunFixture,
+  multiLaneRunFixture,
+} from '../PracticeStats/test-fixtures';
 import { musicalReceipt } from './musicalReceipt';
 
+/** An all-miss run: real attempts on two lanes, zero hits anywhere -
+ * mirrors the exact shape the finish-visual capture harness produces when
+ * the "keyboard" device has no mapped keys (see
+ * docs/design-qa/2026-08-13-finish/capture-finish.mjs). */
+function allMissRunFixture() {
+  return {
+    ...multiLaneRunFixture(),
+    totalHits: 0,
+    totalMisses: 132,
+    totalWrong: 0,
+    overallAccuracy: 0,
+    laneAccuracy: [
+      { element: 'hihat' as const, hits: 0, misses: 4, accuracy: 0 },
+      { element: 'snare' as const, hits: 0, misses: 128, accuracy: 0 },
+    ],
+  };
+}
+
 describe('musicalReceipt', () => {
+  it('never congratulates a run with no attempts at all', () => {
+    expect(musicalReceipt(emptyRunFixture(), undefined)).toMatchObject({
+      headline: 'No hits recorded this pass',
+      action: 'replay',
+      changed: false,
+    });
+  });
+
+  it('calls out a run that fell apart instead of staying neutral', () => {
+    expect(musicalReceipt(allMissRunFixture(), undefined)).toMatchObject({
+      headline: 'This pass did not connect',
+      action: 'replay',
+      changed: false,
+    });
+  });
+
+  it('never praises an all-miss run just because it also saved a loop target - the exact recapture scenario', () => {
+    // This is the composite that produced the "Nice reps" over 0% defect:
+    // an all-miss run that ALSO carries coachEvidence with a bar range, so
+    // loopTarget() would otherwise win and headline "ready for a loop"
+    // directly above 0% accuracy cells.
+    const summary = {
+      ...allMissRunFixture(),
+      coachEvidence: [
+        {
+          id: 'bars-1-17',
+          kind: 'timing',
+          severity: 'medium' as const,
+          skillTag: 'timing',
+          sampleCount: 12,
+          barStart: 1,
+          barEnd: 17,
+        },
+      ],
+    };
+
+    expect(musicalReceipt(summary, undefined)).toMatchObject({
+      headline: 'This pass did not connect',
+      // The concrete next step (replay the saved loop target) is still the
+      // right action even though the headline no longer claims readiness.
+      action: 'replay',
+      actionLabel: 'Replay this loop',
+      changed: false,
+    });
+  });
+
+  it('still leads with a genuine per-drum improvement even on an otherwise weak run', () => {
+    // A real, data-backed improvement outranks the fell-apart framing - it
+    // contradicts nothing on screen and is the "one clear improvement"
+    // case the receipt exists to surface.
+    const previous = {
+      ...allMissRunFixture(),
+      laneAccuracy: [
+        { element: 'kick' as const, hits: 1, misses: 9, accuracy: 0.1 },
+      ],
+    };
+    const summary = {
+      ...previous,
+      totalHits: 8,
+      totalMisses: 92,
+      overallAccuracy: 0.08,
+      laneAccuracy: [
+        { element: 'kick' as const, hits: 8, misses: 2, accuracy: 0.8 },
+      ],
+    };
+
+    expect(musicalReceipt(summary, previous)).toMatchObject({
+      headline: 'Kick rose 70 points',
+      action: 'continue',
+      changed: true,
+    });
+  });
+
   it('reports a comparable per-drum improvement before supporting rewards', () => {
     const previous = {
       ...multiLaneRunFixture(),

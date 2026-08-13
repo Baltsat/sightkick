@@ -1,5 +1,8 @@
 import { IpcMainEvent } from 'electron';
 import type {
+  KitElement,
+  LaneAccuracy,
+  LaneBias,
   PracticeAttemptCheckpoint,
   PracticeAttemptCheckpointBySong,
   PracticeRunArchive,
@@ -8,6 +11,8 @@ import type {
   RunSummary,
   StoredHitRecord,
   StoredPracticeRun,
+  TimingBiasStats,
+  WrongHitCount,
 } from '../../renderer/services/practice-stats';
 import {
   archiveRunSummaries,
@@ -17,7 +22,9 @@ import {
   MAX_RECENT_PRACTICE_SUMMARIES_PER_SONG,
   PRACTICE_ATTEMPT_CHECKPOINT_SCHEMA_VERSION,
   readPracticeRunArchive,
+  summarizeRun,
 } from '../../renderer/services/practice-stats';
+import type { SkillEvidenceEvent } from '../../renderer/services/pedagogy/types';
 import { appState } from '../AppState';
 
 /** Keep recent, individually inspectable summaries; older evidence is archived. */
@@ -44,6 +51,30 @@ export const PRACTICE_RUN_ARCHIVE_STORE_KEY = 'practiceRunArchive';
 
 const archiveStoreKey = (songId: string) =>
   `${PRACTICE_RUN_ARCHIVE_STORE_KEY}.${songId}`;
+
+/**
+ * Atomic per-item skill evidence (the Bayesian mastery/spaced-review
+ * signal) is the one kind of run evidence `archiveRunSummaries`/`addToDay`
+ * does not fold into the compact per-day archive when a summary is evicted
+ * past `MAX_STORED_RUNS_PER_SONG` - see `RunLearningEvidence` vs
+ * `atomicSkillEvidence` in practice-stats/types.ts. Without a home of its
+ * own, that evidence would be silently destroyed the moment a well-practiced
+ * song crosses the retention cap. This sidecar keeps every evicted event,
+ * append-only, independent of the summary/archive/full-run caps above.
+ */
+export const PRACTICE_RUN_SKILL_EVIDENCE_ARCHIVE_STORE_KEY =
+  'practiceRunSkillEvidenceArchive';
+
+/**
+ * A generous safety rail, not a normal truncation policy (mirrors
+ * `MAX_PRACTICE_ATTEMPT_RECORDS`'s reasoning): one atomic event is authored
+ * per manifest item per run, far sparser than raw hit records, so this would
+ * take many thousands of runs on one song to ever approach.
+ */
+export const MAX_ARCHIVED_SKILL_EVIDENCE_EVENTS_PER_SONG = 20_000;
+
+const skillEvidenceArchiveStoreKey = (songId: string) =>
+  `${PRACTICE_RUN_SKILL_EVIDENCE_ARCHIVE_STORE_KEY}.${songId}`;
 
 export interface IpcSavePracticeRunPayload {
   songId: string;
@@ -89,6 +120,14 @@ export interface IpcPracticeRunsResponse {
   fullRuns: StoredPracticeRun[];
   /** Compact evidence for detailed summaries evicted by the retention cap. */
   archive: PracticeRunArchive;
+  /**
+   * Atomic per-item skill evidence carried by summaries evicted past the
+   * retention cap - see `PRACTICE_RUN_SKILL_EVIDENCE_ARCHIVE_STORE_KEY`.
+   * Consumers that replay full mastery history should read this alongside
+   * `runs[].atomicSkillEvidence` rather than in place of it: this array only
+   * ever holds evidence for runs no longer present in `runs`.
+   */
+  atomicSkillEvidenceArchive: SkillEvidenceEvent[];
 }
 
 export interface IpcPracticeStatsError {
@@ -100,6 +139,11 @@ type PracticeRunsStore = Record<string, RunSummary[]>;
 type PracticeRunDetailsStore = Record<string, StoredPracticeRun[]>;
 
 type PracticeRunArchiveStore = Record<string, PracticeRunArchive>;
+
+type PracticeRunSkillEvidenceArchiveStore = Record<
+  string,
+  SkillEvidenceEvent[]
+>;
 
 type PracticeAttemptCheckpointsStore = PracticeAttemptCheckpointBySong;
 
@@ -193,6 +237,47 @@ function isMidiInputTelemetry(value: unknown): value is MidiInputTelemetry {
       value.lastMappedLane === 'tom2' ||
       value.lastMappedLane === 'tom3')
   );
+}
+
+function isSkillEvidenceEvent(value: unknown): value is SkillEvidenceEvent {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.run_id === 'string' &&
+    typeof value.chart_revision === 'string' &&
+    typeof value.manifest_revision === 'string' &&
+    typeof value.skill_id === 'string' &&
+    typeof value.item_id === 'string' &&
+    typeof value.context_signature === 'string' &&
+    (value.evidence_kind === 'acquisition' ||
+      value.evidence_kind === 'retention' ||
+      value.evidence_kind === 'transfer') &&
+    isFiniteNumber(value.quality) &&
+    isFiniteNumber(value.weight) &&
+    isFiniteNumber(value.playback_speed) &&
+    typeof value.completed_at === 'string' &&
+    isOptionalFiniteNumber(value.target_bpm) &&
+    isOptionalFiniteNumber(value.scored_notes) &&
+    isOptionalFiniteNumber(value.judging_window_ms) &&
+    isOptionalFiniteNumber(value.raw_timing_spread_ms) &&
+    isOptionalFiniteNumber(value.normalized_timing_stability)
+  );
+}
+
+/**
+ * Malformed or legacy (pre-feature) data reads as an empty archive. Exported
+ * for `gamification.ts`'s `loadAllPracticeRuns`, which reads this same store
+ * key across every song - the actual read path `SongListView`'s mastery/My
+ * Wave replay uses (see the store key's own doc comment).
+ */
+export function readSkillEvidenceArchive(raw: unknown): SkillEvidenceEvent[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw.filter(isSkillEvidenceEvent);
 }
 
 function assertValidCheckpointPayload(
@@ -324,6 +409,192 @@ function checkpointStoreKey(songId: string): string {
   return `${PRACTICE_ATTEMPT_CHECKPOINTS_STORE_KEY}.${songId}`;
 }
 
+function weightedMean(
+  meanA: number,
+  countA: number,
+  meanB: number,
+  countB: number,
+): number {
+  const totalCount = countA + countB;
+
+  return totalCount === 0 ? 0 : (meanA * countA + meanB * countB) / totalCount;
+}
+
+function mergeLaneAccuracy(
+  a: LaneAccuracy[],
+  b: LaneAccuracy[],
+): LaneAccuracy[] {
+  const byLane = new Map<KitElement, { hits: number; misses: number }>();
+
+  for (const lane of [...a, ...b]) {
+    const entry = byLane.get(lane.element) ?? { hits: 0, misses: 0 };
+
+    entry.hits += lane.hits;
+    entry.misses += lane.misses;
+    byLane.set(lane.element, entry);
+  }
+
+  return [...byLane.entries()].map(([element, { hits, misses }]) => ({
+    element,
+    hits,
+    misses,
+    accuracy: hits / (hits + misses),
+  }));
+}
+
+function mergeLaneBias(a: LaneBias[], b: LaneBias[]): LaneBias[] {
+  const byLane = new Map<KitElement, { meanMs: number; sampleCount: number }>();
+
+  for (const lane of [...a, ...b]) {
+    const existing = byLane.get(lane.element);
+
+    byLane.set(
+      lane.element,
+      existing
+        ? {
+            meanMs: weightedMean(
+              existing.meanMs,
+              existing.sampleCount,
+              lane.meanMs,
+              lane.sampleCount,
+            ),
+            sampleCount: existing.sampleCount + lane.sampleCount,
+          }
+        : { meanMs: lane.meanMs, sampleCount: lane.sampleCount },
+    );
+  }
+
+  return [...byLane.entries()].map(([element, stats]) => ({
+    element,
+    ...stats,
+  }));
+}
+
+function mergeWrongHitCounts(
+  a: WrongHitCount[],
+  b: WrongHitCount[],
+): WrongHitCount[] {
+  const byLane = new Map<KitElement, number>();
+
+  for (const wrong of [...a, ...b]) {
+    byLane.set(wrong.element, (byLane.get(wrong.element) ?? 0) + wrong.count);
+  }
+
+  return [...byLane.entries()].map(([element, count]) => ({ element, count }));
+}
+
+function mergeTimingBias(
+  a: TimingBiasStats,
+  b: TimingBiasStats,
+): TimingBiasStats {
+  return {
+    meanMs: weightedMean(a.meanMs, a.sampleCount, b.meanMs, b.sampleCount),
+    // Exact per-run medians/spreads aren't recoverable from two already-
+    // aggregated summaries (the raw deltas behind them are gone); a sample-
+    // count-weighted blend is the closest available approximation.
+    medianMs: weightedMean(
+      a.medianMs,
+      a.sampleCount,
+      b.medianMs,
+      b.sampleCount,
+    ),
+    spreadMs: weightedMean(
+      a.spreadMs,
+      a.sampleCount,
+      b.spreadMs,
+      b.sampleCount,
+    ),
+    earlyCount: a.earlyCount + b.earlyCount,
+    lateCount: a.lateCount + b.lateCount,
+    onTimeCount: a.onTimeCount + b.onTimeCount,
+    sampleCount: a.sampleCount + b.sampleCount,
+  };
+}
+
+/** Exact count-based merge of two already-aggregated summaries' base stats. */
+function mergeSummaryStatsApproximate(
+  summary: RunSummary,
+  orphaned: RunSummary,
+): RunSummary {
+  const totalHits = summary.totalHits + orphaned.totalHits;
+  const totalMisses = summary.totalMisses + orphaned.totalMisses;
+
+  return {
+    ...summary,
+    totalHits,
+    totalMisses,
+    totalWrong: summary.totalWrong + orphaned.totalWrong,
+    overallAccuracy:
+      totalHits + totalMisses === 0 ? 0 : totalHits / (totalHits + totalMisses),
+    laneAccuracy: mergeLaneAccuracy(
+      summary.laneAccuracy,
+      orphaned.laneAccuracy,
+    ),
+    laneBias: mergeLaneBias(summary.laneBias, orphaned.laneBias),
+    timingBias: mergeTimingBias(summary.timingBias, orphaned.timingBias),
+    wrongHitCounts: mergeWrongHitCounts(
+      summary.wrongHitCounts,
+      orphaned.wrongHitCounts,
+    ),
+  };
+}
+
+/**
+ * Folds already-scored hit records from a checkpoint that belongs to a
+ * *different* scored session than the run being saved into the persisted
+ * summary/records, instead of letting them silently vanish the instant the
+ * checkpoint that held them is discarded (see the `orphanedRecords` filter
+ * in `savePracticeRun`, below, for which checkpoints qualify - the run's own
+ * periodic safety-net autosave is deliberately excluded there, since its
+ * records already are this run's `records`).
+ *
+ * `summarizeRun` and everything it calls in compute.ts never read
+ * `timeSeconds`; only `verdict`/`element`/`deltaMs` drive every derived
+ * stat, so a checkpoint's `StoredHitRecord` (which has no `timeSeconds`) can
+ * stand in for a `HitRecord` here without losing any precision that matters.
+ */
+function mergeOrphanedCheckpointEvidence(
+  summary: RunSummary,
+  records: HitRecord[] | undefined,
+  orphanedRecords: StoredHitRecord[],
+): { summary: RunSummary; records: HitRecord[] | undefined } {
+  if (orphanedRecords.length === 0) {
+    return { summary, records };
+  }
+
+  const orphanedAsHitRecords: HitRecord[] = orphanedRecords.map((record) => ({
+    ...record,
+    timeSeconds: 0,
+  }));
+
+  if (records !== undefined) {
+    const mergedRecords = [...orphanedAsHitRecords, ...records];
+
+    return {
+      summary: {
+        ...summary,
+        ...summarizeRun(mergedRecords, summary.completedAt),
+      },
+      records: mergedRecords,
+    };
+  }
+
+  // No full-resolution records travelled with this save. Every current
+  // production caller sends them (see SongView.tsx's save-practice-run
+  // message), so this is a defensive fallback for a hypothetical caller
+  // that omits them - the counts stay exact, the continuous timing stats
+  // become a documented approximation (see mergeTimingBias/mergeLaneBias).
+  const orphanedSummary = summarizeRun(
+    orphanedAsHitRecords,
+    summary.completedAt,
+  );
+
+  return {
+    summary: mergeSummaryStatsApproximate(summary, orphanedSummary),
+    records,
+  };
+}
+
 /**
  * Appends one run summary to the song's detailed history. The latest
  * `MAX_STORED_RUNS_PER_SONG` summaries remain individually inspectable;
@@ -338,8 +609,8 @@ export function savePracticeRun(
   try {
     const {
       songId,
-      summary,
-      records,
+      summary: submittedSummary,
+      records: submittedRecords,
       finalizeAttemptSessionId,
       finalizeAttemptSessionIds,
     } = payload;
@@ -371,6 +642,29 @@ export function savePracticeRun(
             | PracticeAttemptCheckpointsStore
             | undefined) ?? {}
         : undefined;
+    const checkpointsForSong = practiceAttemptCheckpoints
+      ? readPracticeAttemptCheckpoints(practiceAttemptCheckpoints[songId])
+      : [];
+    // A checkpoint finalized in this same snapshot may hold hit evidence the
+    // submitted `summary`/`records` never saw: the pre-interruption attempt
+    // this run resumed from, or a draft left over from a run whose own save
+    // previously failed (its sessionId stays "pending" and gets retried on
+    // the next successful save for this song). A checkpoint sharing this
+    // run's own session id is instead the run's own periodic autosave -
+    // already fully reflected in `submittedRecords` - so it is deliberately
+    // excluded here and just discarded below like before.
+    const orphanedRecords: StoredHitRecord[] = checkpointsForSong
+      .filter(
+        (checkpoint) =>
+          finalizedSessionIds.has(checkpoint.sessionId) &&
+          checkpoint.sessionId !== submittedSummary.context?.sessionId,
+      )
+      .flatMap((checkpoint) => checkpoint.records);
+    const { summary, records } = mergeOrphanedCheckpointEvidence(
+      submittedSummary,
+      submittedRecords,
+      orphanedRecords,
+    );
     const existing = practiceRuns[songId] ?? [];
     const allRuns = [...existing, summary];
     const firstRetainedIndex = Math.max(
@@ -383,6 +677,20 @@ export function savePracticeRun(
       readPracticeRunArchive(practiceRunArchive[songId]),
       evicted,
     );
+    // Every evicted summary's atomic skill evidence must survive the cap
+    // too - `archiveRunSummaries` above only folds in aggregate/learning
+    // evidence, never `atomicSkillEvidence` (see the constant's doc comment).
+    const evictedSkillEvidence: SkillEvidenceEvent[] = evicted.flatMap(
+      (evictedSummary) => evictedSummary.atomicSkillEvidence ?? [],
+    );
+    const practiceRunSkillEvidenceArchive =
+      (appState.store.get(PRACTICE_RUN_SKILL_EVIDENCE_ARCHIVE_STORE_KEY) as
+        | PracticeRunSkillEvidenceArchiveStore
+        | undefined) ?? {};
+    const skillEvidenceArchive = [
+      ...readSkillEvidenceArchive(practiceRunSkillEvidenceArchive[songId]),
+      ...evictedSkillEvidence,
+    ].slice(-MAX_ARCHIVED_SKILL_EVIDENCE_EVENTS_PER_SONG);
     const existingFullRuns = practiceRunDetails[songId] ?? [];
     const fullRuns =
       records !== undefined
@@ -393,17 +701,16 @@ export function savePracticeRun(
         : existingFullRuns;
     const finalizedCheckpoints =
       finalizedSessionIds.size > 0
-        ? readPracticeAttemptCheckpoints(
-            practiceAttemptCheckpoints?.[songId],
-          ).filter(
+        ? checkpointsForSong.filter(
             (checkpoint) => !finalizedSessionIds.has(checkpoint.sessionId),
           )
         : undefined;
 
     // electron-store's object-form setter builds the complete next store in
-    // memory and performs one filesystem write. Keeping all three evidence
-    // namespaces in that single snapshot prevents a failed write from leaving
-    // summaries, archives, and full-resolution details out of sync.
+    // memory and performs one filesystem write. Keeping every evidence
+    // namespace in that single snapshot prevents a failed write from leaving
+    // summaries, archives, full-resolution details, and archived skill
+    // evidence out of sync.
     appState.store.set({
       [PRACTICE_RUNS_STORE_KEY]: { ...practiceRuns, [songId]: next },
       [PRACTICE_RUN_ARCHIVE_STORE_KEY]:
@@ -414,6 +721,13 @@ export function savePracticeRun(
         records !== undefined
           ? { ...practiceRunDetails, [songId]: fullRuns }
           : practiceRunDetails,
+      [PRACTICE_RUN_SKILL_EVIDENCE_ARCHIVE_STORE_KEY]:
+        evictedSkillEvidence.length > 0
+          ? {
+              ...practiceRunSkillEvidenceArchive,
+              [songId]: skillEvidenceArchive,
+            }
+          : practiceRunSkillEvidenceArchive,
       ...(finalizedCheckpoints && practiceAttemptCheckpoints
         ? {
             [PRACTICE_ATTEMPT_CHECKPOINTS_STORE_KEY]: {
@@ -597,8 +911,17 @@ export function loadPracticeRuns(event: IpcMainEvent, songId: string): void {
     const archive = readPracticeRunArchive(
       appState.store.get(archiveStoreKey(songId)),
     );
+    const atomicSkillEvidenceArchive = readSkillEvidenceArchive(
+      appState.store.get(skillEvidenceArchiveStoreKey(songId)),
+    );
 
-    event.reply('load-practice-runs', { songId, runs, fullRuns, archive });
+    event.reply('load-practice-runs', {
+      songId,
+      runs,
+      fullRuns,
+      archive,
+      atomicSkillEvidenceArchive,
+    } satisfies IpcPracticeRunsResponse);
   } catch (error) {
     event.reply('load-practice-runs', { error: toErrorMessage(error) });
   }

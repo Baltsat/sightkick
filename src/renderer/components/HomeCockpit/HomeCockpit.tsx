@@ -162,15 +162,37 @@ const EMPTY_SHELF_COPY: ShelfCopy = {
   title: 'Choose a song to begin',
   detail: 'Pick a song, then strike a highlighted drum to start.',
 };
+/**
+ * Shown when a lesson/song target is already armed (the hero above already
+ * reads "Start practice") but no musical payoff has been ranked yet. This
+ * must never collapse to `EMPTY_SHELF_COPY` - "Choose a song to begin" is
+ * idle-state copy, and showing it under an armed hero is exactly the
+ * self-contradiction the 2026-08-13 critique flagged (item 1: "the hero
+ * title reads a specific armed lesson ... the line directly beneath says
+ * 'Choose a song to begin'"). Stays factual about what is (nothing ranked)
+ * rather than promising a future state the store can't guarantee.
+ */
+const ARMED_SHELF_FALLBACK_COPY: ShelfCopy = {
+  title: 'No song payoff yet',
+  detail: 'No favourite-song section is ranked to play yet.',
+};
 
 /** The goal-song low shelf's copy, honest about the one state
  * `next-practice/home-session.ts` can hand back that isn't actually a
- * payoff: its own `NO_PAYOFF_PLACEHOLDER` fallback string. */
+ * payoff: its own `NO_PAYOFF_PLACEHOLDER` fallback string. `hasPracticeTarget`
+ * decides which "nothing to show" copy applies - idle copy only when no
+ * target is armed at all, the armed-fallback copy when a target is armed but
+ * simply has no ranked song payoff yet (see `ARMED_SHELF_FALLBACK_COPY`). */
 export function resolveShelfCopy(
   sessionSummary: HomeSessionReceipt | undefined,
+  hasPracticeTarget: boolean,
 ): ShelfCopy {
-  if (!sessionSummary || sessionSummary.title === NO_PAYOFF_PLACEHOLDER) {
+  if (!hasPracticeTarget) {
     return EMPTY_SHELF_COPY;
+  }
+
+  if (!sessionSummary || sessionSummary.title === NO_PAYOFF_PLACEHOLDER) {
+    return ARMED_SHELF_FALLBACK_COPY;
   }
 
   return { title: sessionSummary.title, detail: sessionSummary.detail };
@@ -195,7 +217,6 @@ export function HomeCockpit({
   onStartSession,
   onStartPracticeCard,
   onOpenSongs,
-  onOpenProfile,
 }: HomeCockpitProps) {
   const { inputMapping, inputReadiness, selectedDevice } = useInput();
   const [activeLane, setActiveLane] = useState<KitElement>();
@@ -293,13 +314,10 @@ export function HomeCockpit({
     [gamification.runsBySong],
   );
   const kitColors = useKitColorMaturity(kitColorRuns);
-  const { todayXp: liveTodayXp, streakCurrent: liveStreakCurrent } =
-    liveDailyProgress(gamification);
-  const progressLine = `${describeStreak(
-    liveStreakCurrent,
-  )} · ${describeGoalProgress(liveTodayXp, gamification.goalXp)}`;
-  const { title: shelfTitle, detail: shelfDetail } =
-    resolveShelfCopy(sessionSummary);
+  const { title: shelfTitle, detail: shelfDetail } = resolveShelfCopy(
+    sessionSummary,
+    hasPracticeTarget,
+  );
 
   useLayoutEffect(() => {
     const studio = studioRef.current;
@@ -556,21 +574,6 @@ export function HomeCockpit({
                 />
               </div>
             </details>
-          </section>
-
-          <section
-            className="kit-home__profile-snapshot"
-            data-testid="home-profile-snapshot"
-            aria-label="Your practice profile"
-          >
-            <span>{progressLine}</span>
-            <button
-              type="button"
-              data-testid="home-open-profile"
-              onClick={onOpenProfile}
-            >
-              View profile
-            </button>
           </section>
         </div>
       </aside>

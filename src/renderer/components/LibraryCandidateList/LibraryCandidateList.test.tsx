@@ -236,7 +236,7 @@ describe('LibraryCandidateList — source rows', () => {
 
     expect(
       screen.getByTestId('library-candidate-state-Drums-1'),
-    ).toHaveTextContent('Needs proof · local audio + reviewed chart');
+    ).toHaveTextContent('Not in your library yet');
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -282,9 +282,74 @@ describe('LibraryCandidateList — source rows', () => {
 
     expect(
       screen.getByTestId('library-candidate-state-Drums-1'),
-    ).toHaveTextContent('Reviewed chart found · local audio still required');
+    ).toHaveTextContent('Chart found · needs your audio');
     expect(
       screen.getByRole('button', { name: /use lawful local audio for loyal/i }),
     ).toBeDisabled();
+  });
+
+  it('keeps the check-charts / use-local-audio pair out of the resting row and reveals them only when the row is focused', () => {
+    const track = sourceTrack('source-3', 'Wantchya');
+    const entries = build_unified_library({
+      songs: [],
+      sources: sources([track]),
+      now: '2026-08-12T00:00:00.000Z',
+    });
+    const { rerender } = render(
+      <LibraryCandidateList
+        entries={entries}
+        difficulty={DIFFICULTY}
+        canUseLocalAudio
+        onPlaySong={vi.fn()}
+        onResolveSource={vi.fn()}
+        onUseLocalAudioForSource={vi.fn()}
+      />,
+    );
+    const actions = screen.getByTestId('library-candidate-actions-Drums-1');
+
+    expect(actions).toHaveClass('opacity-0');
+    expect(actions).not.toHaveClass('opacity-100');
+
+    rerender(
+      <LibraryCandidateList
+        entries={entries}
+        difficulty={DIFFICULTY}
+        focusedIndex={0}
+        canUseLocalAudio
+        onPlaySong={vi.fn()}
+        onResolveSource={vi.fn()}
+        onUseLocalAudioForSource={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('library-candidate-actions-Drums-1')).toHaveClass(
+      'opacity-100',
+    );
+  });
+
+  it('never shows the raw pipeline label — only plain human copy', () => {
+    const track = sourceTrack('source-4', 'Sanctuary');
+    const entries = build_unified_library({
+      songs: [],
+      sources: sources([track]),
+      now: '2026-08-12T00:00:00.000Z',
+    });
+
+    render(
+      <LibraryCandidateList
+        entries={entries}
+        difficulty={DIFFICULTY}
+        canUseLocalAudio
+        onPlaySong={vi.fn()}
+        onResolveSource={vi.fn()}
+        onUseLocalAudioForSource={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByTestId('library-candidate-state-Drums-1'),
+    ).toHaveTextContent('Not in your library yet');
+    expect(screen.queryByText(/reviewed chart/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/local audio \+/i)).not.toBeInTheDocument();
   });
 });

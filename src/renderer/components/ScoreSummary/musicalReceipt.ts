@@ -65,6 +65,39 @@ function timingImprovement(
   return improvement >= 8 ? improvement : undefined;
 }
 
+/** Sample floor before an accuracy signal is trusted as meaningful rather
+ * than noise from a handful of strikes. */
+const FELL_APART_MIN_ATTEMPTS = 4;
+/** At or below this overall accuracy, a run has not merely underperformed
+ * - it did not connect. Below the threshold the headline must say so
+ * plainly instead of reaching for a neutral/positive frame. */
+const FELL_APART_MAX_ACCURACY = 0.15;
+
+function attemptedCount(summary: RunSummary): number {
+  return summary.totalHits + summary.totalMisses;
+}
+
+/** True when the kit received input but essentially nothing landed - the
+ * "run that fell apart" case the receipt must never dress up as neutral. */
+function fellApart(summary: RunSummary): boolean {
+  return (
+    attemptedCount(summary) >= FELL_APART_MIN_ATTEMPTS &&
+    summary.overallAccuracy <= FELL_APART_MAX_ACCURACY
+  );
+}
+
+/** True when nothing was scored at all - the player started and stopped, or
+ * the run captured no hits, misses, or wrong hits of any kind. Distinct from
+ * `noMusicalInput` (the kit never reached the app): here the practice
+ * pipeline worked, there is simply nothing to report. */
+function noAttempts(summary: RunSummary): boolean {
+  return (
+    summary.totalHits === 0 &&
+    summary.totalMisses === 0 &&
+    summary.totalWrong === 0
+  );
+}
+
 function cleanRecovery(summary: RunSummary): string | undefined {
   const bars = Object.entries(summary.learningEvidence?.bars ?? {}).find(
     ([, evidence]) => (evidence.recoveryCleanCount ?? 0) > 0,
@@ -95,6 +128,17 @@ export function musicalReceipt(
     return undefined;
   }
 
+  if (noAttempts(summary)) {
+    return {
+      headline: 'No hits recorded this pass',
+      meaning:
+        'Nothing was played during this run. Start the loop again when you are ready.',
+      action: 'replay',
+      actionLabel: 'Replay this loop',
+      changed: false,
+    };
+  }
+
   if (previous) {
     const lane = laneDelta(summary, previous);
 
@@ -121,6 +165,23 @@ export function musicalReceipt(
         changed: true,
       };
     }
+  }
+
+  // Checked ahead of both saved-recovery and loop-target evidence: neither
+  // of those is false when a run also fell apart overall, but leading with
+  // "recovered cleanly" or "ready for a loop" over near-zero accuracy reads
+  // as praise the numbers directly contradict. The run's overall honesty
+  // outranks a narrower, more flattering fact about it.
+  if (fellApart(summary)) {
+    const attempted = attemptedCount(summary);
+
+    return {
+      headline: 'This pass did not connect',
+      meaning: `${summary.totalHits} of ${attempted} notes landed. Slow the tempo or check the kit mapping, then try the loop again.`,
+      action: 'replay',
+      actionLabel: 'Replay this loop',
+      changed: false,
+    };
   }
 
   const recoveredBar = cleanRecovery(summary);

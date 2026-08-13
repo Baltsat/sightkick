@@ -126,6 +126,41 @@ export const NoMusicalInput: Story = {
   },
 };
 
+export const AllMissDoesNotCongratulate: Story = {
+  args: {
+    scoreData: undefined,
+    practiceSummary: {
+      ...kickRun(0, 0, '2026-08-12T12:00:00.000Z'),
+      totalHits: 0,
+      totalMisses: 132,
+      totalWrong: 0,
+      overallAccuracy: 0,
+      laneAccuracy: [
+        { element: 'hihat', hits: 0, misses: 4, accuracy: 0 },
+        { element: 'snare', hits: 0, misses: 128, accuracy: 0 },
+      ],
+      coachEvidence: [
+        {
+          id: 'bars-1-17',
+          kind: 'timing',
+          severity: 'medium',
+          skillTag: 'timing',
+          sampleCount: 12,
+          barStart: 1,
+          barEnd: 17,
+        },
+      ],
+    },
+  },
+};
+
+export const NoAttemptsThisRun: Story = {
+  args: {
+    scoreData: undefined,
+    practiceSummary: kickRun(0, 0, '2026-08-12T12:00:00.000Z'),
+  },
+};
+
 export const SectionAudition: Story = {
   args: {
     scoreData: undefined,

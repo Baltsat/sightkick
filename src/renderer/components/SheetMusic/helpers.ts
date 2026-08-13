@@ -47,6 +47,47 @@ export function autoScrollSpeed(clientY: number, edge: ScrollEdge): number {
   return down > 0 ? down : 0;
 }
 
+// Flow's stave sat centred in a viewport-height box while rendering at the
+// same fixed scale as Classic's browsable full-page sheet, so it read as a
+// small object in a big empty room rather than the subject of the practice
+// screen (visual-system-v3's "one dominant object" rule: >=58% of the
+// usable area at the 1024x700 minimum). This computes the extra multiplier
+// Flow alone needs on top of the shared classic baseline to fill a
+// deliberate share of its own real viewport height, floored at that shared
+// baseline (Flow is never smaller than Classic) and capped so a very tall,
+// narrow window can't blow the stave up absurdly.
+export const FLOW_AUTO_ZOOM_MIN_MULTIPLIER = 1.15;
+
+export const FLOW_AUTO_ZOOM_MAX_MULTIPLIER = 2.6;
+
+export const FLOW_AUTO_ZOOM_TARGET_HEIGHT_FRACTION = 0.6;
+
+/**
+ * `naturalNotationHeight` and `availableViewportHeight` must both be real
+ * measurements (an unmeasurable value - not yet laid out, e.g. jsdom, or
+ * before VexFlow has painted - is <= 0), in which case this returns the
+ * shared baseline unchanged so the caller can leave presentationZoom at its
+ * existing `zoom * 1.15` value.
+ */
+export function flowAutoZoomMultiplier(
+  naturalNotationHeight: number,
+  availableViewportHeight: number,
+): number {
+  if (naturalNotationHeight <= 0 || availableViewportHeight <= 0) {
+    return FLOW_AUTO_ZOOM_MIN_MULTIPLIER;
+  }
+
+  const fitted =
+    (FLOW_AUTO_ZOOM_TARGET_HEIGHT_FRACTION * availableViewportHeight) /
+    naturalNotationHeight;
+
+  return clamp(
+    fitted,
+    FLOW_AUTO_ZOOM_MIN_MULTIPLIER,
+    FLOW_AUTO_ZOOM_MAX_MULTIPLIER,
+  );
+}
+
 function gcd(a: number, b: number): number {
   return b === 0 ? a : gcd(b, a % b);
 }

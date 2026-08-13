@@ -24,6 +24,9 @@ export async function downloadSong(
   event: Electron.IpcMainEvent,
   { url, md5, name, artist, charter, chartSource, reviewed }: Props,
 ) {
+  let outputDir: string | undefined;
+  let outputCreated = false;
+
   try {
     if (chartSource !== 'chorus-encore' || reviewed !== true) {
       throw new Error(
@@ -53,7 +56,9 @@ export async function downloadSong(
       /[\\/:*?"<>|]/g,
       '',
     );
-    const outputDir = path.join(lastOpenedPath, folderName);
+
+    outputDir = path.join(lastOpenedPath, folderName);
+
     const songs = (appState.store.get('songs') as StorageSchema['songs']) ?? {};
 
     if (songs[md5] || fs.existsSync(outputDir)) {
@@ -123,6 +128,7 @@ export async function downloadSong(
     });
 
     fs.mkdirSync(outputDir, { recursive: true });
+    outputCreated = true;
 
     for (const file of files) {
       const dest = path.join(outputDir, file.name);
@@ -142,6 +148,10 @@ export async function downloadSong(
       throw new Error('Failed to parse downloaded song');
     }
 
+    if (songData.audio.length === 0) {
+      throw new Error('Downloaded chart has no playable audio file');
+    }
+
     if (!songData.drumDifficulties?.length) {
       throw new Error('Downloaded chart has no playable drum part');
     }
@@ -156,6 +166,14 @@ export async function downloadSong(
       }),
     });
   } catch (err) {
+    // A partial/failed unpack must not leave a folder behind: `outputDir`'s
+    // mere existence is what the top-of-function `alreadyExists` gate keys
+    // on, so an orphaned folder would silently and permanently block every
+    // future retry of this exact song without ever re-attempting the fetch.
+    if (outputCreated && outputDir && fs.existsSync(outputDir)) {
+      fs.rmSync(outputDir, { recursive: true, force: true });
+    }
+
     event.reply('download-song', {
       success: false,
       md5,

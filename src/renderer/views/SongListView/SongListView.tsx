@@ -614,36 +614,82 @@ export function SongListView() {
       }),
     [songList, yandexSources, lessonManifests, atomicStates, libraryNow],
   );
-  const searchableEntries = useMemo(
+  // The default shelf never shows a lesson song — Journey owns the
+  // curriculum, and mixing it into "Songs" would put the same content on
+  // two routes. The header count must describe that same population, or it
+  // makes a claim the row list can never back up: this fixture's real
+  // local library is entirely the lesson curriculum (170 songs, all
+  // lessons), so counting them here used to produce "170 ready to play"
+  // on a screen that can never show a single one of those 170 rows — see
+  // docs/design-qa/2026-08-13-finish/critique.md, Songs finding 2.
+  const browsableEntries = useMemo(
     () =>
-      nameFilter.trim()
-        ? unifiedEntries
-        : unifiedEntries.filter(
-            (entry) => !(entry.song && isLessonSong(entry.song)),
-          ),
-    [unifiedEntries, nameFilter],
+      unifiedEntries.filter(
+        (entry) => !(entry.song && isLessonSong(entry.song)),
+      ),
+    [unifiedEntries],
+  );
+  const searchableEntries = useMemo(
+    () => (nameFilter.trim() ? unifiedEntries : browsableEntries),
+    [unifiedEntries, browsableEntries, nameFilter],
   );
   const matches = useMemo(
     () => search_unified_library(searchableEntries, nameFilter),
     [searchableEntries, nameFilter],
   );
-  const visibleEntries = useMemo(
-    () =>
-      order_unified_library(
-        filter_unified_library(matches, readinessFilter),
-        sort,
-      ),
-    [matches, readinessFilter, sort],
-  );
+  const visibleEntries = useMemo(() => {
+    const ordered = order_unified_library(
+      filter_unified_library(matches, readinessFilter),
+      sort,
+    );
+
+    // `order_unified_library`'s 'difficulty' sort ranks by each entry's
+    // chart-derived difficulty (unified-library.ts's `song_difficulty`),
+    // but this call site never supplies a per-song chart map — doing so
+    // would mean eagerly parsing every song's chart just to sort a list.
+    // Every entry (real songs and unresolved source-row suggestions alike)
+    // therefore ties at the same "no known difficulty" value, and the sort
+    // silently collapses to alphabetical-by-title with no regard for
+    // whether the row can actually be played. That let a screen of
+    // unresolved "Needs proof" suggestions from Favorites/Drums sort ahead
+    // of every one of the songs the header's own "N ready to play" count
+    // promises — see docs/design-qa/2026-08-13-finish/critique.md, Songs
+    // finding 2. Until real per-song difficulty is threaded through, break
+    // the tie on the one honest fact already on hand: whether it plays.
+    // This mirrors the existing 'ready' sort's own tie-break, so it isn't
+    // new sorting behaviour — the 'Difficulty' chip stays the default and
+    // keeps its title order within each group.
+    if (sort !== 'difficulty') {
+      return ordered;
+    }
+
+    const ready = ordered.filter((entry) => entry.ready);
+    const notReady = ordered.filter((entry) => !entry.ready);
+
+    return [...ready, ...notReady];
+  }, [matches, readinessFilter, sort]);
   const offerYoutube = useMemo(
     () =>
       youtubeImportAvailable &&
       should_offer_youtube(unifiedEntries, nameFilter),
     [youtubeImportAvailable, unifiedEntries, nameFilter],
   );
+  // "In your library" must mean songs he actually owns — a source-row
+  // entry is an unresolved suggestion pulled from a Yandex playlist, never
+  // downloaded, charted, or added. Folding it into the same count produced
+  // a header that argued with its own rows: "N in your library" over a
+  // screen where every visible row says "Not in your library yet" (see
+  // docs/design-qa/2026-08-13-finish/critique.md, Songs finding 2 — the
+  // fix for the alphabetical-order half of that finding must not
+  // reintroduce the same contradiction from the other side).
+  const songCount = useMemo(
+    () => browsableEntries.filter((entry) => entry.kind === 'song').length,
+    [browsableEntries],
+  );
+  const suggestionCount = browsableEntries.length - songCount;
   const readyCount = useMemo(
-    () => unifiedEntries.filter((entry) => entry.ready).length,
-    [unifiedEntries],
+    () => browsableEntries.filter((entry) => entry.ready).length,
+    [browsableEntries],
   );
   // A song can carry a past score yet no longer be playable — its audio or
   // chart went missing after a bad download/rescan (see
@@ -673,7 +719,9 @@ export function SongListView() {
     ? `${matches.length} ${
         matches.length === 1 ? 'match' : 'matches'
       } for “${trimmedNameFilter}”`
-    : `${unifiedEntries.length} in your library · ${readyCount} ready to play`;
+    : suggestionCount > 0
+    ? `${songCount} in your library · ${readyCount} ready to play · ${suggestionCount} to add from your playlists`
+    : `${songCount} in your library · ${readyCount} ready to play`;
 
   useEffect(() => {
     return window.electron.ipcRenderer.on<
@@ -1382,79 +1430,96 @@ export function SongListView() {
                       Ready only
                     </Button>
                   </div>
-                  <div
-                    className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted"
-                    role="status"
-                    aria-live="polite"
-                    data-testid="library-control-legend"
-                    data-control-source={libraryControls.source}
-                  >
-                    <span className="font-semibold text-text-body">
-                      {libraryControls.source === 'kit-lanes'
-                        ? 'Kit navigation'
-                        : libraryControls.source === 'mixed'
-                        ? 'Mixed navigation'
-                        : libraryControls.source === 'explicit'
-                        ? 'Mapped navigation'
-                        : 'Navigation unavailable'}
-                    </span>
-                    {(libraryControls.source === 'kit-lanes' ||
-                      libraryControls.source === 'mixed') && (
+                  {
+                    // With no kit or keyboard control mapped at all, there is
+                    // nothing honest to say here — "Navigation unavailable ·
+                    // Set library controls in Configure input" is a debug
+                    // string about missing settings, not something he would
+                    // ever say himself, and it has no business sitting under
+                    // the filter chips of the main library route (see
+                    // docs/design-qa/2026-08-13-finish/critique.md, Songs
+                    // finding 3). Mouse and Tab/Enter still work with no
+                    // legend at all; the real fact — no kit control mapped —
+                    // belongs in Settings, one intentional action away.
+                    libraryControls.source !== 'unavailable' && (
                       <div
-                        className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
-                        data-testid="library-kit-control-commands"
+                        className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted"
+                        role="status"
+                        aria-live="polite"
+                        data-testid="library-control-legend"
+                        data-control-source={libraryControls.source}
                       >
-                        {libraryMoveSteps.length > 0 && (
-                          <KitCommandPrompt
-                            compact
-                            model={{
-                              label: 'Move',
-                              steps: libraryMoveSteps,
-                              relationship: 'alternatives',
-                              stepHints: libraryMoveHints,
-                            }}
-                          />
+                        <span className="font-semibold text-text-body">
+                          {libraryControls.source === 'kit-lanes'
+                            ? 'Kit navigation'
+                            : libraryControls.source === 'mixed'
+                            ? 'Mixed navigation'
+                            : 'Mapped navigation'}
+                        </span>
+                        {(libraryControls.source === 'kit-lanes' ||
+                          libraryControls.source === 'mixed') && (
+                          <div
+                            className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
+                            data-testid="library-kit-control-commands"
+                          >
+                            {libraryMoveSteps.length > 0 && (
+                              <KitCommandPrompt
+                                compact
+                                model={{
+                                  label: 'Move',
+                                  steps: libraryMoveSteps,
+                                  relationship: 'alternatives',
+                                  stepHints: libraryMoveHints,
+                                }}
+                              />
+                            )}
+                            {libraryControls.kitActions.includes('confirm') && (
+                              <KitCommandPrompt
+                                compact
+                                model={{ label: 'Choose', steps: ['snare'] }}
+                              />
+                            )}
+                            {libraryControls.kitActions.includes(
+                              'difficulty',
+                            ) && (
+                              <KitCommandPrompt
+                                compact
+                                model={{
+                                  label: 'Difficulty',
+                                  steps: ['hihat'],
+                                }}
+                              />
+                            )}
+                            {libraryControls.kitActions.includes('sort') && (
+                              <KitCommandPrompt
+                                compact
+                                model={{ label: 'Sort', steps: ['tom3'] }}
+                              />
+                            )}
+                            {libraryControls.kitActions.includes('back') && (
+                              <KitCommandPrompt
+                                compact
+                                model={{ label: 'Back', steps: ['crash'] }}
+                              />
+                            )}
+                          </div>
                         )}
+                        <span
+                          className={
+                            libraryControls.source === 'kit-lanes' ||
+                            libraryControls.source === 'mixed'
+                              ? 'sr-only'
+                              : undefined
+                          }
+                        >
+                          {libraryControls.legend}
+                        </span>
                         {libraryControls.kitActions.includes('confirm') && (
-                          <KitCommandPrompt
-                            compact
-                            model={{ label: 'Choose', steps: ['snare'] }}
-                          />
-                        )}
-                        {libraryControls.kitActions.includes('difficulty') && (
-                          <KitCommandPrompt
-                            compact
-                            model={{ label: 'Difficulty', steps: ['hihat'] }}
-                          />
-                        )}
-                        {libraryControls.kitActions.includes('sort') && (
-                          <KitCommandPrompt
-                            compact
-                            model={{ label: 'Sort', steps: ['tom3'] }}
-                          />
-                        )}
-                        {libraryControls.kitActions.includes('back') && (
-                          <KitCommandPrompt
-                            compact
-                            model={{ label: 'Back', steps: ['crash'] }}
-                          />
+                          <span>Local choices open directly in Practice.</span>
                         )}
                       </div>
-                    )}
-                    <span
-                      className={
-                        libraryControls.source === 'kit-lanes' ||
-                        libraryControls.source === 'mixed'
-                          ? 'sr-only'
-                          : undefined
-                      }
-                    >
-                      {libraryControls.legend}
-                    </span>
-                    {libraryControls.kitActions.includes('confirm') && (
-                      <span>Local choices open directly in Practice.</span>
-                    )}
-                  </div>
+                    )
+                  }
                   {libraryCandidates.error && (
                     <p className="text-xs text-orange" role="status">
                       Drums and Favorites didn’t load: {libraryCandidates.error}
@@ -1507,8 +1572,8 @@ export function SongListView() {
                     {trimmedNameFilter ? ` for “${trimmedNameFilter}”` : ''}
                   </h2>
                   <p className="text-sm leading-relaxed text-text-muted">
-                    {matches.length} still{' '}
-                    {matches.length === 1 ? 'needs' : 'need'} proof.
+                    {matches.length} {matches.length === 1 ? "isn't" : "aren't"}{' '}
+                    ready to play yet.
                   </p>
                   <Button
                     size="large"

@@ -33,6 +33,7 @@ export interface SeasonCardProps {
   kitActions: Array<'up' | 'down' | 'left' | 'right' | 'confirm' | 'back'>;
   controlsVisible: boolean;
   onRevealControls: () => void;
+  onToggleControls: () => void;
   onPlay: (entry: LessonEntry) => void;
   onLockedClick: (entry: LessonEntry) => void;
 }
@@ -60,6 +61,7 @@ export function SeasonCard({
   kitActions,
   controlsVisible,
   onRevealControls,
+  onToggleControls,
   onPlay,
   onLockedClick,
 }: SeasonCardProps) {
@@ -165,6 +167,7 @@ export function SeasonCard({
           kitActions={kitActions}
           controlsVisible={controlsVisible}
           onRevealControls={onRevealControls}
+          onToggleControls={onToggleControls}
           onPlay={onPlay}
           onLockedClick={onLockedClick}
         />

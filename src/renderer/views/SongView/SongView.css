@@ -52,6 +52,11 @@
   flex: 0 1 17rem;
 }
 
+/* He practices at 0.7x and needs the mode and speed at a glance - never
+ * drop .drumroll-practice-toolbar__mode-label/layout-label/speed-label at
+ * any captured width. This block is shrink-0 and the Playback scrubber
+ * next to it is grow, so the scrubber absorbs width first; nothing here
+ * needs to degrade down to the 1024px minimum. */
 .drumroll-practice-toolbar__session-state {
   display: inline-flex;
   min-width: 0;
@@ -174,11 +179,6 @@
     min-width: 0;
     max-width: 11rem;
     flex-basis: 11rem;
-  }
-
-  .drumroll-practice-toolbar__session-state > span:nth-child(2),
-  .drumroll-practice-toolbar__session-state > span:nth-child(3) {
-    display: none;
   }
 
   .drumroll-practice-streak {

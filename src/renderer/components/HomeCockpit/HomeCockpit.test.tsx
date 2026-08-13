@@ -296,49 +296,17 @@ describe('HomeCockpit kit home', () => {
     );
   });
 
-  it('keeps the player state, streak, goal, and profile route on Home', () => {
-    const onOpenProfile = vi.fn();
-
-    render(
+  it('never shows an XP or streak readout on home - progress is earned on the profile route, not here', () => {
+    // 2026-08-13 critique, home item 4: an unearned counter shown before
+    // anything is played must not just move to quieter type, it must not
+    // render in the first viewport at all. Profile is already a primary
+    // rail destination (AppShell), so home carries no duplicate affordance
+    // for it either.
+    const { container } = render(
       <InputProvider>
         <HomeCockpit
           songList={[song]}
           gamification={gamification}
-          recommendation={recommendation}
-          onStartRecommended={vi.fn()}
-          onOpenSongs={vi.fn()}
-          onOpenProfile={onOpenProfile}
-        />
-      </InputProvider>,
-    );
-
-    expect(screen.getByTestId('home-profile-snapshot')).toHaveTextContent(
-      'No active streak',
-    );
-    expect(screen.getByTestId('home-profile-snapshot')).toHaveTextContent(
-      'Today · 0 / 100 XP',
-    );
-
-    fireEvent.click(screen.getByTestId('home-open-profile'));
-
-    expect(onOpenProfile).toHaveBeenCalledOnce();
-  });
-
-  it('renders a real stored day that far exceeds the goal as complete, never as a raw fraction', () => {
-    // This is the exact shape of the reported defect: a stored day of
-    // xp: 411 against a 50 XP goal, shown next to a genuine 1-day streak.
-    const exceededGamification = {
-      ...gamification,
-      streak: { current: 1 },
-      todayXp: 411,
-      goalXp: 50,
-    } as unknown as UseGamificationResult;
-
-    render(
-      <InputProvider>
-        <HomeCockpit
-          songList={[song]}
-          gamification={exceededGamification}
           recommendation={recommendation}
           onStartRecommended={vi.fn()}
           onOpenSongs={vi.fn()}
@@ -347,11 +315,47 @@ describe('HomeCockpit kit home', () => {
       </InputProvider>,
     );
 
-    const snapshot = screen.getByTestId('home-profile-snapshot');
+    expect(
+      screen.queryByTestId('home-profile-snapshot'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('home-open-profile')).not.toBeInTheDocument();
+    expect(screen.queryByText(/no active streak/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\bXP\b/)).not.toBeInTheDocument();
+    expect(container).not.toHaveTextContent('View profile');
+  });
 
-    expect(snapshot).toHaveTextContent('1-day streak');
-    expect(snapshot).toHaveTextContent('Set complete · 411 XP');
-    expect(snapshot).not.toHaveTextContent('411 / 50');
+  it('does not contradict an armed hero with idle "choose a song" shelf copy', () => {
+    // The exact defect from the 2026-08-13 critique: the hero read a
+    // specific armed lesson while the shelf beneath it still said "Choose a
+    // song to begin" - two states on one screen. Root cause was
+    // `resolveShelfCopy` losing its `hasPracticeTarget` argument at the
+    // call site. Assert on the `<strong>` node directly, not the whole
+    // `home-session-summary` text content - that node also contains a
+    // closed `<details>` whose text is present in the DOM regardless of
+    // open/closed state, so a substring match there can pass for the wrong
+    // reason.
+    render(
+      <InputProvider>
+        <HomeCockpit
+          songList={[lessonSong, song]}
+          gamification={gamification}
+          recommendation={lessonRecommendation}
+          practiceRanking={[lessonRecommendation, songRecommendation]}
+          practiceWave={practiceWave}
+          onStartRecommended={vi.fn()}
+          onOpenSongs={vi.fn()}
+          onOpenProfile={vi.fn()}
+        />
+      </InputProvider>,
+    );
+
+    expect(screen.getByTestId('home-start-practice')).toBeInTheDocument();
+
+    const shelfHeadline = screen
+      .getByTestId('home-session-summary')
+      .querySelector('strong');
+
+    expect(shelfHeadline).not.toHaveTextContent('Choose a song to begin');
   });
 });
 
@@ -460,26 +464,52 @@ describe('liveDailyProgress', () => {
 });
 
 describe('resolveShelfCopy', () => {
-  it('shows the choose-a-song state when there is no session at all', () => {
-    expect(resolveShelfCopy(undefined)).toEqual({
+  it('shows the choose-a-song state whenever no practice target is armed, regardless of session', () => {
+    expect(resolveShelfCopy(undefined, false)).toEqual({
+      title: 'Choose a song to begin',
+      detail: 'Pick a song, then strike a highlighted drum to start.',
+    });
+
+    const payoff: HomeSessionReceipt = {
+      title: 'Boulevard of Broken Dreams',
+      detail: 'Apply the session in your goal song.',
+      candidateId: 'song-1',
+    };
+
+    // Even a real payoff receipt must not out-rank an unarmed hero - the
+    // hero above already reads "Choose a song" in that state, and showing
+    // a song title in the shelf underneath it would be the same
+    // self-contradiction this function exists to prevent, just inverted
+    // (2026-08-13 critique, home item 1).
+    expect(resolveShelfCopy(payoff, false)).toEqual({
       title: 'Choose a song to begin',
       detail: 'Pick a song, then strike a highlighted drum to start.',
     });
   });
 
-  it('never surfaces next-practice/home-session.ts own dead-end placeholder verbatim', () => {
+  it('never surfaces next-practice/home-session.ts own dead-end placeholder verbatim once armed', () => {
     const deadEnd: HomeSessionReceipt = {
       title: 'No musical payoff yet',
       detail: 'No playable favourite-song section is currently ranked.',
     };
 
-    expect(resolveShelfCopy(deadEnd)).toEqual({
-      title: 'Choose a song to begin',
-      detail: 'Pick a song, then strike a highlighted drum to start.',
+    // Armed (the hero reads a specific lesson/song), but nothing was ranked
+    // as a payoff: the shelf must say so honestly, never fall back to the
+    // idle "Choose a song to begin" copy - that was exactly the bug the
+    // 2026-08-13 critique caught (hero armed, shelf still idle) because the
+    // call site once dropped this second argument entirely.
+    expect(resolveShelfCopy(deadEnd, true)).toEqual({
+      title: 'No song payoff yet',
+      detail: 'No favourite-song section is ranked to play yet.',
+    });
+
+    expect(resolveShelfCopy(undefined, true)).toEqual({
+      title: 'No song payoff yet',
+      detail: 'No favourite-song section is ranked to play yet.',
     });
   });
 
-  it('passes a real payoff receipt through unchanged', () => {
+  it('passes a real payoff receipt through unchanged once armed', () => {
     const payoff: HomeSessionReceipt = {
       title: 'Boulevard of Broken Dreams',
       detail:
@@ -487,7 +517,7 @@ describe('resolveShelfCopy', () => {
       candidateId: 'song-1',
     };
 
-    expect(resolveShelfCopy(payoff)).toEqual({
+    expect(resolveShelfCopy(payoff, true)).toEqual({
       title: payoff.title,
       detail: payoff.detail,
     });

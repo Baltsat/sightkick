@@ -127,6 +127,9 @@ import {
 import { SettingLabel } from '../../components/SettingsButton/SettingLabel';
 import { PracticeOutletContext } from '../practice-context';
 import { chartContentRevision } from '../../services/chart-revision';
+import { curriculumItemManifest } from '../../services/pedagogy/item-manifest';
+import { deriveAtomicSkillEvidence } from '../../services/pedagogy/skill-state';
+import { useWordBoundaryTruncate } from './useWordBoundaryTruncate';
 import './SongView.css';
 
 interface PracticeRunIdentity {
@@ -747,9 +750,32 @@ export function SongView() {
               }).findings,
             )
           : [];
+      // The Bayesian mastery/spaced-review system reads atomicSkillEvidence
+      // exclusively (SongListView's replayAtomicSkillState) - without this,
+      // it is permanently starved regardless of how much he practices. Only
+      // curriculum lesson songs carry a manifest to derive it against;
+      // priorAtomicEvidence is this song's own already-saved runs (prefetched
+      // on load below) so a same-context rep can classify as 'retention'
+      // instead of every rep looking like first-time 'acquisition' forever.
+      const lessonManifest = songData?.lesson
+        ? curriculumItemManifest(songData.lesson.id)
+        : undefined;
+      const atomicSkillEvidence = lessonManifest
+        ? [
+            ...deriveAtomicSkillEvidence({
+              run_id: identity.sessionId,
+              summary: baseRunSummary,
+              manifest: lessonManifest,
+              previous_events: (fullRuns ?? []).flatMap(
+                (run) => run.summary.atomicSkillEvidence ?? [],
+              ),
+            }).events,
+          ]
+        : [];
       const runSummary: RunSummary = {
         ...baseRunSummary,
         ...(coachEvidence.length > 0 ? { coachEvidence } : {}),
+        ...(atomicSkillEvidence.length > 0 ? { atomicSkillEvidence } : {}),
       };
       const runEvidence = decideRunEvidence({
         score,
@@ -771,10 +797,13 @@ export function SongView() {
 
       setPracticeSummary(runSummary);
       setNoMusicalInput(missingMusicalInput);
+      // The save-practice-run IPC round trip below is not Perform-only (see
+      // the comment on onEnded above), so this state must track it in every
+      // mode - gating it to Practice left Perform's Continue/Play-again
+      // always clickable mid-save, tearing down the only listener for the
+      // reply that mints XP/streak/star credit.
       setPracticePersistenceState(
-        gameMode === 'practice' && id && persistEligible
-          ? 'saving'
-          : 'no-evidence',
+        id && persistEligible ? 'saving' : 'no-evidence',
       );
       // Cleared synchronously so a still-open modal from a prior run never
       // shows last run's XP for a frame while this run's recordRun IPC
@@ -1055,7 +1084,10 @@ export function SongView() {
     [beginLessonTraversal, markRunStarted, playFromTick],
   );
   const onNextSong = useCallback(() => {
-    if (gameMode === 'practice' && practicePersistenceState === 'saving') {
+    // Perform runs save the same way Practice runs do (see onEnded), so
+    // this must block on the in-flight write in every mode - see the
+    // matching comment on setPracticePersistenceState above.
+    if (practicePersistenceState === 'saving') {
       return;
     }
 
@@ -1085,7 +1117,7 @@ export function SongView() {
     practiceSummary,
   ]);
   const onRetry = useCallback(() => {
-    if (gameMode === 'practice' && practicePersistenceState === 'saving') {
+    if (practicePersistenceState === 'saving') {
       return;
     }
 
@@ -1093,47 +1125,69 @@ export function SongView() {
     setPracticePersistenceState('no-evidence');
     setNoMusicalInput(false);
     playRunFromTick(0);
-  }, [gameMode, playRunFromTick, practicePersistenceState]);
-  const loadStoredRuns = useCallback(
-    (forCoach: boolean) => {
-      if (!id) {
-        return;
-      }
+  }, [playRunFromTick, practicePersistenceState]);
+  // No unconditional setState in the body itself (only inside the async IPC
+  // reply callback, which is the sanctioned "subscribe, then setState in a
+  // callback" shape) - every caller that wants the coach-loading spinner
+  // sets it itself before calling this, so this function stays safe to call
+  // from an effect (the lesson-load prefetch below) without tripping
+  // cascading synchronous-setState-in-effect risk. Always clears it on
+  // reply regardless of who asked: a coach-loading request can be
+  // superseded by an unrelated call (the lesson prefetch effect re-firing
+  // on an `id` change, or Stats opening) before its reply arrives -
+  // `loadRunsOffRef.current?.()` below cancels the stale listener, so only
+  // the winning call's reply ever runs. Clearing unconditionally there
+  // means the coach spinner can never stick.
+  const loadStoredRuns = useCallback(() => {
+    if (!id) {
+      return;
+    }
 
-      if (forCoach) {
-        setIsCoachLoading(true);
-      }
-
-      loadRunsOffRef.current?.();
-      loadRunsOffRef.current = window.electron.ipcRenderer.once<
-        | {
-            songId: string;
-            runs: RunSummary[];
-            fullRuns?: StoredPracticeRun[];
-          }
-        | { error: string }
-      >('load-practice-runs', (result) => {
-        loadRunsOffRef.current = undefined;
-        setIsCoachLoading(false);
-
-        if ('runs' in result) {
-          setSongRuns(result.runs);
-          setFullRuns(result.fullRuns ?? []);
+    loadRunsOffRef.current?.();
+    loadRunsOffRef.current = window.electron.ipcRenderer.once<
+      | {
+          songId: string;
+          runs: RunSummary[];
+          fullRuns?: StoredPracticeRun[];
         }
-      });
-      window.electron.ipcRenderer.sendMessage('load-practice-runs', id);
-    },
-    [id],
-  );
+      | { error: string }
+    >('load-practice-runs', (result) => {
+      loadRunsOffRef.current = undefined;
+      setIsCoachLoading(false);
+
+      if ('runs' in result) {
+        setSongRuns(result.runs);
+        setFullRuns(result.fullRuns ?? []);
+      }
+    });
+    window.electron.ipcRenderer.sendMessage('load-practice-runs', id);
+  }, [id]);
   const onOpenStats = useCallback(() => {
     setIsStatsOpen(true);
-    loadStoredRuns(false);
+    loadStoredRuns();
   }, [loadStoredRuns]);
   const onOpenCoach = useCallback(() => {
     setIsScoreModalOpen(false);
     setIsCoachOpen(true);
-    loadStoredRuns(true);
+    setIsCoachLoading(true);
+    loadStoredRuns();
   }, [loadStoredRuns]);
+  const isLessonSong = Boolean(songData?.lesson);
+
+  // Prefetches this song's saved runs the moment a lesson loads, well ahead
+  // of any run finishing, so onEnded's atomic-skill-evidence derivation
+  // below has real prior events to classify a rep as 'retention' rather
+  // than every rep looking like first-time 'acquisition' forever (Coach
+  // and Stats already trigger the same load lazily; this only moves the
+  // fetch earlier for lesson songs, which are the only ones that use it).
+  useEffect(() => {
+    if (!isLessonSong) {
+      return;
+    }
+
+    loadStoredRuns();
+  }, [isLessonSong, loadStoredRuns]);
+
   const onExportPdf = useCallback(() => {
     if (!vexflowContainerRef.current || !songData) {
       return;
@@ -1364,7 +1418,8 @@ export function SongView() {
     clearSelection();
     pause();
     setIsCoachOpen(true);
-    loadStoredRuns(true);
+    setIsCoachLoading(true);
+    loadStoredRuns();
   }, [
     clearSelection,
     loadStoredRuns,
@@ -1714,9 +1769,7 @@ export function SongView() {
         !isCounting
       ) &&
       !(
-        drumGestureSurface === 'result' &&
-        gameMode === 'practice' &&
-        practicePersistenceState === 'saving'
+        drumGestureSurface === 'result' && practicePersistenceState === 'saving'
       ),
     surface: drumGestureSurface,
     mapping: inputMapping,
@@ -1951,7 +2004,8 @@ export function SongView() {
 
     const timeout = window.setTimeout(() => {
       setIsCoachOpen(true);
-      loadStoredRuns(true);
+      setIsCoachLoading(true);
+      loadStoredRuns();
 
       const next = new URLSearchParams(searchParams);
 
@@ -2483,6 +2537,14 @@ export function SongView() {
     !showCountInCaption &&
     !showTransportCaption &&
     (practicePresentationPhase === 'paused' ||
+      // The inactivity veil steps aside on any pointer activity, but the
+      // real park (genuine pause, seek back to the checkpoint) stays in
+      // effect until a mapped kit hit resumes it - without this branch the
+      // screen goes back to looking like ordinary silence with no
+      // explanation once the veil is gone. tutorDisplayState already
+      // computes 'inactivity-paused' and TutorHud already renders it; this
+      // was the only missing render gate.
+      practicePresentationPhase === 'inactivity-paused' ||
       (gameMode === 'practice' &&
         (practicePresentationPhase === 'recovery-explain' ||
           Boolean(remediationSession.activeTask) ||
@@ -2512,6 +2574,18 @@ export function SongView() {
     !showCountInCaption &&
     !showTransportCaption &&
     !showTutorCaption;
+  // The toolbar title/subtitle truncate at a fixed pixel width regardless
+  // of word boundaries - CSS ellipsis alone cuts mid-word ("...Altern...",
+  // "...next les...") at both captured widths. This measures the real
+  // rendered width and backs off to the last whole word instead.
+  const toolbarTitleText = songData?.name ?? '';
+  const toolbarSubtitleText = practiceRecommendationReason
+    ? `My Wave · ${practiceRecommendationReason}`
+    : songData?.artist ?? '';
+  const { ref: toolbarTitleRef, display: toolbarTitleDisplay } =
+    useWordBoundaryTruncate<HTMLHeadingElement>(toolbarTitleText);
+  const { ref: toolbarSubtitleRef, display: toolbarSubtitleDisplay } =
+    useWordBoundaryTruncate<HTMLParagraphElement>(toolbarSubtitleText);
 
   return (
     <Layout
@@ -2533,9 +2607,7 @@ export function SongView() {
           practicePersistenceState,
           songData,
         )}
-        persistenceState={
-          gameMode === 'practice' ? practicePersistenceState : undefined
-        }
+        persistenceState={practicePersistenceState}
         onRetry={onRetry}
         onCoach={onOpenCoach}
         songData={songData}
@@ -2665,13 +2737,15 @@ export function SongView() {
 
         <div className="drumroll-practice-toolbar__identity min-w-0">
           <h1
-            className="truncate font-display text-base font-semibold leading-tight text-text-body"
+            ref={toolbarTitleRef}
+            className="overflow-hidden whitespace-nowrap font-display text-base font-semibold leading-tight text-text-body"
             title={songData?.name}
           >
-            {songData?.name}
+            {toolbarTitleDisplay}
           </h1>
           <p
-            className="m-0 truncate text-xs leading-tight text-text-faint"
+            ref={toolbarSubtitleRef}
+            className="m-0 overflow-hidden whitespace-nowrap text-xs leading-tight text-text-faint"
             data-testid={
               practiceRecommendationReason ? 'practice-wave-reason' : undefined
             }
@@ -2681,9 +2755,7 @@ export function SongView() {
                 : songData?.artist
             }
           >
-            {practiceRecommendationReason
-              ? `My Wave · ${practiceRecommendationReason}`
-              : songData?.artist}
+            {toolbarSubtitleDisplay}
           </p>
         </div>
 
@@ -2721,9 +2793,17 @@ export function SongView() {
             practiceInputStatus.accessibleLabel
           }`}
         >
-          <span>{gameMode === 'practice' ? 'Practice' : 'Perform'}</span>
-          <span>{notationLayout}</span>
-          {policy.speedControl && <span>{playbackSpeed.toFixed(1)}×</span>}
+          <span className="drumroll-practice-toolbar__mode-label">
+            {gameMode === 'practice' ? 'Practice' : 'Perform'}
+          </span>
+          <span className="drumroll-practice-toolbar__layout-label">
+            {notationLayout}
+          </span>
+          {policy.speedControl && (
+            <span className="drumroll-practice-toolbar__speed-label">
+              {playbackSpeed.toFixed(1)}×
+            </span>
+          )}
           {isLooping && <span>Loop</span>}
           <span
             className="drumroll-practice-input-readiness"

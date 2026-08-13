@@ -3,41 +3,48 @@ import type {
   YandexPlaylistCandidate,
 } from '../../../types';
 
+// Plain human copy only — this is the one line a not-yet-added suggestion
+// row is allowed to say about itself. No "proof", "metadata", "identity",
+// or other pipeline words a drummer never asked about (see
+// docs/design-qa/2026-08-13-finish/critique.md, Songs finding 1, and
+// docs/design-acceptance-notes.md's "plain human copy" rule). The exact
+// technical reason still reaches him — through a tooltip on the row's
+// action, one intentional hover away, never as the row's resting state.
 export function libraryCandidateState(
   track: YandexPlaylistCandidate,
   linked = false,
   resolution?: LibraryCandidateResolution,
 ): string {
   if (linked) {
-    return 'Playable · proof gates green';
+    return 'Ready to play';
   }
 
   if (resolution?.status === 'exact-reviewed-chart') {
-    return 'Reviewed chart found · local audio still required';
+    return 'Chart found · needs your audio';
   }
 
   if (resolution?.status === 'identity-incomplete') {
-    return 'Blocked · source identity lacks duration';
+    return "Can't check this one yet";
   }
 
   if (resolution?.status === 'no-exact-reviewed-chart') {
-    return 'No reviewed exact chart · local audio can be auto-charted';
+    return 'No chart yet · could be charted from audio';
   }
 
   if (
     track.sourceAvailability === 'unavailable' ||
     track.practiceStatus === 'unavailable'
   ) {
-    return 'Unavailable · reference only';
+    return 'No longer available';
   }
 
   if (track.sourceAvailability === 'private') {
-    return 'Private · metadata only';
+    return 'Private on Yandex';
   }
 
   if (track.sourceReferenceStatus === 'not-visible') {
-    return 'Metadata only · source link not visible';
+    return "Can't verify this one yet";
   }
 
-  return 'Needs proof · local audio + reviewed chart';
+  return 'Not in your library yet';
 }

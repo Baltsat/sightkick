@@ -668,6 +668,70 @@ describe('practice mode analytics', () => {
     }
   }, 30000);
 
+  it('writes atomic skill evidence from the run-completion path so Bayesian mastery can advance', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView({
+        route: '/lesson-1?gameMode=practice',
+        settings: {
+          countIn: false,
+          adaptiveTutorEnabled: false,
+          handsFreeControlsEnabled: false,
+        },
+        keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+      });
+
+      // DRUM_CHART's 8 notes clear MINIMUM_SCORED_NOTES (4) even though
+      // only one is actually hit here - the rest score as misses at
+      // natural end, and quality/scoring is not what this test asserts.
+      await view.loadSong(
+        makeSong({
+          id: 'lesson-1',
+          lesson: {
+            id: '01.01',
+            title: 'Alternating Singles Warm-Up',
+            unit: 'Foundations',
+            starsToUnlock: 0,
+          },
+        }),
+        DRUM_CHART,
+      );
+      view.clickPlay();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+      await view.pressKey('KeyJ');
+
+      await runToEnd(view);
+
+      const payload = view.ipc.sent
+        .filter((entry) => entry.channel === 'save-practice-run')
+        .map((entry) => entry.args[0])
+        .at(-1) as
+        | {
+            summary: {
+              atomicSkillEvidence?: { skill_id: string; item_id: string }[];
+            };
+          }
+        | undefined;
+
+      expect(payload).toBeDefined();
+
+      const evidence = payload!.summary.atomicSkillEvidence;
+
+      expect(evidence).toBeDefined();
+      expect(evidence!.map((event) => event.skill_id).sort()).toEqual([
+        'hand.singles',
+        'pulse.sixteenth',
+      ]);
+      expect(evidence!.every((event) => event.item_id === '01.01')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 30000);
+
   it('does not unlock a lesson when a run starts below the learning tempo and only finishes at target speed', async () => {
     vi.useFakeTimers();
 

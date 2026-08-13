@@ -35,11 +35,19 @@
   inset: 0 auto 0 0;
   z-index: 2;
   display: flex;
-  width: min(38%, 27rem);
+  width: min(44%, 32rem);
   min-width: 15rem;
   min-height: 0;
   flex-direction: column;
-  justify-content: space-between;
+  /* `flex-start` + an explicit gap - not `space-between` - deliberately: a
+   * full-height space-between stretches the shelf to the studio's bottom
+   * edge no matter how little content either side has, which is exactly
+   * the "roughly 350px of empty space... leftover, not deliberate" defect
+   * (2026-08-13 critique, home item 2/8). The manifest and the low shelf
+   * now read as one grouped column that hugs the top of the frame; what's
+   * left below is uncovered kit, not a stretched, empty text container. */
+  justify-content: flex-start;
+  gap: clamp(1.75rem, 5vh, 3.25rem);
   padding: clamp(1.5rem, 4.5vh, 3.25rem) clamp(1.25rem, 3vw, 2.5rem);
   /* Text sits over live strike zones (hi-hat/crash reach ~14-35% from the
    * left edge) - only the manifest/shelf's own controls should capture
@@ -94,13 +102,17 @@
 
 .kit-home__wash {
   pointer-events: none;
+  /* Horizontal stops track `.kit-home__context`'s own width (44% desktop) -
+   * the scrim has to stay opaque under the full title column, not just the
+   * old 38%, or a wider/bigger title reads clearly on lines 1-2 and washes
+   * out on the lines that now fall past the old fade point. */
   background:
     linear-gradient(
       100deg,
       color-mix(in srgb, var(--surface-studio) 90%, transparent) 0%,
-      color-mix(in srgb, var(--surface-studio) 64%, transparent) 26%,
-      color-mix(in srgb, var(--surface-studio) 22%, transparent) 44%,
-      transparent 62%
+      color-mix(in srgb, var(--surface-studio) 68%, transparent) 32%,
+      color-mix(in srgb, var(--surface-studio) 28%, transparent) 52%,
+      transparent 72%
     ),
     linear-gradient(
       0deg,
@@ -117,15 +129,19 @@
 .kit-home__manifest h1 {
   /* No character cap: the column's own width (not a "Nch" guess) decides
    * wrapping, so a long lesson title breaks into a few generous lines
-   * instead of five cramped fragments (design-acceptance-notes.md #2). */
+   * instead of five cramped fragments (design-acceptance-notes.md #2). The
+   * wider column (44%, up from 38%) plus this larger scale is what turns
+   * four cramped fragments into two or three lines that own the frame the
+   * way `My Vibe` owns its title, instead of reading as a caption pinned
+   * over the photograph (2026-08-13 critique, home item 5). */
   max-width: 100%;
   margin: 0;
   color: var(--kit-home-studio-ink);
   font-family: var(--font-display);
-  font-size: clamp(2.1rem, 3.6vw, 3.5rem);
-  font-weight: 650;
+  font-size: clamp(2.4rem, 4.4vw, 4.1rem);
+  font-weight: 660;
   letter-spacing: -0.03em;
-  line-height: 0.98;
+  line-height: 0.94;
   text-shadow: 0 0.35rem 1.4rem rgb(10 8 5 / 55%);
   text-wrap: balance;
 }
@@ -154,8 +170,7 @@
 
 .kit-home__primary-action:focus-visible,
 .kit-home__pad:focus-visible,
-.kit-home__session-summary summary:focus-visible,
-.kit-home__profile-snapshot button:focus-visible {
+.kit-home__session-summary summary:focus-visible {
   outline: 2px solid var(--signal-ember);
   outline-offset: 3px;
 }
@@ -179,8 +194,16 @@
    * faded the maturity signal gets, without touching the maturity service
    * itself - full color-mix() saturation still ramps in above the floor,
    * so an early, unfaded pad looks identical to today.
+   *
+   * The floor moved from 46% to 65%: at 46%, a yellow ring on a
+   * yellow-lit tom or a tan ring on the beige floor tom disappeared into
+   * the photograph's own colours at arm's length (2026-08-13 critique,
+   * home item 5 - "closer to faded to nearly invisible than to
+   * unmistakable at two metres"). 65% keeps the zone reading as coloured
+   * light on the drumhead, not a sticker, while staying clearly above the
+   * photo's own saturation in every lit area of the kit.
    */
-  --kit-pad-vividness: max(var(--kit-color-vividness, 100%), 46%);
+  --kit-pad-vividness: max(var(--kit-color-vividness, 100%), 65%);
   --kit-pad-signal: color-mix(
     in srgb,
     var(--color-yellow) var(--kit-pad-vividness),
@@ -250,12 +273,16 @@
 .kit-home__pad-head {
   inset: 0;
   z-index: -1;
-  border: 2.5px solid color-mix(in srgb, var(--kit-pad-signal) 78%, white);
+  /* Thicker ring (2.5px -> 3.5px) and a stronger radial fill (30%/10% ->
+   * 50%/22%) so the zone reads as lit drumhead colour, not a thin outline
+   * that only shows up against a dark background (2026-08-13 critique,
+   * home item 5). */
+  border: 3.5px solid color-mix(in srgb, var(--kit-pad-signal) 82%, white);
   background: radial-gradient(
     ellipse at 50% 50%,
-    color-mix(in srgb, var(--kit-pad-signal) 30%, transparent),
-    color-mix(in srgb, var(--kit-pad-signal) 10%, transparent) 71%,
-    transparent 76%
+    color-mix(in srgb, var(--kit-pad-signal) 50%, transparent),
+    color-mix(in srgb, var(--kit-pad-signal) 22%, transparent) 71%,
+    transparent 78%
   );
   /* An always-on dark ring under the colour ring, independent of
    * `--kit-pad-signal` - a light-coloured border alone can wash out
@@ -349,12 +376,14 @@
 }
 
 /*
- * One low shelf, flush to the image's bottom-left corner, holding the
- * goal-song payoff (the reason to practice - design-acceptance-notes.md
- * #5) and a single quiet progress caption underneath it, separated by one
- * hairline rather than each living in its own bordered block. "no cards"
- * (visual-system-v3, home screen direction: "a one-line strip ... uses
- * dividers, no cards").
+ * One low shelf, grouped directly under the manifest (see the `gap` on
+ * `.kit-home__context`), holding the goal-song payoff - the reason to
+ * practice (design-acceptance-notes.md #5) and visual-system-v3's "a
+ * one-line strip... can show next lesson, last musical win, and current
+ * daily commitment." No XP/streak readout here: progress is earned on the
+ * profile route, not shown unearned in the first viewport (2026-08-13
+ * critique, home item 4) - this shelf is the honest My Wave reason line
+ * only, on the same field as the kit, no card.
  */
 .kit-home__shelf {
   display: grid;
@@ -362,10 +391,17 @@
   gap: 0.85rem;
   padding: 1.1rem 1.2rem;
   border-radius: 0.75rem;
+  /* Stronger and more even than before (was 40%->74%, weakest exactly
+   * where the headline sits) - grouping the shelf directly under the
+   * manifest (see the context `gap`) can put a strike-zone ring right
+   * behind the headline at some title lengths/widths. A flap this opaque
+   * keeps the ring a soft presence behind the flap rather than a sharp
+   * line cutting across the text, without turning the shelf into an
+   * opaque card. */
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--surface-studio) 40%, transparent),
-    color-mix(in srgb, var(--surface-studio) 74%, transparent)
+    color-mix(in srgb, var(--surface-studio) 74%, transparent),
+    color-mix(in srgb, var(--surface-studio) 88%, transparent)
   );
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 8%);
 }
@@ -375,50 +411,6 @@
   min-width: 0;
   gap: 0.3rem;
   color: var(--kit-home-studio-ink);
-}
-
-.kit-home__profile-snapshot {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  min-width: 0;
-  gap: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--kit-home-studio-line);
-}
-
-/* This is the streak/XP sentence's only rendered surface - clipping it with
- * an ellipsis (the previous rule) can hide the actual number behind "...",
- * which reads as a wrong readout even though the underlying string is
- * honest. Let it wrap onto a second line instead of losing digits; the
- * neighbouring "View profile" button stays fixed-width so it never crowds
- * out real evidence. */
-.kit-home__profile-snapshot > span {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow-wrap: break-word;
-  color: var(--kit-home-studio-ink-muted);
-  font-size: 0.76rem;
-  font-weight: 600;
-}
-
-.kit-home__profile-snapshot button {
-  flex: none;
-  padding: 0;
-  border: 0;
-  color: var(--kit-home-studio-ink);
-  background: transparent;
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 760;
-  text-decoration: underline;
-  text-decoration-color: rgb(255 248 237 / 38%);
-  text-underline-offset: 0.15rem;
-  cursor: pointer;
-}
-
-.kit-home__profile-snapshot button:hover {
-  text-decoration-color: var(--kit-home-studio-ink);
 }
 
 .kit-home__session-summary > strong {
@@ -525,12 +517,13 @@
  * point of item #5) must stay readable here, not disappear. */
 @media (max-width: 1100px) {
   .kit-home__context {
-    width: min(46%, 23rem);
+    width: min(52%, 27rem);
+    gap: clamp(1.25rem, 4vh, 2rem);
     padding: clamp(1.1rem, 3.5vh, 2rem) clamp(1rem, 2.5vw, 1.75rem);
   }
 
   .kit-home__manifest h1 {
-    font-size: clamp(1.8rem, 3.6vw, 2.6rem);
+    font-size: clamp(2rem, 4.2vw, 2.85rem);
   }
 
   .kit-home__shelf {

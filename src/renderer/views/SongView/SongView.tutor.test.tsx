@@ -1,4 +1,10 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BEAT_SECONDS,
@@ -439,6 +445,53 @@ describe('safe hands-free run intent', () => {
     );
     expect(document.querySelectorAll('[data-edge-caption]')).toHaveLength(1);
   });
+
+  it('keeps a fallback caption once the inactivity veil steps aside from pointer activity', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice',
+        settings: { countIn: false, handsFreeControlsEnabled: true },
+      });
+
+      await view.loadSong();
+      view.clickPlay();
+
+      // DRUM_CHART's quarter notes are 0.5s apart at 120bpm - let ~3s of
+      // real song time pass without a single hit so the kit inactivity
+      // recovery hook genuinely parks (INACTIVITY_MIN_SECONDS = 2.25s,
+      // INACTIVITY_MIN_EXPECTED_HEADS = 3 abandoned heads - both cross
+      // well before 3s of untouched playback).
+      for (let index = 0; index < 6; index += 1) {
+        view.audio.currentTime += 0.5;
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(150);
+        });
+      }
+
+      const veil = screen.getByTestId('inactivity-pause-veil');
+
+      expect(screen.queryByTestId('tutor-hud')).not.toBeInTheDocument();
+
+      // An ordinary trackpad brush over the practice view - not a hit on
+      // any pad - steps the veil aside without ending the real park.
+      fireEvent.pointerDown(veil);
+
+      expect(
+        screen.queryByTestId('inactivity-pause-veil'),
+      ).not.toBeInTheDocument();
+
+      const hud = screen.getByTestId('tutor-hud');
+
+      expect(hud).toHaveAttribute('data-display-state', 'inactivity-paused');
+      expect(hud).toHaveTextContent('Paused — input check');
+      expect(document.querySelectorAll('[data-edge-caption]')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 30000);
 
   it('gives kit gestures sole ownership when a pad also has a transport mapping', async () => {
     const view = setupSongView({

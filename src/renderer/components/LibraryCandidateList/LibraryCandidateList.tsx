@@ -246,7 +246,7 @@ function SourceRow({
       data-practice-status={track.practiceStatus}
       data-focused={focused ? 'true' : undefined}
       className={cn(
-        'flex min-w-0 items-center gap-3 border-b border-border-soft px-2 py-2',
+        'group flex min-w-0 items-center gap-3 border-b border-border-soft px-2 py-2',
         {
           'bg-accent-soft-bg outline-2 -outline-offset-2 outline-accent':
             focused,
@@ -291,7 +291,20 @@ function SourceRow({
         >
           {label}
         </span>
-        <div className="flex shrink-0 gap-2">
+        {/* These are operational tools (chart lookup, local audio) — not
+            the visual start point of a row that was never played. They stay
+            out of the resting row and reveal only on the row the player is
+            actually pointing at: pointer hover, keyboard focus landing on
+            either button, or kit-driven row focus. See
+            docs/visual-system-v3.md's "lists and rows" and
+            docs/design-qa/2026-08-13-finish/critique.md, Songs finding 1. */}
+        <div
+          data-testid={`library-candidate-actions-${testIdSuffix}`}
+          className={cn(
+            'flex shrink-0 gap-2 opacity-0 transition-opacity duration-[120ms] ease-out focus-within:opacity-100 group-hover:opacity-100',
+            { 'opacity-100': focused },
+          )}
+        >
           <Tooltip title="Check Chorus Encore and RhythmVerse for an exact reviewed drum chart">
             <Button
               size="small"
@@ -312,7 +325,7 @@ function SourceRow({
           <Tooltip
             title={
               track.durationSeconds === null
-                ? 'This source row has no duration, so its identity cannot pass the safety gate'
+                ? "This song is missing a length, so it can't be safely identified yet"
                 : canUseLocalAudio
                 ? 'Choose audio you own or are allowed to process; Drumroll will chart it locally'
                 : 'Select a local library folder first'

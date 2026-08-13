@@ -5,7 +5,9 @@ import {
   PracticeRunArchive,
   RunSummary,
   StoredPracticeRun,
+  summarizeRun,
 } from '../../renderer/services/practice-stats';
+import type { SkillEvidenceEvent } from '../../renderer/services/pedagogy/types';
 import { FakeStore, lastReply, makeEvent, makeStore } from './test-support';
 
 const storeHolder = vi.hoisted(() => ({
@@ -53,6 +55,7 @@ vi.mock('../AppState', () => ({
 }));
 
 const {
+  MAX_ARCHIVED_SKILL_EVIDENCE_EVENTS_PER_SONG,
   MAX_STORED_FULL_RUNS_PER_SONG,
   MAX_STORED_RUNS_PER_SONG,
   finalizePracticeAttemptCheckpoint,
@@ -62,7 +65,7 @@ const {
   savePracticeRun,
 } = await import('./practiceStats');
 
-function fakeSummary(overallAccuracy = 1): RunSummary {
+function fakeSummary(overallAccuracy = 1, ownSessionId?: string): RunSummary {
   return {
     completedAt: '2026-08-01T00:00:00.000Z',
     totalHits: 1,
@@ -81,6 +84,26 @@ function fakeSummary(overallAccuracy = 1): RunSummary {
       onTimeCount: 0,
       sampleCount: 0,
     },
+    // Stamping `context.sessionId` marks this summary as belonging to a
+    // specific run session, exactly as SongView does in production. Tests
+    // that finalize a checkpoint sharing this id are asserting the "own
+    // periodic autosave, already reflected in `records`" case; tests that
+    // omit it (or use a different id) are asserting the "orphaned evidence
+    // from a different session" merge case.
+    ...(ownSessionId
+      ? {
+          context: {
+            sessionId: ownSessionId,
+            schemaVersion: 3,
+            appVersion: '1.0.0-test',
+            scoringPolicyVersion: 'judge-evidence-v3',
+            startedAt: '2026-08-01T00:00:00.000Z',
+            chartRevision: 'chart-revision-1',
+            inputLatencyMs: 0,
+            inputMapping: {},
+          },
+        }
+      : {}),
   };
 }
 
@@ -123,6 +146,25 @@ function fakeCheckpoint(
 
 function emptyArchive() {
   return { schemaVersion: 1, days: {} };
+}
+
+function fakeSkillEvidenceEvent(
+  runId: string,
+  itemId = 'item-1',
+): SkillEvidenceEvent {
+  return {
+    run_id: runId,
+    chart_revision: 'chart-revision-1',
+    manifest_revision: 'manifest-1',
+    skill_id: 'skill-1',
+    item_id: itemId,
+    context_signature: 'context-1',
+    evidence_kind: 'acquisition',
+    quality: 0.9,
+    weight: 1,
+    playback_speed: 1,
+    completed_at: '2026-08-01T00:00:00.000Z',
+  };
 }
 
 function evidenceSummary(index: number, completedAt: string): RunSummary {
@@ -280,6 +322,7 @@ describe('savePracticeRun', () => {
         },
       ],
       archive: emptyArchive(),
+      atomicSkillEvidenceArchive: [],
     });
   });
 
@@ -322,6 +365,7 @@ describe('savePracticeRun', () => {
       'practiceRuns',
       'practiceRunArchive',
       'practiceRunDetails',
+      'practiceRunSkillEvidenceArchive',
     ]);
 
     const runs = storeHolder.current.get('practiceRuns.song-1') as RunSummary[];
@@ -678,6 +722,114 @@ describe('savePracticeRun', () => {
     );
   });
 
+  it('archives atomic skill evidence from an evicted summary instead of discarding it', () => {
+    const existing = Array.from({ length: MAX_STORED_RUNS_PER_SONG }, (_, i) =>
+      evidenceSummary(i, '2024-01-05T12:00:00.000Z'),
+    );
+    const evictedEvidence = [fakeSkillEvidenceEvent('run-0', 'item-a')];
+
+    existing[0] = { ...existing[0], atomicSkillEvidence: evictedEvidence };
+
+    storeHolder.current = makeStore({
+      practiceRuns: { 'song-1': existing },
+    });
+
+    // Pushing one more run past the cap evicts exactly `existing[0]`.
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary: evidenceSummary(99, '2026-08-01T12:00:00.000Z'),
+    });
+
+    expect(
+      storeHolder.current.get('practiceRunSkillEvidenceArchive.song-1'),
+    ).toEqual(evictedEvidence);
+
+    const event = makeEvent();
+
+    loadPracticeRuns(event as never, 'song-1');
+
+    expect(lastReply(event, 'load-practice-runs')!.args[0]).toMatchObject({
+      atomicSkillEvidenceArchive: evictedEvidence,
+    });
+  });
+
+  it('accumulates archived skill evidence across multiple eviction waves without overwriting earlier events', () => {
+    const firstWave = Array.from({ length: MAX_STORED_RUNS_PER_SONG }, (_, i) =>
+      evidenceSummary(i, '2024-01-05T12:00:00.000Z'),
+    );
+    const firstEvicted = fakeSkillEvidenceEvent('run-first', 'item-a');
+
+    firstWave[0] = { ...firstWave[0], atomicSkillEvidence: [firstEvicted] };
+
+    storeHolder.current = makeStore({ practiceRuns: { 'song-1': firstWave } });
+
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary: evidenceSummary(50, '2026-08-01T12:00:00.000Z'),
+    });
+
+    expect(
+      storeHolder.current.get('practiceRunSkillEvidenceArchive.song-1'),
+    ).toEqual([firstEvicted]);
+
+    // Splice a second run carrying its own atomic skill evidence into the
+    // slot the *next* save will evict, so this proves accumulation across
+    // two separate eviction waves rather than one eviction that happens to
+    // carry two events.
+    const runsAfterFirstSave = storeHolder.current.get(
+      'practiceRuns.song-1',
+    ) as RunSummary[];
+    const secondEvicted = fakeSkillEvidenceEvent('run-second', 'item-b');
+
+    runsAfterFirstSave[0] = {
+      ...runsAfterFirstSave[0],
+      atomicSkillEvidence: [secondEvicted],
+    };
+    storeHolder.current.set('practiceRuns.song-1', runsAfterFirstSave);
+
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary: evidenceSummary(51, '2026-08-02T12:00:00.000Z'),
+    });
+
+    expect(
+      storeHolder.current.get('practiceRunSkillEvidenceArchive.song-1'),
+    ).toEqual([firstEvicted, secondEvicted]);
+  });
+
+  it('keeps a generous bound on archived skill evidence instead of growing without limit', () => {
+    const existing = Array.from({ length: MAX_STORED_RUNS_PER_SONG }, (_, i) =>
+      evidenceSummary(i, '2024-01-05T12:00:00.000Z'),
+    );
+    const newlyEvicted = fakeSkillEvidenceEvent('run-new', 'item-new');
+
+    existing[0] = { ...existing[0], atomicSkillEvidence: [newlyEvicted] };
+
+    const preexisting = Array.from(
+      { length: MAX_ARCHIVED_SKILL_EVIDENCE_EVENTS_PER_SONG },
+      (_, i) => fakeSkillEvidenceEvent(`run-old-${i}`, `item-old-${i}`),
+    );
+
+    storeHolder.current = makeStore({
+      practiceRuns: { 'song-1': existing },
+      practiceRunSkillEvidenceArchive: { 'song-1': preexisting },
+    });
+
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary: evidenceSummary(99, '2026-08-01T12:00:00.000Z'),
+    });
+
+    const archived = storeHolder.current.get(
+      'practiceRunSkillEvidenceArchive.song-1',
+    ) as SkillEvidenceEvent[];
+
+    expect(archived).toHaveLength(MAX_ARCHIVED_SKILL_EVIDENCE_EVENTS_PER_SONG);
+    // Oldest archived event is dropped to make room; the newest still lands.
+    expect(archived[0]).toEqual(preexisting[1]);
+    expect(archived.at(-1)).toEqual(newlyEvicted);
+  });
+
   it('replies with an error when songId is missing', () => {
     storeHolder.current = makeStore({});
 
@@ -709,6 +861,7 @@ describe('loadPracticeRuns', () => {
       runs,
       fullRuns: [],
       archive: emptyArchive(),
+      atomicSkillEvidenceArchive: [],
     });
   });
 
@@ -737,6 +890,7 @@ describe('loadPracticeRuns', () => {
       runs: [summary],
       fullRuns: [{ summary, records: [legacyRecord] }],
       archive: emptyArchive(),
+      atomicSkillEvidenceArchive: [],
     });
   });
 
@@ -752,6 +906,7 @@ describe('loadPracticeRuns', () => {
       runs: [],
       fullRuns: [],
       archive: emptyArchive(),
+      atomicSkillEvidenceArchive: [],
     });
   });
 
@@ -983,17 +1138,19 @@ describe('practice attempt checkpoints', () => {
     );
 
     const event = makeEvent();
+    // The finalized checkpoint shares this run's own session id: it is the
+    // run's own periodic safety-net autosave, already fully reflected in
+    // `records` below, not orphaned pre-interruption evidence.
+    const summary = fakeSummary(1, 'attempt-to-complete');
 
     savePracticeRun(event as never, {
       songId: 'song-1',
-      summary: fakeSummary(),
+      summary,
       records: [fakeRecord(480)],
       finalizeAttemptSessionId: 'attempt-to-complete',
     });
 
-    expect(storeHolder.current.get('practiceRuns.song-1')).toEqual([
-      fakeSummary(),
-    ]);
+    expect(storeHolder.current.get('practiceRuns.song-1')).toEqual([summary]);
     expect(
       storeHolder.current.get('practiceAttemptCheckpoints.song-1'),
     ).toEqual([]);
@@ -1004,6 +1161,115 @@ describe('practice attempt checkpoints', () => {
         practiceAttemptCheckpoints: { 'song-1': [] },
       }),
     );
+  });
+
+  it('does not inflate totals when the finalized checkpoint is this run’s own autosave', () => {
+    storeHolder.current = makeStore({});
+    savePracticeAttemptCheckpoint(
+      makeEvent() as never,
+      fakeCheckpoint('own-session'),
+    );
+
+    const summary = fakeSummary(1, 'own-session');
+
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary,
+      records: [fakeRecord(480)],
+      finalizeAttemptSessionId: 'own-session',
+    });
+
+    const stored = storeHolder.current.get(
+      'practiceRuns.song-1',
+    ) as RunSummary[];
+
+    // The checkpoint's own fakeRecord(480) hit must not be counted a second
+    // time on top of the identical hit already present in `records`.
+    expect(stored).toEqual([summary]);
+    expect(stored[0].totalHits).toBe(1);
+  });
+
+  it('merges an interrupted checkpoint’s already-scored hits into the resumed, completed run instead of discarding them', () => {
+    storeHolder.current = makeStore({});
+    // The pre-interruption checkpoint: scored evidence from a session that
+    // is NOT the one being saved below (no `context.sessionId` match).
+    savePracticeAttemptCheckpoint(
+      makeEvent() as never,
+      fakeCheckpoint('interrupted-source'),
+    );
+
+    const event = makeEvent();
+    // The resumed run's own fresh Engine only ever saw the post-resume tail
+    // - one hit at tick 960 - because Engine has no way to seed the
+    // pre-interruption evidence (see bug-hunt-20260812.md).
+    const tailRecord = fakeRecord(960);
+    const submittedSummary = summarizeRun(
+      [tailRecord],
+      '2026-08-10T00:05:00.000Z',
+    );
+
+    savePracticeRun(event as never, {
+      songId: 'song-1',
+      summary: submittedSummary,
+      records: [tailRecord],
+      finalizeAttemptSessionId: 'interrupted-source',
+    });
+
+    const stored = storeHolder.current.get(
+      'practiceRuns.song-1',
+    ) as RunSummary[];
+
+    // Both the pre-interruption hit (tick 480, from the checkpoint) and the
+    // post-resume hit (tick 960) must be reflected in the one saved run.
+    expect(stored).toHaveLength(1);
+    expect(stored[0].totalHits).toBe(2);
+    expect(stored[0].laneAccuracy).toEqual([
+      { element: 'snare', hits: 2, misses: 0, accuracy: 1 },
+    ]);
+
+    const fullRuns = storeHolder.current.get(
+      'practiceRunDetails.song-1',
+    ) as StoredPracticeRun[];
+
+    expect(fullRuns[0].records.map((record) => record.tick).sort()).toEqual([
+      480, 960,
+    ]);
+    expect(
+      storeHolder.current.get('practiceAttemptCheckpoints.song-1'),
+    ).toEqual([]);
+  });
+
+  it('merges a stale pending checkpoint from a previously-failed save into the next successful one for that song', () => {
+    storeHolder.current = makeStore({});
+    savePracticeAttemptCheckpoint(
+      makeEvent() as never,
+      fakeCheckpoint('failed-earlier-run'),
+    );
+
+    const tailRecord = fakeRecord(960);
+    const submittedSummary = summarizeRun(
+      [tailRecord],
+      '2026-08-10T00:05:00.000Z',
+    );
+
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary: submittedSummary,
+      records: [tailRecord],
+      // Mirrors SongView.tsx: a checkpoint whose own save previously failed
+      // stays in `pendingAttemptSessionIdsRef` and is retried on the next
+      // successful save for the same song.
+      finalizeAttemptSessionIds: ['failed-earlier-run'],
+    });
+
+    const stored = storeHolder.current.get(
+      'practiceRuns.song-1',
+    ) as RunSummary[];
+
+    expect(stored[0].totalHits).toBe(2);
+    expect(
+      storeHolder.current.get('practiceAttemptCheckpoints.song-1'),
+    ).toEqual([]);
   });
 
   it('atomically retires both the resumed source and live run drafts', () => {

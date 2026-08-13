@@ -18,7 +18,6 @@ import { useInput } from '../../context/InputContext';
 import { useInputControls } from '../../hooks/useInputControls';
 import journeyStudio from '../../assets/daybreak/journey-studio.png';
 import { resolveJourneyControls } from './journey-controls';
-import '../LessonsJourney/daybreak-journey.css';
 import '../LessonsJourney/JourneyV2.css';
 
 export interface LessonsViewProps {
@@ -104,6 +103,15 @@ export function LessonsView({
   );
   const revealJourneyControls = useCallback(() => {
     setJourneyControlsVisible(true);
+  }, []);
+  // Kit/keyboard navigation (moveKitFocus, moveSeason, confirm, back) always
+  // *reveals* the hint - a player mid-navigation should never have it flicker
+  // shut. The visible "Controls" chip is the one place that should actually
+  // toggle, so a player who opened it can close it again (2026-08-13
+  // critique, journey item 3: an `aria-expanded` control that can only ever
+  // expand isn't a real toggle).
+  const toggleJourneyControls = useCallback(() => {
+    setJourneyControlsVisible((current) => !current);
   }, []);
   const moveKitFocus = useCallback(
     (delta: number) => {
@@ -334,6 +342,7 @@ export function LessonsView({
               kitActions={journeyControls.kitActions}
               controlsVisible={journeyControlsVisible}
               onRevealControls={revealJourneyControls}
+              onToggleControls={toggleJourneyControls}
               onPlay={onPlay}
               onLockedClick={handleLockedClick}
             />

@@ -1,0 +1,242 @@
+/* The result screen as one honest musical receipt on warm paper - see
+   docs/visual-system-v3.md "receipts" and "the canvas is continuous". No
+   dimmed mask, no floating rounded card, no shadow: this surface simply
+   replaces the practice canvas the way "done" replaces "playing" in the
+   state table, instead of sitting on top of it. */
+
+.drumroll-score-summary {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--dr-canvas, var(--color-bg));
+  font-family: var(--font-ui);
+}
+
+.drumroll-score-summary__header {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 4px;
+  padding: clamp(16px, 2.4vh, 24px) clamp(20px, 3vw, 32px) 16px;
+  border-bottom: 1px solid var(--dr-line, rgb(36 31 25 / 16%));
+}
+
+.drumroll-score-summary__eyebrow {
+  color: var(--dr-wine, var(--color-accent-text));
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.drumroll-score-summary__eyebrow[data-tone='warning'] {
+  color: var(--dr-warning, var(--color-amber-text));
+}
+
+.drumroll-score-summary__title {
+  overflow: hidden;
+  color: var(--dr-ink, var(--color-ink));
+  font-family: var(--font-display);
+  font-size: clamp(18px, 1.6vw, 20px);
+  font-weight: 650;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drumroll-score-summary__subtitle {
+  color: var(--dr-ink-muted, var(--color-text-muted));
+  font-size: 14px;
+  font-weight: 520;
+  line-height: 1.3;
+}
+
+.drumroll-score-summary__body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2.2vh, 24px);
+  padding: clamp(16px, 2.4vh, 24px) clamp(20px, 3vw, 32px);
+  overflow-y: auto;
+}
+
+.drumroll-score-summary__statement {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.drumroll-score-summary__statement-headline {
+  color: var(--dr-ink, var(--color-ink));
+  font-family: var(--font-display);
+  font-size: clamp(24px, 2.6vw, 30px);
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.drumroll-score-summary__statement-meaning {
+  max-width: 52ch;
+  color: var(--dr-ink-muted, var(--color-text-muted));
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.drumroll-score-summary__stars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  text-align: center;
+}
+
+.drumroll-score-summary__cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 0;
+}
+
+.drumroll-score-summary__cell {
+  flex: 1 1 160px;
+  min-width: 0;
+  padding: 0 20px;
+  border-left: 1px solid var(--dr-line, rgb(36 31 25 / 16%));
+}
+
+.drumroll-score-summary__cell:first-child {
+  padding-left: 0;
+  border-left: none;
+}
+
+.drumroll-score-summary__cell-label {
+  color: var(--dr-ink-muted, var(--color-text-muted));
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.drumroll-score-summary__cell-value {
+  overflow: hidden;
+  color: var(--dr-ink, var(--color-ink));
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drumroll-score-summary__status {
+  padding: 10px 14px;
+  border: 1px solid var(--dr-line, rgb(36 31 25 / 16%));
+  color: var(--dr-ink-muted, var(--color-text-muted));
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.drumroll-score-summary__status[data-tone='error'] {
+  border-color: color-mix(in srgb, var(--dr-error, #b9473d) 45%, transparent);
+  color: var(--dr-error, #b9473d);
+}
+
+.drumroll-score-summary__status[data-tone='warning'] {
+  border-color: color-mix(in srgb, var(--dr-warning, #a95e28) 45%, transparent);
+  color: var(--dr-warning, #a95e28);
+}
+
+.drumroll-score-summary__evidence {
+  padding-top: clamp(12px, 1.8vh, 16px);
+  border-top: 1px solid var(--dr-line, rgb(36 31 25 / 16%));
+}
+
+.drumroll-score-summary__evidence-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  color: var(--dr-ink, var(--color-ink));
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.drumroll-score-summary__evidence-summary::-webkit-details-marker {
+  display: none;
+}
+
+.drumroll-score-summary__evidence-summary::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid var(--dr-ink-muted, var(--color-text-muted));
+  transition: transform 120ms ease-out;
+}
+
+.drumroll-score-summary__evidence[open]
+  > .drumroll-score-summary__evidence-summary::before {
+  transform: rotate(90deg);
+}
+
+.drumroll-score-summary__evidence-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-top: 16px;
+}
+
+.drumroll-score-summary__footer {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px clamp(20px, 3vw, 32px) clamp(16px, 2.4vh, 24px);
+  border-top: 1px solid var(--dr-line, rgb(36 31 25 / 16%));
+}
+
+.drumroll-score-summary__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drumroll-score-summary__actions-secondary {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* Primary action grammar (visual-system-v3 "primary action has one
+   grammar"): ember fill, dark ink, singular. Everything else in this
+   footer stays quiet by comparison. */
+.drumroll-score-summary .ant-btn-primary {
+  border-color: var(--dr-ember, var(--color-accent));
+  color: var(--dr-studio-ink, #fff8ed);
+  background: var(--dr-ember, var(--color-accent));
+}
+
+.drumroll-score-summary .ant-btn-primary:not(:disabled):hover,
+.drumroll-score-summary .ant-btn-primary:not(:disabled):active {
+  border-color: var(--dr-ember-pressed, var(--color-accent-deep));
+  background: var(--dr-ember-pressed, var(--color-accent-deep));
+}
+
+.drumroll-score-summary .ant-btn-text {
+  color: var(--dr-ink-muted, var(--color-text-muted));
+}
+
+.drumroll-score-summary .ant-btn-text:not(:disabled):hover {
+  color: var(--dr-ink, var(--color-ink));
+  background: var(--dr-paper-low, var(--color-paper));
+}
+
+@media (max-width: 1120px) {
+  .drumroll-score-summary__cell {
+    flex-basis: 120px;
+  }
+}
