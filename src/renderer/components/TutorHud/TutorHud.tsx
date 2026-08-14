@@ -28,10 +28,11 @@ interface TutorHudProps {
     title: string;
     detail: string;
   };
-  speedChange?: {
-    previous: number;
-    applied: number;
-    onKeepOwnSpeed: () => void;
+  tempoSuggestion?: {
+    current: number;
+    suggested: number;
+    onAccept: () => void;
+    onKeepCurrent: () => void;
   };
 }
 
@@ -154,7 +155,7 @@ function tutorNextReason(
 
   if (displayState === 'remediation') {
     if (recoveryCaption?.title === 'First anchor acquired') {
-      return 'The anchor is in. Take the same phrase one small tempo step so it holds after the loop.';
+      return 'The anchor is in. Settle one more quality pass at this tempo before the next planned step.';
     }
 
     if (recoveryCaption?.title === 'Near-clean quality retained') {
@@ -177,7 +178,7 @@ export function TutorHud({
   displayState,
   controlPrompt,
   recoveryCaption,
-  speedChange,
+  tempoSuggestion,
 }: TutorHudProps) {
   const titleId = useId();
   const detailId = useId();
@@ -198,7 +199,7 @@ export function TutorHud({
     !displayState &&
     !controlPrompt &&
     !recoveryCaption &&
-    !speedChange
+    !tempoSuggestion
   ) {
     return null;
   }
@@ -262,20 +263,27 @@ export function TutorHud({
           {nextReason}
         </span>
       )}
-      {speedChange && (
+      {tempoSuggestion && (
         <>
           <span
             className="drumroll-practice-edge-caption__detail"
-            data-testid="coach-speed-change"
+            data-testid="coach-tempo-suggestion"
           >
-            Try this loop at {speedChange.applied.toFixed(1)}×; keep your own
-            speed if it feels right.
+            Coach suggests {tempoSuggestion.suggested.toFixed(1)}× for this
+            loop.
           </span>
           <Button
-            data-testid="keep-learner-speed"
-            onClick={speedChange.onKeepOwnSpeed}
+            type="primary"
+            data-testid="accept-coach-speed"
+            onClick={tempoSuggestion.onAccept}
           >
-            Keep my {speedChange.previous.toFixed(1)}×
+            Try {tempoSuggestion.suggested.toFixed(1)}×
+          </Button>
+          <Button
+            data-testid="keep-learner-speed"
+            onClick={tempoSuggestion.onKeepCurrent}
+          >
+            Keep my {tempoSuggestion.current.toFixed(1)}×
           </Button>
         </>
       )}

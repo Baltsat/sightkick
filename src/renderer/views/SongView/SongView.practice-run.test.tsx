@@ -935,7 +935,6 @@ describe('practice mode analytics', () => {
         settings: {
           countIn: false,
           adaptiveTutorEnabled: false,
-          autoContinueEnabled: true,
           handsFreeControlsEnabled: true,
         },
         keyboard: {
@@ -994,7 +993,9 @@ describe('practice mode analytics', () => {
       });
 
       expect(screen.getByTestId('score-next')).toBeEnabled();
-      expect(screen.getByTestId('score-auto-continue')).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('score-auto-continue'),
+      ).not.toBeInTheDocument();
       expect(screen.getByTestId('score-kit-controls')).toBeInTheDocument();
 
       await act(async () => {
@@ -1020,7 +1021,7 @@ describe('practice mode analytics', () => {
     }
   }, 30000);
 
-  it('finishes a stored Coach remediation after two natural clean loop wraps and returns to the same review', async () => {
+  it('finishes a stored Coach remediation through planned tempo probes and returns to the same review', async () => {
     vi.useFakeTimers();
 
     const frames = installFrameDriver();
@@ -1079,6 +1080,11 @@ describe('practice mode analytics', () => {
       ).toBeInTheDocument();
       fireEvent.click(screen.getByTestId('coach-practice-bars'));
       await settlePlaybackStart();
+      expect(screen.getByTestId('coach-tempo-suggestion')).toHaveTextContent(
+        'Coach suggests 0.7× for this loop.',
+      );
+      fireEvent.click(screen.getByTestId('accept-coach-speed'));
+      await settlePlaybackStart();
 
       const storageKey = TEST_REMEDIATION_STORAGE_KEY;
       const startedQueue = JSON.parse(
@@ -1122,10 +1128,8 @@ describe('practice mode analytics', () => {
         tasks: { consecutiveCleanPasses: number }[];
       };
 
-      expect(afterFirstPass).toMatchObject({
-        status: 'active',
-        tasks: [{ consecutiveCleanPasses: 1 }],
-      });
+      expect(afterFirstPass.status).toBe('active');
+      expect(afterFirstPass.tasks[0].consecutiveCleanPasses).toBe(1);
       expect(
         screen.queryByTestId('remediation-repetition'),
       ).not.toBeInTheDocument();
@@ -1137,7 +1141,26 @@ describe('practice mode analytics', () => {
         'First anchor acquired',
       );
 
-      await playCleanFirstBar(view, frames, 0.8);
+      expect(
+        screen.queryByTestId('coach-tempo-suggestion'),
+      ).not.toBeInTheDocument();
+
+      await playCleanFirstBar(view, frames, 0.7);
+      await settlePlaybackStart();
+
+      for (const speed of [0.8, 0.9, 1]) {
+        expect(screen.getByTestId('coach-tempo-suggestion')).toHaveTextContent(
+          `Coach suggests ${speed.toFixed(1)}× for this loop.`,
+        );
+        fireEvent.click(screen.getByTestId('accept-coach-speed'));
+        await settlePlaybackStart();
+        await playCleanFirstBar(view, frames, speed);
+        await playCleanFirstBar(view, frames, speed);
+
+        if (speed < 1) {
+          await settlePlaybackStart();
+        }
+      }
 
       const completedQueue = JSON.parse(
         window.localStorage.getItem(storageKey) ?? 'null',
@@ -1154,7 +1177,7 @@ describe('practice mode analytics', () => {
 
       expect(completedQueue).toMatchObject({
         status: 'completed',
-        activeTaskIndex: 1,
+        activeTaskIndex: 4,
         tasks: [
           {
             status: 'completed',
@@ -1163,6 +1186,18 @@ describe('practice mode analytics', () => {
               { qualifiesAsCleanPass: true },
               { qualifiesAsCleanPass: true },
             ],
+          },
+          {
+            status: 'completed',
+            consecutiveCleanPasses: 2,
+          },
+          {
+            status: 'completed',
+            consecutiveCleanPasses: 2,
+          },
+          {
+            status: 'completed',
+            consecutiveCleanPasses: 2,
           },
         ],
       });

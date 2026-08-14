@@ -103,7 +103,9 @@ describe('adaptive tutor surfaces', () => {
     expect(
       screen.getByRole('switch', { name: 'Challenge lives' }),
     ).not.toBeChecked();
-    expect(screen.getByRole('switch', { name: 'Auto-continue' })).toBeChecked();
+    expect(
+      screen.queryByRole('switch', { name: 'Auto-continue' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Kit controls' })).toBeChecked();
     expect(screen.getByTestId('setup-input')).toHaveTextContent(
       'Configure Keyboard',

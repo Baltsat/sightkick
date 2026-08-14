@@ -103,11 +103,29 @@ function normalizedPlaybackSpeed(value: number | undefined): number {
     : DEFAULT_REMEDIATION_SPEED;
 }
 
-function variedPlaybackSpeed(value: number): number {
-  const current = normalizedPlaybackSpeed(value);
-  const varied = current < 1 ? current + 0.1 : current - 0.1;
+export function planRemediationTempoLadder(
+  value: number | undefined,
+): number[] {
+  const start = Math.min(
+    1,
+    Math.round(normalizedPlaybackSpeed(value) * 10) / 10,
+  );
 
-  return Math.round(normalizedPlaybackSpeed(varied) * 10) / 10;
+  if (start === 1) {
+    return [1];
+  }
+
+  const steps: number[] = [];
+
+  for (
+    let speed = start;
+    speed < 1;
+    speed = Math.round((speed + 0.1) * 10) / 10
+  ) {
+    steps.push(speed);
+  }
+
+  return [...steps, 1];
 }
 
 function skillLabel(task: RemediationTask): string {
@@ -123,11 +141,15 @@ function skillLabel(task: RemediationTask): string {
 export function remediationTaskWhy(task: RemediationTask): string {
   const skill = skillLabel(task);
 
-  return task.approach === 'tempo-variation'
+  return task.approach === 'target-probe'
+    ? `This is the target-tempo probe at ${task.playbackSpeed.toFixed(
+        1,
+      )}×. Keep the phrase musical at full speed.`
+    : task.approach === 'tempo-variation'
     ? `The anchor is in. Keep ${skill} through this phrase at ${task.playbackSpeed.toFixed(
         1,
-      )}× so it holds when the song moves on.`
-    : `Build ${skill} in this phrase first; one clean anchor earns a nearby-tempo return.`;
+      )}× before the next planned tempo probe.`
+    : `Build ${skill} in this phrase first; two good-enough passes unlock the next planned tempo probe.`;
 }
 
 /**
@@ -171,32 +193,49 @@ export function createRemediationQueue(
         ].map(findingReference),
       );
 
-      return splitBarRange(first.evidence.barStart, first.evidence.barEnd).map(
-        ({ barStart, barEnd }) => ({
-          id: taskId(barStart, barEnd),
+      return splitBarRange(
+        first.evidence.barStart,
+        first.evidence.barEnd,
+      ).flatMap(({ barStart, barEnd }) => {
+        const minimumResolvedNotes = normalizedMinimumResolvedNotes(
+          input.minimumResolvedNotesForRange?.(barStart, barEnd, findings),
+        );
+        const tempoLadder = planRemediationTempoLadder(
+          input.playbackSpeedForRange?.(barStart, barEnd, findings) ??
+            findings.find((finding) => finding.evidence.slowSpeed !== undefined)
+              ?.evidence.slowSpeed,
+        );
+        const rangeId = taskId(barStart, barEnd);
+
+        return tempoLadder.map((playbackSpeed, index) => ({
+          id:
+            index === 0
+              ? rangeId
+              : playbackSpeed === 1
+              ? `${rangeId}:target`
+              : `${rangeId}:tempo-${playbackSpeed.toFixed(1)}`,
           barStart,
           barEnd,
           findings: references,
-          minimumResolvedNotes: normalizedMinimumResolvedNotes(
-            input.minimumResolvedNotesForRange?.(barStart, barEnd, findings),
-          ),
-          playbackSpeed: normalizedPlaybackSpeed(
-            input.playbackSpeedForRange?.(barStart, barEnd, findings) ??
-              findings.find(
-                (finding) => finding.evidence.slowSpeed !== undefined,
-              )?.evidence.slowSpeed,
-          ),
-          approach: 'anchor' as const,
+          minimumResolvedNotes,
+          playbackSpeed,
+          approach:
+            index === 0
+              ? ('anchor' as const)
+              : playbackSpeed === 1
+              ? ('target-probe' as const)
+              : ('tempo-variation' as const),
           status: 'pending' as const,
           consecutiveCleanPasses: 0,
           attempts: [],
-        }),
-      );
+        }));
+      });
     })
     .sort(
       (left, right) =>
         left.barStart - right.barStart ||
         left.barEnd - right.barEnd ||
+        left.playbackSpeed - right.playbackSpeed ||
         left.id.localeCompare(right.id),
     )
     .map((task, index) =>
@@ -316,11 +355,6 @@ export function recordRemediationPass(
   const attempt = makeAttempt(activeTask, input);
   const taskCompleted =
     attempt.consecutiveCleanPassesAfter >= REQUIRED_CONSECUTIVE_CLEAN_PASSES;
-  const shouldVary =
-    attempt.qualifiesAsCleanPass &&
-    activeTask.consecutiveCleanPasses === 0 &&
-    !taskCompleted &&
-    activeTask.approach !== 'tempo-variation';
   const nextActiveTaskIndex = taskCompleted
     ? queue.activeTaskIndex + 1
     : queue.activeTaskIndex;
@@ -331,13 +365,6 @@ export function recordRemediationPass(
         ...task,
         attempts: [...task.attempts, attempt],
         consecutiveCleanPasses: attempt.consecutiveCleanPassesAfter,
-        ...(shouldVary
-          ? {
-              id: `${task.id}:tempo`,
-              approach: 'tempo-variation' as const,
-              playbackSpeed: variedPlaybackSpeed(task.playbackSpeed),
-            }
-          : {}),
         ...(taskCompleted
           ? { status: 'completed' as const, completedAt: input.completedAt }
           : {}),
@@ -426,7 +453,8 @@ function isAttempt(
   if (
     value.approach !== undefined &&
     value.approach !== 'anchor' &&
-    value.approach !== 'tempo-variation'
+    value.approach !== 'tempo-variation' &&
+    value.approach !== 'target-probe'
   ) {
     return false;
   }
@@ -498,7 +526,8 @@ function isTask(value: unknown): value is RemediationTask {
   if (
     value.approach !== undefined &&
     value.approach !== 'anchor' &&
-    value.approach !== 'tempo-variation'
+    value.approach !== 'tempo-variation' &&
+    value.approach !== 'target-probe'
   ) {
     return false;
   }

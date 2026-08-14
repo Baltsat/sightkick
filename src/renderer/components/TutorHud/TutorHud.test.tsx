@@ -183,7 +183,7 @@ describe('TutorHud', () => {
     );
 
     expect(screen.getByTestId('tutor-next-reason')).toHaveTextContent(
-      'The anchor is in. Take the same phrase one small tempo step so it holds after the loop.',
+      'The anchor is in. Settle one more quality pass at this tempo before the next planned step.',
     );
   });
 

@@ -1,5 +1,5 @@
 import { Button } from 'antd';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ScoreData, Song } from '../../../types';
 import { Difficulty } from 'scan-chart';
@@ -76,77 +76,12 @@ function capitalize(value: string): string {
     : value;
 }
 
-interface AutoContinueCountdownProps {
-  label: string;
-  seconds: number;
-  onComplete: () => void;
-}
-
-function AutoContinueCountdown({
-  label,
-  seconds,
-  onComplete,
-}: AutoContinueCountdownProps) {
-  const [remaining, setRemaining] = useState(() =>
-    Math.max(1, Math.round(seconds)),
-  );
-  const [cancelled, setCancelled] = useState(false);
-  const triggeredRef = useRef(false);
-
-  useEffect(() => {
-    if (remaining <= 0 || cancelled) {
-      return undefined;
-    }
-
-    const timer = window.setTimeout(() => {
-      setRemaining((current) => Math.max(0, current - 1));
-    }, 1000);
-
-    return () => window.clearTimeout(timer);
-  }, [cancelled, remaining]);
-
-  useEffect(() => {
-    if (remaining !== 0 || cancelled || triggeredRef.current) {
-      return;
-    }
-
-    triggeredRef.current = true;
-    onComplete();
-  }, [cancelled, onComplete, remaining]);
-
-  if (cancelled) {
-    return null;
-  }
-
-  return (
-    <div
-      className="drumroll-score-summary__status flex items-center justify-between gap-3"
-      role="status"
-      data-testid="score-auto-continue"
-    >
-      <span>
-        {label} starts in {remaining}s
-      </span>
-      <Button
-        type="text"
-        size="small"
-        data-testid="score-auto-continue-cancel"
-        onClick={() => setCancelled(true)}
-      >
-        Cancel
-      </Button>
-    </div>
-  );
-}
-
 export function ScoreSummary({
   isOpen,
   onRetry,
   onNextSong,
   nextLabel = 'Back to library',
   continuationLabelLocked = false,
-  autoContinueEnabled = false,
-  autoContinueSeconds = 8,
   persistenceState,
   onCoach,
   songData,
@@ -594,8 +529,8 @@ export function ScoreSummary({
             role="alert"
             data-testid="score-persistence-status"
           >
-            Practice history was not saved. Automatic continuation is paused so
-            this run is not silently lost.
+            Practice history was not saved. Choose what to play next so this run
+            is not silently lost.
           </div>
         )}
         {persistenceState === 'no-evidence' && !noMusicalInput && (
@@ -607,13 +542,6 @@ export function ScoreSummary({
             No scored notes were captured. Choose what to play next when you are
             ready.
           </div>
-        )}
-        {autoContinueEnabled && !noMusicalInput && !continuationBlocked && (
-          <AutoContinueCountdown
-            label={nextLabel}
-            seconds={autoContinueSeconds}
-            onComplete={onNextSong}
-          />
         )}
         {handsFreeControlsEnabled && !continuationBlocked && (
           <section

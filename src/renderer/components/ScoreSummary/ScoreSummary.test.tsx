@@ -275,7 +275,7 @@ describe('ScoreSummary', () => {
     },
   );
 
-  it('shows a visible countdown and automatically starts the next Practice task', async () => {
+  it('never starts another Practice task from an elapsed timer', async () => {
     vi.useFakeTimers();
 
     try {
@@ -287,42 +287,9 @@ describe('ScoreSummary', () => {
         autoContinueSeconds: 3,
         practiceSummary: multiLaneRunFixture(),
       });
-
-      expect(modal.getByTestId('score-auto-continue')).toHaveTextContent(
-        'Next practice starts in 3s',
-      );
-
-      for (let second = 0; second < 3; second += 1) {
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(1000);
-        });
-      }
-
-      await act(async () => Promise.resolve());
-
-      expect(onNextSong).toHaveBeenCalledOnce();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('lets the player cancel auto-continue without leaving the result', async () => {
-    vi.useFakeTimers();
-
-    try {
-      const onNextSong = vi.fn();
-      const { modal } = renderSummary({
-        onNextSong,
-        nextLabel: 'Next practice',
-        autoContinueEnabled: true,
-        autoContinueSeconds: 3,
-        practiceSummary: multiLaneRunFixture(),
-      });
-
-      fireEvent.click(modal.getByTestId('score-auto-continue-cancel'));
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(5000);
+        await vi.advanceTimersByTimeAsync(10_000);
       });
 
       expect(onNextSong).not.toHaveBeenCalled();

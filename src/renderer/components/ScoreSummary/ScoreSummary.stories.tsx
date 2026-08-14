@@ -163,8 +163,8 @@ export const NoAttemptsThisRun: Story = {
 
 /** Stress case for "keeps its continuation action visible without
  * scrolling at 1024x700" (docs/design-acceptance-notes.md item 4): every
- * optional footer row on at once - a saving-state banner, the auto-continue
- * countdown, all three hands-free kit prompts, and the postcard export
+ * optional footer row on at once - a saving-state banner, all three
+ * hands-free kit prompts, and the postcard export
  * button - stacked above the primary action. The body's internal scroll
  * (`.drumroll-score-summary__body { overflow-y: auto }`) is what keeps the
  * footer itself pinned and fully visible regardless of body content. */
@@ -175,8 +175,6 @@ export const WorstCaseFooter: Story = {
     previousPracticeSummary: previousRun,
     gamification,
     persistenceState: 'saved',
-    autoContinueEnabled: true,
-    autoContinueSeconds: 8,
     handsFreeControlsEnabled: true,
     nextLabel: 'Continue My Wave',
     lessonProgression: {

@@ -47,7 +47,10 @@ export interface RemediationFindingReference {
 
 export type RemediationTaskStatus = 'pending' | 'active' | 'completed';
 
-export type RemediationTaskApproach = 'anchor' | 'tempo-variation';
+export type RemediationTaskApproach =
+  | 'anchor'
+  | 'tempo-variation'
+  | 'target-probe';
 
 /** One observed loop pass, including failed evidence rather than only wins. */
 export interface RemediationAttempt {

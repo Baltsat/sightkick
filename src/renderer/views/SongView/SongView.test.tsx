@@ -18,7 +18,6 @@ import {
 import { multiLaneRunFixture } from '../../components/PracticeStats/test-fixtures';
 import { chartContentRevision } from '../../services/chart-revision';
 import { remediationQueueSlotKey } from '../../services/remediation';
-import { canAutoContinuePractice } from './SongView';
 
 const TEST_CHART_REVISION = chartContentRevision({
   songId: 'song-1',
@@ -1397,27 +1396,6 @@ describe('the stem mixer', () => {
 });
 
 describe('the score summary', () => {
-  it('keeps a completed lesson on its own result instead of auto-jumping to songs', () => {
-    expect(
-      canAutoContinuePractice(
-        'practice',
-        true,
-        'saved',
-        makeSong({
-          lesson: {
-            id: '01.01',
-            starsToUnlock: 0,
-            unit: 'Unit 1',
-            title: 'First beat',
-          },
-        }),
-      ),
-    ).toBe(false);
-    expect(canAutoContinuePractice('practice', true, 'saved', makeSong())).toBe(
-      true,
-    );
-  });
-
   it('shows the current My Wave reason while a practice stop is open', async () => {
     const view = setupSongView({
       route: '/song-1?gameMode=practice',
@@ -1506,7 +1484,7 @@ describe('the score summary', () => {
     expect(within(modal).getByTestId('practice-stats')).toBeInTheDocument();
   });
 
-  it('opens the coach with stored findings and presets a targeted practice loop', async () => {
+  it('opens the coach with stored findings and waits for tempo acceptance', async () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
@@ -1556,7 +1534,7 @@ describe('the score summary', () => {
       );
       expect(screen.getByTestId('practice-mode-indicator')).toHaveAttribute(
         'data-speed',
-        '0.7',
+        '1.0',
       );
       expect(view.measureHighlights()[0]).toHaveAttribute(
         'data-selected',
@@ -1569,24 +1547,27 @@ describe('the score summary', () => {
       expect(screen.getByTestId('tutor-recovery-caption')).toHaveTextContent(
         'Coach loop armed',
       );
-      expect(screen.getByTestId('coach-speed-change')).toHaveTextContent(
-        'Try this loop at 0.7×; keep your own speed if it feels right.',
+      expect(screen.getByTestId('coach-tempo-suggestion')).toHaveTextContent(
+        'Coach suggests 0.7× for this loop.',
+      );
+      expect(screen.getByTestId('accept-coach-speed')).toHaveTextContent(
+        'Try 0.7×',
       );
       expect(screen.getByTestId('keep-learner-speed')).toHaveTextContent(
         'Keep my 1.0×',
       );
     });
-    fireEvent.click(screen.getByTestId('keep-learner-speed'));
+    fireEvent.click(screen.getByTestId('accept-coach-speed'));
 
     await waitFor(() => {
       expect(screen.getByTestId('practice-mode-indicator')).toHaveAttribute(
         'data-speed',
-        '1.0',
+        '0.7',
       );
     });
     expect(
       window.localStorage.getItem('song.song-1.learnerPlaybackSpeed'),
-    ).toBe('1');
+    ).toBe('0.7');
     expect(window.localStorage.getItem(TEST_REMEDIATION_STORAGE_KEY)).toContain(
       '"status":"active"',
     );

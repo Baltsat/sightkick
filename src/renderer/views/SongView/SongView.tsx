@@ -63,7 +63,7 @@ import {
   loopEscapePhase,
   NotationLocationReadout,
 } from '../../components/ContinuousNotation';
-import { InputMapping, ScoreData, Song } from '../../../types';
+import { InputMapping, ScoreData } from '../../../types';
 import {
   computeRunsTrend,
   decideRunEvidence,
@@ -139,20 +139,6 @@ import './SongView.css';
 interface PracticeRunIdentity {
   sessionId: string;
   startedAt?: string;
-}
-
-export function canAutoContinuePractice(
-  gameMode: GameMode | undefined,
-  enabled: boolean,
-  persistenceState: 'saving' | 'saved' | 'failed' | 'no-evidence',
-  songData: Song | undefined,
-): boolean {
-  return (
-    gameMode === 'practice' &&
-    !songData?.lesson &&
-    enabled &&
-    persistenceState === 'saved'
-  );
 }
 
 const APP_VERSION =
@@ -323,9 +309,9 @@ export function SongView() {
   const [isExporting, setIsExporting] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isCoachOpen, setIsCoachOpen] = useState(false);
-  const [coachSpeedChange, setCoachSpeedChange] = useState<{
-    previous: number;
-    applied: number;
+  const [coachTempoSuggestion, setCoachTempoSuggestion] = useState<{
+    current: number;
+    suggested: number;
   }>();
   const [isCoachLoading, setIsCoachLoading] = useState(false);
   const [songRuns, setSongRuns] = useState<RunSummary[]>();
@@ -371,10 +357,6 @@ export function SongView() {
   const [tutorLivesEnabled, setTutorLivesEnabled] = usePersisted<boolean>(
     'settings.challengeLivesEnabled',
     false,
-  );
-  const [autoContinueEnabled, setAutoContinueEnabled] = usePersisted<boolean>(
-    'settings.autoContinueEnabled',
-    true,
   );
   const [handsFreeControlsEnabled, setHandsFreeControlsEnabled] =
     usePersisted<boolean>('settings.handsFreeControlsEnabled', true);
@@ -675,7 +657,7 @@ export function SongView() {
   const onExplicitSpeedChange = useCallback(
     (speed: number) => {
       setLearnerPlaybackSpeed(speed);
-      setCoachSpeedChange(undefined);
+      setCoachTempoSuggestion(undefined);
     },
     [setLearnerPlaybackSpeed],
   );
@@ -1307,19 +1289,36 @@ export function SongView() {
   const clearPracticeLoop = useCallback(() => {
     setIsLooping(false);
     onPracticeRangeChange(undefined);
+    setCoachTempoSuggestion(undefined);
     clearSelection();
   }, [clearSelection, onPracticeRangeChange, setIsLooping]);
-  const applyCoachSpeed = useCallback(
+  const suggestCoachTempo = useCallback(
     (speed: number) => {
-      setCoachSpeedChange(
+      setCoachTempoSuggestion(
         Math.abs(playbackSpeed - speed) > 0.001
-          ? { previous: playbackSpeed, applied: speed }
+          ? { current: playbackSpeed, suggested: speed }
           : undefined,
       );
-      setPlaybackSpeed(speed);
     },
-    [playbackSpeed, setPlaybackSpeed],
+    [playbackSpeed],
   );
+  const acceptCoachTempo = useCallback(() => {
+    if (!coachTempoSuggestion) {
+      return;
+    }
+
+    setPlaybackSpeed(coachTempoSuggestion.suggested);
+    setLearnerPlaybackSpeed(coachTempoSuggestion.suggested);
+    setCoachTempoSuggestion(undefined);
+  }, [coachTempoSuggestion, setLearnerPlaybackSpeed, setPlaybackSpeed]);
+  const keepLearnerPlaybackSpeed = useCallback(() => {
+    if (!coachTempoSuggestion) {
+      return;
+    }
+
+    setLearnerPlaybackSpeed(coachTempoSuggestion.current);
+    setCoachTempoSuggestion(undefined);
+  }, [coachTempoSuggestion, setLearnerPlaybackSpeed]);
   const applyCoachLoop = useCallback(
     (barStart: number, barEnd: number, speed: number): boolean => {
       const start = barStart - 1;
@@ -1331,7 +1330,7 @@ export function SongView() {
       }
 
       pause();
-      applyCoachSpeed(speed);
+      suggestCoachTempo(speed);
       setIsLooping(true);
       onPracticeRangeChange({ start, end });
       seekSeconds(
@@ -1343,7 +1342,6 @@ export function SongView() {
       return true;
     },
     [
-      applyCoachSpeed,
       chart,
       delaySeconds,
       onPracticeRangeChange,
@@ -1351,17 +1349,9 @@ export function SongView() {
       renderData,
       seekSeconds,
       setIsLooping,
+      suggestCoachTempo,
     ],
   );
-  const keepLearnerPlaybackSpeed = useCallback(() => {
-    if (!coachSpeedChange) {
-      return;
-    }
-
-    setPlaybackSpeed(coachSpeedChange.previous);
-    setLearnerPlaybackSpeed(coachSpeedChange.previous);
-    setCoachSpeedChange(undefined);
-  }, [coachSpeedChange, setLearnerPlaybackSpeed, setPlaybackSpeed]);
   const appliedAuditionRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -1446,7 +1436,7 @@ export function SongView() {
       previous.barEnd === task.barEnd &&
       isLooping
     ) {
-      applyCoachSpeed(task.playbackSpeed);
+      suggestCoachTempo(task.playbackSpeed);
       appliedRemediationTaskRef.current = {
         token,
         barStart: task.barStart,
@@ -1464,12 +1454,12 @@ export function SongView() {
       };
     }
   }, [
-    applyCoachSpeed,
     applyCoachLoop,
     gameMode,
     isLooping,
     remediationSession.activeTask,
     remediationSession.queue,
+    suggestCoachTempo,
   ]);
 
   useEffect(() => {
@@ -1911,10 +1901,14 @@ export function SongView() {
           : lastAttempt && !lastAttempt.qualifiesAsCleanPass
           ? 'That attempt was saved. Settle the pattern and try once more.'
           : 'A good-enough pass can include one developing hit; useful progress is retained.';
+      const tempoDetail =
+        remediationTask.approach === 'target-probe'
+          ? 'This is the target-tempo probe.'
+          : `Tempo ${remediationTask.playbackSpeed.toFixed(1)}×.`;
 
       return {
         title: `Coach loop · ${bars}`,
-        detail: `${remediationTask.consecutiveCleanPasses}/${REQUIRED_CONSECUTIVE_CLEAN_PASSES} pattern passes. ${coverageDetail}`,
+        detail: `${tempoDetail} ${remediationTask.consecutiveCleanPasses}/${REQUIRED_CONSECUTIVE_CLEAN_PASSES} pattern passes. ${coverageDetail}`,
         tone:
           remediationTask.consecutiveCleanPasses > 0
             ? ('success' as const)
@@ -2339,7 +2333,7 @@ export function SongView() {
 
               setPlaybackSpeed(newValue);
               setLearnerPlaybackSpeed(newValue);
-              setCoachSpeedChange(undefined);
+              setCoachTempoSuggestion(undefined);
             }}
             styles={{
               input: {
@@ -2480,19 +2474,6 @@ export function SongView() {
           checked={tutorLivesEnabled}
           disabled={!adaptiveTutorEnabled}
           onChange={setTutorLivesEnabled}
-        />
-      </div>
-      <div className="flex items-center justify-between gap-3">
-        <SettingLabel
-          label="Auto-continue"
-          tooltip="After a completed Practice task, show a cancellable countdown and start the next useful task automatically."
-        />
-        <Switch
-          size="small"
-          data-testid="setting-auto-continue"
-          aria-label="Auto-continue"
-          checked={autoContinueEnabled}
-          onChange={setAutoContinueEnabled}
         />
       </div>
       <div className="flex items-center justify-between gap-3">
@@ -2695,12 +2676,6 @@ export function SongView() {
         onNextSong={onNextSong}
         nextLabel={gameMode === 'practice' ? 'Continue My Wave' : undefined}
         continuationLabelLocked={gameMode === 'practice'}
-        autoContinueEnabled={canAutoContinuePractice(
-          gameMode,
-          autoContinueEnabled,
-          practicePersistenceState,
-          songData,
-        )}
         persistenceState={practicePersistenceState}
         onRetry={onRetry}
         onCoach={onOpenCoach}
@@ -3041,11 +3016,12 @@ export function SongView() {
             recoveryCaption={recoveryCaption}
             displayState={tutorDisplayState}
             controlPrompt={kitControlPrompt}
-            speedChange={
-              coachSpeedChange
+            tempoSuggestion={
+              coachTempoSuggestion
                 ? {
-                    ...coachSpeedChange,
-                    onKeepOwnSpeed: keepLearnerPlaybackSpeed,
+                    ...coachTempoSuggestion,
+                    onAccept: acceptCoachTempo,
+                    onKeepCurrent: keepLearnerPlaybackSpeed,
                   }
                 : undefined
             }
@@ -3067,20 +3043,27 @@ export function SongView() {
             <p className="drumroll-practice-edge-caption__detail">
               Kick to count in · clear it to return to the full song.
             </p>
-            {coachSpeedChange && (
+            {coachTempoSuggestion && (
               <>
                 <span
                   className="drumroll-practice-edge-caption__detail"
-                  data-testid="coach-speed-change"
+                  data-testid="coach-tempo-suggestion"
                 >
-                  Coach set {coachSpeedChange.applied.toFixed(1)}× to rehearse
-                  this loop.
+                  Coach suggests {coachTempoSuggestion.suggested.toFixed(1)}×
+                  for this loop.
                 </span>
+                <Button
+                  type="primary"
+                  data-testid="accept-coach-speed"
+                  onClick={acceptCoachTempo}
+                >
+                  Try {coachTempoSuggestion.suggested.toFixed(1)}×
+                </Button>
                 <Button
                   data-testid="keep-learner-speed"
                   onClick={keepLearnerPlaybackSpeed}
                 >
-                  Keep my {coachSpeedChange.previous.toFixed(1)}×
+                  Keep my {coachTempoSuggestion.current.toFixed(1)}×
                 </Button>
               </>
             )}
