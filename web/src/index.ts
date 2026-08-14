@@ -1,6 +1,6 @@
 import '@fontsource-variable/instrument-sans';
 import { installWebPlatform } from '../../src/platform/web';
-import coachPanel from '../../docs/design-qa/daybreak-arena/implementation-coach.png';
+import insightsEvidence from './assets/insights-evidence.jpg';
 import flowPractice from './assets/flow-practice.jpg';
 import homeCockpit from './assets/home-cockpit.jpg';
 import journeyMap from './assets/journey-map.jpg';
@@ -55,8 +55,8 @@ function showLanding(): void {
           <p class="web-fineprint">The browser app keeps lesson progress locally and supports Web MIDI. Local audio and chart creation remain in the signed desktop app.</p>
         </div>
         <figure class="web-media-frame web-hero-capture">
-          <img src="${homeCockpit}" alt="The current Drumroll home cockpit with a drum kit, song context, kit-lane accuracy, and a play action." />
-          <figcaption>Current desktop cockpit. The kit is the controller.</figcaption>
+          <img src="${homeCockpit}" alt="The Drumroll home: the kit photograph is the whole screen and every drum is a labelled coloured door — kick continues, snare starts My Wave, hi-hat opens the next lesson." />
+          <figcaption>Home is a kit, not a dashboard. Every drum is a door.</figcaption>
         </figure>
       </section>
 
@@ -75,8 +75,8 @@ function showLanding(): void {
           <p>Flow keeps the playhead fixed while the chart moves. Practice controls let you choose speed, notation, loops, checkpoint recovery, and lives without losing the musical thread.</p>
         </div>
         <figure class="web-media-frame web-practice-capture">
-          <img src="${flowPractice}" alt="Drumroll Flow notation in a live Practice session with colored drum notes and a fixed playhead." />
-          <figcaption>Current Flow notation in a Drumroll Practice session.</figcaption>
+          <img src="${flowPractice}" alt="Drumroll practice on the warm paper field: Flow notation, a fixed playhead, and a count-in armed for a kick strike." />
+          <figcaption>Flow notation on the warm field. Kick to count in; no lives, no clutter.</figcaption>
         </figure>
         <div class="web-sequence" aria-label="Drumroll practice sequence">
           <article><span>01</span><h3>Choose a reachable challenge.</h3><p>The next-practice selector balances prerequisites, recent mastery, kit-lane weakness, speed, spacing, and variety.</p></article>
@@ -93,15 +93,15 @@ function showLanding(): void {
           <button type="button" class="web-inline-action" data-testid="start-drumroll-journey">Take the next lesson in browser</button>
         </div>
         <figure class="web-media-frame web-journey-capture">
-          <img src="${journeyMap}" alt="The current Drumroll Journey showing the Foundations season and Lesson 01.01 as the next exercise." />
-          <figcaption>Current Journey view with the Foundations season.</figcaption>
+          <img src="${journeyMap}" alt="The Drumroll Journey: every lesson open in a bright studio, with the next lesson invited by name and the skill it builds." />
+          <figcaption>All 170 lessons open. The next one is an invitation, not a lock.</figcaption>
         </figure>
       </section>
 
       <section class="web-coach-section" id="coach" aria-labelledby="web-coach-title">
         <figure class="web-media-frame web-coach-capture">
-          <img src="${coachPanel}" alt="Drumroll's practice coach explaining a saved run and the evidence it has available." />
-          <figcaption>Coach reports what a saved run actually contains.</figcaption>
+          <img src="${insightsEvidence}" alt="Drumroll's Insights screen: one skill to build next, honest zero counters, and per-skill measurement that admits what is not yet measured." />
+          <figcaption>Insights names the next useful skill and admits what is unmeasured.</figcaption>
         </figure>
         <div class="web-coach-copy">
           <p class="web-section-index">The evidence</p>
