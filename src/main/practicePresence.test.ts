@@ -1,4 +1,12 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { makeStore } from './ipc/test-support';
 
 const holder = vi.hoisted(() => ({
@@ -89,6 +97,22 @@ vi.mock('electron', () => {
 
 const { PRACTICE_PRESENCE_SETTINGS_KEY, PracticePresenceController } =
   await import('./practicePresence');
+// The shipped app is macOS-only and the menu-bar title is a darwin Tray
+// feature; pin the platform so CI on Linux exercises the contract that ships.
+const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform');
+
+beforeAll(() => {
+  Object.defineProperty(process, 'platform', {
+    value: 'darwin',
+    configurable: true,
+  });
+});
+
+afterAll(() => {
+  if (platformDescriptor) {
+    Object.defineProperty(process, 'platform', platformDescriptor);
+  }
+});
 
 afterEach(() => {
   holder.trays.length = 0;
