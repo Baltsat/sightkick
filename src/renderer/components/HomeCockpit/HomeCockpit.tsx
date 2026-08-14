@@ -198,6 +198,25 @@ export interface ShelfCopy {
   detail: string;
 }
 
+export type HomeOfferKind = 'wave' | 'lesson' | 'song';
+
+export interface HomeOffer {
+  kind: HomeOfferKind;
+  label: string;
+  title: string;
+  reason: string;
+  candidate: RankedPracticeCandidate;
+  session?: OneKickHomeSession;
+}
+
+export interface SelectHomeOffersInput {
+  homeSession?: OneKickHomeSession;
+  myWaveSession?: OneKickHomeSession;
+  practiceWave?: PracticeWaveResult;
+  runsBySong?: UseGamificationResult['runsBySong'];
+  playableSongIds: readonly string[];
+}
+
 const EMPTY_SHELF_COPY: ShelfCopy = {
   title: 'Choose a song to begin',
   detail: 'Pick a song, then strike a highlighted drum to start.',
@@ -221,6 +240,176 @@ export function resolveShelfCopy(
   }
 
   return { title: sessionSummary.title, detail: sessionSummary.detail };
+}
+
+function isPlayableOfferCandidate(candidate: RankedPracticeCandidate): boolean {
+  return (
+    candidate.candidate.available && candidate.candidate.unlocked !== false
+  );
+}
+
+function evidenceDetail(
+  candidate: RankedPracticeCandidate,
+  keys: readonly string[],
+): string | undefined {
+  return (candidate.factors ?? []).find(
+    (factor) =>
+      keys.includes(factor.key) &&
+      factor.contribution > 0 &&
+      factor.detail.trim().length > 0,
+  )?.detail;
+}
+
+function directRemediationDetail(
+  candidate: RankedPracticeCandidate,
+): string | undefined {
+  const findingCount = candidate.directRemediation?.findingCount ?? 0;
+
+  return findingCount > 0
+    ? `${findingCount} saved Coach finding${
+        findingCount === 1 ? '' : 's'
+      } route directly to this lesson.`
+    : undefined;
+}
+
+function waveEvidence(candidate: RankedPracticeCandidate): string | undefined {
+  return (
+    directRemediationDetail(candidate) ??
+    evidenceDetail(candidate, [
+      'weak-skill-match',
+      'weak-lane-match',
+      'deadline-pacing',
+      'atomic-zpd',
+      'zone-fit',
+      'preference',
+    ])
+  );
+}
+
+function lessonEvidence(
+  candidate: RankedPracticeCandidate,
+): string | undefined {
+  return (
+    directRemediationDetail(candidate) ??
+    evidenceDetail(candidate, [
+      'weak-skill-match',
+      'weak-lane-match',
+      'deadline-pacing',
+      'atomic-zpd',
+      'atomic-retention',
+      'zone-fit',
+    ])
+  );
+}
+
+function unplayedSongEvidence(
+  candidate: RankedPracticeCandidate,
+): string | undefined {
+  if (!candidate.candidate.liked) {
+    return undefined;
+  }
+
+  const affection = evidenceDetail(candidate, ['preference']);
+  const zone = evidenceDetail(candidate, ['atomic-zpd', 'zone-fit']);
+
+  if (!affection || !zone) {
+    return undefined;
+  }
+
+  return affection === zone ? affection : `${affection} ${zone}`;
+}
+
+export function selectHomeOffers({
+  homeSession,
+  myWaveSession,
+  practiceWave,
+  runsBySong,
+  playableSongIds,
+}: SelectHomeOffersInput): HomeOffer[] {
+  const offers: HomeOffer[] = [];
+  const waveCandidate = myWaveSession?.launch;
+  const waveReason = waveCandidate ? waveEvidence(waveCandidate) : undefined;
+
+  if (waveCandidate && waveReason && isPlayableOfferCandidate(waveCandidate)) {
+    offers.push({
+      kind: 'wave',
+      label: 'My Wave',
+      title: waveCandidate.candidate.title,
+      reason: waveReason,
+      candidate: waveCandidate,
+      session: myWaveSession,
+    });
+  }
+
+  const lessonCandidate = homeSession?.launch;
+  const lessonReason = lessonCandidate
+    ? lessonEvidence(lessonCandidate)
+    : undefined;
+
+  if (
+    lessonCandidate &&
+    lessonCandidate.candidate.kind === 'lesson' &&
+    lessonReason &&
+    isPlayableOfferCandidate(lessonCandidate)
+  ) {
+    offers.push({
+      kind: 'lesson',
+      label: 'Picked lesson',
+      title: lessonCandidate.candidate.title,
+      reason: lessonReason,
+      candidate: lessonCandidate,
+      session: homeSession,
+    });
+  }
+
+  const playableSongs = new Set(playableSongIds);
+  const playedSongIds = new Set(
+    Object.entries(runsBySong ?? {})
+      .filter(([, runs]) => runs.length > 0)
+      .map(([songId]) => songId),
+  );
+  const waveCandidateId = waveCandidate?.candidate.id;
+  const unplayedStop = practiceWave?.stops.find(
+    ({ linkedSkills, recommendation }) => {
+      const candidate = recommendation.candidate;
+
+      return (
+        linkedSkills.length > 0 &&
+        candidate.kind === 'song' &&
+        candidate.id !== waveCandidateId &&
+        playableSongs.has(candidate.id) &&
+        !playedSongIds.has(candidate.id) &&
+        isPlayableOfferCandidate(recommendation) &&
+        unplayedSongEvidence(recommendation) !== undefined
+      );
+    },
+  );
+
+  if (unplayedStop) {
+    const reason = unplayedSongEvidence(unplayedStop.recommendation);
+
+    if (reason) {
+      offers.push({
+        kind: 'song',
+        label: 'Unplayed song',
+        title: unplayedStop.recommendation.candidate.title,
+        reason,
+        candidate: unplayedStop.recommendation,
+      });
+    }
+  }
+
+  const seenCandidateIds = new Set<string>();
+
+  return offers.filter(({ candidate }) => {
+    if (seenCandidateIds.has(candidate.candidate.id)) {
+      return false;
+    }
+
+    seenCandidateIds.add(candidate.candidate.id);
+
+    return true;
+  });
 }
 
 export function HomeCockpit({
@@ -416,6 +605,23 @@ export function HomeCockpit({
     sessionSummary,
     hasContinuationTarget,
   );
+  const homeOffers = useMemo(
+    () =>
+      selectHomeOffers({
+        homeSession,
+        myWaveSession,
+        practiceWave,
+        runsBySong: gamification.runsBySong,
+        playableSongIds: songList.map(({ id }) => id),
+      }),
+    [
+      gamification.runsBySong,
+      homeSession,
+      myWaveSession,
+      practiceWave,
+      songList,
+    ],
+  );
 
   useLayoutEffect(() => {
     const studio = studioRef.current;
@@ -485,19 +691,21 @@ export function HomeCockpit({
       snare: {
         action: 'my-wave',
         label: 'My Wave',
-        detail:
-          myWaveSession?.launch.candidate.title ??
-          'Add a song to build your stream',
+        detail: myWaveSession
+          ? 'Let the stream choose your next move'
+          : 'Add a song to build your stream',
         ariaLabel: myWaveSession
-          ? `Snare. My Wave: start ${myWaveSession.launch.candidate.title}.`
+          ? 'Snare. Start My Wave.'
           : 'Snare. My Wave needs a playable song.',
       },
       hihat: {
         action: 'next-lesson',
         label: 'Next lesson',
-        detail: nextLesson?.candidate.title ?? 'Open Journey to choose one',
+        detail: nextLesson
+          ? 'Follow your learning path'
+          : 'Open Journey to choose one',
         ariaLabel: nextLesson
-          ? `Hi-hat. Open your next lesson, ${nextLesson.candidate.title}.`
+          ? 'Hi-hat. Open your next lesson.'
           : 'Hi-hat. Open Journey to choose your next lesson.',
       },
       ride: {
@@ -593,6 +801,24 @@ export function HomeCockpit({
       onStartSong(song);
     },
     [onOpenSongs, onStartSong],
+  );
+  const startOffer = useCallback(
+    (offer: HomeOffer) => {
+      if (offer.session) {
+        startSession(offer.session);
+
+        return;
+      }
+
+      const song = songList.find(
+        ({ id }) => id === offer.candidate.candidate.id,
+      );
+
+      if (song) {
+        startSong(song);
+      }
+    },
+    [songList, startSession, startSong],
   );
   const executeDoor = useCallback(
     (element: KitElement) => {
@@ -863,27 +1089,54 @@ export function HomeCockpit({
           aria-label="Today’s practice"
           data-testid="home-session-summary"
         >
-          <strong>{shelfTitle}</strong>
-          <span>{shelfDetail}</span>
-          <details>
-            <summary>Session details</summary>
-            <div className="kit-home__session-details">
-              {sessionDetails.map(({ label, stop }) =>
-                stop ? (
-                  <p key={stop.title}>
-                    <strong>{label}</strong>
-                    <span>{stop.title}</span>
-                  </p>
-                ) : null,
-              )}
-              <EvidencePracticeCards
-                compact
-                cards={homePracticeCards.cards}
-                onStart={onStartPracticeCard}
-                testId="home-practice-card"
-              />
-            </div>
-          </details>
+          {homeOffers.length > 0 ? (
+            <section
+              className="kit-home__offer-strip"
+              aria-label="Picked for you"
+              data-testid="home-offers"
+              data-offer-count={homeOffers.length}
+            >
+              {homeOffers.map((offer) => (
+                <button
+                  key={offer.kind}
+                  className="kit-home__offer"
+                  type="button"
+                  data-testid={`home-offer-${offer.kind}`}
+                  data-offer-target={offer.candidate.candidate.id}
+                  aria-label={`Start ${offer.label}: ${offer.title}. ${offer.reason}`}
+                  onClick={() => startOffer(offer)}
+                >
+                  <span className="kit-home__offer-label">{offer.label}</span>
+                  <strong>{offer.title}</strong>
+                  <span className="kit-home__offer-reason">{offer.reason}</span>
+                </button>
+              ))}
+            </section>
+          ) : (
+            <>
+              <strong>{shelfTitle}</strong>
+              <span>{shelfDetail}</span>
+              <details>
+                <summary>Session details</summary>
+                <div className="kit-home__session-details">
+                  {sessionDetails.map(({ label, stop }) =>
+                    stop ? (
+                      <p key={stop.title}>
+                        <strong>{label}</strong>
+                        <span>{stop.title}</span>
+                      </p>
+                    ) : null,
+                  )}
+                  <EvidencePracticeCards
+                    compact
+                    cards={homePracticeCards.cards}
+                    onStart={onStartPracticeCard}
+                    testId="home-practice-card"
+                  />
+                </div>
+              </details>
+            </>
+          )}
         </section>
       </div>
 

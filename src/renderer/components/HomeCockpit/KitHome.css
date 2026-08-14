@@ -201,7 +201,8 @@
 }
 
 .kit-home__pad:focus-visible,
-.kit-home__session-summary summary:focus-visible {
+.kit-home__session-summary summary:focus-visible,
+.kit-home__offer:focus-visible {
   outline: 2px solid var(--signal-ember);
   outline-offset: 3px;
 }
@@ -474,6 +475,83 @@
   color: var(--kit-home-studio-ink);
 }
 
+.kit-home__offer-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  border-top: 1px solid
+    color-mix(in srgb, var(--kit-home-studio-ink) 26%, transparent);
+}
+
+.kit-home__offer-strip[data-offer-count='1'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.kit-home__offer-strip[data-offer-count='2'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.kit-home__offer {
+  display: grid;
+  min-width: 0;
+  gap: 0.12rem;
+  padding: 0.5rem clamp(0.55rem, 1.1vw, 1rem);
+  border: 0;
+  border-left: 1px solid
+    color-mix(in srgb, var(--kit-home-studio-ink) 22%, transparent);
+  color: var(--kit-home-studio-ink);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.kit-home__offer:first-child {
+  border-left: 0;
+}
+
+.kit-home__offer:hover {
+  border-left-color: color-mix(
+    in srgb,
+    var(--kit-home-studio-ink) 48%,
+    transparent
+  );
+  background: color-mix(in srgb, var(--kit-home-studio-ink) 8%, transparent);
+}
+
+.kit-home__offer-label,
+.kit-home__offer-reason,
+.kit-home__offer > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kit-home__offer-label {
+  color: var(--kit-home-studio-ink-muted);
+  font-family: var(--font-ui);
+  font-size: clamp(0.62rem, 0.74vw, 0.72rem);
+  font-weight: 720;
+  letter-spacing: 0.04em;
+}
+
+.kit-home__offer > strong {
+  font-family: var(--font-display);
+  font-size: clamp(0.84rem, 1vw, 1.02rem);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.kit-home__offer-reason {
+  color: var(--kit-home-studio-ink-muted);
+  font-size: clamp(0.64rem, 0.76vw, 0.74rem);
+  line-height: 1.25;
+}
+
 .kit-home__session-summary > strong {
   overflow: hidden;
   font-family: var(--font-display);
@@ -620,6 +698,10 @@
   .kit-home__action-band {
     gap: clamp(0.75rem, 1.6vw, 1.25rem);
   }
+
+  .kit-home__offer {
+    padding-block: 0.42rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -629,5 +711,9 @@
   .kit-home__pad-label {
     transition: none;
     animation: none;
+  }
+
+  .kit-home__offer {
+    transition: none;
   }
 }

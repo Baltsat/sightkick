@@ -15,6 +15,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import songArtPlaceholder from '../../../../assets/song-art-placeholder.svg';
+import { isPlayableEvidence } from '../../../library-sources/playability';
 import { cn } from '../../cn';
 import {
   ControlMapping,
@@ -112,6 +113,12 @@ import {
   wrapSortIndex,
 } from './helpers';
 import { resolveLibraryControls } from './library-controls';
+import { ActionableSongShelves } from './ActionableSongShelves';
+import {
+  build_actionable_library_shelves,
+  favourite_song_ids,
+  yandex_taste_seeded_song_ids,
+} from './actionable-shelves';
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard', 'expert'];
 
@@ -141,6 +148,18 @@ export function candidateDifficulty(
   return [...DIFFICULTIES]
     .reverse()
     .find((difficulty) => song.drumDifficulties?.includes(difficulty));
+}
+
+function song_ready_for_practice(song: Song): boolean {
+  if (!song.drumDifficulties || song.drumDifficulties.length === 0) {
+    return false;
+  }
+
+  if (song.sourceLinked || song.sourceProvenance) {
+    return isPlayableEvidence(song.playability);
+  }
+
+  return song.audio.length > 0;
 }
 
 function LibraryInputControls({
@@ -222,7 +241,14 @@ export function SongListView() {
   const [searchParams] = useSearchParams();
   const songOpen = useOutlet() !== null;
   const stemTools = useStemTools();
-  const { songList, scanProgress, addSong } = useSongList();
+  const {
+    songList,
+    scanProgress,
+    addSong,
+    handleLikeChange,
+    handleSplit,
+    splittingIds,
+  } = useSongList();
   const scanPercent =
     scanProgress && scanProgress.total > 0
       ? Math.round((scanProgress.current / scanProgress.total) * 100)
@@ -250,11 +276,16 @@ export function SongListView() {
   const [sort, setSort] = useState<UnifiedLibrarySort>('difficulty');
   const [readinessFilter, setReadinessFilter] =
     useState<UnifiedLibraryFilter>('all');
+  const [showEntireLibrary, setShowEntireLibrary] = useState(false);
   const libraryCandidates = useLibraryCandidates();
   // The player's own songs must never wait on the Drums/Favorites IPC round
   // trip — this stands in until it resolves, then the shelf quietly grows.
   const yandexSources =
     libraryCandidates.candidates?.yandex ?? EMPTY_YANDEX_SOURCES;
+  const yandexTasteSeededSongIds = useMemo(
+    () => yandex_taste_seeded_song_ids(songList, yandexSources),
+    [songList, yandexSources],
+  );
   const [focusedSongIndex, setFocusedSongIndex] = useState<number | undefined>(
     undefined,
   );
@@ -343,8 +374,8 @@ export function SongListView() {
           title: song.name,
           kind: 'song' as const,
           difficulty: targetDifficulty,
-          available: true,
-          liked: song.liked,
+          available: song_ready_for_practice(song),
+          liked: song.liked || yandexTasteSeededSongIds.has(song.id),
           skills: [
             ...new Set(
               (gamification.runsBySong?.[song.id] ?? []).flatMap((run) =>
@@ -358,7 +389,13 @@ export function SongListView() {
         },
       ];
     });
-  }, [difficulty, gamification.runsBySong, lessonProgress.entries, songList]);
+  }, [
+    difficulty,
+    gamification.runsBySong,
+    lessonProgress.entries,
+    songList,
+    yandexTasteSeededSongIds,
+  ]);
   const practiceHistory = useMemo<PracticeHistoryEntry[]>(
     () =>
       Object.entries(gamification.runsBySong ?? {}).flatMap(
@@ -696,6 +733,37 @@ export function SongListView() {
 
     return [...ready, ...notReady];
   }, [matches, readinessFilter, sort]);
+  const trimmedNameFilter = nameFilter.trim();
+  const favouriteSongIds = useMemo(
+    () => favourite_song_ids(songList, yandexTasteSeededSongIds),
+    [songList, yandexTasteSeededSongIds],
+  );
+  const inZoneSongIds = useMemo(
+    () =>
+      nextPractice.ranking
+        .filter(
+          ({ candidate, predictedSuccess }) =>
+            candidate.kind === 'song' &&
+            predictedSuccess >= 0.45 &&
+            predictedSuccess <= 0.9,
+        )
+        .map(({ candidate }) => candidate.id),
+    [nextPractice.ranking],
+  );
+  const actionableLibrary = useMemo(
+    () =>
+      build_actionable_library_shelves({
+        entries: browsableEntries,
+        inZoneSongIds,
+        favouriteSongIds,
+      }),
+    [browsableEntries, favouriteSongIds, inZoneSongIds],
+  );
+  const isBrowsingLibrary =
+    showEntireLibrary ||
+    trimmedNameFilter.length > 0 ||
+    readinessFilter !== 'all' ||
+    sort !== 'difficulty';
   const offerYoutube = useMemo(
     () =>
       youtubeImportAvailable &&
@@ -742,7 +810,6 @@ export function SongListView() {
   const continuedAccuracy = continuedScore
     ? calculateAccuracy(continuedScore)
     : undefined;
-  const trimmedNameFilter = nameFilter.trim();
   const shelfSubtitle = trimmedNameFilter
     ? `${matches.length} ${
         matches.length === 1 ? 'match' : 'matches'
@@ -1127,15 +1194,31 @@ export function SongListView() {
         back: () => setIsSortOpen(false),
       }
     : {
-        up: () =>
+        up: () => {
+          if (!isBrowsingLibrary) {
+            setShowEntireLibrary(true);
+          }
+
           setFocusedSongIndex((index) =>
             nextSongIndex(index, visibleEntries.length, -1),
-          ),
-        down: () =>
+          );
+        },
+        down: () => {
+          if (!isBrowsingLibrary) {
+            setShowEntireLibrary(true);
+          }
+
           setFocusedSongIndex((index) =>
             nextSongIndex(index, visibleEntries.length, 1),
-          ),
+          );
+        },
         confirm: () => {
+          if (!isBrowsingLibrary) {
+            setShowEntireLibrary(true);
+
+            return;
+          }
+
           if (focusedSongIndex === undefined) {
             return;
           }
@@ -1482,6 +1565,23 @@ export function SongListView() {
                     >
                       Ready only
                     </Button>
+
+                    {showEntireLibrary &&
+                    trimmedNameFilter.length === 0 &&
+                    readinessFilter === 'all' &&
+                    sort === 'difficulty' ? (
+                      <Button
+                        size="small"
+                        type="text"
+                        data-testid="show-actionable-shelves"
+                        onClick={() => {
+                          setShowEntireLibrary(false);
+                          setFocusedSongIndex(undefined);
+                        }}
+                      >
+                        Back to picks
+                      </Button>
+                    ) : null}
                   </div>
                   {
                     // With no kit or keyboard control mapped at all, there is
@@ -1587,13 +1687,25 @@ export function SongListView() {
             </header>
 
             <div className="relative mx-auto flex min-h-0 w-full max-w-360 grow flex-col overflow-hidden bg-transparent">
-              {visibleEntries.length > 0 ? (
+              {!isBrowsingLibrary && visibleEntries.length > 0 ? (
+                <ActionableSongShelves
+                  shelves={actionableLibrary.shelves}
+                  sourceSeededSongIds={yandexTasteSeededSongIds}
+                  restCount={actionableLibrary.rest.length}
+                  difficulty={difficulty}
+                  splittingIds={splittingIds}
+                  onPlaySong={play}
+                  onLikeChange={handleLikeChange}
+                  onSplit={handleSplit}
+                  onBrowseAll={() => setShowEntireLibrary(true)}
+                />
+              ) : visibleEntries.length > 0 ? (
                 <LibraryCandidateList
                   entries={visibleEntries}
                   difficulty={difficulty}
                   previewEnabled={hoverPreviewEnabled}
                   focusedIndex={!isSortOpen ? focusedSongIndex : undefined}
-                  scrollKey={`${nameFilter}:${sort}:${readinessFilter}`}
+                  scrollKey={`${nameFilter}:${sort}:${readinessFilter}:${showEntireLibrary}`}
                   resolutions={candidateResolutions}
                   resolvingTrackIds={resolvingCandidateIds}
                   canUseLocalAudio={currentPath !== null}

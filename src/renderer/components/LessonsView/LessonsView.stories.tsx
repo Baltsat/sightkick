@@ -122,8 +122,5 @@ export default meta;
 
 type Story = StoryObj<typeof LessonsView>;
 
-/** The current season, its rail, and the winding path all sitting directly
- * on the shared warm-paper field (docs/kit-launcher-design.md, "The field";
- * docs/visual-system-v3.md law 2, "the canvas is continuous") instead of a
- * separate studio-dusk backdrop photo. */
+/** The current season, its rail, and the winding path over the rehearsal studio. */
 export const RehearsalRoute: Story = {};

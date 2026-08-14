@@ -6,6 +6,7 @@ import { InputProvider } from '../../context/InputContext';
 import type { RunSummary } from '../../services/practice-stats';
 import type {
   HomeSessionReceipt,
+  OneKickHomeSession,
   PracticeWaveResult,
   RankedPracticeCandidate,
 } from '../../services/next-practice';
@@ -17,6 +18,7 @@ import {
   HomeCockpit,
   liveDailyProgress,
   resolveShelfCopy,
+  selectHomeOffers,
 } from './HomeCockpit';
 import { HOME_KIT_ZONE_MAP, type KitZoneMap } from './kit-zone-map';
 import { computeKitTextSafeBands } from './kit-text-safe-bands';
@@ -146,6 +148,142 @@ const practiceWave: PracticeWaveResult = {
   ],
   focusSkills: ['kick-independence'],
 };
+
+type OfferEvidence = {
+  key: RankedPracticeCandidate['factors'][number]['key'];
+  detail: string;
+};
+
+function offerRecommendation({
+  id,
+  title,
+  kind,
+  liked,
+  evidence,
+}: {
+  id: string;
+  title: string;
+  kind: 'lesson' | 'song';
+  liked?: boolean;
+  evidence: readonly OfferEvidence[];
+}): RankedPracticeCandidate {
+  return {
+    candidate: {
+      id,
+      title,
+      kind,
+      difficulty: 'easy',
+      available: true,
+      ...(liked ? { liked: true } : {}),
+    },
+    score: 86,
+    predictedSuccess: 0.8,
+    suggestedSpeed: 0.8,
+    mastery: 30,
+    reason: evidence[0]?.detail ?? 'No concrete evidence is available.',
+    factors: evidence.map(({ key, detail }) => ({
+      key,
+      label: key,
+      value: 0.8,
+      weight: 10,
+      contribution: 8,
+      detail,
+    })),
+    confidence: {
+      value: 0.8,
+      level: 'high',
+      evidenceRuns: 3,
+      detail: 'Three saved runs support this route.',
+    },
+  };
+}
+
+function offerSession(
+  intent: OneKickHomeSession['intent'],
+  launch: RankedPracticeCandidate,
+): OneKickHomeSession {
+  return {
+    intent,
+    size: 'full',
+    launch,
+    launchSpeed: launch.suggestedSpeed,
+    reason: launch.reason,
+    source: 'ranking',
+    focus: { title: launch.candidate.title, detail: launch.reason },
+    build: { title: launch.candidate.title, detail: launch.reason },
+    payoff: { title: launch.candidate.title, detail: launch.reason },
+  };
+}
+
+function evidenceRichOffers() {
+  const lesson = offerRecommendation({
+    id: 'lesson:timing',
+    title: 'Pulse Through the Bar',
+    kind: 'lesson',
+    evidence: [
+      {
+        key: 'weak-skill-match',
+        detail:
+          'Targets kick independence, the strongest matching Coach weakness.',
+      },
+    ],
+  });
+  const waveSong = offerRecommendation({
+    id: 'song:wave',
+    title: 'Night Ride',
+    kind: 'song',
+    liked: true,
+    evidence: [
+      {
+        key: 'weak-lane-match',
+        detail: 'Targets your recently weak snare lane.',
+      },
+    ],
+  });
+  const unplayedSong = offerRecommendation({
+    id: 'song:new',
+    title: 'Glass Hour',
+    kind: 'song',
+    liked: true,
+    evidence: [
+      {
+        key: 'preference',
+        detail: 'A saved favourite is still inside the current practice zone.',
+      },
+      {
+        key: 'zone-fit',
+        detail:
+          'Predicted 80% success is inside the productive challenge zone.',
+      },
+    ],
+  });
+  const wave: PracticeWaveResult = {
+    strategy: 'skill-linked',
+    stops: [
+      {
+        role: 'focus',
+        recommendation: lesson,
+        reason: lesson.reason,
+        linkedSkills: ['kick-independence'],
+      },
+      {
+        role: 'apply',
+        recommendation: waveSong,
+        reason: waveSong.reason,
+        linkedSkills: ['kick-independence'],
+      },
+      {
+        role: 'consolidate',
+        recommendation: unplayedSong,
+        reason: unplayedSong.reason,
+        linkedSkills: ['kick-independence'],
+      },
+    ],
+    focusSkills: ['kick-independence'],
+  };
+
+  return { lesson, waveSong, unplayedSong, wave };
+}
 
 describe('HomeCockpit kit home', () => {
   beforeEach(() => {
@@ -496,6 +634,201 @@ describe('HomeCockpit kit home', () => {
       .querySelector('strong');
 
     expect(shelfHeadline).not.toHaveTextContent('Choose a song to begin');
+  });
+});
+
+describe('home offer selection', () => {
+  beforeEach(() => {
+    installLocalStorage();
+    installIpcMock();
+  });
+
+  it('shows each offer type only when its engine carries concrete evidence', () => {
+    const { lesson, waveSong, unplayedSong, wave } = evidenceRichOffers();
+    const offers = selectHomeOffers({
+      homeSession: offerSession('learning', lesson),
+      myWaveSession: offerSession('songs', waveSong),
+      practiceWave: wave,
+      runsBySong: { [waveSong.candidate.id]: [run(0)] },
+      playableSongIds: [waveSong.candidate.id, unplayedSong.candidate.id],
+    });
+
+    expect(
+      offers.map(({ kind, title, reason }) => ({ kind, title, reason })),
+    ).toEqual([
+      {
+        kind: 'wave',
+        title: 'Night Ride',
+        reason: 'Targets your recently weak snare lane.',
+      },
+      {
+        kind: 'lesson',
+        title: 'Pulse Through the Bar',
+        reason:
+          'Targets kick independence, the strongest matching Coach weakness.',
+      },
+      {
+        kind: 'song',
+        title: 'Glass Hour',
+        reason:
+          'A saved favourite is still inside the current practice zone. Predicted 80% success is inside the productive challenge zone.',
+      },
+    ]);
+
+    const noEvidence = offerRecommendation({
+      id: 'song:no-evidence',
+      title: 'Blank Promise',
+      kind: 'song',
+      liked: true,
+      evidence: [],
+    });
+
+    expect(
+      selectHomeOffers({
+        homeSession: offerSession('learning', noEvidence),
+        myWaveSession: offerSession('songs', noEvidence),
+        practiceWave: {
+          strategy: 'evidence-ranked',
+          stops: [
+            {
+              role: 'apply',
+              recommendation: noEvidence,
+              reason: noEvidence.reason,
+              linkedSkills: ['timing'],
+            },
+          ],
+          focusSkills: ['timing'],
+        },
+        playableSongIds: [noEvidence.candidate.id],
+      }),
+    ).toEqual([]);
+  });
+
+  it('does not surface an unplayed song without both affection and zone evidence', () => {
+    const { lesson, waveSong, unplayedSong, wave } = evidenceRichOffers();
+    const withoutAffection = {
+      ...unplayedSong,
+      candidate: { ...unplayedSong.candidate, liked: false },
+    };
+    const withoutZone = {
+      ...unplayedSong,
+      factors: unplayedSong.factors.filter(({ key }) => key !== 'zone-fit'),
+    };
+
+    [withoutAffection, withoutZone].forEach((candidate) => {
+      const offers = selectHomeOffers({
+        homeSession: offerSession('learning', lesson),
+        myWaveSession: offerSession('songs', waveSong),
+        practiceWave: {
+          ...wave,
+          stops: wave.stops.map((stop) =>
+            stop.recommendation.candidate.id === unplayedSong.candidate.id
+              ? { ...stop, recommendation: candidate }
+              : stop,
+          ),
+        },
+        runsBySong: { [waveSong.candidate.id]: [run(0)] },
+        playableSongIds: [waveSong.candidate.id, candidate.candidate.id],
+      });
+
+      expect(offers.map(({ kind }) => kind)).not.toContain('song');
+    });
+  });
+
+  it('collapses a duplicate wave target instead of stating it twice', () => {
+    const { lesson, waveSong, wave } = evidenceRichOffers();
+    const offers = selectHomeOffers({
+      homeSession: offerSession('learning', lesson),
+      myWaveSession: offerSession('songs', waveSong),
+      practiceWave: wave,
+      runsBySong: { [waveSong.candidate.id]: [run(0)] },
+      playableSongIds: [waveSong.candidate.id],
+    });
+
+    expect(offers.map(({ kind }) => kind)).toEqual(['wave', 'lesson']);
+    expect(
+      offers.filter(
+        ({ candidate }) => candidate.candidate.id === waveSong.candidate.id,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('starts the exact named target from every visible offer', () => {
+    const { lesson, waveSong, unplayedSong, wave } = evidenceRichOffers();
+    const offerLessonSong = {
+      id: lesson.candidate.id,
+      name: lesson.candidate.title,
+      artist: 'Drumroll Method',
+      lesson: { id: '02.03', title: lesson.candidate.title },
+    } as Song;
+    const waveSongData = {
+      id: waveSong.candidate.id,
+      name: waveSong.candidate.title,
+      artist: 'Drumroll',
+    } as Song;
+    const unplayedSongData = {
+      id: unplayedSong.candidate.id,
+      name: unplayedSong.candidate.title,
+      artist: 'Drumroll',
+    } as Song;
+    const onStartSession = vi.fn();
+    const onStartSong = vi.fn();
+
+    render(
+      <InputProvider>
+        <HomeCockpit
+          songList={[offerLessonSong, waveSongData, unplayedSongData]}
+          gamification={
+            {
+              ...emptyGamification,
+              runsBySong: { [waveSong.candidate.id]: [run(0)] },
+            } as UseGamificationResult
+          }
+          recommendation={lesson}
+          practiceRanking={[lesson, waveSong, unplayedSong]}
+          practiceWave={wave}
+          onStartRecommended={vi.fn()}
+          onStartSession={onStartSession}
+          onStartSong={onStartSong}
+          onOpenSongs={vi.fn()}
+          onOpenProfile={vi.fn()}
+        />
+      </InputProvider>,
+    );
+
+    const offerStrip = screen.getByTestId('home-offers');
+
+    expect(offerStrip).toHaveAttribute('data-offer-count', '3');
+    expect(offerStrip).toHaveTextContent('Night Ride');
+    expect(offerStrip).toHaveTextContent('Pulse Through the Bar');
+    expect(offerStrip).toHaveTextContent('Glass Hour');
+    expect(screen.getByTestId('kit-hotspot-snare')).not.toHaveTextContent(
+      'Night Ride',
+    );
+
+    fireEvent.click(screen.getByTestId('home-offer-wave'));
+    fireEvent.click(screen.getByTestId('home-offer-lesson'));
+    fireEvent.click(screen.getByTestId('home-offer-song'));
+
+    expect(onStartSession).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        intent: 'songs',
+        launch: expect.objectContaining({
+          candidate: expect.objectContaining({ id: waveSong.candidate.id }),
+        }),
+      }),
+    );
+    expect(onStartSession).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        intent: 'learning',
+        launch: expect.objectContaining({
+          candidate: expect.objectContaining({ id: lesson.candidate.id }),
+        }),
+      }),
+    );
+    expect(onStartSong).toHaveBeenCalledWith(unplayedSongData);
   });
 });
 

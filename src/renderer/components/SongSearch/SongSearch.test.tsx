@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { App as AntdApp } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installIpcMock, IpcMock } from '../../hooks/test-support';
+import type { IpcAutoChartJob, Song } from '../../../types';
 import { SongSearch, SongSearchRequest } from './SongSearch';
 
 // antd's Popover drives its open/close animation (CSSMotion) off real
@@ -34,6 +35,23 @@ function typeQuery(value: string) {
 function flushDebounce() {
   act(() => {
     vi.advanceTimersByTime(300);
+  });
+}
+
+function emitAutoChartUpdate(
+  overrides: Partial<IpcAutoChartJob> & { id: string },
+) {
+  act(() => {
+    ipc.emit('auto-chart-update', {
+      attempt: 1,
+      stage: 'queued',
+      message: 'Chart queued for Drumroll processing',
+      backend: 'sightkick',
+      youtubeUrl: sampleResults[0].watchUrl,
+      autoImport: true,
+      jobs: [],
+      ...overrides,
+    });
   });
 }
 
@@ -183,6 +201,145 @@ describe('SongSearch', () => {
         },
       ],
     });
+  });
+
+  it('keeps a selected result inline while it downloads, charts, and imports', () => {
+    renderSongSearch();
+
+    typeQuery('some song');
+    flushDebounce();
+
+    act(() => {
+      ipc.emit('search-youtube', { results: sampleResults });
+    });
+
+    fireEvent.click(screen.getByTestId('song-search-result-abcdefghijk'));
+
+    expect(screen.getByTestId('song-search-import-row')).toHaveTextContent(
+      'Queued "Some Great Drum Song"',
+    );
+    expect(screen.queryByTestId('song-search-results')).not.toBeInTheDocument();
+
+    fireEvent.blur(screen.getByTestId('song-search-input'));
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+
+    expect(screen.getByTestId('song-search-input')).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+
+    emitAutoChartUpdate({
+      id: 'job-1',
+      stage: 'downloading',
+      message: 'Downloading audio from YouTube',
+      percent: 18,
+    });
+
+    expect(screen.getByTestId('song-search-import-row')).toHaveTextContent(
+      'Downloading audio from YouTube',
+    );
+    expect(screen.getByTestId('song-search-import-progress')).toHaveTextContent(
+      '18%',
+    );
+
+    emitAutoChartUpdate({
+      id: 'job-1',
+      stage: 'processing',
+      message: 'Transcribing drums',
+      percent: 76,
+    });
+
+    expect(screen.getByTestId('song-search-import-row')).toHaveTextContent(
+      'Transcribing drums',
+    );
+
+    emitAutoChartUpdate({
+      id: 'job-1',
+      stage: 'importing',
+      message: 'Adding reviewed chart to the current library',
+    });
+
+    expect(screen.getByTestId('song-search-import-row')).toHaveTextContent(
+      'Adding reviewed chart to the current library',
+    );
+  });
+
+  it('retries a failed import from the selected row', () => {
+    renderSongSearch();
+
+    typeQuery('some song');
+    flushDebounce();
+
+    act(() => {
+      ipc.emit('search-youtube', { results: sampleResults });
+    });
+
+    fireEvent.click(screen.getByTestId('song-search-result-abcdefghijk'));
+    emitAutoChartUpdate({
+      id: 'job-1',
+      stage: 'failed',
+      message: 'Chart creation failed',
+      error: 'yt-dlp could not fetch this recording',
+    });
+
+    expect(screen.getByTestId('song-search-import-row')).toHaveTextContent(
+      'yt-dlp could not fetch this recording',
+    );
+
+    fireEvent.click(screen.getByTestId('song-search-import-retry'));
+
+    expect(ipc.sent).toContainEqual({
+      channel: 'retry-auto-chart',
+      args: ['job-1'],
+    });
+    expect(screen.getByTestId('song-search-import-row')).toHaveTextContent(
+      'Retrying "Some Great Drum Song"',
+    );
+
+    emitAutoChartUpdate({
+      id: 'job-2',
+      stage: 'queued',
+      message: 'Chart queued for Drumroll processing',
+    });
+
+    expect(screen.getByTestId('song-search-import-row')).toHaveTextContent(
+      'Chart queued for Drumroll processing',
+    );
+  });
+
+  it('exposes the imported song to the one-field owner so it can open it', () => {
+    const onImported = vi.fn();
+
+    render(
+      <AntdApp>
+        <SongSearch onImported={onImported} />
+      </AntdApp>,
+    );
+
+    typeQuery('some song');
+    flushDebounce();
+
+    act(() => {
+      ipc.emit('search-youtube', { results: sampleResults });
+    });
+
+    fireEvent.click(screen.getByTestId('song-search-result-abcdefghijk'));
+
+    const importedSong = {
+      id: 'imported-song',
+      name: 'Some Great Drum Song',
+    } as Song;
+
+    emitAutoChartUpdate({
+      id: 'job-1',
+      stage: 'imported',
+      message: 'Added Some Great Drum Song to your library',
+      song: importedSong,
+    });
+
+    expect(onImported).toHaveBeenCalledWith(importedSong);
   });
 
   it('accepts only the exact source-linked recording and sends its candidate identity', () => {
@@ -436,7 +593,7 @@ describe('SongSearch', () => {
     expect(onQueryChange).toHaveBeenLastCalledWith('boulevard');
   });
 
-  it('stays visible but suppresses the YouTube panel and network search while inactive', () => {
+  it('only offers online matches after the caller confirms no local match', () => {
     const view = render(
       <AntdApp>
         <SongSearch active={false} />
@@ -465,6 +622,22 @@ describe('SongSearch', () => {
       channel: 'search-youtube',
       args: [{ query: 'boulevard of broken dreams' }],
     });
+
+    act(() => {
+      ipc.emit('search-youtube', {
+        results: [
+          {
+            videoId: 'boulevard01',
+            title: 'Green Day - Boulevard of Broken Dreams (Official Audio)',
+            uploader: 'Green Day',
+            durationSeconds: 261,
+            watchUrl: 'https://www.youtube.com/watch?v=boulevard01',
+          },
+        ],
+      });
+    });
+
+    expect(screen.getByTestId('song-search-results')).toBeInTheDocument();
   });
 
   it('renders the input under a caller-chosen testid', () => {

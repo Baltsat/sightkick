@@ -6,6 +6,8 @@ import {
   configureRemoteAutoChartStore,
   createRemoteAutoChartRunner,
   extractRemoteAutoChartResult,
+  getRemoteAutoChartRuntime,
+  getRemoteAutoChartSettings,
   isRemoteAutoChartAvailable,
   saveAndTestRemoteAutoChart,
 } from './remoteAutoChart';
@@ -131,8 +133,7 @@ describe('remote auto-chart runner', () => {
     expect(events).toEqual([
       {
         kind: 'error',
-        message:
-          'Remote transcriber rejected the saved token (401). Update it and try again',
+        message: 'Remote transcriber rejected its credentials (401)',
       },
     ]);
     expect(events[0].message).not.toContain(runtime.token);
@@ -204,6 +205,50 @@ describe('remote auto-chart runner', () => {
 });
 
 describe('remote auto-chart settings', () => {
+  it('uses deployment credentials before stale manual settings', () => {
+    const values = new Map<string, unknown>([
+      ['autoChart.remote.endpoint', 'https://stale.example.com'],
+      ['autoChart.remote.token', 'stale-token'],
+    ]);
+    const previousEndpoint = process.env.TRANSCRIBER_URL;
+    const previousToken = process.env.TRANSCRIBER_TOKEN;
+
+    configureRemoteAutoChartStore({
+      get: (key) => values.get(key),
+      set: (key, value) => values.set(key, value),
+    });
+    process.env.TRANSCRIBER_URL = 'http://localhost:18010/';
+    process.env.TRANSCRIBER_TOKEN = 'deployment-token';
+
+    try {
+      expect(getRemoteAutoChartRuntime()).toEqual({
+        endpoint: 'http://localhost:18010',
+        token: 'deployment-token',
+      });
+
+      const event = makeEvent();
+
+      getRemoteAutoChartSettings(event as never);
+
+      expect(lastReply(event, 'auto-chart-remote-settings')?.args[0]).toEqual({
+        endpoint: 'http://localhost:18010',
+        tokenConfigured: true,
+      });
+    } finally {
+      if (previousEndpoint === undefined) {
+        delete process.env.TRANSCRIBER_URL;
+      } else {
+        process.env.TRANSCRIBER_URL = previousEndpoint;
+      }
+
+      if (previousToken === undefined) {
+        delete process.env.TRANSCRIBER_TOKEN;
+      } else {
+        process.env.TRANSCRIBER_TOKEN = previousToken;
+      }
+    }
+  });
+
   it('stores a secret without returning it and requires a healthy endpoint', async () => {
     const values = new Map<string, unknown>();
     const store = {

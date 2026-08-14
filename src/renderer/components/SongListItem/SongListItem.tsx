@@ -40,6 +40,7 @@ export interface SongListItemProps {
   preview?: SongHoverPreviewState;
   onPreviewStart?: () => void;
   onPreviewEnd?: () => void;
+  tasteSeeded?: boolean;
 }
 
 export function SongListItem({
@@ -58,6 +59,7 @@ export function SongListItem({
   preview,
   onPreviewStart,
   onPreviewEnd,
+  tasteSeeded = false,
 }: SongListItemProps) {
   const local = 'source' in songData ? undefined : songData;
   const hasAudio = (local?.audio?.length ?? 0) > 0;
@@ -209,11 +211,11 @@ export function SongListItem({
         data-focused={focused ? 'true' : undefined}
         data-previewing={preview ? 'true' : undefined}
         className={cn(
-          'flex min-w-0 border border-border-soft grow no-underline bg-surface rounded-xl duration-100 ease-out cursor-default p-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+          'group flex min-w-0 items-center border-b border-border-soft grow no-underline bg-transparent px-2 py-2 duration-100 ease-out cursor-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
           {
-            'hover:bg-accent-soft-bg hover:border-accent-soft-border cursor-pointer transition-[background-color,border-color,box-shadow]':
+            'hover:bg-[var(--dr-paper-low)] cursor-pointer transition-[background-color,border-color,box-shadow]':
               Boolean(local && playable),
-            'bg-accent-soft-bg border-accent-soft-border outline-2 outline-accent shadow-accent-soft':
+            'bg-[var(--dr-paper-low)] outline-2 outline-accent shadow-accent-soft':
               focused,
           },
         )}
@@ -242,6 +244,14 @@ export function SongListItem({
               >
                 {artist}
               </div>
+              {tasteSeeded && !local?.liked && (
+                <span
+                  className="shrink-0 text-xs font-medium text-text-muted"
+                  data-testid="song-yandex-taste-seed"
+                >
+                  Saved on Yandex Music
+                </span>
+              )}
               {preview && (
                 <div
                   className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-soft-bg px-1.5 py-0.5 font-ui text-[10px] font-semibold text-accent"

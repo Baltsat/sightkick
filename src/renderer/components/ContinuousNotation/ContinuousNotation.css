@@ -241,29 +241,65 @@
 
 .drumroll-pattern-band {
   position: absolute;
-  top: 0.5rem;
-  bottom: 0.5rem;
-  border-inline: 1px solid
-    color-mix(in srgb, var(--dr-violet, #7c3aed) 20%, transparent);
-  border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--dr-violet, #7c3aed) 6%, transparent);
+  box-sizing: border-box;
+  border-top: 1px solid
+    color-mix(in srgb, var(--dr-violet, #7c3aed) 42%, transparent);
+  background: transparent;
+}
+
+.drumroll-pattern-band::before,
+.drumroll-pattern-band::after {
+  position: absolute;
+  top: 0;
+  height: 0.45rem;
+  border-left: 1px solid
+    color-mix(in srgb, var(--dr-violet, #7c3aed) 42%, transparent);
+  content: '';
+}
+
+.drumroll-pattern-band::before {
+  left: 0;
+}
+
+.drumroll-pattern-band::after {
+  right: 0;
 }
 
 .drumroll-pattern-band > span {
   position: absolute;
-  top: 0.5rem;
-  left: 0.7rem;
+  top: 0.26rem;
+  left: 0.38rem;
   color: color-mix(
     in srgb,
-    var(--dr-violet, #7c3aed) 80%,
+    var(--dr-violet, #7c3aed) 68%,
     var(--dr-ink-muted, var(--color-text-muted))
   );
   font-family: var(--font-ui);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 0.65rem;
+  font-weight: 760;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.drumroll-classic-score-header {
+  position: sticky;
+  z-index: 1;
+  left: 0;
+  align-self: flex-start;
+  box-sizing: border-box;
+}
+
+.drumroll-classic-score-title {
+  padding-inline: 1.5rem;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.drumroll-classic-score-credits {
+  padding: 0 1.5rem 0.85rem;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 .drumroll-flow-meter__bar {

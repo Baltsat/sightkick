@@ -7,6 +7,7 @@ import {
   build_my_wave,
   build_my_wave_item_profile,
   extract_drum_chart_features,
+  score_my_wave_affection,
   score_my_wave_difficulty,
 } from './my-wave';
 
@@ -101,6 +102,25 @@ function fill_bar(): string {
     '1680 snare yellow',
   ]);
 }
+
+describe('My Wave affection', () => {
+  it('keeps an explicit favourite stronger than any replay-only signal', () => {
+    const favourite = score_my_wave_affection({
+      liked: true,
+      replay_count: 0,
+      max_replay_count: 48,
+    });
+    const replayed = score_my_wave_affection({
+      liked: false,
+      replay_count: 48,
+      max_replay_count: 48,
+    });
+
+    expect(favourite).toMatchObject({ favourite: true, value: 0.68 });
+    expect(replayed).toMatchObject({ favourite: false, value: 0.32 });
+    expect(favourite.value).toBeGreaterThan(replayed.value);
+  });
+});
 
 function manifest(
   item_id: string,

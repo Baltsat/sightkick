@@ -51,6 +51,10 @@ function setupSongListView(...args: Parameters<typeof mountSongListView>) {
   return view;
 }
 
+function browseAllLibrary(): void {
+  fireEvent.click(screen.getByTestId('browse-all-library'));
+}
+
 describe('SongListView — loading the library', () => {
   it('opens on the playfield-first Home cockpit', () => {
     mountSongListView();
@@ -689,6 +693,9 @@ describe('SongListView — loading the library', () => {
     expect(screen.queryByTestId('mode-drums')).not.toBeInTheDocument();
     expect(screen.queryByTestId('mode-favorites')).not.toBeInTheDocument();
     expect(screen.queryByTestId('mode-online')).not.toBeInTheDocument();
+
+    browseAllLibrary();
+
     expect(screen.getByText('Master of Puppets')).toBeInTheDocument();
     expect(
       screen.getByTestId('library-candidate-state-Drums-1'),
@@ -723,6 +730,31 @@ describe('SongListView — loading the library', () => {
     ).toBeInTheDocument();
   });
 
+  it('persists a favourite from one press on an actionable row', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('favourite', {
+        updatedAt: '2026-08-14T09:00:00.000Z',
+      }),
+    ]);
+
+    const row = screen.getByTestId('song-item-favourite');
+    const likeButton = within(row).getByTestId('like-toggle');
+
+    fireEvent.click(likeButton);
+
+    expect(view.ipc.sent).toContainEqual({
+      channel: 'like-song',
+      args: ['favourite', true],
+    });
+    expect(
+      within(screen.getByTestId('song-item-favourite')).getByTestId(
+        'like-toggle',
+      ),
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('selects all 13 Drums candidates with honest metadata-only states', () => {
     const view = setupSongListView();
     const drums = parseYandexPlaylistCandidates(yandexSource);
@@ -735,6 +767,8 @@ describe('SongListView — loading the library', () => {
         favorites,
       },
     });
+
+    browseAllLibrary();
 
     const drumsRows = drums.tracks.map((track) =>
       screen.getByTestId(`library-candidate-Drums-${track.ordinal}`),
@@ -886,6 +920,8 @@ describe('SongListView — loading the library', () => {
       },
     });
 
+    browseAllLibrary();
+
     // A linked track never appears as a source row at all — it is the
     // playable song row, merged and deduplicated by the unified model.
     expect(screen.getByTestId('song-item-linked-chart')).toBeInTheDocument();
@@ -921,6 +957,9 @@ describe('SongListView — loading the library', () => {
         favorites: parseYandexPlaylistCandidates(yandexFavoritesSource),
       },
     });
+
+    browseAllLibrary();
+
     expect(
       within(
         screen.getByTestId(`library-candidate-Drums-${track.ordinal}`),
@@ -1269,6 +1308,8 @@ describe('SongListView — filtering and sorting', () => {
       },
     });
 
+    browseAllLibrary();
+
     const readyRow = screen.getByTestId('song-item-ready');
     const unreadyRow = screen.getByTestId('song-item-unready');
     const firstCandidateRow = screen.getByTestId(
@@ -1402,13 +1443,6 @@ describe('SongListView — difficulty', () => {
   });
 });
 
-// The inline like toggle was dropped from the row: the row grammar allows
-// exactly one right-side evidence mark (visual-system-v3.md), and this row
-// already spends it on the ready/score state. Liking a song is still real
-// product functionality (it feeds `favorite`-flavoured recommendations and
-// is settable elsewhere) — it just no longer has a Songs-shelf trigger.
-// Left for a follow-up lane to reattach, e.g. behind a row's hover menu.
-
 describe('SongListView — opening a song', () => {
   const failedHardPractice = {
     completedAt: '2026-08-08T12:00:00.000Z',
@@ -1471,6 +1505,7 @@ describe('SongListView — opening a song', () => {
 
     view.loadSongs([makeListSong('hard-song')]);
     await loadFailedHardPractice(view);
+    browseAllLibrary();
     view.clickSong('hard-song');
     view.chooseGameMode('practice');
 
@@ -1485,6 +1520,7 @@ describe('SongListView — opening a song', () => {
 
     view.loadSongs([makeListSong('hard-song')]);
     await loadFailedHardPractice(view);
+    browseAllLibrary();
     view.clickSong('hard-song');
     view.chooseGameMode('perform');
 
@@ -2163,6 +2199,8 @@ describe('SongListView — lessons filter split', () => {
       makeListSong('a', { name: 'Master of Puppets' }),
       makeLessonSong('lesson-1', { id: '01.01', title: 'Warm-Up Groove' }),
     ]);
+
+    browseAllLibrary();
 
     expect(screen.getByText('Master of Puppets')).toBeInTheDocument();
     expect(screen.queryByText('Warm-Up Groove')).not.toBeInTheDocument();

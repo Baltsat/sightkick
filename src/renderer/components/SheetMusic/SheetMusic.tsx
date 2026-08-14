@@ -438,6 +438,7 @@ export function SheetMusic({
   const [flowAutoZoom, setFlowAutoZoom] = useState(
     FLOW_AUTO_ZOOM_MIN_MULTIPLIER,
   );
+  const [classicHeaderWidth, setClassicHeaderWidth] = useState<number>();
 
   // Flow deliberately renders larger than Classic's fixed browsing scale:
   // notation is the one dominant object on the practice screen (see
@@ -488,6 +489,48 @@ export function SheetMusic({
 
   const presentationZoom = isFlow ? flowAutoZoom * zoom : zoom * 1.15;
 
+  useLayoutEffect(() => {
+    if (isFlow) {
+      return undefined;
+    }
+
+    const viewport = wrapperRef.current?.parentElement;
+    const score = flowStageRef.current;
+
+    if (!viewport || !score) {
+      return undefined;
+    }
+
+    const updateHeaderWidth = () => {
+      const scoreStyle = window.getComputedStyle(score);
+      const scorePadding =
+        Number.parseFloat(scoreStyle.paddingLeft) +
+        Number.parseFloat(scoreStyle.paddingRight);
+      const nextWidth = Math.max(
+        0,
+        viewport.clientWidth / presentationZoom - scorePadding,
+      );
+
+      setClassicHeaderWidth((currentWidth) =>
+        currentWidth !== undefined && Math.abs(currentWidth - nextWidth) < 0.5
+          ? currentWidth
+          : nextWidth,
+      );
+    };
+
+    updateHeaderWidth();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return undefined;
+    }
+
+    const observer = new ResizeObserver(updateHeaderWidth);
+
+    observer.observe(viewport);
+
+    return () => observer.disconnect();
+  }, [isFlow, presentationZoom]);
+
   return (
     <div
       ref={wrapperRef}
@@ -526,15 +569,17 @@ export function SheetMusic({
         {!isFlow && (
           <>
             <h1
-              className="my-0 mx-auto text-xl text-ink font-semibold"
+              className="drumroll-classic-score-header drumroll-classic-score-title my-0 text-xl text-ink font-semibold"
               data-testid="sheet-score-title"
+              style={{ width: classicHeaderWidth }}
             >
               {songData.name}
             </h1>
             {scoreCredits.length > 0 && (
               <div
-                className="ml-auto text-[15px] italic font-bold flex flex-col items-end text-ink"
+                className="drumroll-classic-score-header drumroll-classic-score-credits text-[15px] italic font-bold flex flex-col items-end text-ink"
                 data-testid="sheet-score-credits"
+                style={{ width: classicHeaderWidth }}
               >
                 {scoreCredits.map((credit) => (
                   <div key={credit}>{credit}</div>

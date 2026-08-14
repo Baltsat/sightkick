@@ -154,6 +154,18 @@ export interface NotationPatternRun {
   count: number;
 }
 
+const REPEAT_CUE_GAP = 10;
+const REPEAT_CUE_HEIGHT = 16;
+
+export interface RepeatCueSegment {
+  startIndex: number;
+  endIndex: number;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 function notationPatternKey(measure: RenderData['measure']): string {
   const duration = Math.max(1, measure.endTick - measure.startTick);
 
@@ -203,6 +215,56 @@ export function repeatedNotationPatterns(
   }
 
   return patterns;
+}
+
+export function repeatCueSegments(
+  renderData: RenderData[],
+  pattern: NotationPatternRun,
+): RepeatCueSegment[] {
+  const segments: RepeatCueSegment[] = [];
+  let segment: RepeatCueSegment | undefined;
+
+  for (
+    let measureIndex = pattern.startIndex;
+    measureIndex <= pattern.endIndex;
+    measureIndex += 1
+  ) {
+    const measureData = renderData[measureIndex];
+
+    if (!measureData) {
+      continue;
+    }
+
+    const left = measureData.stave.getX();
+    const width = measureData.stave.getWidth();
+    const top =
+      measureData.yOffset +
+      measureData.stave.getY() +
+      measureData.stave.getHeight() +
+      REPEAT_CUE_GAP;
+
+    if (!segment || segment.top !== top) {
+      segment = {
+        startIndex: measureIndex,
+        endIndex: measureIndex,
+        left,
+        top,
+        width,
+        height: REPEAT_CUE_HEIGHT,
+      };
+      segments.push(segment);
+
+      continue;
+    }
+
+    const right = Math.max(segment.left + segment.width, left + width);
+
+    segment.left = Math.min(segment.left, left);
+    segment.width = right - segment.left;
+    segment.endIndex = measureIndex;
+  }
+
+  return segments;
 }
 
 /**
@@ -295,34 +357,35 @@ export function flowMeterBars(renderData: RenderData[]): FlowMeterBar[] {
 }
 
 export function PatternBands({ renderData }: { renderData: RenderData[] }) {
-  const bars = flowMeterBars(renderData);
   const patterns = repeatedNotationPatterns(renderData);
 
   return (
     <div className="drumroll-pattern-bands" aria-hidden="true">
-      {patterns.map((pattern) => {
-        const firstBar = bars[pattern.startIndex];
-        const lastBar = bars[pattern.endIndex];
-
-        if (!firstBar || !lastBar) {
-          return null;
-        }
-
-        return (
+      {patterns.flatMap((pattern) =>
+        repeatCueSegments(renderData, pattern).map((segment, segmentIndex) => (
           <div
-            key={`${pattern.startIndex}:${pattern.endIndex}`}
+            key={`${pattern.startIndex}:${pattern.endIndex}:${segment.startIndex}:${segment.endIndex}`}
             className="drumroll-pattern-band"
             data-repeat-count={pattern.count}
-            data-testid={`notation-pattern-${pattern.startIndex}-${pattern.endIndex}`}
+            data-repeat-label={segmentIndex === 0 ? 'true' : undefined}
+            data-repeat-start={segment.startIndex}
+            data-repeat-end={segment.endIndex}
+            data-testid={
+              segmentIndex === 0
+                ? `notation-pattern-${pattern.startIndex}-${pattern.endIndex}`
+                : `notation-pattern-${pattern.startIndex}-${pattern.endIndex}-${segment.startIndex}-${segment.endIndex}`
+            }
             style={{
-              left: firstBar.x,
-              width: lastBar.x + lastBar.width - firstBar.x,
+              left: segment.left,
+              top: segment.top,
+              width: segment.width,
+              height: segment.height,
             }}
           >
-            <span>repeat ×{pattern.count}</span>
+            {segmentIndex === 0 && <span>repeat ×{pattern.count}</span>}
           </div>
-        );
-      })}
+        )),
+      )}
     </div>
   );
 }

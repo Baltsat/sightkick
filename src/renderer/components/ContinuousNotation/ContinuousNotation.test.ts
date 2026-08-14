@@ -29,6 +29,7 @@ import {
   loopEscapePhase,
   NotationLocationReadout,
   PatternBands,
+  repeatCueSegments,
   repeatedNotationPatterns,
 } from './ContinuousNotation';
 
@@ -280,6 +281,97 @@ describe('Flow meter and current location', () => {
     expect(screen.getByTestId('notation-pattern-0-3')).toHaveTextContent(
       'repeat ×4',
     );
+  });
+
+  it('bounds repeat cues to their own stave rows without covering noteheads', () => {
+    const figure = [
+      {
+        notes: ['C/5'],
+        duration: '8',
+        dots: 0,
+        isRest: false,
+        tick: 0,
+      },
+    ] as Measure['notes'];
+    const data = Array.from({ length: 4 }, (_, measureIndex) => {
+      const startTick = measureIndex * 400;
+      const item = measureData(
+        startTick,
+        startTick + 400,
+        (measureIndex % 2) * 400,
+        400,
+        [4, 4],
+        false,
+        figure.map((note) => ({ ...note, tick: note.tick + startTick })),
+      );
+
+      return {
+        ...item,
+        yOffset: measureIndex < 2 ? 0 : 180,
+      };
+    });
+    const segments = repeatCueSegments(data, {
+      startIndex: 0,
+      endIndex: 3,
+      count: 4,
+    });
+    const notehead = { left: 160, right: 180, top: 18, bottom: 78 };
+
+    expect(segments).toEqual([
+      {
+        startIndex: 0,
+        endIndex: 1,
+        left: 0,
+        top: 90,
+        width: 800,
+        height: 16,
+      },
+      {
+        startIndex: 2,
+        endIndex: 3,
+        left: 0,
+        top: 270,
+        width: 800,
+        height: 16,
+      },
+    ]);
+    expect(
+      segments.some(
+        (segment) =>
+          segment.left < notehead.right &&
+          segment.left + segment.width > notehead.left &&
+          segment.top < notehead.bottom &&
+          segment.top + segment.height > notehead.top,
+      ),
+    ).toBe(false);
+
+    render(createElement(PatternBands, { renderData: data }));
+
+    expect(screen.getByTestId('notation-pattern-0-3')).toHaveStyle({
+      top: '90px',
+      width: '800px',
+      height: '16px',
+    });
+    expect(screen.getByTestId('notation-pattern-0-3')).toHaveAttribute(
+      'data-repeat-label',
+      'true',
+    );
+    expect(screen.getByTestId('notation-pattern-0-3-2-3')).toHaveStyle({
+      top: '270px',
+      width: '800px',
+      height: '16px',
+    });
+
+    const notationCss = readFileSync(
+      'src/renderer/components/ContinuousNotation/ContinuousNotation.css',
+      'utf8',
+    );
+    const rule = notationCss.match(
+      /\.drumroll-pattern-band\s*\{([^}]*)\}/,
+    )?.[1];
+
+    expect(rule).toContain('background: transparent');
+    expect(rule).not.toContain('bottom:');
   });
 
   it('keeps every notehead colour aligned with its matching kit zone', () => {

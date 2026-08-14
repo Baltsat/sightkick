@@ -1,20 +1,32 @@
-import { KeyboardEvent, useEffect, useState } from 'react';
-import { App, Empty, Input, Popover, Spin } from 'antd';
+import {
+  KeyboardEvent,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
+import { Empty, Input, Popover, Spin } from 'antd';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
 import appIcon from '../../../../assets/icon.png';
 import {
   IpcYoutubeSearchResult,
   LibrarySourceTrackProvenance,
+  Song,
 } from '../../../types';
 import { formatTime } from '../../helpers';
 import { cn } from '../../cn';
 import { popoverStyles } from '../../overlayStyles';
 import { Tooltip } from '../Tooltip';
 import { useYoutubeSearch } from '../../hooks/useYoutubeSearch';
+import { useAutoChartJobs } from '../../hooks/useAutoChartJobs';
 import {
   createAutoImportRequest,
+  initialAutoImportState,
   rankAutoImportCandidates,
+  reduceAutoImport,
+  retryAutoImportRequest,
 } from '../../services/auto-import';
 import type { AutoImportCandidate } from '../../services/auto-import';
 
@@ -42,6 +54,7 @@ interface Props {
   active?: boolean;
   /** Overrides the input's data-testid; defaults to "song-search-input". */
   inputTestId?: string;
+  onImported?: (song: Song) => void;
 }
 
 function resultSubtitle(result: IpcYoutubeSearchResult): string {
@@ -64,12 +77,21 @@ function SongSearchInner({
   onQueryChange,
   active = true,
   inputTestId = 'song-search-input',
+  onImported,
 }: Props) {
-  const { notification } = App.useApp();
-  const requestedQuery = disabled ? '' : requestedSearch?.query.trim() ?? '';
+  const requestedSearchQuery = requestedSearch?.query.trim();
+  const requestedQuery = disabled ? '' : requestedSearchQuery || '';
   const [query, setQuery] = useState(requestedQuery);
   const [open, setOpen] = useState(Boolean(requestedQuery));
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [autoImport, dispatchAutoImport] = useReducer(
+    reduceAutoImport,
+    initialAutoImportState,
+  );
+  const selectedCandidateRef = useRef<AutoImportCandidate | undefined>(
+    undefined,
+  );
+  const importedJobIdsRef = useRef<Set<string>>(new Set());
   const [sourceProvenance, setSourceProvenance] = useState<
     LibrarySourceTrackProvenance | undefined
   >(() => {
@@ -98,11 +120,49 @@ function SongSearchInner({
   const { results, loading, error, retry } = useYoutubeSearch(
     active ? query : '',
   );
-  const candidates = rankAutoImportCandidates(
-    query,
-    results,
-    sourceProvenance,
-  ).candidates;
+  const candidates = useMemo(
+    () => rankAutoImportCandidates(query, results, sourceProvenance).candidates,
+    [query, results, sourceProvenance],
+  );
+  const importInFlight = [
+    'queued',
+    'resolving',
+    'fetching',
+    'charting',
+    'checking',
+    'importing',
+  ].includes(autoImport.phase);
+
+  useAutoChartJobs((job) => {
+    dispatchAutoImport({ type: 'job', job });
+
+    if (
+      job.stage === 'imported' &&
+      job.song &&
+      selectedCandidateRef.current?.watchUrl === job.youtubeUrl &&
+      !importedJobIdsRef.current.has(job.id)
+    ) {
+      importedJobIdsRef.current.add(job.id);
+      onImported?.(job.song);
+    }
+  });
+
+  useEffect(() => {
+    if (!active || !trimmed || autoImport.selected) {
+      return;
+    }
+
+    if (loading) {
+      dispatchAutoImport({ type: 'searching' });
+
+      return;
+    }
+
+    if (!error) {
+      dispatchAutoImport({ type: 'candidates', candidates });
+    }
+  }, [active, autoImport.selected, candidates, error, loading, trimmed]);
+
   const [prevResults, setPrevResults] = useState(results);
 
   if (results !== prevResults) {
@@ -111,18 +171,22 @@ function SongSearchInner({
   }
 
   const select = (result: AutoImportCandidate) => {
+    selectedCandidateRef.current = result;
+    dispatchAutoImport({ type: 'selected', candidate: result });
     window.electron.ipcRenderer.sendMessage('create-auto-chart', {
       ...createAutoImportRequest(result, sourceProvenance),
     });
-    notification.info({
-      title: 'Adding to your library',
-      description: `Finding drums for "${result.title}"…`,
-      placement: 'bottomRight',
-    });
-    setQuery('');
-    setSourceProvenance(undefined);
-    setOpen(false);
     setActiveIndex(-1);
+  };
+  const retryImport = () => {
+    if (!autoImport.retryJobId) {
+      return;
+    }
+
+    const request = retryAutoImportRequest(autoImport.retryJobId);
+
+    dispatchAutoImport({ type: 'retry' });
+    window.electron.ipcRenderer.sendMessage(request.channel, request.id);
   };
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Escape') {
@@ -157,10 +221,61 @@ function SongSearchInner({
       select(candidates[activeIndex >= 0 ? activeIndex : 0]);
     }
   };
-  const showPanel = open && Boolean(trimmed) && active;
+  const showPanel =
+    open && Boolean(trimmed) && (active || Boolean(autoImport.selected));
   const content = (
     <div className="flex w-88 flex-col gap-1" data-testid="song-search-panel">
-      {loading && (
+      {autoImport.selected && (
+        <div
+          className="flex items-center gap-3 rounded-lg p-2"
+          data-testid="song-search-import-row"
+          role={autoImport.error ? 'alert' : 'status'}
+          aria-live={autoImport.error ? 'assertive' : 'polite'}
+        >
+          <img
+            src={autoImport.selected.thumbnailUrl ?? appIcon}
+            alt=""
+            onError={(event) => {
+              event.currentTarget.src = appIcon;
+            }}
+            className="size-12 shrink-0 rounded-md object-cover outline outline-1 -outline-offset-1 outline-white/10"
+          />
+          <div className="min-w-0 grow">
+            <div
+              className="truncate text-sm font-semibold text-text-body"
+              title={autoImport.selected.title}
+            >
+              {autoImport.selected.title}
+            </div>
+            <div className="mt-1 text-xs text-text-muted">
+              {autoImport.message ?? `Preparing ${autoImport.selected.title}`}
+            </div>
+            {autoImport.percent !== undefined && (
+              <div
+                className="mt-1 text-xs font-medium text-text-body"
+                data-testid="song-search-import-progress"
+              >
+                {Math.round(autoImport.percent)}%
+              </div>
+            )}
+            {autoImport.error && (
+              <div className="mt-1 text-xs text-red">{autoImport.error}</div>
+            )}
+            {autoImport.retryJobId && (
+              <button
+                type="button"
+                className="mt-2 text-xs font-semibold text-text-body underline underline-offset-2"
+                data-testid="song-search-import-retry"
+                onClick={retryImport}
+              >
+                Retry import
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!autoImport.selected && loading && (
         <div
           className="flex items-center gap-2 p-3 text-sm text-text-muted"
           data-testid="song-search-loading"
@@ -169,7 +284,7 @@ function SongSearchInner({
         </div>
       )}
 
-      {!loading && error && (
+      {!autoImport.selected && !loading && error && (
         <div
           className="p-3 text-sm text-red"
           role="alert"
@@ -187,20 +302,23 @@ function SongSearchInner({
         </div>
       )}
 
-      {!loading && !error && candidates.length === 0 && (
-        <div className="p-3" data-testid="song-search-empty">
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={
-              sourceProvenance && results.length > 0
-                ? `No exact recording found for "${sourceProvenance.title}"`
-                : `No YouTube results for "${trimmed}"`
-            }
-          />
-        </div>
-      )}
+      {!autoImport.selected &&
+        !loading &&
+        !error &&
+        candidates.length === 0 && (
+          <div className="p-3" data-testid="song-search-empty">
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={
+                sourceProvenance && results.length > 0
+                  ? `No exact recording found for "${sourceProvenance.title}"`
+                  : `No YouTube results for "${trimmed}"`
+              }
+            />
+          </div>
+        )}
 
-      {!loading && !error && candidates.length > 0 && (
+      {!autoImport.selected && !loading && !error && candidates.length > 0 && (
         <div
           role="listbox"
           id="song-search-listbox"
@@ -249,7 +367,7 @@ function SongSearchInner({
         </div>
       )}
 
-      {!loading && candidates.length > 0 && (
+      {!autoImport.selected && !loading && candidates.length > 0 && (
         <div
           className="border-t border-border-soft px-3 py-2 text-xs text-text-faint"
           data-testid="song-search-provenance"
@@ -275,7 +393,7 @@ function SongSearchInner({
           />
         }
         value={query}
-        disabled={disabled}
+        disabled={disabled || importInFlight}
         role="combobox"
         aria-autocomplete="list"
         aria-expanded={showPanel}
@@ -285,6 +403,11 @@ function SongSearchInner({
         }
         onChange={(event) => {
           const nextQuery = event.target.value;
+
+          if (autoImport.selected && !importInFlight) {
+            selectedCandidateRef.current = undefined;
+            dispatchAutoImport({ type: 'reset' });
+          }
 
           setQuery(nextQuery);
 
@@ -300,7 +423,11 @@ function SongSearchInner({
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => {
-          setTimeout(() => setOpen(false), 150);
+          setTimeout(() => {
+            if (!selectedCandidateRef.current) {
+              setOpen(false);
+            }
+          }, 150);
         }}
         onKeyDown={onKeyDown}
       />
