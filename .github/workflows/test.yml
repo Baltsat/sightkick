@@ -28,14 +28,20 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     strategy:
+      fail-fast: false
+      # Drumroll ships one artifact: the macOS arm64 DMG. The win/linux
+      # electron-builder targets are upstream leftovers and cannot package the
+      # bundled lesson library as-is (lesson titles carry characters that are
+      # illegal in Windows paths), so this gate proves the target that ships.
+      # CI has no Developer ID certificate, so it proves the unsigned package
+      # pipeline; signing and notarization are proven per release by
+      # scripts/build-macos-release-api-key.sh on the owner's machine.
       matrix:
         include:
           - os: macos-latest
-            package_cmd: yarn package
-          - os: windows-latest
-            package_cmd: yarn package:win
-          - os: ubuntu-latest
-            package_cmd: yarn package:linux
+            package_cmd: >-
+              yarn package -c.mac.identity=null
+              -c.mac.forceCodeSigning=false -c.mac.notarize=false
 
     steps:
       - name: Check out Git repository
@@ -50,9 +56,27 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
+      # The lesson-library generator runs through uv (see
+      # web/scripts/package-lessons.mjs); every packaging target needs it.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+
       - name: Install ALSA headers
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
+      # The lesson-library generator encodes click tracks with ffmpeg.
+      - name: Install FFmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y ffmpeg
+
+      - name: Install FFmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+
+      - name: Install FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg -y
 
       - name: Install dependencies
         run: yarn install
