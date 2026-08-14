@@ -457,20 +457,12 @@ export function SongView() {
   const [runIdentity, setRunIdentity] = useState<PracticeRunIdentity>(
     createPracticeRunIdentity,
   );
-  const { telemetry: midiTelemetry, readTelemetry: readMidiTelemetry } =
-    useMidiInputTelemetry({
-      sessionId: runIdentity.sessionId,
-      selectedDevice,
-      inputMapping,
-      selectedPortEpoch: midiPortEpoch,
-    });
-  const lastMidiTime = midiTelemetry?.lastMidiTimestamp
-    ? new Date(midiTelemetry.lastMidiTimestamp).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })
-    : 'none';
+  const { readTelemetry: readMidiTelemetry } = useMidiInputTelemetry({
+    sessionId: runIdentity.sessionId,
+    selectedDevice,
+    inputMapping,
+    selectedPortEpoch: midiPortEpoch,
+  });
   const runIdentityRef = useRef<PracticeRunIdentity>(runIdentity);
   const attemptCheckpointControlRef = useRef<
     | {
@@ -2426,16 +2418,6 @@ export function SongView() {
           }))}
         />
       </div>
-      {midiTelemetry && (
-        <p
-          className="drumroll-practice-input-telemetry"
-          data-testid="practice-midi-telemetry"
-        >
-          MIDI {midiTelemetry.rawMessageCount} · last {lastMidiTime} · port E
-          {midiTelemetry.selectedPortEpoch} ·{' '}
-          {midiTelemetry.lastMappedLane ?? 'unmapped'}
-        </p>
-      )}
       <div className="grid grid-cols-2 gap-2">
         <Button
           icon={<FontAwesomeIcon icon={faWandMagicSparkles} />}

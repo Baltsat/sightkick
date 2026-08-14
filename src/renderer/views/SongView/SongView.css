@@ -114,17 +114,6 @@
   background: var(--dr-line, var(--color-text-faint));
 }
 
-.drumroll-practice-input-telemetry {
-  margin: 0;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--dr-line, rgb(36 31 25 / 16%));
-  color: var(--dr-ink-muted, var(--color-text-muted));
-  font-family: var(--font-ui);
-  font-size: 0.72rem;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.45;
-}
-
 .drumroll-performance-inspector {
   max-width: calc(100vw - 1.5rem);
 }

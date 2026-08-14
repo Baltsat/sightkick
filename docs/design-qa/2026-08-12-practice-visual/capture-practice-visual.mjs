@@ -131,9 +131,6 @@ async function proofFor(page, label) {
         },
       },
       phase: shell?.getAttribute('data-session-phase') ?? null,
-      rawMidi: Boolean(
-        document.querySelector('[data-testid="practice-midi-telemetry"]'),
-      ),
       score: {
         ancestorEffects,
         filter: stageStyle?.filter ?? null,
