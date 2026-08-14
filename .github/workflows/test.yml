@@ -33,10 +33,15 @@ jobs:
       # electron-builder targets are upstream leftovers and cannot package the
       # bundled lesson library as-is (lesson titles carry characters that are
       # illegal in Windows paths), so this gate proves the target that ships.
+      # CI has no Developer ID certificate, so it proves the unsigned package
+      # pipeline; signing and notarization are proven per release by
+      # scripts/build-macos-release-api-key.sh on the owner's machine.
       matrix:
         include:
           - os: macos-latest
-            package_cmd: yarn package
+            package_cmd: >-
+              yarn package -c.mac.identity=null
+              -c.mac.forceCodeSigning=false -c.mac.notarize=false
 
     steps:
       - name: Check out Git repository
