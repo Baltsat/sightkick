@@ -1,0 +1,20 @@
+{
+  "mode": "isolated Electron renderer with deterministic main-process search and import events",
+  "page_errors": [],
+  "legacy_surface_counts": {
+    "add_music_actions": 0,
+    "import_song_trigger": 0,
+    "my_music_trigger": 0,
+    "create_chart_trigger": 0,
+    "auto_chart_progress": 0,
+    "local_audio_copy": 0,
+    "remote_transcriber_endpoint": 0
+  },
+  "captures": [
+    "05-one-search-library.png",
+    "06-one-search-results.png",
+    "07-one-search-importing.png",
+    "08-one-search-song-open.png"
+  ],
+  "imported_song_title_loaded": true
+}

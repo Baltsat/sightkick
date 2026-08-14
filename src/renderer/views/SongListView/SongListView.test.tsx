@@ -350,6 +350,79 @@ describe('SongListView — loading the library', () => {
     expect(view.sentChannels()).not.toContain('search-youtube');
   });
 
+  it('keeps the shelves while one-search imports open the new song directly', async () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('a', { name: 'First shelf song' }),
+      makeListSong('b', { name: 'Second shelf song', liked: true }),
+      makeListSong('c', { name: 'Third shelf song' }),
+      makeListSong('d', { name: 'Fourth shelf song' }),
+    ]);
+
+    expect(screen.getByTestId('library-shelf-ready-now')).toBeInTheDocument();
+    expect(screen.getByTestId('library-shelf-favourites')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('library-shelf-recently-imported'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('browse-all-library')).toBeInTheDocument();
+    expect(screen.queryByTestId('add-music-actions')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('import-song-trigger')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('my-music-trigger')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('create-chart-trigger'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auto-chart-progress')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Choose a local audio file instead'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Remote transcriber endpoint'),
+    ).not.toBeInTheDocument();
+
+    view.search('Some Great Drum Song');
+    await waitFor(() =>
+      expect(view.sentChannels()).toContain('search-youtube'),
+    );
+    view.emit('search-youtube', {
+      results: [
+        {
+          videoId: 'abcdefghijk',
+          title: 'Some Great Drum Song',
+          uploader: 'Some Channel',
+          durationSeconds: 125,
+          watchUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByTestId('song-search-result-abcdefghijk'));
+    expect(screen.getByTestId('song-search-import-row')).toHaveTextContent(
+      'Queued "Some Great Drum Song"',
+    );
+
+    const importedSong = makeListSong('imported-song', {
+      name: 'Some Great Drum Song',
+    });
+
+    view.emit('auto-chart-update', {
+      id: 'job-1',
+      attempt: 1,
+      stage: 'imported',
+      message: 'Added Some Great Drum Song to your library',
+      backend: 'sightkick',
+      youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+      autoImport: true,
+      jobs: [],
+      song: importedSong,
+    });
+
+    expect(await screen.findByTestId('song-view-stub')).toHaveAttribute(
+      'data-song-id',
+      importedSong.id,
+    );
+  });
+
   it('launches the deterministic next lesson directly in Practice at its recommended speed', async () => {
     const view = mountSongListView();
 
@@ -1027,7 +1100,7 @@ describe('SongListView — loading the library', () => {
       'flex-wrap',
     );
     expect(screen.getByTestId('library-name-filter')).toHaveClass('min-w-64');
-    expect(screen.getByTestId('add-music-actions')).toHaveClass('flex-wrap');
+    expect(screen.queryByTestId('add-music-actions')).not.toBeInTheDocument();
   });
 
   it('surfaces existing progress as a continue-practicing moment', () => {
@@ -1147,70 +1220,6 @@ describe('SongListView — loading the library', () => {
 
     expect(screen.queryByText('Name a')).not.toBeInTheDocument();
     expect(screen.getByText('Name c')).toBeInTheDocument();
-  });
-
-  it('validates, previews and imports a prepared local chart folder', async () => {
-    const view = setupSongListView();
-
-    view.loadSongs([], '/music');
-    fireEvent.click(screen.getByTestId('import-song-trigger'));
-
-    expect(view.sentChannels()).toContain('select-import-song');
-
-    view.emit('select-import-song', {
-      preview: {
-        sourceDir: '/incoming/Raging',
-        name: 'Raging',
-        artist: 'Kygo feat. Kodaline',
-        album: 'Cloud Nine',
-        charter: '',
-        autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
-        chartFormat: 'mid',
-        audioCount: 7,
-        drumDifficulties: ['easy', 'medium', 'hard', 'expert'],
-        albumCoverDataUrl: 'data:image/jpeg;base64,cHJldmlldw==',
-        coverSource: 'embedded',
-      },
-    });
-
-    expect(screen.getByText('Review song import')).toBeInTheDocument();
-    expect(screen.getByText('Raging')).toBeInTheDocument();
-    expect(screen.getByText('Auto-charted with STRUM')).toBeInTheDocument();
-    expect(screen.getByText(/Embedded artwork found/)).toBeInTheDocument();
-
-    fireEvent.change(screen.getByTestId('import-artwork-url'), {
-      target: { value: 'https://example.com/permitted-cover.jpg' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add to library' }));
-
-    expect(view.ipc.sent).toContainEqual({
-      channel: 'import-song',
-      args: [
-        {
-          sourceDir: '/incoming/Raging',
-          artworkUrl: 'https://example.com/permitted-cover.jpg',
-        },
-      ],
-    });
-
-    view.emit('import-song', {
-      success: true,
-      song: makeListSong('raging', {
-        name: 'Raging',
-        charter: '',
-        autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
-      }),
-    });
-
-    expect(screen.getByTestId('song-item-raging')).toBeInTheDocument();
-  });
-
-  it('disables local import until a library folder is selected', () => {
-    const view = setupSongListView();
-
-    view.loadSongs([], null);
-
-    expect(screen.getByTestId('import-song-trigger')).toBeDisabled();
   });
 });
 
@@ -2292,7 +2301,7 @@ describe('SongListView — Lessons surface', () => {
     expect(within(card).getByText('Warm-Up Groove')).toBeInTheDocument();
   });
 
-  it('greys out a locked lesson with a clear-count hint', () => {
+  it('keeps a formerly gated lesson open with no clear-count gate', () => {
     const view = setupSongListView();
 
     view.loadSongs([
@@ -2310,15 +2319,15 @@ describe('SongListView — Lessons surface', () => {
 
     view.selectView('lessons');
 
-    const locked = screen.getByTestId('lesson-item-01.02');
+    const formerlyGated = screen.getByTestId('lesson-item-01.02');
 
-    expect(locked).toHaveAttribute('data-locked', 'true');
+    expect(formerlyGated).not.toHaveAttribute('data-locked');
     expect(
-      within(locked).getByText('Clear 12 more lessons'),
-    ).toBeInTheDocument();
+      within(formerlyGated).queryByText(/Clear \d+ more lesson/),
+    ).not.toBeInTheDocument();
   });
 
-  it('shows an honest message instead of a dead click on a locked lesson', () => {
+  it('opens a formerly gated lesson straight into practice', async () => {
     const view = setupSongListView();
 
     view.loadSongs([
@@ -2337,8 +2346,11 @@ describe('SongListView — Lessons surface', () => {
     view.selectView('lessons');
     view.clickLesson('01.02');
 
-    expect(screen.getByText('This lesson is locked')).toBeInTheDocument();
-    expect(screen.queryByTestId('song-view-stub')).not.toBeInTheDocument();
+    expect(screen.queryByText('This lesson is locked')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('song-view-stub')).toHaveAttribute(
+      'data-song-id',
+      'lesson-2',
+    );
   });
 
   it('keeps lessons visible in the Lessons tab regardless of the selected difficulty', () => {

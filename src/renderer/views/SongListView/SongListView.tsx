@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Drawer, Modal, Tooltip } from 'antd';
+import { Button, Drawer } from 'antd';
 import { Difficulty } from 'scan-chart';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCog,
-  faFolder,
-  faMusic,
-  faPlay,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCog, faFolder, faPlay } from '@fortawesome/free-solid-svg-icons';
 import {
   Outlet,
   useNavigate,
@@ -29,10 +24,7 @@ import {
   YandexPlaylistCandidateCollection,
 } from '../../../types';
 import { SettingsButton } from '../../components/SettingsButton';
-import { AutoChart } from '../../components/AutoChart';
-import { SongImport } from '../../components/SongImport';
 import { SongSearch } from '../../components/SongSearch';
-import { MyMusic } from '../../components/MyMusic';
 import { LessonsView } from '../../components/LessonsView';
 import { useApp } from '../../context/AppContext';
 import { useInput } from '../../context/InputContext';
@@ -232,11 +224,6 @@ export function SongListView() {
   ];
   const platformCapabilities = window.drumrollPlatform?.capabilities;
   const youtubeImportAvailable = platformCapabilities?.youtubeImport ?? true;
-  const localFolderImportAvailable =
-    platformCapabilities?.localFolderImport ?? true;
-  const myMusicAvailable = platformCapabilities?.myMusic ?? true;
-  const hasAddMusicAction =
-    youtubeImportAvailable || localFolderImportAvailable || myMusicAvailable;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const songOpen = useOutlet() !== null;
@@ -297,7 +284,6 @@ export function SongListView() {
     useState(readinessFilter);
   const gameModeSelector = useGameModeSelector();
   const [view, setView] = useState<ArenaView>('home');
-  const [myMusicOpen, setMyMusicOpen] = useState(false);
   const [candidateResolutions, setCandidateResolutions] = useState<
     Record<string, LibraryCandidateResolution>
   >({});
@@ -643,11 +629,12 @@ export function SongListView() {
     }
   }, [loadAchievements, view]);
 
-  const handleSongImported = useCallback(
+  const handleSearchImported = useCallback(
     (song: Song) => {
       addSong(song);
+      navigate(`/${song.id}`);
     },
-    [addSong],
+    [addSong, navigate],
   );
   // One continuous shelf: the unified model merges local songs with the
   // Drums/Favorites source rows, in learner-relative difficulty order by
@@ -1479,51 +1466,9 @@ export function SongListView() {
                         inputTestId="song-search"
                         onQueryChange={setNameFilter}
                         active={offerYoutube}
+                        onImported={handleSearchImported}
                       />
                     </div>
-
-                    {hasAddMusicAction && (
-                      <div
-                        className="flex min-w-fit shrink-0 flex-wrap items-center gap-2 rounded-2xl bg-fill p-1.5 *:shrink-0"
-                        data-testid="add-music-actions"
-                        aria-label="Add music"
-                      >
-                        <span className="px-2 text-xs font-semibold uppercase tracking-[0.12em] text-text-faint">
-                          Add music
-                        </span>
-                        {localFolderImportAvailable && (
-                          <SongImport
-                            disabled={currentPath === null}
-                            onImported={handleSongImported}
-                          />
-                        )}
-                        {myMusicAvailable && (
-                          <Tooltip
-                            title={
-                              currentPath === null
-                                ? 'Select a library folder first'
-                                : 'Add songs from your YouTube Music Liked playlist'
-                            }
-                          >
-                            <Button
-                              icon={<FontAwesomeIcon icon={faMusic} />}
-                              size="large"
-                              data-testid="my-music-trigger"
-                              disabled={currentPath === null}
-                              onClick={() => setMyMusicOpen(true)}
-                            >
-                              My Music
-                            </Button>
-                          </Tooltip>
-                        )}
-                        {youtubeImportAvailable && (
-                          <AutoChart
-                            disabled={currentPath === null}
-                            onImported={handleSongImported}
-                          />
-                        )}
-                      </div>
-                    )}
 
                     <div
                       className="flex shrink-0 flex-wrap items-center gap-1 rounded-xl bg-fill p-1"
@@ -1787,8 +1732,7 @@ export function SongListView() {
                     Build your practice library
                   </h2>
                   <p className="text-sm leading-relaxed text-text-muted">
-                    Search above to find and add any song, or bring in local
-                    files or your YouTube Music Liked playlist.
+                    Search above to find and add any song.
                   </p>
                 </section>
               )}
@@ -1796,15 +1740,6 @@ export function SongListView() {
           </section>
         )}
       </AppShell>
-
-      <Modal
-        open={myMusicOpen}
-        onCancel={() => setMyMusicOpen(false)}
-        footer={null}
-        width={640}
-      >
-        <MyMusic librarySongs={librarySongs} disabled={currentPath === null} />
-      </Modal>
 
       <Drawer
         title="Your practice stats"

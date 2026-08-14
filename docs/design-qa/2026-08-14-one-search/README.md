@@ -1,55 +1,51 @@
-# one search field – visual proof
+# one-search field – visual proof
 
-these captures use a production Electron preview of this checkout with an
-isolated `SK_USER_DATA_DIR`. they show the actual desktop renderer, not a
-Storybook fixture.
+the current capture runs the production Electron build from this checkout with
+an isolated `SK_USER_DATA_DIR`. [capture-one-search.mjs](capture-one-search.mjs)
+types and clicks through the desktop renderer, then uses deterministic
+main-process replies for external search and import. the normal `load-song`
+IPC opens a real playable fixture from the isolated `live-import` library.
 
-## captured states
+## captured journey
 
-| capture                                                | observed state                                                                                                                                                                                 |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [01-library-search.png](01-library-search.png)         | typing `3 Nights` filters the existing music shelf. no external request panel appears because the shelf has a match.                                                                           |
-| [02-external-results.png](02-external-results.png)     | typing `Dominic Fike 3 Nights Official Audio` finds no local match, then the same field opens ranked YouTube results. the official-audio result is first; the video and lyric variants follow. |
-| [03-importing.png](03-importing.png)                   | one click on that first result disables the field and replaces results with its inline status row. the live job was downloading audio and reported `0%`.                                       |
-| [04-retry-after-cancel.png](04-retry-after-cancel.png) | after the isolated proof job was cancelled, the same inline row offered `Retry import`; no dialog remained.                                                                                    |
+| capture                                                    | observed state                                                                                                                          |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| [05-one-search-library.png](05-one-search-library.png)     | Songs has one search field, `Ready now`, `Favourites`, `Recently imported`, and the browse door. the legacy import controls are absent. |
+| [06-one-search-results.png](06-one-search-results.png)     | typing `3 Nights One Search Proof` produces no local match, then the same field shows the selected YouTube result.                      |
+| [07-one-search-importing.png](07-one-search-importing.png) | one click disables the field and shows its `42%` download status inline in the result popover.                                          |
+| [08-one-search-song-open.png](08-one-search-song-open.png) | the imported event adds the song, navigates to its route, and opens its real notation screen.                                           |
 
-the proof job was cancelled after the capture. the preview process was then
-stopped while its real downloader had already moved into transcription, so its
-isolated temporary `sk_transcriber_s0eptbkl` directory was moved to the system
-Trash instead of being deleted. no song was imported into the isolated library,
-and the working `sightkick-auto-chart` root has no job subdirectory.
+[capture-notes.json](capture-notes.json) records zero rendered instances of
+the removed `Add music`, local import, My Music, Create chart, global progress,
+local-audio copy, and remote-transcriber controls. it also records a clean
+renderer and the opened fixture title.
 
-## flow covered by this lane
+## proof boundary
 
-`SongSearch` keeps the supplied local search callback in front. its caller
-sets `active` only after local search returns no matching shelf entries. an
-active field searches YouTube, passes results through the existing identity
-ranker, and sends the selected result to the already-proven `autoImport`
-pipeline. the selected row stays in the popover through queue, download,
-transcription, importing, failure, cancellation, and retry.
+the script temporarily removes the isolated Electron process’s real
+`search-youtube` and `create-auto-chart` handlers before the renderer types and
+clicks. it then emits the matching search and queue updates through the real
+IPC channel. this keeps the capture deterministic and prevents a downloader or
+network request. the last event carries an existing locally playable song; the
+normal main-process loader reads it and `SongView` renders its notation.
 
-on an `imported` queue event it calls `onImported(song)` exactly once. the
-Songs view must use that callback to add and open the new song; the exact
-parent change is in [HANDOFF.md](HANDOFF.md).
-
-## current integration boundary
-
-the captures honestly still show the older `Add music` controls and an older
-global `Create chart` progress panel. those are mounted by `SongListView` and
-`AutoChart`, which are owned by another lane and intentionally untouched
-here. their duplicate status UI is the remaining integration work, not a
-second import path in `SongSearch`.
+the earlier [01-library-search.png](01-library-search.png) through
+[04-retry-after-cancel.png](04-retry-after-cancel.png) capture the prior live
+search/import states. the new four-image journey is the post-integration
+receipt for the one-search route.
 
 ## automated proof
 
-| command                                                                                                                                  | result                     |
-| ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| `corepack yarn vitest run src/renderer/components/SongSearch src/renderer/components/LibraryCandidateList src/renderer/services/library` | passed – 3 files, 33 tests |
-| `corepack yarn vitest run src/main/ipc/remoteAutoChart.test.ts`                                                                          | passed – 7 tests           |
-| `corepack yarn typecheck`                                                                                                                | passed                     |
-| scoped ESLint on changed source and tests                                                                                                | passed                     |
-| `corepack yarn build`                                                                                                                    | passed                     |
-| `git diff --check`                                                                                                                       | passed                     |
+| command                                                                                                                                                                    | result                                                          |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `corepack yarn vitest run src/renderer/views/SongListView/SongListView.test.tsx --testNamePattern='keeps the shelves while one-search imports open the new song directly'` | passed – 1 focused integration test                             |
+| `corepack yarn vitest run src/renderer/views/SongListView src/renderer/components/AutoChart`                                                                               | 128 passed; 2 pre-existing Journey failures outside this change |
+| `corepack yarn typecheck`                                                                                                                                                  | passed                                                          |
+| scoped ESLint on `SongListView.tsx` and its test                                                                                                                           | passed                                                          |
+| `corepack yarn build`                                                                                                                                                      | passed                                                          |
+| `node docs/design-qa/2026-08-14-one-search/capture-one-search.mjs`                                                                                                         | passed                                                          |
+| `git diff --check`                                                                                                                                                         | passed                                                          |
 
-full-repository lint is tracked separately because unrelated parallel capture
-scripts were already failing it; the changed one-search files are lint-clean.
+full-repository lint currently fails in shared-tree changes under
+`ScoreSummary`, `TutorHud`, `SongView`, and pedagogy/remediation. the scoped
+Songs files are lint-clean.
