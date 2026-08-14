@@ -497,10 +497,12 @@
 .daybreak-lesson-node__glow {
   position: absolute;
   inset: 14%;
-  border: 1px solid var(--line-soft);
+  border: 1px solid
+    color-mix(in srgb, var(--lesson-lane-color) 82%, var(--surface-raised));
   border-radius: 50%;
-  background: color-mix(in srgb, var(--surface-raised) 18%, transparent);
-  box-shadow: none;
+  background: color-mix(in srgb, var(--lesson-lane-color) 13%, transparent);
+  box-shadow: 0 0.55rem 1.25rem -0.7rem
+    color-mix(in srgb, var(--lesson-lane-dark) 88%, transparent);
 }
 
 .daybreak-lesson-node__image {

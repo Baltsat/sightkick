@@ -10,7 +10,7 @@ const electronMock = {
   ipcRenderer: {
     sendMessage: () => {},
     on: () => () => {},
-    once: () => {},
+    once: () => () => {},
   },
 };
 

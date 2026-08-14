@@ -11,6 +11,15 @@
   --signal-wine: #7b3d46;
   --signal-green: #2e8068;
   --surface-studio: #28221b;
+  --color-surface-canvas: var(--surface-canvas);
+  --color-surface-raised: var(--surface-raised);
+  --color-ink-strong: var(--ink-strong);
+  --color-ink-muted: var(--ink-muted);
+  --color-line-soft: var(--line-soft);
+  --color-signal-ember: var(--signal-ember);
+  --color-signal-wine: var(--signal-wine);
+  --color-signal-green: var(--signal-green);
+  --color-surface-studio: var(--surface-studio);
 
   /* drumroll v3 token contract — docs/visual-system-v3.md "token contract".
      Defined once here; every surface reads these instead of inventing its
@@ -48,7 +57,6 @@
 
   --color-bg: #f8f5ef;
   --color-surface: #ffffff;
-  --color-surface-raised: #eee8dc;
   --color-surface-sunken: #e4ddd0;
 
   --color-border: rgba(17, 23, 34, 0.14);
