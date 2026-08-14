@@ -1,11 +1,20 @@
 import { act, render, screen } from '@testing-library/react';
 import { createElement } from 'react';
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Stave, StaveNote } from 'vexflow';
 import { Measure, ParsedChart, RenderData } from '../../../chart-parser/types';
+import type { ResolvedJudgement } from '../../services/engine';
+import { describeMistake } from '../../services/pedagogy';
 import { TimeStore } from '../../services/time-store';
 import { secondsToTicks } from '../../../chart-parser/timing';
 import { getXForTick } from '../../services/engine/cursor-geometry';
+import {
+  KIT_ELEMENT_COLOR_VAR,
+  KIT_ELEMENT_LABEL,
+} from '../../services/pedagogy';
+import { HOME_KIT_ZONE_LANES } from '../HomeCockpit/kit-zone-map';
+import { notationElementForTarget } from '../NotationGlossary';
 import {
   flowBeatCount,
   flowFixedPlayheadGeometry,
@@ -19,6 +28,9 @@ import {
   loopEscapeEnergy,
   loopEscapePhase,
   NotationLocationReadout,
+  PatternBands,
+  repeatCueSegments,
+  repeatedNotationPatterns,
 } from './ContinuousNotation';
 
 function measureData(
@@ -28,6 +40,7 @@ function measureData(
   width: number,
   timeSig: [number, number] = [4, 4],
   isCompound = false,
+  notes: Measure['notes'] = [],
 ): RenderData {
   const note = {
     isRest: () => true,
@@ -45,6 +58,7 @@ function measureData(
       endTick,
       timeSig,
       isCompound,
+      notes,
     } as Measure,
     stave,
     renderedNotes: [{ tick: startTick, note }],
@@ -221,6 +235,190 @@ describe('Flow meter and current location', () => {
       [4, 400],
     ]);
     expect(bars[1].beats[0].x).toBe(500);
+  });
+
+  it('marks consecutive matching figures as one calm repeat passage', () => {
+    const figure = [
+      {
+        notes: ['C/5'],
+        duration: '8',
+        dots: 0,
+        isRest: false,
+        tick: 0,
+      },
+      {
+        notes: ['D/5'],
+        duration: '8',
+        dots: 0,
+        isRest: false,
+        tick: 200,
+      },
+    ] as Measure['notes'];
+    const data = Array.from({ length: 4 }, (_, measureIndex) => {
+      const startTick = measureIndex * 400;
+
+      return measureData(
+        startTick,
+        startTick + 400,
+        measureIndex * 400,
+        400,
+        [4, 4],
+        false,
+        figure.map((note) => ({ ...note, tick: note.tick + startTick })),
+      );
+    });
+
+    expect(repeatedNotationPatterns(data)).toEqual([
+      { startIndex: 0, endIndex: 3, count: 4 },
+    ]);
+
+    render(createElement(PatternBands, { renderData: data }));
+
+    expect(screen.getByTestId('notation-pattern-0-3')).toHaveAttribute(
+      'data-repeat-count',
+      '4',
+    );
+    expect(screen.getByTestId('notation-pattern-0-3')).toHaveTextContent(
+      'repeat ×4',
+    );
+  });
+
+  it('bounds repeat cues to their own stave rows without covering noteheads', () => {
+    const figure = [
+      {
+        notes: ['C/5'],
+        duration: '8',
+        dots: 0,
+        isRest: false,
+        tick: 0,
+      },
+    ] as Measure['notes'];
+    const data = Array.from({ length: 4 }, (_, measureIndex) => {
+      const startTick = measureIndex * 400;
+      const item = measureData(
+        startTick,
+        startTick + 400,
+        (measureIndex % 2) * 400,
+        400,
+        [4, 4],
+        false,
+        figure.map((note) => ({ ...note, tick: note.tick + startTick })),
+      );
+
+      return {
+        ...item,
+        yOffset: measureIndex < 2 ? 0 : 180,
+      };
+    });
+    const segments = repeatCueSegments(data, {
+      startIndex: 0,
+      endIndex: 3,
+      count: 4,
+    });
+    const notehead = { left: 160, right: 180, top: 18, bottom: 78 };
+
+    expect(segments).toEqual([
+      {
+        startIndex: 0,
+        endIndex: 1,
+        left: 0,
+        top: 90,
+        width: 800,
+        height: 16,
+      },
+      {
+        startIndex: 2,
+        endIndex: 3,
+        left: 0,
+        top: 270,
+        width: 800,
+        height: 16,
+      },
+    ]);
+    expect(
+      segments.some(
+        (segment) =>
+          segment.left < notehead.right &&
+          segment.left + segment.width > notehead.left &&
+          segment.top < notehead.bottom &&
+          segment.top + segment.height > notehead.top,
+      ),
+    ).toBe(false);
+
+    render(createElement(PatternBands, { renderData: data }));
+
+    expect(screen.getByTestId('notation-pattern-0-3')).toHaveStyle({
+      top: '90px',
+      width: '800px',
+      height: '16px',
+    });
+    expect(screen.getByTestId('notation-pattern-0-3')).toHaveAttribute(
+      'data-repeat-label',
+      'true',
+    );
+    expect(screen.getByTestId('notation-pattern-0-3-2-3')).toHaveStyle({
+      top: '270px',
+      width: '800px',
+      height: '16px',
+    });
+
+    const notationCss = readFileSync(
+      'src/renderer/components/ContinuousNotation/ContinuousNotation.css',
+      'utf8',
+    );
+    const rule = notationCss.match(
+      /\.drumroll-pattern-band\s*\{([^}]*)\}/,
+    )?.[1];
+
+    expect(rule).toContain('background: transparent');
+    expect(rule).not.toContain('bottom:');
+  });
+
+  it('keeps every notehead colour aligned with its matching kit zone', () => {
+    const noteHead = document.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'path',
+    );
+
+    noteHead.classList.add('vf-note-missed', 'vf-note-hihat');
+    document.body.append(noteHead);
+
+    const element = notationElementForTarget(noteHead);
+
+    expect(element).toBe('hihat');
+    expect(
+      describeMistake({
+        id: 'note:0:hihat',
+        verdict: 'miss',
+        expectedElement: element,
+        measureIndex: 0,
+        scoreable: true,
+      } satisfies ResolvedJudgement)?.title,
+    ).toBe('Bar 1: Hi-hat expected');
+
+    const notationCss = readFileSync(
+      'src/renderer/styles/sheet-music.css',
+      'utf8',
+    );
+
+    (
+      Object.keys(KIT_ELEMENT_LABEL) as Array<keyof typeof KIT_ELEMENT_LABEL>
+    ).forEach((kitElement) => {
+      const kitColour = `var(--color-${HOME_KIT_ZONE_LANES[kitElement]})`;
+
+      expect(KIT_ELEMENT_COLOR_VAR[kitElement]).toBe(kitColour);
+      expect(notationCss).toMatch(
+        new RegExp(
+          `\\.vf-note-${kitElement}\\s*\\{\\s*--vf-note-lane-color:\\s*${kitColour.replace(
+            /[()]/g,
+            '\\$&',
+          )};`,
+        ),
+      );
+    });
+    expect(notationCss).toContain(
+      'fill: var(--vf-note-lane-color, var(--color-red-dark, #8b1c1c));',
+    );
   });
 
   it('keeps a live bar/total and beat readout for Classic notation', () => {

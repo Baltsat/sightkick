@@ -235,7 +235,7 @@ describe('LessonsView — empty state', () => {
 });
 
 describe('LessonsView — chain progress header', () => {
-  it('keeps the exact N of M unlocked and K-star-earned summary', () => {
+  it('shows every lesson as open while retaining the earned-star total', () => {
     const progress = makeMixedProgress();
 
     render(
@@ -244,7 +244,7 @@ describe('LessonsView — chain progress header', () => {
     );
 
     expect(screen.getByTestId('lesson-progress-summary')).toHaveTextContent(
-      `${progress.unlockedCount} of ${progress.totalLessons} unlocked · ${progress.totalStars} earned`,
+      `${progress.totalLessons} of ${progress.totalLessons} unlocked · ${progress.totalStars} earned`,
     );
     expect(
       within(screen.getByTestId('lesson-progress-summary')).getByLabelText(
@@ -265,12 +265,29 @@ describe('LessonsView — chain progress header', () => {
       'overflow-hidden',
     );
     expect(screen.getByTestId('lesson-season-stage')).toHaveClass('grow');
-    expect(screen.getAllByTestId('journey-kit-controls')[0]).toHaveTextContent(
-      'Set Journey controls in Configure input',
-    );
   });
 
-  it('shows a continue card for the furthest uncleared unlocked lesson', () => {
+  it('says nothing about unmapped navigation, instead of the raw config string, when no control is mapped', () => {
+    // Regression for docs/design-qa/2026-08-13-finish/critique.md, Songs
+    // finding 3, which is the same defect class on this route: "Set Journey
+    // controls in Configure input" is a debug string about missing
+    // settings, not something he would ever say, and it must never reach
+    // the primary Journey view. The real fact belongs in Settings, one
+    // intentional action away — the hint panel says nothing at all instead.
+    const progress = makeMixedProgress();
+
+    render(
+      <LessonsView progress={progress} onPlay={vi.fn()} onRescan={vi.fn()} />,
+      { wrapper },
+    );
+
+    expect(
+      screen.getAllByTestId('journey-kit-controls')[0],
+    ).not.toHaveTextContent('Set Journey controls in Configure input');
+    expect(screen.queryByText(/Configure input/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps the authored next lesson after opening the rest of the path', () => {
     const progress = makeMixedProgress();
 
     render(
@@ -362,7 +379,7 @@ describe('LessonsView — seasons', () => {
     expect(node.querySelector('img')).toHaveAttribute('draggable', 'false');
   });
 
-  it('renders every unit as a season card with a locked/active/completed state', () => {
+  it('renders every unit as an active or completed season', () => {
     const progress = makeMixedProgress();
 
     render(
@@ -380,7 +397,7 @@ describe('LessonsView — seasons', () => {
     );
     expect(screen.getByTestId('season-card-Grooves')).toHaveAttribute(
       'data-season-state',
-      'locked',
+      'active',
     );
   });
 
@@ -483,11 +500,17 @@ describe('LessonsView — seasons', () => {
     expect(screen.getByTestId('journey-world-marker')).toHaveTextContent(
       'Season 02ReadingCurrent stage',
     );
+    expect(screen.getByTestId('journey-world-title')).toHaveTextContent(
+      'Reading',
+    );
+    expect(screen.getByTestId('journey-world-title')).not.toHaveTextContent(
+      '…',
+    );
     expect(
       screen.getByTestId('season-rail-state-Foundations'),
     ).toHaveTextContent('Cleared');
     expect(screen.getByTestId('season-rail-state-Grooves')).toHaveTextContent(
-      'Locked',
+      'Live',
     );
 
     fireEvent.click(screen.getByTestId('season-rail-Grooves'));
@@ -506,10 +529,13 @@ describe('LessonsView — seasons', () => {
     );
     expect(screen.getByTestId('lesson-season-stage')).toHaveAttribute(
       'data-selected-season-state',
-      'locked',
+      'active',
     );
     expect(screen.getByTestId('journey-world-marker')).toHaveTextContent(
-      'Season 03GroovesVenue locked',
+      'Season 03GroovesCurrent stage',
+    );
+    expect(screen.getByTestId('journey-world-title')).toHaveTextContent(
+      'Grooves',
     );
   });
 
@@ -529,7 +555,7 @@ describe('LessonsView — seasons', () => {
 });
 
 describe('LessonsView — path nodes', () => {
-  it('marks locked, next-up and done nodes distinctly', () => {
+  it('marks completed, next-up, and explorable nodes distinctly', () => {
     const progress = makeMixedProgress();
 
     render(
@@ -551,11 +577,11 @@ describe('LessonsView — path nodes', () => {
     );
     expect(screen.getByTestId('lesson-item-02.03')).toHaveAttribute(
       'data-node-state',
-      'locked',
+      'available',
     );
     expect(screen.getByTestId('lesson-item-03.01')).toHaveAttribute(
       'data-node-state',
-      'locked',
+      'available',
     );
   });
 
@@ -580,7 +606,7 @@ describe('LessonsView — path nodes', () => {
     );
   });
 
-  it('greys out a locked node with data-locked and a clear-count hint', () => {
+  it('turns prerequisite gates into skill invitations', () => {
     const progress = makeMixedProgress();
 
     render(
@@ -588,15 +614,20 @@ describe('LessonsView — path nodes', () => {
       { wrapper },
     );
 
-    const locked = screen.getByTestId('lesson-item-02.03');
+    const invitation = screen.getByTestId('lesson-item-02.03');
 
-    expect(locked).toHaveAttribute('data-locked', 'true');
-    expect(locked).toHaveClass('daybreak-lesson-node--locked');
-    expect(locked).not.toHaveClass('opacity-65');
-    expect(within(locked).getByText('Clear 1 more lesson')).toBeInTheDocument();
+    expect(invitation).not.toHaveAttribute('data-locked');
+    expect(invitation).not.toHaveClass('daybreak-lesson-node--locked');
+    expect(within(invitation).getByText('Snare')).toBeInTheDocument();
+    expect(
+      within(invitation).queryByText(/Clear \d+ more lesson/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('lesson-open-path-styles')).toHaveTextContent(
+      'builds',
+    );
   });
 
-  it('shows an honest "locked" notification instead of a dead click, and never calls onPlay', () => {
+  it('launches a later lesson even when no prerequisite is met', async () => {
     const progress = makeMixedProgress();
     const onPlay = vi.fn();
 
@@ -607,8 +638,26 @@ describe('LessonsView — path nodes', () => {
 
     fireEvent.click(screen.getByTestId('lesson-item-02.03'));
 
-    expect(screen.getByText('This lesson is locked')).toBeInTheDocument();
-    expect(onPlay).not.toHaveBeenCalled();
+    await waitFor(() => expect(onPlay).toHaveBeenCalledTimes(1));
+    expect(onPlay.mock.calls[0][0].lesson.id).toBe('02.03');
+  });
+
+  it('shows earned stars on a played node and none on an unplayed node', () => {
+    const progress = makeMixedProgress();
+
+    render(
+      <LessonsView progress={progress} onPlay={vi.fn()} onRescan={vi.fn()} />,
+      { wrapper },
+    );
+
+    const played = screen.getByTestId('lesson-item-02.02');
+    const unplayed = screen.getByTestId('lesson-item-02.03');
+
+    expect(played.querySelectorAll('[data-filled="true"]')).toHaveLength(2);
+    expect(unplayed.querySelectorAll('[data-filled="true"]')).toHaveLength(0);
+    expect(screen.getByTestId('lesson-open-path-styles')).toHaveTextContent(
+      ".daybreak-lesson-node__stars:has([data-filled='true'])",
+    );
   });
 
   it('strikes and sounds an unlocked drum node before opening it', async () => {

@@ -128,21 +128,25 @@ function manifestsMatch(left: LessonManifest, right: LessonManifest): boolean {
 function scanBundledLessons(
   root: string,
   manifest: LessonManifest,
+  options: { allowPersonalSongs?: boolean } = {},
 ): StorageSchema['songs'] {
   const expectedIds = new Set(manifest.lessons.map((entry) => entry.song.id));
-  const directories = lessonDirectories(root);
+  const scannedSongs = lessonDirectories(root).map((dir) =>
+    buildSongFromDir(dir, {
+      drumDifficulties: ['expert'],
+    }),
+  );
+  const songs = options.allowPersonalSongs
+    ? scannedSongs.filter(
+        (song): song is SongData => song !== null && expectedIds.has(song.id),
+      )
+    : scannedSongs;
 
-  if (directories.length !== manifest.lessonCount) {
+  if (songs.length !== manifest.lessonCount) {
     throw new Error(
-      `Bundled lesson library is incomplete: expected ${manifest.lessonCount} folders, found ${directories.length}.`,
+      `Bundled lesson library is incomplete: expected ${manifest.lessonCount} folders, found ${songs.length}.`,
     );
   }
-
-  const songs = directories.map((dir) => {
-    return buildSongFromDir(dir, {
-      drumDifficulties: ['expert'],
-    });
-  });
 
   if (songs.some((song) => !song)) {
     throw new Error('Bundled lesson library contains an invalid song folder.');
@@ -365,12 +369,29 @@ function isCompleteLessonLibrary(root: string): boolean {
   }
 
   try {
-    scanBundledLessons(root, manifest);
+    scanBundledLessons(root, manifest, { allowPersonalSongs: true });
 
     return true;
   } catch {
     return false;
   }
+}
+
+function personalSongDirectories(
+  libraryRoot: string,
+  bundledManifest: LessonManifest,
+): string[] {
+  const lessonIds = new Set(
+    bundledManifest.lessons.map((entry) => entry.song.id),
+  );
+
+  return lessonDirectories(libraryRoot).filter((dir) => {
+    const song = buildSongFromDir(dir, {
+      drumDifficulties: ['expert'],
+    });
+
+    return !song || !lessonIds.has(song.id);
+  });
 }
 
 /**
@@ -405,6 +426,10 @@ function replaceLessonLibrary(
 ): void {
   const installingRoot = installingLibraryPath(libraryRoot);
   const previousRoot = previousLibraryPath(libraryRoot);
+  const hadLibrary = fs.existsSync(libraryRoot);
+  const personalDirectories = hadLibrary
+    ? personalSongDirectories(libraryRoot, bundledManifest)
+    : [];
 
   fs.mkdirSync(path.dirname(libraryRoot), { recursive: true });
   fs.rmSync(installingRoot, { recursive: true, force: true });
@@ -415,6 +440,26 @@ function replaceLessonLibrary(
       errorOnExist: true,
     });
 
+    for (const sourceDir of personalDirectories) {
+      const destinationDir = path.join(
+        installingRoot,
+        path.basename(sourceDir),
+      );
+
+      if (fs.existsSync(destinationDir)) {
+        throw new Error(
+          `Cannot preserve imported song folder during lesson refresh: ${path.basename(
+            sourceDir,
+          )}.`,
+        );
+      }
+
+      fs.cpSync(sourceDir, destinationDir, {
+        recursive: true,
+        errorOnExist: true,
+      });
+    }
+
     const copiedManifest = readLessonManifest(installingRoot);
 
     if (!copiedManifest || !manifestsMatch(copiedManifest, bundledManifest)) {
@@ -424,14 +469,14 @@ function replaceLessonLibrary(
     }
 
     // Validate every copied folder before the old install is moved.
-    scanBundledLessons(installingRoot, copiedManifest);
+    scanBundledLessons(installingRoot, copiedManifest, {
+      allowPersonalSongs: true,
+    });
   } catch (error) {
     fs.rmSync(installingRoot, { recursive: true, force: true });
 
     throw error;
   }
-
-  const hadLibrary = fs.existsSync(libraryRoot);
 
   if (hadLibrary) {
     fs.renameSync(libraryRoot, previousRoot);
@@ -484,7 +529,9 @@ export function bootstrapLessonLibrary({
 
   if (installedManifest && manifestsMatch(installedManifest, bundledManifest)) {
     try {
-      installedLessons = scanBundledLessons(libraryRoot, installedManifest);
+      installedLessons = scanBundledLessons(libraryRoot, installedManifest, {
+        allowPersonalSongs: true,
+      });
     } catch {
       needsRefresh = true;
     }
@@ -503,7 +550,10 @@ export function bootstrapLessonLibrary({
   }
 
   const lessons =
-    installedLessons ?? scanBundledLessons(libraryRoot, currentManifest);
+    installedLessons ??
+    scanBundledLessons(libraryRoot, currentManifest, {
+      allowPersonalSongs: true,
+    });
   const reconciled = reconcileLessons(existingSongs, lessons);
 
   return {

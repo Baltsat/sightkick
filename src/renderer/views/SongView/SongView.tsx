@@ -21,6 +21,7 @@ import {
 import { Playback } from '../../components/Playback';
 import { SettingsButton } from '../../components/SettingsButton';
 import { SheetMusic } from '../../components/SheetMusic';
+import { NotationKitKey } from '../../components/NotationGlossary';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowLeft,
@@ -34,6 +35,7 @@ import { useInput } from '../../context/InputContext';
 import { useSongViewSettings } from '../../context/SongViewSettingsContext';
 import { ClickControls } from '../../components/ClickControls';
 import { usePersisted } from '../../hooks/usePersisted';
+import { useLearnerPlaybackSpeed } from '../../hooks/useLearnerPlaybackSpeed';
 import { useSongLoader } from '../../hooks/useSongLoader';
 import { useEngine } from '../../hooks/useEngine';
 import { useVolumeControls } from '../../hooks/useVolumeControls';
@@ -61,7 +63,7 @@ import {
   loopEscapePhase,
   NotationLocationReadout,
 } from '../../components/ContinuousNotation';
-import { InputMapping, ScoreData, Song } from '../../../types';
+import { InputMapping, ScoreData } from '../../../types';
 import {
   computeRunsTrend,
   decideRunEvidence,
@@ -81,7 +83,7 @@ import { serializeMeasureToDsl } from '../../components/SheetMusic';
 import { AudioVolume } from '../../components/AudioVolume';
 import { GameMode, PracticeRange } from '../../types';
 import { resolveModePolicy } from '../../modes';
-import { RenderData } from '../../../chart-parser/types';
+import { ParsedChart, RenderData } from '../../../chart-parser/types';
 import { SheetMusicLayout } from '../../../chart-parser/renderer';
 import { AICoach } from '../../components/AICoach';
 import {
@@ -94,7 +96,6 @@ import {
   PracticeReadinessCue,
   PracticeReadinessPhase,
 } from '../../components/PracticeReadinessCue';
-import { KitCommandPrompt } from '../../components/KitCommandPrompt';
 import {
   InactivityPauseVeil,
   useInactivityPauseVeil,
@@ -128,25 +129,16 @@ import {
 import { SettingLabel } from '../../components/SettingsButton/SettingLabel';
 import { PracticeOutletContext } from '../practice-context';
 import { chartContentRevision } from '../../services/chart-revision';
+import { curriculumItemManifest } from '../../services/pedagogy/item-manifest';
+import { build_my_wave_item_profile } from '../../services/pedagogy/my-wave';
+import { deriveAtomicSkillEvidence } from '../../services/pedagogy/skill-state';
+import { ItemSkillManifest } from '../../services/pedagogy/types';
+import { useWordBoundaryTruncate } from './useWordBoundaryTruncate';
 import './SongView.css';
 
 interface PracticeRunIdentity {
   sessionId: string;
   startedAt?: string;
-}
-
-export function canAutoContinuePractice(
-  gameMode: GameMode | undefined,
-  enabled: boolean,
-  persistenceState: 'saving' | 'saved' | 'failed' | 'no-evidence',
-  songData: Song | undefined,
-): boolean {
-  return (
-    gameMode === 'practice' &&
-    !songData?.lesson &&
-    enabled &&
-    persistenceState === 'saved'
-  );
 }
 
 const APP_VERSION =
@@ -160,6 +152,41 @@ function createPracticeRunIdentity(): PracticeRunIdentity {
     sessionId:
       randomId ??
       `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+  };
+}
+
+function chartManifestForFreePlay(
+  songId: string | undefined,
+  chart: ParsedChart | null | undefined,
+  chartRevision: string,
+): ItemSkillManifest | undefined {
+  if (!songId || !chart) {
+    return undefined;
+  }
+
+  const profile = build_my_wave_item_profile({
+    id: songId,
+    title: songId,
+    kind: 'song',
+    chart,
+    chart_revision: chartRevision,
+  });
+
+  if (!profile.features || profile.demands.length === 0) {
+    return undefined;
+  }
+
+  return {
+    item_id: songId,
+    source: 'chart_analysis',
+    source_revision: `chart-analysis:${chartRevision}`,
+    chart_revision: chartRevision,
+    demands: profile.demands,
+    context_signature: `meter=${profile.features.meter};subdivision=${
+      profile.features.subdivision
+    };lanes=${profile.features.active_lanes.join(',')}`,
+    assessment_confidence: profile.evidence_confidence,
+    chart_total_notes: profile.features.note_count,
   };
 }
 
@@ -268,17 +295,9 @@ export function SongView() {
     inputReadiness,
     midiPortEpoch,
     inputLatencyMs,
-    reconnectMidi,
   } = useInput();
-  const {
-    playheadStyle,
-    enableColors,
-    showBarNumbers,
-    showTempo,
-    countIn,
-    showReference,
-    zoom,
-  } = useSongViewSettings();
+  const { playheadStyle, showBarNumbers, showTempo, countIn, zoom } =
+    useSongViewSettings();
   const { notification, message } = App.useApp();
   const [scoreData, setScoreData] = useState<ScoreData>();
   const [practiceSummary, setPracticeSummary] = useState<RunSummary>();
@@ -290,6 +309,10 @@ export function SongView() {
   const [isExporting, setIsExporting] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isCoachOpen, setIsCoachOpen] = useState(false);
+  const [coachTempoSuggestion, setCoachTempoSuggestion] = useState<{
+    current: number;
+    suggested: number;
+  }>();
   const [isCoachLoading, setIsCoachLoading] = useState(false);
   const [songRuns, setSongRuns] = useState<RunSummary[]>();
   const [fullRuns, setFullRuns] = useState<StoredPracticeRun[]>();
@@ -319,6 +342,10 @@ export function SongView() {
     'settings.practiceNotationLayout',
     'flow',
   );
+  const [notationKitKeyVisible, setNotationKitKeyVisible] = usePersisted(
+    'settings.notationKitKeyVisible',
+    false,
+  );
   const [adaptiveTutorEnabled, setAdaptiveTutorEnabled] = usePersisted<boolean>(
     'settings.adaptiveTutorEnabled',
     true,
@@ -330,10 +357,6 @@ export function SongView() {
   const [tutorLivesEnabled, setTutorLivesEnabled] = usePersisted<boolean>(
     'settings.challengeLivesEnabled',
     false,
-  );
-  const [autoContinueEnabled, setAutoContinueEnabled] = usePersisted<boolean>(
-    'settings.autoContinueEnabled',
-    true,
   );
   const [handsFreeControlsEnabled, setHandsFreeControlsEnabled] =
     usePersisted<boolean>('settings.handsFreeControlsEnabled', true);
@@ -374,6 +397,13 @@ export function SongView() {
       ? Math.min(2, Math.max(0.3, value))
       : 1;
   }, [gameMode, searchParams]);
+  // Learner-owned tempo, "and the next session": see useLearnerPlaybackSpeed
+  // for why this is not usePersisted (SongView does not remount on a
+  // same-route song change, so a naive key-based persisted value would
+  // cross-write song A's speed onto song B).
+  const [learnerPlaybackSpeed, setLearnerPlaybackSpeed] =
+    useLearnerPlaybackSpeed(id);
+  const initialPlaybackSpeed = learnerPlaybackSpeed ?? requestedPracticeSpeed;
   const practiceCardEvidence = useMemo(
     () => parsePracticeCardEvidence(searchParams, id),
     [id, searchParams],
@@ -409,20 +439,12 @@ export function SongView() {
   const [runIdentity, setRunIdentity] = useState<PracticeRunIdentity>(
     createPracticeRunIdentity,
   );
-  const { telemetry: midiTelemetry, readTelemetry: readMidiTelemetry } =
-    useMidiInputTelemetry({
-      sessionId: runIdentity.sessionId,
-      selectedDevice,
-      inputMapping,
-      selectedPortEpoch: midiPortEpoch,
-    });
-  const lastMidiTime = midiTelemetry?.lastMidiTimestamp
-    ? new Date(midiTelemetry.lastMidiTimestamp).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })
-    : 'none';
+  const { readTelemetry: readMidiTelemetry } = useMidiInputTelemetry({
+    sessionId: runIdentity.sessionId,
+    selectedDevice,
+    inputMapping,
+    selectedPortEpoch: midiPortEpoch,
+  });
   const runIdentityRef = useRef<PracticeRunIdentity>(runIdentity);
   const attemptCheckpointControlRef = useRef<
     | {
@@ -518,7 +540,6 @@ export function SongView() {
   const availableDifficulties: Difficulty[] = songData?.drumDifficulties?.length
     ? songData.drumDifficulties
     : [difficulty];
-  const notationColorsEnabled = notationLayout === 'flow' || enableColors;
   const practiceInputStatus = useMemo(() => {
     if (selectedDevice?.sourceId === 'keyboard') {
       return {
@@ -562,7 +583,7 @@ export function SongView() {
     songId: songData?.id,
     difficulty,
     showBarNumbers: isDev && showBarNumbers,
-    enableColors: notationColorsEnabled,
+    enableColors: true,
     showTempo,
     layout: notationLayout,
   });
@@ -633,6 +654,13 @@ export function SongView() {
       delaySeconds
     );
   }, [chart, parsedMidi, delaySeconds]);
+  const onExplicitSpeedChange = useCallback(
+    (speed: number) => {
+      setLearnerPlaybackSpeed(speed);
+      setCoachTempoSuggestion(undefined);
+    },
+    [setLearnerPlaybackSpeed],
+  );
   const {
     engine,
     isReady,
@@ -749,9 +777,25 @@ export function SongView() {
               }).findings,
             )
           : [];
+      const itemManifest = songData?.lesson
+        ? curriculumItemManifest(songData.lesson.id)
+        : chartManifestForFreePlay(id, chart, currentChartRevision);
+      const atomicSkillEvidence = itemManifest
+        ? [
+            ...deriveAtomicSkillEvidence({
+              run_id: identity.sessionId,
+              summary: baseRunSummary,
+              manifest: itemManifest,
+              previous_events: (fullRuns ?? []).flatMap(
+                (run) => run.summary.atomicSkillEvidence ?? [],
+              ),
+            }).events,
+          ]
+        : [];
       const runSummary: RunSummary = {
         ...baseRunSummary,
         ...(coachEvidence.length > 0 ? { coachEvidence } : {}),
+        ...(atomicSkillEvidence.length > 0 ? { atomicSkillEvidence } : {}),
       };
       const runEvidence = decideRunEvidence({
         score,
@@ -773,10 +817,13 @@ export function SongView() {
 
       setPracticeSummary(runSummary);
       setNoMusicalInput(missingMusicalInput);
+      // The save-practice-run IPC round trip below is not Perform-only (see
+      // the comment on onEnded above), so this state must track it in every
+      // mode - gating it to Practice left Perform's Continue/Play-again
+      // always clickable mid-save, tearing down the only listener for the
+      // reply that mints XP/streak/star credit.
       setPracticePersistenceState(
-        gameMode === 'practice' && id && persistEligible
-          ? 'saving'
-          : 'no-evidence',
+        id && persistEligible ? 'saving' : 'no-evidence',
       );
       // Cleared synchronously so a still-open modal from a prior run never
       // shows last run's XP for a frame while this run's recordRun IPC
@@ -1057,7 +1104,10 @@ export function SongView() {
     [beginLessonTraversal, markRunStarted, playFromTick],
   );
   const onNextSong = useCallback(() => {
-    if (gameMode === 'practice' && practicePersistenceState === 'saving') {
+    // Perform runs save the same way Practice runs do (see onEnded), so
+    // this must block on the in-flight write in every mode - see the
+    // matching comment on setPracticePersistenceState above.
+    if (practicePersistenceState === 'saving') {
       return;
     }
 
@@ -1087,7 +1137,7 @@ export function SongView() {
     practiceSummary,
   ]);
   const onRetry = useCallback(() => {
-    if (gameMode === 'practice' && practicePersistenceState === 'saving') {
+    if (practicePersistenceState === 'saving') {
       return;
     }
 
@@ -1095,47 +1145,69 @@ export function SongView() {
     setPracticePersistenceState('no-evidence');
     setNoMusicalInput(false);
     playRunFromTick(0);
-  }, [gameMode, playRunFromTick, practicePersistenceState]);
-  const loadStoredRuns = useCallback(
-    (forCoach: boolean) => {
-      if (!id) {
-        return;
-      }
+  }, [playRunFromTick, practicePersistenceState]);
+  // No unconditional setState in the body itself (only inside the async IPC
+  // reply callback, which is the sanctioned "subscribe, then setState in a
+  // callback" shape) - every caller that wants the coach-loading spinner
+  // sets it itself before calling this, so this function stays safe to call
+  // from an effect (the lesson-load prefetch below) without tripping
+  // cascading synchronous-setState-in-effect risk. Always clears it on
+  // reply regardless of who asked: a coach-loading request can be
+  // superseded by an unrelated call (the lesson prefetch effect re-firing
+  // on an `id` change, or Stats opening) before its reply arrives -
+  // `loadRunsOffRef.current?.()` below cancels the stale listener, so only
+  // the winning call's reply ever runs. Clearing unconditionally there
+  // means the coach spinner can never stick.
+  const loadStoredRuns = useCallback(() => {
+    if (!id) {
+      return;
+    }
 
-      if (forCoach) {
-        setIsCoachLoading(true);
-      }
-
-      loadRunsOffRef.current?.();
-      loadRunsOffRef.current = window.electron.ipcRenderer.once<
-        | {
-            songId: string;
-            runs: RunSummary[];
-            fullRuns?: StoredPracticeRun[];
-          }
-        | { error: string }
-      >('load-practice-runs', (result) => {
-        loadRunsOffRef.current = undefined;
-        setIsCoachLoading(false);
-
-        if ('runs' in result) {
-          setSongRuns(result.runs);
-          setFullRuns(result.fullRuns ?? []);
+    loadRunsOffRef.current?.();
+    loadRunsOffRef.current = window.electron.ipcRenderer.once<
+      | {
+          songId: string;
+          runs: RunSummary[];
+          fullRuns?: StoredPracticeRun[];
         }
-      });
-      window.electron.ipcRenderer.sendMessage('load-practice-runs', id);
-    },
-    [id],
-  );
+      | { error: string }
+    >('load-practice-runs', (result) => {
+      loadRunsOffRef.current = undefined;
+      setIsCoachLoading(false);
+
+      if ('runs' in result) {
+        setSongRuns(result.runs);
+        setFullRuns(result.fullRuns ?? []);
+      }
+    });
+    window.electron.ipcRenderer.sendMessage('load-practice-runs', id);
+  }, [id]);
   const onOpenStats = useCallback(() => {
     setIsStatsOpen(true);
-    loadStoredRuns(false);
+    loadStoredRuns();
   }, [loadStoredRuns]);
   const onOpenCoach = useCallback(() => {
     setIsScoreModalOpen(false);
     setIsCoachOpen(true);
-    loadStoredRuns(true);
+    setIsCoachLoading(true);
+    loadStoredRuns();
   }, [loadStoredRuns]);
+  const isLessonSong = Boolean(songData?.lesson);
+
+  // Prefetches this song's saved runs the moment a lesson loads, well ahead
+  // of any run finishing, so onEnded's atomic-skill-evidence derivation
+  // below has real prior events to classify a rep as 'retention' rather
+  // than every rep looking like first-time 'acquisition' forever (Coach
+  // and Stats already trigger the same load lazily; this only moves the
+  // fetch earlier for lesson songs, which are the only ones that use it).
+  useEffect(() => {
+    if (!isLessonSong) {
+      return;
+    }
+
+    loadStoredRuns();
+  }, [isLessonSong, loadStoredRuns]);
+
   const onExportPdf = useCallback(() => {
     if (!vexflowContainerRef.current || !songData) {
       return;
@@ -1202,7 +1274,8 @@ export function SongView() {
     delaySeconds,
     isEnded,
     onExit: () => navigate('/'),
-    initialPlaybackSpeed: requestedPracticeSpeed,
+    initialPlaybackSpeed,
+    onExplicitSpeedChange,
     onPlay: playRun,
     onPlayFromTick: playRunFromTick,
   });
@@ -1216,8 +1289,36 @@ export function SongView() {
   const clearPracticeLoop = useCallback(() => {
     setIsLooping(false);
     onPracticeRangeChange(undefined);
+    setCoachTempoSuggestion(undefined);
     clearSelection();
   }, [clearSelection, onPracticeRangeChange, setIsLooping]);
+  const suggestCoachTempo = useCallback(
+    (speed: number) => {
+      setCoachTempoSuggestion(
+        Math.abs(playbackSpeed - speed) > 0.001
+          ? { current: playbackSpeed, suggested: speed }
+          : undefined,
+      );
+    },
+    [playbackSpeed],
+  );
+  const acceptCoachTempo = useCallback(() => {
+    if (!coachTempoSuggestion) {
+      return;
+    }
+
+    setPlaybackSpeed(coachTempoSuggestion.suggested);
+    setLearnerPlaybackSpeed(coachTempoSuggestion.suggested);
+    setCoachTempoSuggestion(undefined);
+  }, [coachTempoSuggestion, setLearnerPlaybackSpeed, setPlaybackSpeed]);
+  const keepLearnerPlaybackSpeed = useCallback(() => {
+    if (!coachTempoSuggestion) {
+      return;
+    }
+
+    setLearnerPlaybackSpeed(coachTempoSuggestion.current);
+    setCoachTempoSuggestion(undefined);
+  }, [coachTempoSuggestion, setLearnerPlaybackSpeed]);
   const applyCoachLoop = useCallback(
     (barStart: number, barEnd: number, speed: number): boolean => {
       const start = barStart - 1;
@@ -1229,7 +1330,7 @@ export function SongView() {
       }
 
       pause();
-      setPlaybackSpeed(speed);
+      suggestCoachTempo(speed);
       setIsLooping(true);
       onPracticeRangeChange({ start, end });
       seekSeconds(
@@ -1248,7 +1349,7 @@ export function SongView() {
       renderData,
       seekSeconds,
       setIsLooping,
-      setPlaybackSpeed,
+      suggestCoachTempo,
     ],
   );
   const appliedAuditionRef = useRef<string | undefined>(undefined);
@@ -1310,7 +1411,9 @@ export function SongView() {
       percent: Math.round((completedUnits / totalUnits) * 100),
     };
   }, [remediationSession.activeTask, remediationSession.queue]);
-  const appliedRemediationTaskRef = useRef<string | undefined>(undefined);
+  const appliedRemediationTaskRef = useRef<
+    { token: string; barStart: number; barEnd: number } | undefined
+  >(undefined);
   const handledRemediationCompletionRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -1322,19 +1425,41 @@ export function SongView() {
     }
 
     const token = `${queue.id}:${task.id}`;
+    const previous = appliedRemediationTaskRef.current;
 
-    if (appliedRemediationTaskRef.current === token) {
+    if (previous?.token === token) {
+      return;
+    }
+
+    if (
+      previous?.barStart === task.barStart &&
+      previous.barEnd === task.barEnd &&
+      isLooping
+    ) {
+      suggestCoachTempo(task.playbackSpeed);
+      appliedRemediationTaskRef.current = {
+        token,
+        barStart: task.barStart,
+        barEnd: task.barEnd,
+      };
+
       return;
     }
 
     if (applyCoachLoop(task.barStart, task.barEnd, task.playbackSpeed)) {
-      appliedRemediationTaskRef.current = token;
+      appliedRemediationTaskRef.current = {
+        token,
+        barStart: task.barStart,
+        barEnd: task.barEnd,
+      };
     }
   }, [
     applyCoachLoop,
     gameMode,
+    isLooping,
     remediationSession.activeTask,
     remediationSession.queue,
+    suggestCoachTempo,
   ]);
 
   useEffect(() => {
@@ -1366,7 +1491,8 @@ export function SongView() {
     clearSelection();
     pause();
     setIsCoachOpen(true);
-    loadStoredRuns(true);
+    setIsCoachLoading(true);
+    loadStoredRuns();
   }, [
     clearSelection,
     loadStoredRuns,
@@ -1383,7 +1509,11 @@ export function SongView() {
         return;
       }
 
-      reconnectMidi();
+      // No reconnectMidi() here: the device was never actually lost, and
+      // forcing a native MIDI port teardown/reopen on every park opens a
+      // race where the very first resume strike - the one the player is
+      // about to make, right now, to un-pause - lands in the gap and is
+      // silently dropped. See useKitInactivityRecovery's parked contract.
       pause();
       seekSeconds(
         ticksToSeconds(
@@ -1393,7 +1523,7 @@ export function SongView() {
         ) + delaySeconds,
       );
     },
-    [chart, delaySeconds, pause, reconnectMidi, seekSeconds],
+    [chart, delaySeconds, pause, seekSeconds],
   );
   const resumeAfterInactivity = useCallback(
     (checkpoint: InactivityCheckpoint) => {
@@ -1417,6 +1547,7 @@ export function SongView() {
     timeStore,
     onPark: parkForInactivity,
     onResume: resumeAfterInactivity,
+    playbackSpeed,
   });
   const inactivityPauseVeil = useInactivityPauseVeil(
     gameMode === 'practice' && inactivityRecovery.phase === 'parked'
@@ -1436,7 +1567,14 @@ export function SongView() {
       return;
     }
 
-    if (Math.abs(playbackSpeed - requestedPracticeSpeed) > 0.001) {
+    // Learner-owned tempo: a My Wave/practiceSpeed recommendation may only
+    // pre-fill a song he has never set a speed on himself. Once he has (a
+    // persisted `learnerPlaybackSpeed`), a fresh recommendation must not
+    // silently override it on this or any later launch.
+    if (
+      learnerPlaybackSpeed === null &&
+      Math.abs(playbackSpeed - requestedPracticeSpeed) > 0.001
+    ) {
       setPlaybackSpeed(requestedPracticeSpeed);
       engine?.setPlaybackSpeed(requestedPracticeSpeed);
 
@@ -1458,6 +1596,7 @@ export function SongView() {
     isPlaying,
     isReady,
     isStarted,
+    learnerPlaybackSpeed,
     playbackSpeed,
     playRun,
     requestedPracticeSpeed,
@@ -1489,7 +1628,6 @@ export function SongView() {
       inactivityRecovery.phase === 'parked' ||
       remediationSession.queue?.status === 'active',
     targetSpeed: playbackSpeed,
-    setPlaybackSpeed,
     onTutorTakeover,
     onStateChange: onTutorStateChange,
     settings: {
@@ -1550,8 +1688,12 @@ export function SongView() {
         qualityProgress: recovery.qualityProgress,
         requiredCleanPasses:
           tutorSession.state.settings.requiredCleanRepetitions,
-        currentSpeed: tutorSession.state.currentSpeed,
-        targetSpeed: tutorSession.state.targetSpeed,
+        // Learner-owned tempo: recovery never changes playback speed, so the
+        // only truthful number here is the player's own live speed - never
+        // the tutor's internal (recommendation-only) currentSpeed/targetSpeed,
+        // which can go stale the moment the player moves the slider mid-run.
+        currentSpeed: playbackSpeed,
+        targetSpeed: playbackSpeed,
         retainedQuality:
           lastAttempt?.result === 'retry' && recovery.qualityProgress > 0,
       };
@@ -1566,8 +1708,10 @@ export function SongView() {
         qualityProgress: outcome.qualityProgress,
         requiredCleanPasses:
           tutorSession.state.settings.requiredCleanRepetitions,
-        currentSpeed: outcome.resumeSpeed,
-        targetSpeed: tutorSession.state.targetSpeed,
+        // Same reasoning as above: outcome.resumeSpeed is the tutor's
+        // internal record, not necessarily what is actually playing now.
+        currentSpeed: playbackSpeed,
+        targetSpeed: playbackSpeed,
         phase: 'release',
       };
     }
@@ -1716,9 +1860,7 @@ export function SongView() {
         !isCounting
       ) &&
       !(
-        drumGestureSurface === 'result' &&
-        gameMode === 'practice' &&
-        practicePersistenceState === 'saving'
+        drumGestureSurface === 'result' && practicePersistenceState === 'saving'
       ),
     surface: drumGestureSurface,
     mapping: inputMapping,
@@ -1732,15 +1874,15 @@ export function SongView() {
       const kitName =
         selectedDevice?.sourceId === 'midi' ? selectedDevice.name : undefined;
 
+      // parkForInactivity no longer reconnects the MIDI port on park (that
+      // teardown/reopen raced the very resume strike this caption asks for
+      // - see the comment there), so this copy must not claim a reopen that
+      // never happens.
       return {
-        title: kitName
-          ? 'Paused — checking kit input'
-          : 'Paused — no hits detected',
-        detail: `Rewound to bar ${inactivityRecovery.checkpointMeasure + 1}.${
-          kitName
-            ? ` Reopening ${kitName}; hit any pad to count in and resume.`
-            : ' Hit any pad to count in and resume.'
-        }`,
+        title: kitName ? `Paused — ${kitName}` : 'Paused — no hits detected',
+        detail: `Rewound to bar ${
+          inactivityRecovery.checkpointMeasure + 1
+        }. Hit any pad to count in and resume.`,
         tone: 'warning' as const,
       };
     }
@@ -1759,10 +1901,14 @@ export function SongView() {
           : lastAttempt && !lastAttempt.qualifiesAsCleanPass
           ? 'That attempt was saved. Settle the pattern and try once more.'
           : 'A good-enough pass can include one developing hit; useful progress is retained.';
+      const tempoDetail =
+        remediationTask.approach === 'target-probe'
+          ? 'This is the target-tempo probe.'
+          : `Tempo ${remediationTask.playbackSpeed.toFixed(1)}×.`;
 
       return {
         title: `Coach loop · ${bars}`,
-        detail: `${remediationTask.consecutiveCleanPasses}/${REQUIRED_CONSECUTIVE_CLEAN_PASSES} pattern passes. ${coverageDetail}`,
+        detail: `${tempoDetail} ${remediationTask.consecutiveCleanPasses}/${REQUIRED_CONSECUTIVE_CLEAN_PASSES} pattern passes. ${coverageDetail}`,
         tone:
           remediationTask.consecutiveCleanPasses > 0
             ? ('success' as const)
@@ -1953,7 +2099,8 @@ export function SongView() {
 
     const timeout = window.setTimeout(() => {
       setIsCoachOpen(true);
-      loadStoredRuns(true);
+      setIsCoachLoading(true);
+      loadStoredRuns();
 
       const next = new URLSearchParams(searchParams);
 
@@ -2185,6 +2332,8 @@ export function SongView() {
               }
 
               setPlaybackSpeed(newValue);
+              setLearnerPlaybackSpeed(newValue);
+              setCoachTempoSuggestion(undefined);
             }}
             styles={{
               input: {
@@ -2329,19 +2478,6 @@ export function SongView() {
       </div>
       <div className="flex items-center justify-between gap-3">
         <SettingLabel
-          label="Auto-continue"
-          tooltip="After a completed Practice task, show a cancellable countdown and start the next useful task automatically."
-        />
-        <Switch
-          size="small"
-          data-testid="setting-auto-continue"
-          aria-label="Auto-continue"
-          checked={autoContinueEnabled}
-          onChange={setAutoContinueEnabled}
-        />
-      </div>
-      <div className="flex items-center justify-between gap-3">
-        <SettingLabel
           label="Kit controls"
           tooltip="Kick once to start. During play, deliberate command patterns pause, retry, continue, or leave without touching the Mac."
         />
@@ -2460,43 +2596,87 @@ export function SongView() {
     : practicePresentationPhase === 'ready'
     ? 'ready'
     : 'playing';
-  const showTutorHud =
-    gameMode === 'practice' &&
+  const showInactivityCaption =
+    gameMode === 'practice' && inactivityPauseVeil.visible;
+  const showCountInCaption = !showInactivityCaption && isCounting;
+  const showTransportCaption =
+    Boolean(transportIndicator) &&
+    !isScoreModalOpen &&
+    !showInactivityCaption &&
+    !showCountInCaption &&
+    practicePresentationPhase !== 'result';
+  const showTutorCaption =
     !isLoading &&
-    practicePresentationPhase !== 'ready' &&
-    practicePresentationPhase !== 'counting-in';
+    !showInactivityCaption &&
+    !showCountInCaption &&
+    !showTransportCaption &&
+    (practicePresentationPhase === 'paused' ||
+      // The inactivity veil steps aside on any pointer activity, but the
+      // real park (genuine pause, seek back to the checkpoint) stays in
+      // effect until a mapped kit hit resumes it - without this branch the
+      // screen goes back to looking like ordinary silence with no
+      // explanation once the veil is gone. tutorDisplayState already
+      // computes 'inactivity-paused' and TutorHud already renders it; this
+      // was the only missing render gate.
+      practicePresentationPhase === 'inactivity-paused' ||
+      (gameMode === 'practice' &&
+        (practicePresentationPhase === 'recovery-explain' ||
+          Boolean(remediationSession.activeTask) ||
+          Boolean(loopEscape))));
+  const showLoopCaption =
+    gameMode === 'practice' &&
+    isLooping &&
+    Boolean(practiceRange) &&
+    !loopEscape &&
+    !showInactivityCaption &&
+    !showCountInCaption &&
+    !showTransportCaption &&
+    !showTutorCaption;
+  const showReadinessCaption =
+    gameMode === 'practice' &&
+    !showInactivityCaption &&
+    !showCountInCaption &&
+    !showTransportCaption &&
+    !showTutorCaption &&
+    !showLoopCaption &&
+    practicePresentationPhase !== 'result' &&
+    practiceReadinessPhase !== 'playing';
+  const showPerformCaption =
+    gameMode !== 'practice' &&
+    Boolean(kitControlPrompt) &&
+    practicePresentationPhase !== 'playing' &&
+    !showCountInCaption &&
+    !showTransportCaption &&
+    !showTutorCaption;
+  // The toolbar title/subtitle truncate at a fixed pixel width regardless
+  // of word boundaries - CSS ellipsis alone cuts mid-word ("...Altern...",
+  // "...next les...") at both captured widths. This measures the real
+  // rendered width and backs off to the last whole word instead.
+  const toolbarTitleText = songData?.name ?? '';
+  const toolbarSubtitleText = practiceRecommendationReason
+    ? `My Wave · ${practiceRecommendationReason}`
+    : songData?.artist ?? '';
+  const { ref: toolbarTitleRef, display: toolbarTitleDisplay } =
+    useWordBoundaryTruncate<HTMLHeadingElement>(toolbarTitleText);
+  const { ref: toolbarSubtitleRef, display: toolbarSubtitleDisplay } =
+    useWordBoundaryTruncate<HTMLParagraphElement>(toolbarSubtitleText);
 
   return (
     <Layout
       className="drumroll-practice-shell h-full pointer-events-auto"
       data-session-phase={practicePresentationPhase}
+      data-shared-field="true"
       data-loop-escape={loopEscape ? 'active' : undefined}
       onPointerDownCapture={inactivityPauseVeil.release}
       onPointerMoveCapture={inactivityPauseVeil.release}
       onWheelCapture={inactivityPauseVeil.release}
     >
-      <InactivityPauseVeil
-        visible={inactivityPauseVeil.visible}
-        checkpointMeasure={
-          inactivityRecovery.phase === 'parked'
-            ? inactivityRecovery.checkpointMeasure
-            : 0
-        }
-      />
       <ScoreSummary
         isOpen={isScoreModalOpen}
         onNextSong={onNextSong}
         nextLabel={gameMode === 'practice' ? 'Continue My Wave' : undefined}
         continuationLabelLocked={gameMode === 'practice'}
-        autoContinueEnabled={canAutoContinuePractice(
-          gameMode,
-          autoContinueEnabled,
-          practicePersistenceState,
-          songData,
-        )}
-        persistenceState={
-          gameMode === 'practice' ? practicePersistenceState : undefined
-        }
+        persistenceState={practicePersistenceState}
         onRetry={onRetry}
         onCoach={onOpenCoach}
         songData={songData}
@@ -2626,13 +2806,15 @@ export function SongView() {
 
         <div className="drumroll-practice-toolbar__identity min-w-0">
           <h1
-            className="truncate font-display text-base font-semibold leading-tight text-text-body"
+            ref={toolbarTitleRef}
+            className="overflow-hidden whitespace-nowrap font-display text-base font-semibold leading-tight text-text-body"
             title={songData?.name}
           >
-            {songData?.name}
+            {toolbarTitleDisplay}
           </h1>
           <p
-            className="m-0 truncate text-xs leading-tight text-text-faint"
+            ref={toolbarSubtitleRef}
+            className="m-0 overflow-hidden whitespace-nowrap text-xs leading-tight text-text-faint"
             data-testid={
               practiceRecommendationReason ? 'practice-wave-reason' : undefined
             }
@@ -2642,9 +2824,7 @@ export function SongView() {
                 : songData?.artist
             }
           >
-            {practiceRecommendationReason
-              ? `My Wave · ${practiceRecommendationReason}`
-              : songData?.artist}
+            {toolbarSubtitleDisplay}
           </p>
         </div>
 
@@ -2682,10 +2862,17 @@ export function SongView() {
             practiceInputStatus.accessibleLabel
           }`}
         >
-          <span>{gameMode === 'practice' ? 'Practice' : 'Perform'}</span>
-          <span>{notationLayout}</span>
-          <span>{difficulty}</span>
-          {policy.speedControl && <span>{playbackSpeed.toFixed(1)}×</span>}
+          <span className="drumroll-practice-toolbar__mode-label">
+            {gameMode === 'practice' ? 'Practice' : 'Perform'}
+          </span>
+          <span className="drumroll-practice-toolbar__layout-label">
+            {notationLayout}
+          </span>
+          {policy.speedControl && (
+            <span className="drumroll-practice-toolbar__speed-label">
+              {playbackSpeed.toFixed(1)}×
+            </span>
+          )}
           {isLooping && <span>Loop</span>}
           <span
             className="drumroll-practice-input-readiness"
@@ -2697,22 +2884,22 @@ export function SongView() {
             <span aria-hidden="true" />
             {practiceInputStatus.shortLabel}
           </span>
-          {midiTelemetry && (
-            <span
-              className="drumroll-practice-input-telemetry"
-              data-testid="practice-midi-telemetry"
-              title={`MIDI ${
-                midiTelemetry.rawMessageCount
-              }; last message: ${lastMidiTime}; selected port epoch ${
-                midiTelemetry.selectedPortEpoch
-              }; last mapped lane: ${midiTelemetry.lastMappedLane ?? 'none'}`}
-            >
-              MIDI {midiTelemetry.rawMessageCount} · last {lastMidiTime} · E
-              {midiTelemetry.selectedPortEpoch} ·{' '}
-              {midiTelemetry.lastMappedLane ?? 'unmapped'}
-            </span>
-          )}
         </div>
+        <Button
+          type="text"
+          size="small"
+          data-testid="notation-kit-key-toggle"
+          aria-expanded={notationKitKeyVisible}
+          aria-controls="notation-kit-key"
+          aria-label={
+            notationKitKeyVisible
+              ? 'Hide drum kit notation key'
+              : 'Show drum kit notation key'
+          }
+          onClick={() => setNotationKitKeyVisible((visible) => !visible)}
+        >
+          Kit key
+        </Button>
         <SettingsButton
           page="song-view"
           label="Inspector"
@@ -2740,6 +2927,7 @@ export function SongView() {
           }
           onExportPdf={onExportPdf}
           isExporting={isExporting}
+          onBeforeInputConfigOpen={pause}
         />
       </header>
 
@@ -2749,7 +2937,7 @@ export function SongView() {
             'drumroll-notation-stage grow m-0 flex min-h-0 flex-col font-display text-ink',
             notationLayout === 'flow'
               ? 'drumroll-flow-viewport overflow-hidden'
-              : 'drumroll-classic-viewport items-center overflow-auto',
+              : 'drumroll-classic-viewport items-start overflow-auto',
           )}
         >
           {notationLayout === 'classic' && chart && (
@@ -2760,43 +2948,6 @@ export function SongView() {
               delaySeconds={delaySeconds}
             />
           )}
-          {notationLayout === 'flow' && songData && (
-            <div className="drumroll-flow-hud-anchor">
-              <section
-                className="drumroll-flow-hud"
-                data-testid="flow-viewport-hud"
-                data-mode={gameMode === 'practice' ? 'practice' : 'perform'}
-                aria-label={`${
-                  gameMode === 'practice' ? 'Practice' : 'Perform'
-                } flow: ${songData.name} by ${songData.artist}`}
-              >
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <h2
-                      className="drumroll-flow-hud__title truncate"
-                      title={songData.name}
-                    >
-                      {songData.name}
-                    </h2>
-                    <span className="drumroll-flow-hud__mode shrink-0">
-                      {gameMode === 'practice'
-                        ? 'Practice flow'
-                        : 'Perform flow'}
-                    </span>
-                  </div>
-                  <p
-                    className="drumroll-flow-hud__artist truncate"
-                    title={songData.artist}
-                  >
-                    {songData.artist}
-                  </p>
-                </div>
-                <span className="drumroll-flow-hud__status shrink-0">
-                  Continuous score
-                </span>
-              </section>
-            </div>
-          )}
           {songData && chart && parsedMidi && (
             <SheetMusic
               engine={engine}
@@ -2806,7 +2957,6 @@ export function SongView() {
               focusIndex={focusIndex}
               onPracticeRangeChange={onPracticeRangeChange}
               onLoopRangeSelect={selectPracticeLoop}
-              onClearLoop={clearPracticeLoop}
               gameMode={gameMode}
               songData={songData}
               isDev={isDev}
@@ -2816,8 +2966,6 @@ export function SongView() {
               chart={chart}
               delaySeconds={delaySeconds}
               loopEscape={loopEscape}
-              enableColors={notationColorsEnabled}
-              showReference={showReference}
               vexflowContainerRef={vexflowContainerRef}
               onSelectMeasure={(measure, event) => {
                 if ((event.ctrlKey || event.metaKey) && chart) {
@@ -2837,7 +2985,18 @@ export function SongView() {
             />
           )}
         </Content>
-        {gameMode === 'practice' && (
+        {notationKitKeyVisible && <NotationKitKey layout={notationLayout} />}
+        {showInactivityCaption && (
+          <InactivityPauseVeil
+            visible={inactivityPauseVeil.visible}
+            checkpointMeasure={
+              inactivityRecovery.phase === 'parked'
+                ? inactivityRecovery.checkpointMeasure
+                : 0
+            }
+          />
+        )}
+        {showReadinessCaption && (
           <PracticeReadinessCue
             phase={practiceReadinessPhase}
             resumeMeasure={
@@ -2850,56 +3009,119 @@ export function SongView() {
             }
           />
         )}
-        {showTutorHud && (
+        {showTutorCaption && (
           <TutorHud
             state={tutorSession.state}
             message={tutorHudMessage}
-            midiTelemetry={midiTelemetry}
             recoveryCaption={recoveryCaption}
             displayState={tutorDisplayState}
             controlPrompt={kitControlPrompt}
-            controlPromptCompact={practicePresentationPhase === 'playing'}
-            timingWindowMs={adaptiveTiming.timingWindowMs}
-            timingWindowReason={adaptiveTiming.reason}
-            remediation={
-              remediationSession.activeTask && remediationProgress
+            tempoSuggestion={
+              coachTempoSuggestion
                 ? {
-                    currentTask: remediationSession.queue!.activeTaskIndex + 1,
-                    totalTasks: remediationProgress.totalTasks,
-                    cleanRepetitions:
-                      remediationSession.activeTask.consecutiveCleanPasses,
-                    requiredCleanRepetitions: REQUIRED_CONSECUTIVE_CLEAN_PASSES,
+                    ...coachTempoSuggestion,
+                    onAccept: acceptCoachTempo,
+                    onKeepCurrent: keepLearnerPlaybackSpeed,
                   }
                 : undefined
             }
           />
         )}
-        {gameMode !== 'practice' && kitControlPrompt && (
-          <div
-            className="drumroll-perform-kit-prompt"
-            data-testid="perform-kit-control-prompt"
+        {showLoopCaption && practiceRange && (
+          <aside
+            className="drumroll-practice-edge-caption drumroll-loop-caption"
+            data-edge-caption="loop"
+            data-testid="practice-loop-caption"
+            data-tone="recovery"
+            role="status"
+            aria-live="polite"
           >
-            <KitCommandPrompt
-              model={kitControlPrompt}
-              compact={practicePresentationPhase === 'playing'}
-            />
-          </div>
+            <span className="drumroll-practice-edge-caption__kicker">Loop</span>
+            <strong className="drumroll-practice-edge-caption__title">
+              Bars {practiceRange.start + 1}–{practiceRange.end + 1}
+            </strong>
+            <p className="drumroll-practice-edge-caption__detail">
+              Kick to count in · clear it to return to the full song.
+            </p>
+            {coachTempoSuggestion && (
+              <>
+                <span
+                  className="drumroll-practice-edge-caption__detail"
+                  data-testid="coach-tempo-suggestion"
+                >
+                  Coach suggests {coachTempoSuggestion.suggested.toFixed(1)}×
+                  for this loop.
+                </span>
+                <Button
+                  type="primary"
+                  data-testid="accept-coach-speed"
+                  onClick={acceptCoachTempo}
+                >
+                  Try {coachTempoSuggestion.suggested.toFixed(1)}×
+                </Button>
+                <Button
+                  data-testid="keep-learner-speed"
+                  onClick={keepLearnerPlaybackSpeed}
+                >
+                  Keep my {coachTempoSuggestion.current.toFixed(1)}×
+                </Button>
+              </>
+            )}
+            <Button data-testid="clear-loop" onClick={clearPracticeLoop}>
+              Clear loop
+            </Button>
+          </aside>
         )}
-        <CountIn
-          count={countInBeat}
-          total={countInBeats}
-          beatMs={countInBeatMs}
-        />
-        <StreakMeter ui={streakUi} className="drumroll-practice-streak" />
-        {transportIndicator && (
-          <div
-            data-testid="transport-indicator"
-            className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+        {showPerformCaption && kitControlPrompt && (
+          <aside
+            className="drumroll-practice-edge-caption drumroll-perform-caption"
+            data-edge-caption="perform-command"
+            data-testid="perform-kit-control-prompt"
+            data-tone="recovery"
+            role="status"
+            aria-live="polite"
           >
-            <div className="rounded-full bg-bg/85 px-6 py-3 font-ui text-xl font-semibold text-text shadow-paper-strong">
+            <span className="drumroll-practice-edge-caption__kicker">
+              Kit control
+            </span>
+            <strong className="drumroll-practice-edge-caption__title">
+              {kitControlPrompt.label}
+            </strong>
+            <p className="drumroll-practice-edge-caption__detail">
+              {kitControlPrompt.steps
+                .map((step) =>
+                  step === 'any'
+                    ? 'Any pad'
+                    : `${step.charAt(0).toUpperCase()}${step.slice(1)}`,
+                )
+                .join(' → ')}
+            </p>
+          </aside>
+        )}
+        {showCountInCaption && (
+          <CountIn
+            count={countInBeat}
+            total={countInBeats}
+            beatMs={countInBeatMs}
+          />
+        )}
+        <StreakMeter ui={streakUi} className="drumroll-practice-streak" />
+        {showTransportCaption && transportIndicator && (
+          <aside
+            data-testid="transport-indicator"
+            className="drumroll-practice-edge-caption drumroll-transport-caption"
+            data-edge-caption="transport"
+            data-tone="neutral"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="drumroll-practice-edge-caption__kicker">
+              Transport
+            </span>
+            <strong className="drumroll-practice-edge-caption__title">
               {transportIndicator.label}
-            </div>
-          </div>
+            </strong>
+          </aside>
         )}
       </div>
     </Layout>

@@ -54,6 +54,7 @@ function queue(minimumResolvedNotes = 2) {
     ],
     createdAt: '2026-08-10T00:01:00.000Z',
     minimumResolvedNotesForRange: () => minimumResolvedNotes,
+    playbackSpeedForRange: () => 1,
   })!;
 }
 

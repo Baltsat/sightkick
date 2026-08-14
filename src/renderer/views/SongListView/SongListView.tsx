@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Drawer, Modal, Spin, Tooltip } from 'antd';
+import { Button, Drawer } from 'antd';
 import { Difficulty } from 'scan-chart';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMusic, faPlay } from '@fortawesome/free-solid-svg-icons';
+import { faCog, faFolder, faPlay } from '@fortawesome/free-solid-svg-icons';
 import {
   Outlet,
   useNavigate,
   useOutlet,
   useSearchParams,
 } from 'react-router-dom';
-import appIcon from '../../../../assets/icon.png';
+import songArtPlaceholder from '../../../../assets/song-art-placeholder.svg';
+import { isPlayableEvidence } from '../../../library-sources/playability';
+import { cn } from '../../cn';
 import {
   ControlMapping,
   IpcResolveLibraryCandidatesResponse,
@@ -21,25 +23,14 @@ import {
   YandexPlaylistCandidate,
   YandexPlaylistCandidateCollection,
 } from '../../../types';
-import type { LibraryMode } from '../../types';
-import { SongFilter } from '../../components/SongFilter';
-import { SongList } from '../../components/SongList';
 import { SettingsButton } from '../../components/SettingsButton';
-import { SortButton } from '../../components/SortButton';
-import { SplittingQueue } from '../../components/SplittingQueue';
-import { EmptySongState } from '../../components/EmptySongState';
-import { AutoChart } from '../../components/AutoChart';
-import { SongImport } from '../../components/SongImport';
 import { SongSearch } from '../../components/SongSearch';
-import { MyMusic } from '../../components/MyMusic';
 import { LessonsView } from '../../components/LessonsView';
 import { useApp } from '../../context/AppContext';
 import { useInput } from '../../context/InputContext';
 import { StemToolsProvider } from '../../context/StemToolsContext';
 import { useStemTools } from '../../hooks/useStemTools';
 import { useSongList } from '../../hooks/useSongList';
-import { useDownload } from '../../hooks/useDownload';
-import { useSongFilter } from '../../hooks/useSongFilter';
 import { useLibraryCandidates } from '../../hooks/useLibraryCandidates';
 import {
   InputControlHandlers,
@@ -60,10 +51,9 @@ import { last7Dates, useGamification } from '../../hooks/useGamification';
 import { GamificationHeaderStrip } from '../../components/GamificationHeaderStrip';
 import { StatsPanel } from '../../components/StatsPanel';
 import { localDateKey } from '../../services/streaks';
-import { SaveGoalInput, SetGoalModal, useGoals } from '../../components/Goals';
+import { useGoals } from '../../components/Goals';
 import { AppShell, ArenaView } from '../../components/AppShell';
 import { HomeCockpit } from '../../components/HomeCockpit';
-import { MyWave } from '../../components/MyWave';
 import { KitCommandPrompt } from '../../components/KitCommandPrompt';
 import ProfileView from '../../components/Profile';
 import { buildDrumLearningProfile } from '../../services/learning-profile';
@@ -94,26 +84,74 @@ import type {
   PracticeRhythm,
 } from '../../services/pedagogy';
 import { PracticeOutletContext } from '../practice-context';
+import { LibraryCandidateList } from '../../components/LibraryCandidateList';
 import {
-  filterLibraryCandidates,
-  LibraryCandidateList,
-} from '../../components/LibraryCandidateList';
+  build_unified_library,
+  filter_unified_library,
+  order_unified_library,
+  search_unified_library,
+  should_offer_youtube,
+  UnifiedLibraryFilter,
+  UnifiedLibrarySort,
+} from '../../services/library/unified-library';
+import { buildLessonManifests, EMPTY_YANDEX_SOURCES } from './unified-sources';
+import { useLibraryDifficultyCharts } from './use-library-difficulty-charts';
 import {
+  LIBRARY_SORT_OPTIONS,
   nextDifficulty,
   nextSongIndex,
-  sortForFocusedIndex,
+  sortForIndex,
   sortIndexForKey,
-  toggledSortForIndex,
   wrapSortIndex,
 } from './helpers';
 import { resolveLibraryControls } from './library-controls';
-import { isPlayableEvidence } from '../../../library-sources/playability';
+import { ActionableSongShelves } from './ActionableSongShelves';
+import {
+  build_actionable_library_shelves,
+  favourite_song_ids,
+  yandex_taste_seeded_song_ids,
+} from './actionable-shelves';
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard', 'expert'];
 
 interface PracticeLaunchContext {
   card?: PracticeCardOption;
   audition?: NonNullable<PracticeCardOption['audition']>;
+}
+
+export function candidateDifficulty(
+  song: Song,
+  selected: Difficulty,
+): Difficulty | undefined {
+  // A song with no charted drum difficulty at all has nothing playable to
+  // recommend. Returning `selected` here used to fabricate a difficulty for
+  // it, which let a broken/uncharted song reach My Wave with `available:
+  // true` and auto-launch straight into a chart-parse failure — see
+  // docs/bug-hunt-20260812.md "Song grid and My Wave fabricate a playable
+  // difficulty for songs with zero charted difficulties".
+  if (!song.drumDifficulties || song.drumDifficulties.length === 0) {
+    return undefined;
+  }
+
+  if (song.drumDifficulties.includes(selected)) {
+    return selected;
+  }
+
+  return [...DIFFICULTIES]
+    .reverse()
+    .find((difficulty) => song.drumDifficulties?.includes(difficulty));
+}
+
+function song_ready_for_practice(song: Song): boolean {
+  if (!song.drumDifficulties || song.drumDifficulties.length === 0) {
+    return false;
+  }
+
+  if (song.sourceLinked || song.sourceProvenance) {
+    return isPlayableEvidence(song.playability);
+  }
+
+  return song.audio.length > 0;
 }
 
 function LibraryInputControls({
@@ -126,23 +164,6 @@ function LibraryInputControls({
   useInputControls(mapping, handlers);
 
   return null;
-}
-
-function candidateDifficulty(
-  song: Song,
-  selected: Difficulty,
-): Difficulty | undefined {
-  if (!song.drumDifficulties || song.drumDifficulties.length === 0) {
-    return selected;
-  }
-
-  if (song.drumDifficulties.includes(selected)) {
-    return selected;
-  }
-
-  return [...DIFFICULTIES]
-    .reverse()
-    .find((difficulty) => song.drumDifficulties?.includes(difficulty));
 }
 
 function appendCompletedRun(
@@ -203,25 +224,17 @@ export function SongListView() {
   ];
   const platformCapabilities = window.drumrollPlatform?.capabilities;
   const youtubeImportAvailable = platformCapabilities?.youtubeImport ?? true;
-  const onlineDownloadsAvailable =
-    platformCapabilities?.onlineSongDownloads ?? true;
-  const localFolderImportAvailable =
-    platformCapabilities?.localFolderImport ?? true;
-  const myMusicAvailable = platformCapabilities?.myMusic ?? true;
-  const hasAddMusicAction =
-    youtubeImportAvailable || localFolderImportAvailable || myMusicAvailable;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const songOpen = useOutlet() !== null;
   const stemTools = useStemTools();
   const {
     songList,
-    splittingIds,
-    splitProgress,
     scanProgress,
-    handleSplit,
-    handleLikeChange,
     addSong,
+    handleLikeChange,
+    handleSplit,
+    splittingIds,
   } = useSongList();
   const scanPercent =
     scanProgress && scanProgress.total > 0
@@ -238,10 +251,6 @@ export function SongListView() {
   const activeGoalRecord = goals.primaryGoal ?? goals.goals[0];
   const gamification = useGamification(songList, activeGoalRecord?.songId);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
-  const [isSetGoalOpen, setIsSetGoalOpen] = useState(false);
-  const [goalModalSongId, setGoalModalSongId] = useState<string | undefined>(
-    undefined,
-  );
   const weeklyXp = useMemo(() => {
     const today = new Date();
 
@@ -250,67 +259,31 @@ export function SongListView() {
       xp: gamification.days[localDateKey(date)]?.xp ?? 0,
     }));
   }, [gamification.days]);
-  const {
-    nameFilter,
-    setNameFilter,
-    libraryMode,
-    setLibraryMode,
-    sort,
-    setSort,
-    filteredSongList,
-    onlineResults,
-    onlineHasExactMatch,
-    onlineTotal,
-    onlineLoading,
-    loadMore,
-  } = useSongFilter(songList, difficulty);
+  const [nameFilter, setNameFilter] = useState('');
+  const [sort, setSort] = useState<UnifiedLibrarySort>('difficulty');
+  const [readinessFilter, setReadinessFilter] =
+    useState<UnifiedLibraryFilter>('all');
+  const [showEntireLibrary, setShowEntireLibrary] = useState(false);
   const libraryCandidates = useLibraryCandidates();
-  const yandexSources = libraryCandidates.candidates?.yandex;
-  const isYandexMode = libraryMode === 'drums' || libraryMode === 'favorites';
-  const candidateSource =
-    libraryMode === 'drums'
-      ? yandexSources?.drums
-      : libraryMode === 'favorites'
-        ? yandexSources?.favorites
-        : undefined;
-  const filteredLibraryCandidates = useMemo(
-    () => filterLibraryCandidates(candidateSource?.tracks ?? [], nameFilter),
-    [candidateSource?.tracks, nameFilter],
-  );
-  const linkedCandidateIds = useMemo(() => {
-    if (!candidateSource) {
-      return new Set<string>();
-    }
-
-    return new Set(
-      songList
-        .filter((song) => isPlayableEvidence(song.playability))
-        .map((song) => song.sourceProvenance)
-        .filter(
-          (source) =>
-            source?.provider === candidateSource.source &&
-            source.collectionId === candidateSource.playlist.id,
-        )
-        .map((source) => source!.trackId),
-    );
-  }, [candidateSource, songList]);
-  const { downloadingIds, handleDownload } = useDownload(
-    onlineResults,
-    addSong,
+  // The player's own songs must never wait on the Drums/Favorites IPC round
+  // trip — this stands in until it resolves, then the shelf quietly grows.
+  const yandexSources =
+    libraryCandidates.candidates?.yandex ?? EMPTY_YANDEX_SOURCES;
+  const yandexTasteSeededSongIds = useMemo(
+    () => yandex_taste_seeded_song_ids(songList, yandexSources),
+    [songList, yandexSources],
   );
   const [focusedSongIndex, setFocusedSongIndex] = useState<number | undefined>(
     undefined,
   );
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [focusedSortIndex, setFocusedSortIndex] = useState(0);
-  const sortAvailable = libraryMode === 'local';
   const [prevNameFilter, setPrevNameFilter] = useState(nameFilter);
-  const [prevLibraryMode, setPrevLibraryMode] = useState(libraryMode);
   const [prevSort, setPrevSort] = useState(sort);
-  const [prevSortAvailable, setPrevSortAvailable] = useState(sortAvailable);
+  const [prevReadinessFilter, setPrevReadinessFilter] =
+    useState(readinessFilter);
   const gameModeSelector = useGameModeSelector();
   const [view, setView] = useState<ArenaView>('home');
-  const [myMusicOpen, setMyMusicOpen] = useState(false);
   const [candidateResolutions, setCandidateResolutions] = useState<
     Record<string, LibraryCandidateResolution>
   >({});
@@ -320,12 +293,6 @@ export function SongListView() {
   const [recommendationNowMs, setRecommendationNowMs] = useState(() =>
     Date.now(),
   );
-
-  useEffect(() => {
-    if (!onlineDownloadsAvailable && libraryMode === 'online') {
-      setLibraryMode('local');
-    }
-  }, [libraryMode, onlineDownloadsAvailable, setLibraryMode]);
 
   useEffect(() => {
     const timer = window.setInterval(
@@ -393,8 +360,8 @@ export function SongListView() {
           title: song.name,
           kind: 'song' as const,
           difficulty: targetDifficulty,
-          available: true,
-          liked: song.liked,
+          available: song_ready_for_practice(song),
+          liked: song.liked || yandexTasteSeededSongIds.has(song.id),
           skills: [
             ...new Set(
               (gamification.runsBySong?.[song.id] ?? []).flatMap((run) =>
@@ -408,7 +375,13 @@ export function SongListView() {
         },
       ];
     });
-  }, [difficulty, gamification.runsBySong, lessonProgress.entries, songList]);
+  }, [
+    difficulty,
+    gamification.runsBySong,
+    lessonProgress.entries,
+    songList,
+    yandexTasteSeededSongIds,
+  ]);
   const practiceHistory = useMemo<PracticeHistoryEntry[]>(
     () =>
       Object.entries(gamification.runsBySong ?? {}).flatMap(
@@ -625,34 +598,212 @@ export function SongListView() {
     () => songList.filter((song) => !isLessonSong(song)),
     [songList],
   );
+  // Background, bounded-concurrency parse of the player's own local charts
+  // so the shelf's default "Difficulty" sort can use the real My Wave
+  // learner-relative score instead of a fabricated tie — see
+  // use-library-difficulty-charts.ts. Only requested while Songs is the
+  // open tab; a song whose chart never resolves stays honestly unrated.
+  const { charts: libraryDifficultyCharts, settled: libraryDifficultySettled } =
+    useLibraryDifficultyCharts(librarySongs, !songOpen && view === 'songs');
+  // Every song whose parse settled with no learner-relative score — a
+  // ready song row says "Unrated" once instead of leaving the rated/
+  // unrated boundary invisible. Never includes a song still parsing.
+  const unratedSongIds = useMemo(
+    () =>
+      new Set(
+        librarySongs
+          .filter(
+            (song) =>
+              libraryDifficultySettled.has(song.id) &&
+              !libraryDifficultyCharts.has(song.id),
+          )
+          .map((song) => song.id),
+      ),
+    [librarySongs, libraryDifficultySettled, libraryDifficultyCharts],
+  );
+  const { loadAchievements } = gamification;
+
+  useEffect(() => {
+    if (view === 'home') {
+      loadAchievements();
+    }
+  }, [loadAchievements, view]);
+
+  const handleSearchImported = useCallback(
+    (song: Song) => {
+      addSong(song);
+      navigate(`/${song.id}`);
+    },
+    [addSong, navigate],
+  );
+  // One continuous shelf: the unified model merges local songs with the
+  // Drums/Favorites source rows, in learner-relative difficulty order by
+  // default. Lesson songs stay out of the default view (Journey owns them)
+  // but a deliberate search still surfaces one, same as before.
+  const lessonManifests = useMemo(
+    () => buildLessonManifests(lessonProgress.entries),
+    [lessonProgress.entries],
+  );
+  const libraryNow = useMemo(
+    () => new Date(recommendationNowMs).toISOString(),
+    [recommendationNowMs],
+  );
+  const unifiedEntries = useMemo(
+    () =>
+      build_unified_library({
+        songs: songList,
+        sources: yandexSources,
+        manifests: lessonManifests,
+        charts: libraryDifficultyCharts,
+        atomicStates,
+        now: libraryNow,
+      }),
+    [
+      songList,
+      yandexSources,
+      lessonManifests,
+      libraryDifficultyCharts,
+      atomicStates,
+      libraryNow,
+    ],
+  );
+  // The default shelf never shows a lesson song — Journey owns the
+  // curriculum, and mixing it into "Songs" would put the same content on
+  // two routes. The header count must describe that same population, or it
+  // makes a claim the row list can never back up: this fixture's real
+  // local library is entirely the lesson curriculum (170 songs, all
+  // lessons), so counting them here used to produce "170 ready to play"
+  // on a screen that can never show a single one of those 170 rows — see
+  // docs/design-qa/2026-08-13-finish/critique.md, Songs finding 2.
+  const browsableEntries = useMemo(
+    () =>
+      unifiedEntries.filter(
+        (entry) => !(entry.song && isLessonSong(entry.song)),
+      ),
+    [unifiedEntries],
+  );
+  const searchableEntries = useMemo(
+    () => (nameFilter.trim() ? unifiedEntries : browsableEntries),
+    [unifiedEntries, browsableEntries, nameFilter],
+  );
+  const matches = useMemo(
+    () => search_unified_library(searchableEntries, nameFilter),
+    [searchableEntries, nameFilter],
+  );
+  const visibleEntries = useMemo(() => {
+    const ordered = order_unified_library(
+      filter_unified_library(matches, readinessFilter),
+      sort,
+    );
+
+    // `order_unified_library`'s 'difficulty' sort ranks by each entry's
+    // real My Wave learner-relative score (unified-library.ts's
+    // `song_difficulty`, fed by `libraryDifficultyCharts` above). A song
+    // whose chart has not resolved yet (still parsing, or a source-row
+    // suggestion with no local chart at all) has no known difficulty and
+    // ties at the end of its readiness group rather than fabricating a
+    // value — see docs/visual-system-v3.md's "difficulty" rule and
+    // docs/design-acceptance-notes.md. Readiness still wins the outer
+    // partition: an unresolved "Needs proof" suggestion from
+    // Favorites/Drums must never rank ahead of a song the header's own "N
+    // ready to play" count already promises can play right now, formerly
+    // tracked as docs/design-qa/2026-08-13-finish/critique.md, Songs
+    // finding 2. This mirrors the existing 'ready' sort's own tie-break —
+    // the 'Difficulty' chip stays the default and keeps its real order
+    // within each group as charts finish parsing in the background.
+    if (sort !== 'difficulty') {
+      return ordered;
+    }
+
+    const ready = ordered.filter((entry) => entry.ready);
+    const notReady = ordered.filter((entry) => !entry.ready);
+
+    return [...ready, ...notReady];
+  }, [matches, readinessFilter, sort]);
+  const trimmedNameFilter = nameFilter.trim();
+  const favouriteSongIds = useMemo(
+    () => favourite_song_ids(songList, yandexTasteSeededSongIds),
+    [songList, yandexTasteSeededSongIds],
+  );
+  const inZoneSongIds = useMemo(
+    () =>
+      nextPractice.ranking
+        .filter(
+          ({ candidate, predictedSuccess }) =>
+            candidate.kind === 'song' &&
+            predictedSuccess >= 0.45 &&
+            predictedSuccess <= 0.9,
+        )
+        .map(({ candidate }) => candidate.id),
+    [nextPractice.ranking],
+  );
+  const actionableLibrary = useMemo(
+    () =>
+      build_actionable_library_shelves({
+        entries: browsableEntries,
+        inZoneSongIds,
+        favouriteSongIds,
+      }),
+    [browsableEntries, favouriteSongIds, inZoneSongIds],
+  );
+  const isBrowsingLibrary =
+    showEntireLibrary ||
+    trimmedNameFilter.length > 0 ||
+    readinessFilter !== 'all' ||
+    sort !== 'difficulty';
+  const offerYoutube = useMemo(
+    () =>
+      youtubeImportAvailable &&
+      should_offer_youtube(unifiedEntries, nameFilter),
+    [youtubeImportAvailable, unifiedEntries, nameFilter],
+  );
+  // "In your library" must mean songs he actually owns — a source-row
+  // entry is an unresolved suggestion pulled from a Yandex playlist, never
+  // downloaded, charted, or added. Folding it into the same count produced
+  // a header that argued with its own rows: "N in your library" over a
+  // screen where every visible row says "Not in your library yet" (see
+  // docs/design-qa/2026-08-13-finish/critique.md, Songs finding 2 — the
+  // fix for the alphabetical-order half of that finding must not
+  // reintroduce the same contradiction from the other side).
+  const songCount = useMemo(
+    () => browsableEntries.filter((entry) => entry.kind === 'song').length,
+    [browsableEntries],
+  );
+  const suggestionCount = browsableEntries.length - songCount;
+  const readyCount = useMemo(
+    () => browsableEntries.filter((entry) => entry.ready).length,
+    [browsableEntries],
+  );
+  // A song can carry a past score yet no longer be playable — its audio or
+  // chart went missing after a bad download/rescan (see
+  // docs/bug-hunt-20260812.md's downloadSong.ts audio-gate gap). The
+  // featured "Continue practicing" row must honor the same honest `ready`
+  // state every other row does, or it becomes the single most prominent
+  // dead play button in the view.
+  const readySongIds = useMemo(
+    () =>
+      new Set(
+        unifiedEntries
+          .filter((entry) => entry.kind === 'song' && entry.ready)
+          .map((entry) => entry.song!.id),
+      ),
+    [unifiedEntries],
+  );
   const continuedSong = librarySongs.find(
-    (song) => song.scoreData?.[difficulty] !== undefined,
+    (song) =>
+      song.scoreData?.[difficulty] !== undefined && readySongIds.has(song.id),
   );
   const continuedScore = continuedSong?.scoreData?.[difficulty];
   const continuedAccuracy = continuedScore
     ? calculateAccuracy(continuedScore)
     : undefined;
-  const songsWithProgress = librarySongs.filter(
-    (song) => song.scoreData?.[difficulty] !== undefined,
-  ).length;
-  const { loadAchievements } = gamification;
-
-  // Home and My Wave expose saved lane analytics on their first paint. The
-  // request is intentionally scoped to those surfaces: the detailed Songs
-  // library remains as light as it was before the cockpit existed.
-  useEffect(() => {
-    if (view === 'home' || view === 'wave') {
-      loadAchievements();
-    }
-  }, [loadAchievements, view]);
-
-  const handleSongImported = useCallback(
-    (song: Song) => {
-      addSong(song);
-      setLibraryMode('local');
-    },
-    [addSong, setLibraryMode],
-  );
+  const shelfSubtitle = trimmedNameFilter
+    ? `${matches.length} ${
+        matches.length === 1 ? 'match' : 'matches'
+      } for “${trimmedNameFilter}”`
+    : suggestionCount > 0
+    ? `${songCount} in your library · ${readyCount} ready to play · ${suggestionCount} to add from your playlists`
+    : `${songCount} in your library · ${readyCount} ready to play`;
 
   useEffect(() => {
     return window.electron.ipcRenderer.on<
@@ -684,69 +835,72 @@ export function SongListView() {
 
   const resolveCandidate = useCallback(
     (track: YandexPlaylistCandidate) => {
-      if (!candidateSource) {
-        return;
-      }
+      const collection = yandexSources.drums.tracks.some(
+        ({ id }) => id === track.id,
+      )
+        ? yandexSources.drums
+        : yandexSources.favorites;
 
       setResolvingCandidateIds((previous) => new Set(previous).add(track.id));
       window.electron.ipcRenderer.sendMessage('resolve-library-candidates', {
-        sources: [candidateProvenance(candidateSource, track)],
+        sources: [candidateProvenance(collection, track)],
       });
     },
-    [candidateSource],
+    [yandexSources],
   );
   const autoChartCandidate = useCallback(
     (track: YandexPlaylistCandidate) => {
-      if (!candidateSource || track.durationSeconds === null) {
+      if (track.durationSeconds === null) {
         return;
       }
 
+      const collection = yandexSources.drums.tracks.some(
+        ({ id }) => id === track.id,
+      )
+        ? yandexSources.drums
+        : yandexSources.favorites;
+
       window.electron.ipcRenderer.sendMessage('create-auto-chart', {
         localFile: true,
-        sourceProvenance: candidateProvenance(candidateSource, track),
+        sourceProvenance: candidateProvenance(collection, track),
       });
     },
-    [candidateSource],
+    [yandexSources],
   );
+  // The row-level "Use local audio" fix for a song already linked to a
+  // source track — same IPC shape as `autoChartCandidate` above, just keyed
+  // off the song's own carried provenance instead of a still-unresolved
+  // source row.
+  const autoChartSong = useCallback((song: Song) => {
+    if (!song.sourceProvenance) {
+      return;
+    }
+
+    window.electron.ipcRenderer.sendMessage('create-auto-chart', {
+      localFile: true,
+      sourceProvenance: song.sourceProvenance,
+    });
+  }, []);
 
   if (
     nameFilter !== prevNameFilter ||
-    libraryMode !== prevLibraryMode ||
-    sort !== prevSort
+    sort !== prevSort ||
+    readinessFilter !== prevReadinessFilter
   ) {
     setPrevNameFilter(nameFilter);
-    setPrevLibraryMode(libraryMode);
     setPrevSort(sort);
+    setPrevReadinessFilter(readinessFilter);
     setFocusedSongIndex(undefined);
-  }
-
-  if (sortAvailable !== prevSortAvailable) {
-    setPrevSortAvailable(sortAvailable);
-
-    if (!sortAvailable) {
-      setIsSortOpen(false);
-    }
   }
 
   const moveSortFocus = (delta: number) => {
     const next = wrapSortIndex(focusedSortIndex, delta);
 
     setFocusedSortIndex(next);
-    setSort(sortForFocusedIndex(next, sort));
-  };
-  const toggleFocusedSortDirection = () => {
-    const next = toggledSortForIndex(focusedSortIndex, sort);
-
-    if (next) {
-      setSort(next);
-    }
+    setSort(sortForIndex(next));
   };
   const openSort = () => {
-    if (!sortAvailable) {
-      return;
-    }
-
-    setFocusedSortIndex(sortIndexForKey(sort.key));
+    setFocusedSortIndex(sortIndexForKey(sort));
     setIsSortOpen(true);
   };
   const openManualPractice = (id: string) => {
@@ -1023,66 +1177,74 @@ export function SongListView() {
     ? {
         up: () => moveSortFocus(-1),
         down: () => moveSortFocus(1),
-        confirm: toggleFocusedSortDirection,
+        confirm: () => setIsSortOpen(false),
         back: () => setIsSortOpen(false),
       }
     : {
-        up: () =>
+        up: () => {
+          if (!isBrowsingLibrary) {
+            setShowEntireLibrary(true);
+          }
+
           setFocusedSongIndex((index) =>
-            nextSongIndex(index, filteredSongList.length, -1),
-          ),
-        down: () =>
+            nextSongIndex(index, visibleEntries.length, -1),
+          );
+        },
+        down: () => {
+          if (!isBrowsingLibrary) {
+            setShowEntireLibrary(true);
+          }
+
           setFocusedSongIndex((index) =>
-            nextSongIndex(index, filteredSongList.length, 1),
-          ),
+            nextSongIndex(index, visibleEntries.length, 1),
+          );
+        },
         confirm: () => {
+          if (!isBrowsingLibrary) {
+            setShowEntireLibrary(true);
+
+            return;
+          }
+
           if (focusedSongIndex === undefined) {
             return;
           }
 
-          const song = filteredSongList[focusedSongIndex];
+          const entry = visibleEntries[focusedSongIndex];
 
-          if (!song) {
+          // Rows that are not playable must never act playable, from a
+          // physical pad exactly as from a click.
+          if (!entry || !entry.ready || !entry.song) {
             return;
           }
 
-          if (libraryMode === 'local') {
-            if (libraryControls.kitActions.includes('confirm')) {
-              openManualPractice(song.id);
-            } else {
-              play(song.id);
+          if (libraryControls.kitActions.includes('confirm')) {
+            // The kit path never shows the mode/difficulty picker `play()`
+            // opens for a mouse click — it goes straight to Practice. A row
+            // can be `ready` while only charted at a difficulty other than
+            // the globally selected tab (e.g. hard-only while Expert is
+            // selected), so a strike here must land on the song's own
+            // honest difficulty, not silently try to load a track it never
+            // charted — same fix as `playLesson` already applies.
+            const targetDifficulty = candidateDifficulty(
+              entry.song,
+              difficulty,
+            );
+
+            if (targetDifficulty && targetDifficulty !== difficulty) {
+              setDifficulty(targetDifficulty);
             }
-          } else if (
-            libraryMode === 'online' &&
-            !songList.find(({ id }) => song.id === id)
-          ) {
-            handleDownload(song.id);
+
+            openManualPractice(entry.song.id);
+          } else {
+            play(entry.song.id);
           }
         },
         back: () => setView('home'),
-        sort: () => {
-          if (sortAvailable) {
-            openSort();
-          }
-        },
-        library: () => {
-          if (!libraryControls.kitActions.includes('library')) {
-            if (onlineDownloadsAvailable) {
-              setLibraryMode(libraryMode === 'online' ? 'local' : 'online');
-            }
-
-            return;
-          }
-
-          const modes: LibraryMode[] = onlineDownloadsAvailable
-            ? ['local', 'drums', 'favorites', 'online']
-            : ['local', 'drums', 'favorites'];
-          const currentIndex = modes.indexOf(libraryMode);
-
-          setLibraryMode(modes[(Math.max(0, currentIndex) + 1) % modes.length]);
-        },
+        sort: () => openSort(),
         difficulty: () => setDifficulty(nextDifficulty(difficulty)),
       };
+
   return (
     <StemToolsProvider value={stemTools}>
       {gameModeSelector.element}
@@ -1145,19 +1307,22 @@ export function SongListView() {
             onStartSession={startComposedSession}
             onStartPracticeCard={startPracticeCard}
             onOpenSongs={() => setView('songs')}
+            onOpenJourney={() => setView('journey')}
+            onFindNewMusic={() => {
+              setView('songs');
+              window.requestAnimationFrame(() => {
+                document
+                  .querySelector<HTMLInputElement>(
+                    '[data-testid="song-search"]',
+                  )
+                  ?.focus();
+              });
+            }}
+            onStartSong={(song) => openManualPractice(song.id)}
             onOpenProfile={() => {
               gamification.loadAchievements();
               setView('insights');
             }}
-          />
-        )}
-
-        {!songOpen && view === 'wave' && (
-          <MyWave
-            session={profileHomeSession}
-            onStart={startComposedSession}
-            onOpenSongs={() => setView('songs')}
-            onOpenJourney={() => setView('journey')}
           />
         )}
 
@@ -1214,79 +1379,75 @@ export function SongListView() {
             className="flex h-full min-h-0 flex-col"
             id="library-content"
           >
-            <header className="border-b border-divider bg-surface-raised/76 px-5 py-5">
+            <header className="border-b border-divider bg-transparent px-5 py-5">
               <div className="mx-auto flex w-full max-w-360 flex-col gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <div className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">
+                    <div className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--dr-wine)]">
                       Practice library
                     </div>
                     <h1 className="font-display text-3xl font-semibold leading-tight tracking-[-0.02em] text-text">
                       Your drum library
                     </h1>
-                    <p className="mt-1 text-sm text-text-muted">
-                      {isYandexMode
-                        ? `${
-                            candidateSource?.tracks.length ?? 0
-                          } source rows · ${linkedCandidateIds.size} playable`
-                        : `${librarySongs.length} ${
-                            librarySongs.length === 1 ? 'song' : 'songs'
-                          } · ${songsWithProgress} with progress on ${difficulty}`}
+                    <p
+                      className="mt-1 text-sm text-text-muted"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {shelfSubtitle}
                     </p>
                   </div>
-
-                  {libraryMode === 'local' &&
-                    continuedSong &&
-                    continuedScore && (
-                      <section
-                        className="flex min-w-0 max-w-xl items-center gap-3 rounded-2xl border border-accent-soft-border bg-accent-soft-bg p-2.5 shadow-accent-soft"
-                        data-testid="continue-practicing"
-                        aria-labelledby="continue-practicing-title"
-                      >
-                        <img
-                          src={continuedSong.albumCover ?? appIcon}
-                          alt=""
-                          className="size-16 shrink-0 rounded-xl object-cover outline outline-1 -outline-offset-1 outline-white/10"
-                          onError={(event) => {
-                            event.currentTarget.src = appIcon;
-                          }}
-                        />
-                        <div className="min-w-0 grow">
-                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-accent-text">
-                            Continue practicing
-                          </div>
-                          <h2
-                            id="continue-practicing-title"
-                            className="truncate font-display text-xl font-semibold leading-tight text-text-body"
-                            title={continuedSong.name}
-                          >
-                            {continuedSong.name}
-                          </h2>
-                          <div className="mt-1 flex items-center gap-2 text-xs text-text-muted">
-                            <Stars
-                              rating={getStarRating(continuedScore)}
-                              perfect={continuedAccuracy === 1}
-                              size="xs"
-                              className="gap-1"
-                            />
-                            <span className="tabular-nums">
-                              {Math.round((continuedAccuracy ?? 0) * 100)}% best
-                            </span>
-                          </div>
-                        </div>
-                        <Button
-                          type="primary"
-                          size="large"
-                          className="min-h-11 shrink-0"
-                          icon={<FontAwesomeIcon icon={faPlay} />}
-                          aria-label={`Play ${continuedSong.name}`}
-                          onClick={() => play(continuedSong.id)}
-                        >
-                          Play
-                        </Button>
-                      </section>
-                    )}
                 </div>
+
+                {continuedSong && continuedScore && (
+                  <section
+                    className="flex min-w-0 max-w-xl items-center gap-3 border-b border-border-soft pb-4"
+                    data-testid="continue-practicing"
+                    aria-labelledby="continue-practicing-title"
+                  >
+                    <img
+                      src={continuedSong.albumCover ?? songArtPlaceholder}
+                      alt=""
+                      className="size-14 shrink-0 rounded-lg object-cover outline outline-1 -outline-offset-1 outline-white/10"
+                      onError={(event) => {
+                        event.currentTarget.src = songArtPlaceholder;
+                      }}
+                    />
+                    <div className="min-w-0 grow">
+                      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--dr-wine)]">
+                        Continue practicing
+                      </div>
+                      <h2
+                        id="continue-practicing-title"
+                        className="truncate font-display text-xl font-semibold leading-tight text-text-body"
+                        title={continuedSong.name}
+                      >
+                        {continuedSong.name}
+                      </h2>
+                      <div className="mt-1 flex items-center gap-2 text-xs text-text-muted">
+                        <Stars
+                          rating={getStarRating(continuedScore)}
+                          perfect={continuedAccuracy === 1}
+                          size="xs"
+                          className="gap-1"
+                        />
+                        <span className="tabular-nums">
+                          {Math.round((continuedAccuracy ?? 0) * 100)}% best
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      type="primary"
+                      size="large"
+                      className="min-h-11 shrink-0 border-none !bg-[var(--dr-ember)] hover:!bg-[var(--dr-ember-pressed)] focus:!bg-[var(--dr-ember-pressed)]"
+                      icon={<FontAwesomeIcon icon={faPlay} />}
+                      aria-label={`Play ${continuedSong.name}`}
+                      onClick={() => play(continuedSong.id)}
+                    >
+                      Play
+                    </Button>
+                  </section>
+                )}
 
                 <div
                   className="flex flex-col gap-3"
@@ -1296,280 +1457,289 @@ export function SongListView() {
                     className="flex min-w-0 flex-wrap items-center gap-3"
                     data-testid="library-song-controls"
                   >
-                    <SongFilter
-                      className="w-full"
-                      nameFilter={nameFilter}
-                      onChangeFilter={setNameFilter}
-                      difficulty={difficulty}
-                      setDifficulty={setDifficulty}
-                      filteredSongsCount={
-                        isYandexMode
-                          ? filteredLibraryCandidates.length
-                          : libraryMode === 'online' &&
-                              onlineTotal !== undefined
-                            ? onlineTotal
-                            : filteredSongList.length
-                      }
-                      libraryMode={libraryMode}
-                      onlineDownloadsAvailable={onlineDownloadsAvailable}
-                      onChangeLibraryMode={setLibraryMode}
-                    />
-                    {hasAddMusicAction && (
-                      <div
-                        className="flex min-w-fit shrink-0 flex-wrap items-center gap-2 rounded-2xl bg-fill p-1.5 *:shrink-0"
-                        data-testid="add-music-actions"
-                        aria-label="Add music"
-                      >
-                        <span className="px-2 text-xs font-semibold uppercase tracking-[0.12em] text-text-faint">
-                          Add music
-                        </span>
-                        {youtubeImportAvailable && (
-                          <SongSearch disabled={currentPath === null} />
-                        )}
-                        {localFolderImportAvailable && (
-                          <SongImport
-                            disabled={currentPath === null}
-                            onImported={handleSongImported}
-                          />
-                        )}
-                        {myMusicAvailable && (
-                          <Tooltip
-                            title={
-                              currentPath === null
-                                ? 'Select a library folder first'
-                                : 'Add songs from your YouTube Music Liked playlist'
-                            }
-                          >
-                            <Button
-                              icon={<FontAwesomeIcon icon={faMusic} />}
-                              size="large"
-                              data-testid="my-music-trigger"
-                              disabled={currentPath === null}
-                              onClick={() => setMyMusicOpen(true)}
-                            >
-                              My Music
-                            </Button>
-                          </Tooltip>
-                        )}
-                        {youtubeImportAvailable && (
-                          <AutoChart
-                            disabled={currentPath === null}
-                            onImported={handleSongImported}
-                          />
-                        )}
-                      </div>
-                    )}
-                    <SortButton
-                      sort={sort}
-                      disabled={!sortAvailable}
-                      onSortChange={setSort}
-                      isOpen={isSortOpen}
-                      onOpenChange={setIsSortOpen}
-                      focusedIndex={isSortOpen ? focusedSortIndex : undefined}
-                    />
-                  </div>
-                  <div
-                    className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted"
-                    role="status"
-                    aria-live="polite"
-                    data-testid="library-control-legend"
-                    data-control-source={libraryControls.source}
-                  >
-                    <span className="font-semibold text-text-body">
-                      {libraryControls.source === 'kit-lanes'
-                        ? 'Kit navigation'
-                        : libraryControls.source === 'mixed'
-                          ? 'Mixed navigation'
-                          : libraryControls.source === 'explicit'
-                            ? 'Mapped navigation'
-                            : 'Navigation unavailable'}
-                    </span>
-                    {(libraryControls.source === 'kit-lanes' ||
-                      libraryControls.source === 'mixed') && (
-                      <div
-                        className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
-                        data-testid="library-kit-control-commands"
-                      >
-                        {libraryMoveSteps.length > 0 && (
-                          <KitCommandPrompt
-                            compact
-                            model={{
-                              label: 'Move',
-                              steps: libraryMoveSteps,
-                              relationship: 'alternatives',
-                              stepHints: libraryMoveHints,
-                            }}
-                          />
-                        )}
-                        {libraryControls.kitActions.includes('confirm') && (
-                          <KitCommandPrompt
-                            compact
-                            model={{ label: 'Choose', steps: ['snare'] }}
-                          />
-                        )}
-                        {libraryControls.kitActions.includes('difficulty') && (
-                          <KitCommandPrompt
-                            compact
-                            model={{ label: 'Difficulty', steps: ['hihat'] }}
-                          />
-                        )}
-                        {libraryControls.kitActions.includes('library') && (
-                          <KitCommandPrompt
-                            compact
-                            model={{ label: 'Source', steps: ['ride'] }}
-                          />
-                        )}
-                        {libraryControls.kitActions.includes('sort') && (
-                          <KitCommandPrompt
-                            compact
-                            model={{ label: 'Sort', steps: ['tom3'] }}
-                          />
-                        )}
-                        {libraryControls.kitActions.includes('back') && (
-                          <KitCommandPrompt
-                            compact
-                            model={{ label: 'Back', steps: ['crash'] }}
-                          />
-                        )}
-                      </div>
-                    )}
-                    <span
-                      className={
-                        libraryControls.source === 'kit-lanes' ||
-                        libraryControls.source === 'mixed'
-                          ? 'sr-only'
-                          : undefined
+                    <div
+                      className="min-w-64 grow"
+                      data-testid="library-name-filter"
+                    >
+                      <SongSearch
+                        disabled={currentPath === null}
+                        inputTestId="song-search"
+                        onQueryChange={setNameFilter}
+                        active={offerYoutube}
+                        onImported={handleSearchImported}
+                      />
+                    </div>
+
+                    <div
+                      className="flex shrink-0 flex-wrap items-center gap-1 rounded-xl bg-fill p-1"
+                      role="group"
+                      aria-label="Sort"
+                    >
+                      {LIBRARY_SORT_OPTIONS.map((option) => (
+                        <Button
+                          key={option.key}
+                          size="small"
+                          type="text"
+                          className={cn(
+                            sort === option.key &&
+                              '!bg-[var(--dr-paper)] !text-[var(--dr-ink)] !outline-2 !-outline-offset-2 !outline-[var(--dr-wine)]',
+                          )}
+                          data-testid={`sort-option-${option.key}`}
+                          aria-pressed={sort === option.key}
+                          onClick={() => setSort(option.key)}
+                        >
+                          {option.label}
+                        </Button>
+                      ))}
+                    </div>
+
+                    <Button
+                      size="small"
+                      type="text"
+                      className={cn(
+                        readinessFilter === 'ready' &&
+                          '!bg-[var(--dr-paper)] !text-[var(--dr-ink)] !outline-2 !-outline-offset-2 !outline-[var(--dr-wine)]',
+                      )}
+                      data-testid="library-ready-filter"
+                      aria-pressed={readinessFilter === 'ready'}
+                      onClick={() =>
+                        setReadinessFilter((current) =>
+                          current === 'ready' ? 'all' : 'ready',
+                        )
                       }
                     >
-                      {libraryControls.legend}
-                    </span>
-                    {libraryControls.kitActions.includes('confirm') &&
-                      libraryMode === 'local' && (
-                        <span>Local choices open directly in Practice.</span>
-                      )}
+                      Ready only
+                    </Button>
+
+                    {showEntireLibrary &&
+                    trimmedNameFilter.length === 0 &&
+                    readinessFilter === 'all' &&
+                    sort === 'difficulty' ? (
+                      <Button
+                        size="small"
+                        type="text"
+                        data-testid="show-actionable-shelves"
+                        onClick={() => {
+                          setShowEntireLibrary(false);
+                          setFocusedSongIndex(undefined);
+                        }}
+                      >
+                        Back to picks
+                      </Button>
+                    ) : null}
                   </div>
+                  {
+                    // With no kit or keyboard control mapped at all, there is
+                    // nothing honest to say here — "Navigation unavailable ·
+                    // Set library controls in Configure input" is a debug
+                    // string about missing settings, not something he would
+                    // ever say himself, and it has no business sitting under
+                    // the filter chips of the main library route (see
+                    // docs/design-qa/2026-08-13-finish/critique.md, Songs
+                    // finding 3). Mouse and Tab/Enter still work with no
+                    // legend at all; the real fact — no kit control mapped —
+                    // belongs in Settings, one intentional action away.
+                    libraryControls.source !== 'unavailable' && (
+                      <div
+                        className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted"
+                        role="status"
+                        aria-live="polite"
+                        data-testid="library-control-legend"
+                        data-control-source={libraryControls.source}
+                      >
+                        <span className="font-semibold text-text-body">
+                          {libraryControls.source === 'kit-lanes'
+                            ? 'Kit navigation'
+                            : libraryControls.source === 'mixed'
+                            ? 'Mixed navigation'
+                            : 'Mapped navigation'}
+                        </span>
+                        {(libraryControls.source === 'kit-lanes' ||
+                          libraryControls.source === 'mixed') && (
+                          <div
+                            className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
+                            data-testid="library-kit-control-commands"
+                          >
+                            {libraryMoveSteps.length > 0 && (
+                              <KitCommandPrompt
+                                compact
+                                model={{
+                                  label: 'Move',
+                                  steps: libraryMoveSteps,
+                                  relationship: 'alternatives',
+                                  stepHints: libraryMoveHints,
+                                }}
+                              />
+                            )}
+                            {libraryControls.kitActions.includes('confirm') && (
+                              <KitCommandPrompt
+                                compact
+                                model={{ label: 'Choose', steps: ['snare'] }}
+                              />
+                            )}
+                            {libraryControls.kitActions.includes(
+                              'difficulty',
+                            ) && (
+                              <KitCommandPrompt
+                                compact
+                                model={{
+                                  label: 'Difficulty',
+                                  steps: ['hihat'],
+                                }}
+                              />
+                            )}
+                            {libraryControls.kitActions.includes('sort') && (
+                              <KitCommandPrompt
+                                compact
+                                model={{ label: 'Sort', steps: ['tom3'] }}
+                              />
+                            )}
+                            {libraryControls.kitActions.includes('back') && (
+                              <KitCommandPrompt
+                                compact
+                                model={{ label: 'Back', steps: ['crash'] }}
+                              />
+                            )}
+                          </div>
+                        )}
+                        <span
+                          className={
+                            libraryControls.source === 'kit-lanes' ||
+                            libraryControls.source === 'mixed'
+                              ? 'sr-only'
+                              : undefined
+                          }
+                        >
+                          {libraryControls.legend}
+                        </span>
+                        {libraryControls.kitActions.includes('confirm') && (
+                          <span>Local choices open directly in Practice.</span>
+                        )}
+                      </div>
+                    )
+                  }
+                  {libraryCandidates.error && (
+                    <p
+                      className="text-xs text-[var(--dr-warning)]"
+                      role="status"
+                    >
+                      Drums and Favorites didn’t load: {libraryCandidates.error}
+                      . Your own songs still work.
+                    </p>
+                  )}
                 </div>
-                <SplittingQueue
-                  splittingIds={splittingIds}
-                  splitProgress={splitProgress}
-                  songList={songList}
-                />
               </div>
             </header>
 
-            <div className="relative mx-auto flex min-h-0 w-full max-w-360 grow flex-col overflow-hidden bg-bg">
-              {isYandexMode ? (
-                !libraryCandidates.isLoaded ? (
-                  <div
-                    className="m-auto flex min-h-40 items-center justify-center"
-                    data-testid="playlist-candidate-loading"
-                  >
-                    <Spin size="large" />
-                  </div>
-                ) : libraryCandidates.error ? (
-                  <div
-                    className="m-auto max-w-lg px-6 text-center text-sm text-red"
-                    role="alert"
-                    data-testid="playlist-candidate-error"
-                  >
-                    The playlist source could not be loaded:{' '}
-                    {libraryCandidates.error}
-                  </div>
-                ) : candidateSource ? (
-                  <LibraryCandidateList
-                    source={candidateSource}
-                    tracks={filteredLibraryCandidates}
-                    query={nameFilter}
-                    linkedTrackIds={linkedCandidateIds}
-                    resolutions={candidateResolutions}
-                    resolvingTrackIds={resolvingCandidateIds}
-                    canUseLocalAudio={currentPath !== null}
-                    onResolve={resolveCandidate}
-                    onUseLocalAudio={autoChartCandidate}
-                  />
-                ) : (
-                  <div
-                    className="m-auto max-w-lg px-6 text-center text-sm text-red"
-                    role="alert"
-                  >
-                    The playlist source returned no collection.
-                  </div>
-                )
-              ) : filteredSongList.length > 0 ||
-                (libraryMode === 'online' && onlineLoading) ? (
-                <>
-                  {libraryMode === 'online' &&
-                    nameFilter.trim() &&
-                    !onlineLoading &&
-                    !onlineHasExactMatch && (
-                      <div
-                        className="mx-2 mt-2 rounded-lg border border-border-soft bg-surface px-3 py-2 text-sm text-text-muted"
-                        role="status"
-                      >
-                        No exact matches for “{nameFilter.trim()}”. Showing
-                        fuzzy results.
-                      </div>
-                    )}
-                  <SongList
-                    className="grow min-h-0"
-                    songList={filteredSongList}
-                    scrollKey={nameFilter}
-                    downloadingIds={downloadingIds}
-                    downloadingDisabled={currentPath === null}
-                    difficulty={difficulty}
-                    previewEnabled={hoverPreviewEnabled}
-                    onClickSong={(id) => {
-                      if (libraryMode === 'local') {
-                        play(id);
-                      }
-                    }}
-                    downloadedIds={
-                      libraryMode === 'online'
-                        ? new Set(songList.map((s) => s.id))
-                        : undefined
-                    }
-                    splittingIds={splittingIds}
-                    onSplit={handleSplit}
-                    onSetGoal={(song) => {
-                      setGoalModalSongId(song.id);
-                      setIsSetGoalOpen(true);
-                    }}
-                    onDownload={handleDownload}
-                    onLikeChange={handleLikeChange}
-                    onLoadMore={libraryMode === 'online' ? loadMore : undefined}
-                    focusedIndex={!isSortOpen ? focusedSongIndex : undefined}
-                  />
-                </>
-              ) : (
-                <EmptySongState
-                  libraryMode={libraryMode}
-                  hasFolder={currentPath !== null}
-                  hasSongs={librarySongs.length > 0}
-                  query={nameFilter}
-                  onlineDownloadsAvailable={onlineDownloadsAvailable}
-                  onClearFilter={() => setNameFilter('')}
-                  onBrowseOnline={() => setLibraryMode('online')}
+            <div className="relative mx-auto flex min-h-0 w-full max-w-360 grow flex-col overflow-hidden bg-transparent">
+              {!isBrowsingLibrary && visibleEntries.length > 0 ? (
+                <ActionableSongShelves
+                  shelves={actionableLibrary.shelves}
+                  sourceSeededSongIds={yandexTasteSeededSongIds}
+                  restCount={actionableLibrary.rest.length}
+                  difficulty={difficulty}
+                  splittingIds={splittingIds}
+                  onPlaySong={play}
+                  onLikeChange={handleLikeChange}
+                  onSplit={handleSplit}
+                  onBrowseAll={() => setShowEntireLibrary(true)}
                 />
-              )}
-
-              {libraryMode === 'online' && onlineLoading && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/10 pointer-events-none">
-                  <Spin size="large" />
-                </div>
+              ) : visibleEntries.length > 0 ? (
+                <LibraryCandidateList
+                  entries={visibleEntries}
+                  difficulty={difficulty}
+                  previewEnabled={hoverPreviewEnabled}
+                  focusedIndex={!isSortOpen ? focusedSongIndex : undefined}
+                  scrollKey={`${nameFilter}:${sort}:${readinessFilter}:${showEntireLibrary}`}
+                  resolutions={candidateResolutions}
+                  resolvingTrackIds={resolvingCandidateIds}
+                  canUseLocalAudio={currentPath !== null}
+                  onPlaySong={play}
+                  onResolveSource={resolveCandidate}
+                  onUseLocalAudioForSource={autoChartCandidate}
+                  onUseLocalAudioForSong={autoChartSong}
+                  unratedSongIds={unratedSongIds}
+                />
+              ) : currentPath === null ? (
+                <section className="m-auto flex max-w-md flex-col items-center gap-3 px-6 text-center">
+                  <div className="flex size-12 items-center justify-center rounded-full bg-fill text-[var(--dr-wine)]">
+                    <FontAwesomeIcon icon={faFolder} />
+                  </div>
+                  <h2 className="font-display text-2xl font-semibold text-text-body">
+                    Choose your library folder
+                  </h2>
+                  <p className="text-sm leading-relaxed text-text-muted">
+                    Open Settings, then select the folder where Drumroll will
+                    keep your songs and progress.
+                  </p>
+                  <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface-raised px-4 text-sm text-text-body">
+                    <FontAwesomeIcon icon={faCog} />
+                    <span>Settings</span>
+                    <span aria-hidden="true">→</span>
+                    <FontAwesomeIcon icon={faFolder} />
+                    <span>Select folder</span>
+                  </div>
+                </section>
+              ) : matches.length > 0 ? (
+                <section className="m-auto flex max-w-md flex-col items-center gap-3 px-6 text-center">
+                  <h2 className="font-display text-2xl font-semibold text-text-body">
+                    No ready songs
+                    {trimmedNameFilter ? ` for “${trimmedNameFilter}”` : ''}
+                  </h2>
+                  <p className="text-sm leading-relaxed text-text-muted">
+                    {matches.length} {matches.length === 1 ? "isn't" : "aren't"}{' '}
+                    ready to play yet.
+                  </p>
+                  <Button
+                    size="large"
+                    className="min-h-11"
+                    onClick={() => setReadinessFilter('all')}
+                  >
+                    Show all matches
+                  </Button>
+                </section>
+              ) : trimmedNameFilter ? (
+                offerYoutube ? (
+                  <section className="m-auto flex max-w-md flex-col items-center gap-3 px-6 text-center">
+                    <h2 className="font-display text-2xl font-semibold text-text-body">
+                      No matches in your library for “{trimmedNameFilter}”
+                    </h2>
+                    <p className="text-sm leading-relaxed text-text-muted">
+                      Pick a result above to add it from YouTube.
+                    </p>
+                  </section>
+                ) : (
+                  <section className="m-auto flex max-w-md flex-col items-center gap-3 px-6 text-center">
+                    <h2 className="font-display text-2xl font-semibold text-text-body">
+                      No matches for “{trimmedNameFilter}”
+                    </h2>
+                    <p className="text-sm leading-relaxed text-text-muted">
+                      Try another title or artist, or clear the search to return
+                      to your library.
+                    </p>
+                    <Button
+                      size="large"
+                      className="min-h-11"
+                      onClick={() => setNameFilter('')}
+                    >
+                      Clear search
+                    </Button>
+                  </section>
+                )
+              ) : (
+                <section className="m-auto flex max-w-md flex-col items-center gap-3 px-6 text-center">
+                  <h2 className="font-display text-2xl font-semibold text-text-body">
+                    Build your practice library
+                  </h2>
+                  <p className="text-sm leading-relaxed text-text-muted">
+                    Search above to find and add any song.
+                  </p>
+                </section>
               )}
             </div>
           </section>
         )}
       </AppShell>
-
-      <Modal
-        open={myMusicOpen}
-        onCancel={() => setMyMusicOpen(false)}
-        footer={null}
-        width={640}
-      >
-        <MyMusic librarySongs={librarySongs} disabled={currentPath === null} />
-      </Modal>
 
       <Drawer
         title="Your practice stats"
@@ -1587,15 +1757,6 @@ export function SongListView() {
           practiceRhythm={practiceRhythm}
         />
       </Drawer>
-
-      <SetGoalModal
-        open={isSetGoalOpen}
-        onClose={() => setIsSetGoalOpen(false)}
-        songList={librarySongs}
-        initialSongId={goalModalSongId}
-        isFirstGoal={goals.goals.length === 0}
-        onSave={(input: SaveGoalInput) => goals.saveGoal(input)}
-      />
 
       <div className="fixed inset-0 pointer-events-none z-100">
         <Outlet

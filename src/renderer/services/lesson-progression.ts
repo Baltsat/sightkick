@@ -1,5 +1,6 @@
 import type { ScoreData } from '../../types';
 import type { GameMode } from '../types';
+import type { LessonEntry, LessonProgress } from '../hooks/useLessons';
 import { calculateAccuracy, getStarRating } from '../scoring';
 
 const TARGET_SPEED_EPSILON = 0.001;
@@ -33,6 +34,32 @@ export const EMPTY_LESSON_TRAVERSAL: LessonTraversalEvidence = {
   uninterrupted: false,
   minimumPlaybackSpeed: 0,
 };
+
+export function makeLessonsOpen(progress: LessonProgress): LessonProgress {
+  const entries = progress.entries.map((entry) => ({
+    ...entry,
+    unlocked: true,
+    clearsNeeded: 0,
+  }));
+  const entryBySongId = new Map(entries.map((entry) => [entry.song.id, entry]));
+  const recommendedEntry = progress.continueEntry ?? progress.nextLockedEntry;
+
+  return {
+    ...progress,
+    entries,
+    groups: progress.groups.map((group) => ({
+      ...group,
+      entries: group.entries.map(
+        (entry) => entryBySongId.get(entry.song.id) as LessonEntry,
+      ),
+    })),
+    unlockedCount: entries.length,
+    continueEntry: recommendedEntry
+      ? entryBySongId.get(recommendedEntry.song.id)
+      : undefined,
+    nextLockedEntry: undefined,
+  };
+}
 
 /**
  * Lessons launch directly in Practice. Progression rewards a complete,

@@ -12,6 +12,7 @@ export interface UseYoutubeSearchResult {
   results: IpcYoutubeSearchResult[];
   loading: boolean;
   error: string | undefined;
+  retry: () => void;
 }
 
 export function useYoutubeSearch(query: string): UseYoutubeSearchResult {
@@ -19,6 +20,7 @@ export function useYoutubeSearch(query: string): UseYoutubeSearchResult {
   const [results, setResults] = useState<IpcYoutubeSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
+  const [attempt, setAttempt] = useState(0);
   // A sentinel distinct from any real (possibly empty) trimmed query, so the
   // comparison below also fires on the very first render — matching
   // useOnlineSearch's prevSearchKey pattern.
@@ -65,7 +67,18 @@ export function useYoutubeSearch(query: string): UseYoutubeSearchResult {
       clearTimeout(timer);
       off?.();
     };
-  }, [trimmed]);
+  }, [attempt, trimmed]);
 
-  return { results, loading, error };
+  const retry = () => {
+    if (!trimmed) {
+      return;
+    }
+
+    setError(undefined);
+    setResults([]);
+    setLoading(true);
+    setAttempt((current) => current + 1);
+  };
+
+  return { results, loading, error, retry };
 }

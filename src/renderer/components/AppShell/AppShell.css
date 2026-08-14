@@ -1,23 +1,188 @@
+@keyframes arena-field-arrive {
+  from {
+    opacity: 0.7;
+    transform: translate3d(-1.25%, 0.9%, 0) scale(1.025);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* The field's own idle life — not a route event, so it lives on a separate
+   layer (`::after`) from the route-change arrival (`::before`), because both
+   would otherwise fight over `transform` on the same element. Slow, warm,
+   low-contrast: a 110s alternate drift of the same ember/wine blobs, never
+   the base gradient itself, so it reads as "the light is moving" rather
+   than "the page is moving". Disabled entirely under reduced motion. */
+@keyframes arena-field-drift {
+  from {
+    transform: translate3d(-1.4%, -1%, 0) scale(1.01);
+  }
+
+  to {
+    transform: translate3d(1.4%, 1.2%, 0) scale(1.01);
+  }
+}
+
 .arena-shell {
+  position: relative;
   display: flex;
   height: 100vh;
   min-height: 0;
   overflow: hidden;
   color: var(--color-text);
-  background: var(--surface-canvas);
+  background: var(--dr-field-base);
+  isolation: isolate;
+}
+
+.arena-shell::before {
+  position: absolute;
+  z-index: 0;
+  inset: -14%;
+  content: '';
+  pointer-events: none;
+  background:
+    radial-gradient(
+      70% 88% at 10% 10%,
+      color-mix(in srgb, var(--dr-field-ember) 36%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      70% 90% at 94% 88%,
+      color-mix(in srgb, var(--dr-field-wine) 22%, transparent),
+      transparent 76%
+    ),
+    linear-gradient(
+      118deg,
+      var(--dr-field-base) 0%,
+      var(--dr-canvas) 45%,
+      var(--dr-field-low) 100%
+    );
+  transform: translate3d(0, 0, 0);
+}
+
+.arena-shell::after {
+  position: absolute;
+  z-index: 0;
+  inset: -18%;
+  content: '';
+  pointer-events: none;
+  background:
+    radial-gradient(
+      70% 88% at 10% 10%,
+      color-mix(in srgb, var(--dr-field-ember) 20%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      70% 90% at 94% 88%,
+      color-mix(in srgb, var(--dr-field-wine) 16%, transparent),
+      transparent 76%
+    );
+  transform: translate3d(0, 0, 0);
+  animation: arena-field-drift 110s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.arena-shell[data-view='home']::before {
+  background:
+    radial-gradient(
+      82% 100% at 90% 54%,
+      color-mix(in srgb, var(--dr-field-ember) 40%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      74% 86% at 3% 2%,
+      color-mix(in srgb, var(--dr-field-wine) 28%, transparent),
+      transparent 76%
+    ),
+    linear-gradient(
+      118deg,
+      var(--dr-field-base) 0%,
+      var(--dr-canvas) 48%,
+      var(--dr-field-low) 100%
+    );
+}
+
+.arena-shell[data-view='home']::after {
+  background:
+    radial-gradient(
+      82% 100% at 90% 54%,
+      color-mix(in srgb, var(--dr-field-ember) 22%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      74% 86% at 3% 2%,
+      color-mix(in srgb, var(--dr-field-wine) 18%, transparent),
+      transparent 76%
+    );
+}
+
+.arena-shell--transitioning::before {
+  animation: arena-field-arrive 900ms cubic-bezier(0.16, 1, 0.3, 1) 1;
 }
 
 .arena-shell__rail {
   position: relative;
-  z-index: 5;
+  z-index: 1;
   display: flex;
-  width: 12.5rem;
-  flex: 0 0 12.5rem;
+  width: 13rem;
+  flex: 0 0 13rem;
   flex-direction: column;
   padding: 1.25rem 0.75rem 1rem;
   border-right: 1px solid var(--line-soft);
   background: transparent;
   box-shadow: none;
+  transition: border-color 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Home is the one route with a photograph to continue under the rail, so
+   it is the one route where a hard rail/content border would read as the
+   "panel edge" the owner rejects — everywhere else the hairline still
+   marks the rail honestly. */
+.arena-shell[data-view='home'] .arena-shell__rail {
+  border-right-color: transparent;
+}
+
+/*
+ * Kit-continuity bleed — the shell's half of the handoff documented on the
+ * field-bleed node in AppShell.tsx and on `--dr-home-field-crop` in
+ * theme.css. Contract (one line): publish
+ * `--dr-home-field-crop: url(<right-edge crop of the exact home kit
+ * photo, at least rail-width wide>)` on `:root` while home's kit is
+ * mounted, and clear it on unmount — this layer does the rest.
+ *
+ * `background-image: none` (the unset default) paints nothing, so an
+ * unpublished crop is pixel-identical to today's plain rail: that is the
+ * safe fallback. When a crop *is* published, it is anchored to the right
+ * (the seam with the content panel), sized to cover the rail, held at a
+ * quiet 55% so the ambient field still shows through, and dissolved via a
+ * mask before it reaches the brand/nav side rather than cut off — a blend,
+ * not a second hard edge.
+ */
+.arena-shell__field-bleed {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--dr-home-field-crop, none);
+  background-position: right center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: 0;
+  -webkit-mask-image: linear-gradient(
+    to left,
+    black 0%,
+    black 42%,
+    transparent 88%
+  );
+  mask-image: linear-gradient(to left, black 0%, black 42%, transparent 88%);
+  transition: opacity 900ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.arena-shell[data-view='home'] .arena-shell__field-bleed {
+  opacity: 0.55;
 }
 
 .arena-shell__brand {
@@ -33,23 +198,12 @@
   cursor: pointer;
 }
 
-.arena-shell__brand strong {
-  display: block;
+.arena-shell__brand-name {
   font-family: var(--font-display);
-  font-size: 1.55rem;
+  font-size: 1.4rem;
   font-weight: 700;
   line-height: 1;
-  letter-spacing: -0.05em;
-}
-
-.arena-shell__brand small {
-  display: block;
-  margin-top: 0.26rem;
-  color: var(--color-ink-soft);
-  font-size: 0.57rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  letter-spacing: -0.04em;
 }
 
 .arena-shell__brand-mark {
@@ -57,6 +211,7 @@
   overflow: hidden;
   width: 2rem;
   height: 2rem;
+  flex: 0 0 auto;
   place-items: center;
   border: 0;
   border-radius: 50%;
@@ -86,10 +241,8 @@
   color: var(--color-ink-soft);
   background: transparent;
   font: inherit;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 0.9rem;
+  font-weight: 650;
   text-align: left;
   cursor: pointer;
   transition:
@@ -115,17 +268,57 @@
   filter: none;
 }
 
-.arena-shell__rail-note {
-  margin: auto 0.6rem 0.1rem;
-  color: color-mix(in srgb, var(--color-ink-soft) 74%, transparent);
-  font-family: var(--font-display);
-  font-size: 0.82rem;
-  font-style: italic;
-  line-height: 1.25;
+/* One quiet, fixed foot: profile and settings, never the top of the page. */
+.arena-shell__rail-foot {
+  display: flex;
+  margin-top: auto;
+  flex-direction: column;
+  gap: 0.18rem;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 0.5rem;
+}
+
+.arena-shell__rail-utility {
+  display: flex;
+  align-items: center;
+  padding: 0.2rem 0.7rem;
+}
+
+.arena-shell__profile {
+  display: flex;
+  min-height: 2.7rem;
+  align-items: center;
+  gap: 0.72rem;
+  padding: 0.62rem 0.7rem 0.62rem 0.8rem;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0;
+  color: var(--color-ink-soft);
+  background: transparent;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.arena-shell__profile:hover,
+.arena-shell__profile--active {
+  border-left-color: var(--signal-wine);
+  color: var(--color-ink);
+}
+
+.arena-shell__profile--active svg {
+  color: var(--signal-wine);
 }
 
 .arena-shell__workspace {
   display: flex;
+  position: relative;
+  z-index: 1;
   height: 100%;
   min-height: 0;
   min-width: 0;
@@ -133,147 +326,65 @@
   flex-direction: column;
 }
 
-.arena-shell__topbar {
-  position: relative;
-  z-index: 4;
-  display: flex;
-  min-height: 4.5rem;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.85rem clamp(1rem, 2.1vw, 2rem);
-  border-bottom: 1px solid var(--line-soft);
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-}
-
-.arena-shell__eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 0.48rem;
-  color: var(--color-ink-soft);
-  font-size: 0.64rem;
-  font-weight: 750;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-}
-
-.arena-shell__sun {
-  color: var(--color-amber);
-  filter: drop-shadow(0 0 0.4rem rgb(255 173 47 / 68%));
-}
-
-.arena-shell__actions,
-.arena-shell__status {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.arena-shell__profile {
-  display: flex;
-  min-width: 2.75rem;
-  min-height: 2.75rem;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  padding: 0.65rem 0.9rem;
-  border: 0;
-  border-left: 1px solid var(--line-soft);
-  border-radius: 0;
-  color: var(--color-ink);
-  background: transparent;
-  box-shadow: none;
-  cursor: pointer;
-}
-
-.arena-shell__profile-label {
-  font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.arena-shell__profile:hover {
-  color: var(--signal-wine);
-  border-left-color: var(--signal-wine);
-}
-
 .arena-shell__content {
   position: relative;
   min-height: 0;
   flex: 1;
   overflow: hidden;
+  background: transparent;
 }
 
-@media (max-width: 900px) {
-  .arena-shell {
-    flex-direction: column;
-  }
+.arena-shell__brand:focus-visible,
+.arena-shell__nav-item:focus-visible,
+.arena-shell__profile:focus-visible {
+  outline: 2px solid var(--dr-focus, #256eaa);
+  outline-offset: -2px;
+}
 
+/* Below the doc's compact threshold the rail narrows to icons; it stays a
+   fixed-width vertical column so a route never gains a horizontal header
+   bar or an externally-scrolling workspace. */
+@media (max-width: 1120px) {
   .arena-shell__rail {
-    position: sticky;
-    top: 0;
-    display: flex;
-    width: 100%;
-    min-height: auto;
-    flex: initial;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.7rem;
-    padding: 0.55rem 0.7rem;
-    border-right: 0;
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  .arena-shell__workspace {
-    height: auto;
+    width: 4rem;
+    flex: 0 0 4rem;
+    padding: 1rem 0.5rem;
   }
 
   .arena-shell__brand {
-    padding: 0.28rem;
-  }
-
-  .arena-shell__brand small,
-  .arena-shell__rail-note,
-  .arena-shell__nav-item span {
-    display: none;
-  }
-
-  .arena-shell__nav {
-    display: flex;
-    flex: 1;
-    justify-content: flex-end;
-  }
-
-  .arena-shell__nav-item {
-    width: 2.55rem;
-    min-height: 2.55rem;
     justify-content: center;
-    padding: 0.5rem;
+    padding: 0.3rem 0 1rem;
   }
 
-  .arena-shell__topbar {
-    min-height: 4.1rem;
-  }
-}
-
-@media (max-width: 620px) {
-  .arena-shell__eyebrow,
-  .arena-shell__status {
+  /* Each control already carries its own aria-label; hide the redundant
+     visible word entirely instead of leaving a visually-hidden duplicate
+     that assistive tech would announce twice. */
+  .arena-shell__brand-name,
+  .arena-shell__nav-label,
+  .arena-shell__profile-label {
     display: none;
   }
 
-  .arena-shell__topbar {
-    justify-content: flex-end;
+  .arena-shell__nav-item,
+  .arena-shell__profile {
+    justify-content: center;
+    padding: 0.62rem 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .arena-shell__nav-item {
+  .arena-shell--transitioning::before {
+    animation: none;
+  }
+
+  .arena-shell::after {
+    animation: none;
+  }
+
+  .arena-shell__rail,
+  .arena-shell__field-bleed,
+  .arena-shell__nav-item,
+  .arena-shell__profile {
     transition: none;
   }
 }

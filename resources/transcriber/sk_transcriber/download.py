@@ -8,6 +8,10 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from yt_dlp import YoutubeDL
+from yt_dlp.utils import DownloadError
+
+from sk_transcriber.audio_utils import to_jpg, to_wav
 from sk_transcriber.events import ProgressReporter
 from sk_transcriber.naming import parse_artist_title
 
@@ -74,25 +78,67 @@ def _make_progress_hook(reporter: ProgressReporter, stage: str):
     return hook
 
 
+def _retry_opts(
+    ydl_opts: dict,
+    player_client: str,
+    remote_components: list[str] | None = None,
+) -> dict:
+    options = {
+        **ydl_opts,
+        "extractor_args": {"youtube": {"player_client": [player_client]}},
+    }
+    if remote_components:
+        options["remote_components"] = remote_components
+
+    return options
+
+
+def _extract_info(url: str, ydl_opts: dict) -> dict:
+    with YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+
+    if info is None:
+        raise RuntimeError(f"yt-dlp returned no metadata for {url}")
+
+    return info
+
+
+def _wav_path(work_dir: Path) -> Path:
+    candidates = sorted(
+        candidate
+        for candidate in work_dir.glob("source.*")
+        if candidate.is_file()
+        and candidate.suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp"}
+    )
+    if not candidates:
+        raise RuntimeError(f"yt-dlp did not produce audio in {work_dir}")
+
+    audio_path = work_dir / "source.wav"
+    to_wav(candidates[0], audio_path)
+    return audio_path
+
+
+def _thumbnail_path(work_dir: Path) -> Path | None:
+    for candidate in sorted(work_dir.glob("source*")):
+        if candidate.suffix.lower() in {".jpg", ".jpeg"}:
+            return candidate
+        if candidate.suffix.lower() in {".webp", ".png"}:
+            output = work_dir / "source.jpg"
+            to_jpg(candidate, output)
+            return output
+
+    return None
+
+
 def download_audio(
     url: str, work_dir: Path, reporter: ProgressReporter, stage: str = "download"
 ) -> DownloadResult:
-    import yt_dlp
-
     work_dir.mkdir(parents=True, exist_ok=True)
     out_template = str(work_dir / "source.%(ext)s")
 
     ydl_opts = {
         "format": "bestaudio/best",
         "outtmpl": out_template,
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "wav",
-                "preferredquality": "0",
-            },
-            {"key": "FFmpegThumbnailsConvertor", "format": "jpg"},
-        ],
         "writethumbnail": True,
         "noplaylist": True,
         "quiet": True,
@@ -105,27 +151,45 @@ def download_audio(
     }
 
     reporter.report(stage, 0.0, "Fetching video metadata")
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
+    try:
+        info = _extract_info(url, ydl_opts)
+    except DownloadError as exc:
+        if "HTTP Error 403" not in str(exc):
+            raise
 
-    if info is None:
-        raise RuntimeError(f"yt-dlp returned no metadata for {url}")
+        reporter.report(
+            stage,
+            0.0,
+            "Retrying audio download with a compatible YouTube client",
+        )
+        for candidate in work_dir.glob("source*"):
+            if candidate.is_file():
+                candidate.unlink()
+        try:
+            info = _extract_info(url, _retry_opts(ydl_opts, "android_vr"))
+        except DownloadError as retry_exc:
+            if "HTTP Error 403" not in str(retry_exc):
+                raise
 
-    audio_path = work_dir / "source.wav"
-    if not audio_path.exists():
-        # Extremely rare: extraction produced a differently-named file.
-        candidates = sorted(work_dir.glob("source.*"))
-        wavs = [p for p in candidates if p.suffix.lower() == ".wav"]
-        if not wavs:
-            raise RuntimeError(
-                f"yt-dlp did not produce a wav file in {work_dir} (found: {candidates})"
+            reporter.report(
+                stage,
+                0.0,
+                "Retrying audio download with the embedded YouTube player",
             )
-        audio_path = wavs[0]
+            for candidate in work_dir.glob("source*"):
+                if candidate.is_file():
+                    candidate.unlink()
+            info = _extract_info(
+                url,
+                _retry_opts(
+                    ydl_opts,
+                    "web_embedded",
+                    remote_components=["ejs:github"],
+                ),
+            )
 
-    thumbnail_path: Path | None = None
-    jpg_candidates = sorted(work_dir.glob("source*.jpg"))
-    if jpg_candidates:
-        thumbnail_path = jpg_candidates[0]
+    audio_path = _wav_path(work_dir)
+    thumbnail_path = _thumbnail_path(work_dir)
 
     raw_title = info.get("title") or "Unknown Title"
     uploader = info.get("uploader") or info.get("channel")

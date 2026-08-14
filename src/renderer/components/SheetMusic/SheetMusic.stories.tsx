@@ -306,8 +306,6 @@ function SheetHarness({
       songData={STORY_SONG}
       renderData={renderData}
       vexflowContainerRef={containerRef}
-      enableColors={true}
-      showReference={false}
       isDev={false}
       gameMode={practice ? 'practice' : undefined}
       practiceRange={practiceRange}
@@ -316,10 +314,6 @@ function SheetHarness({
       onLoopRangeSelect={(range) => {
         setPracticeRange(range);
         setIsLooping(true);
-      }}
-      onClearLoop={() => {
-        setPracticeRange(undefined);
-        setIsLooping(false);
       }}
       zoom={1}
       onSelectMeasure={() => {}}

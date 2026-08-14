@@ -4,6 +4,10 @@ import {
   AUTO_SCROLL_EDGE_MARGIN,
   AUTO_SCROLL_MAX_SPEED,
   autoScrollSpeed,
+  FLOW_AUTO_ZOOM_MAX_MULTIPLIER,
+  FLOW_AUTO_ZOOM_MIN_MULTIPLIER,
+  FLOW_AUTO_ZOOM_TARGET_HEIGHT_FRACTION,
+  flowAutoZoomMultiplier,
   parseDsl,
   buildParsedChartFromDsl,
   serializeMeasureToDsl,
@@ -114,6 +118,49 @@ describe('autoScrollSpeed', () => {
 
     expect(autoScrollSpeed(halfway, edge)).toBeCloseTo(
       -AUTO_SCROLL_MAX_SPEED / 2,
+    );
+  });
+});
+
+describe('flowAutoZoomMultiplier', () => {
+  it('falls back to the shared classic baseline when a measurement is unavailable', () => {
+    expect(flowAutoZoomMultiplier(0, 600)).toBe(FLOW_AUTO_ZOOM_MIN_MULTIPLIER);
+    expect(flowAutoZoomMultiplier(150, 0)).toBe(FLOW_AUTO_ZOOM_MIN_MULTIPLIER);
+    expect(flowAutoZoomMultiplier(-10, 600)).toBe(
+      FLOW_AUTO_ZOOM_MIN_MULTIPLIER,
+    );
+  });
+
+  it('fits the stave to the target fraction of the real available height', () => {
+    // A 200px-tall stave in a 700px viewport should scale up to claim
+    // exactly FLOW_AUTO_ZOOM_TARGET_HEIGHT_FRACTION of that height (chosen
+    // so the fitted ratio lands inside the min/max clamp, unlike the
+    // clamp-boundary cases covered separately below).
+    const naturalHeight = 200;
+    const availableHeight = 700;
+
+    expect(flowAutoZoomMultiplier(naturalHeight, availableHeight)).toBeCloseTo(
+      (FLOW_AUTO_ZOOM_TARGET_HEIGHT_FRACTION * availableHeight) / naturalHeight,
+    );
+  });
+
+  it('never scales below the shared classic baseline, even for a tiny viewport', () => {
+    expect(flowAutoZoomMultiplier(400, 200)).toBe(
+      FLOW_AUTO_ZOOM_MIN_MULTIPLIER,
+    );
+  });
+
+  it('caps out rather than blowing the stave up in a very tall, narrow window', () => {
+    expect(flowAutoZoomMultiplier(20, 2000)).toBe(
+      FLOW_AUTO_ZOOM_MAX_MULTIPLIER,
+    );
+  });
+
+  it('never returns less at the compact 700px minimum height than at a taller one', () => {
+    const naturalHeight = 160;
+
+    expect(flowAutoZoomMultiplier(naturalHeight, 620)).toBeLessThanOrEqual(
+      flowAutoZoomMultiplier(naturalHeight, 720),
     );
   });
 });

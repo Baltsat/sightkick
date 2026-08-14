@@ -1,5 +1,6 @@
 import path from 'path';
-import { existsSync } from 'fs';
+import { existsSync, mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
 import { test, expect, Page } from '@playwright/test';
 import { launchApp, Harness } from './support';
 import { toAssetUrl } from '../src/main/util';
@@ -10,9 +11,47 @@ let page: Page;
 test.setTimeout(180_000);
 
 async function waitForAppReady(currentPage: Page) {
+  const libraryHeading = currentPage.getByRole('heading', {
+    name: 'Your drum library',
+  });
+
+  if (!(await libraryHeading.isVisible())) {
+    await expect(
+      currentPage.getByRole('main', { name: 'Home content' }),
+    ).toBeVisible({ timeout: 60_000 });
+    await currentPage.getByTestId('view-songs').click();
+  }
+
+  await expect(libraryHeading).toBeVisible({ timeout: 60_000 });
+}
+
+function autoImportFixturePaths() {
+  return {
+    transcriberPath: path.join(__dirname, 'fixtures', 'fake-transcriber.sh'),
+    ytDlpPath: path.join(__dirname, 'fixtures', 'fake-yt-dlp.sh'),
+  };
+}
+
+async function rejectFileDialogs(currentHarness: Harness) {
+  await currentHarness.app.evaluate(({ dialog }) => {
+    dialog.showOpenDialog = async () => {
+      throw new Error('automatic YouTube import opened a file dialog');
+    };
+  });
+}
+
+async function searchAndChooseRecording(currentPage: Page) {
+  await currentPage.getByTestId('song-search').fill('Natural Villain Mokita');
+
+  const exactRecording = currentPage.getByTestId(
+    'song-search-result-abcdefghijk',
+  );
+
+  await expect(exactRecording).toBeVisible({ timeout: 30_000 });
   await expect(
-    currentPage.getByRole('heading', { name: 'Your drum library' }),
-  ).toBeVisible({ timeout: 60_000 });
+    currentPage.getByTestId('song-search-result-live0000001'),
+  ).toHaveCount(0);
+  await exactRecording.click();
 }
 
 // eslint-disable-next-line no-empty-pattern
@@ -258,6 +297,122 @@ test.describe('seeded library', () => {
         path.join(harness.libraryDir, 'Тестовый артист - 夜のドラム 🥁'),
       ),
     ).toBe(true);
+  });
+
+  test('imports a selected YouTube recording from search and launches it without a file dialog', async () => {
+    test.skip(process.platform === 'win32', 'POSIX sidecar fixture');
+
+    const { transcriberPath, ytDlpPath } = autoImportFixturePaths();
+
+    harness = await launchApp({
+      seedLibrary: true,
+      ytDlpFixturePath: ytDlpPath,
+      env: {
+        SIGHTKICK_TRANSCRIBER_PATH: transcriberPath,
+        SIGHTKICK_DISABLE_YOUTUBE_METADATA: '1',
+        SK_FFMPEG: transcriberPath,
+      },
+    });
+    page = await harness.app.firstWindow();
+    await waitForAppReady(page);
+    await rejectFileDialogs(harness);
+
+    await searchAndChooseRecording(page);
+    await expect(page.getByTestId('auto-chart-progress')).toContainText(
+      /Verifying selected YouTube recording|Downloading fake audio/,
+      { timeout: 30_000 },
+    );
+
+    if (process.env.SIGHTKICK_AUTO_IMPORT_SEARCH_PROOF) {
+      await page.screenshot({
+        path: process.env.SIGHTKICK_AUTO_IMPORT_SEARCH_PROOF,
+      });
+    }
+
+    const imported = page
+      .getByTestId(/song-item-/)
+      .filter({ hasText: '夜のドラム 🥁' });
+
+    await expect(imported).toBeVisible({ timeout: 60_000 });
+    await imported.click();
+    await page.getByRole('button', { name: 'perform' }).click();
+
+    const sheet = page.locator('svg').first();
+
+    await expect(sheet).toBeVisible({ timeout: 30_000 });
+    await expect
+      .poll(async () => page.locator('svg path').count(), { timeout: 30_000 })
+      .toBeGreaterThan(0);
+
+    const playToggle = page.getByTestId('play-toggle');
+
+    await expect(playToggle).not.toHaveClass(/ant-btn-loading/, {
+      timeout: 30_000,
+    });
+    await playToggle.click();
+    await expect(playToggle).toHaveAttribute(
+      'aria-label',
+      /Cancel count-in|Pause/,
+    );
+
+    if (process.env.SIGHTKICK_AUTO_IMPORT_PLAYABLE_PROOF) {
+      await page.screenshot({
+        path: process.env.SIGHTKICK_AUTO_IMPORT_PLAYABLE_PROOF,
+      });
+    }
+  });
+
+  test('shows a forced automatic-import failure and retries with a fresh attempt', async () => {
+    test.skip(process.platform === 'win32', 'POSIX sidecar fixture');
+
+    const { transcriberPath, ytDlpPath } = autoImportFixturePaths();
+    const failureRoot = mkdtempSync(
+      path.join(tmpdir(), 'sightkick-auto-import-'),
+    );
+    const failOnceFile = path.join(failureRoot, 'failed-once');
+
+    harness = await launchApp({
+      seedLibrary: true,
+      ytDlpFixturePath: ytDlpPath,
+      env: {
+        SIGHTKICK_TRANSCRIBER_PATH: transcriberPath,
+        SIGHTKICK_DISABLE_YOUTUBE_METADATA: '1',
+        SIGHTKICK_FAKE_TRANSCRIBER_FAIL_ONCE_FILE: failOnceFile,
+        SK_FFMPEG: transcriberPath,
+      },
+    });
+    page = await harness.app.firstWindow();
+    await waitForAppReady(page);
+    await rejectFileDialogs(harness);
+
+    await searchAndChooseRecording(page);
+
+    const progress = page.getByTestId('auto-chart-progress');
+
+    await expect(progress).toContainText(
+      'Forced sidecar failure for retry proof',
+      {
+        timeout: 30_000,
+      },
+    );
+    await expect(page.getByTestId('auto-chart-retry')).toBeVisible();
+
+    if (process.env.SIGHTKICK_AUTO_IMPORT_RETRY_FAILURE_PROOF) {
+      await page.screenshot({
+        path: process.env.SIGHTKICK_AUTO_IMPORT_RETRY_FAILURE_PROOF,
+      });
+    }
+
+    await page.getByTestId('auto-chart-retry').click();
+    await expect(
+      page.getByTestId(/song-item-/).filter({ hasText: '夜のドラム 🥁' }),
+    ).toBeVisible({ timeout: 60_000 });
+
+    if (process.env.SIGHTKICK_AUTO_IMPORT_RETRY_PLAYABLE_PROOF) {
+      await page.screenshot({
+        path: process.env.SIGHTKICK_AUTO_IMPORT_RETRY_PLAYABLE_PROOF,
+      });
+    }
   });
 
   test('scans the folder, lists the song, and renders real sheet music', async () => {

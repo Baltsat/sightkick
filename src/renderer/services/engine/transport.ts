@@ -530,7 +530,12 @@ export class Transport {
     }
 
     this.suppressNextLoopCompletion = false;
-    this.playFromTick(this.loopRegion.startTick, 'inherit', true);
+    // A natural wrap loops straight back into the phrase - it must never
+    // re-enter a musical count-in (that's only for a genuine fresh take;
+    // see beginPlayback's 'force'/'inherit' policies), even when the user's
+    // Count In preference is on. 'skip' still lets a caller force one
+    // explicitly elsewhere (Tutor recovery loops pass 'force').
+    this.playFromTick(this.loopRegion.startTick, 'skip', true);
   }
 
   private scheduleClicks(): void {

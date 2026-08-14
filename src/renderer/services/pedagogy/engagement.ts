@@ -86,6 +86,7 @@ function available(
 function optionFor({
   kind,
   ranked,
+  title,
   source_label,
   completion_label,
   bar_range,
@@ -93,6 +94,7 @@ function optionFor({
 }: {
   kind: PracticeCardKind;
   ranked: ZpdRankedCandidate;
+  title?: string;
   source_label: string;
   completion_label: string;
   bar_range?: { start: number; end: number };
@@ -116,7 +118,7 @@ function optionFor({
     ].join(':'),
     kind,
     candidate_id: ranked.candidate.item_id,
-    title: ranked.candidate.title,
+    title: title ?? ranked.candidate.title,
     speed: audition?.speed ?? ranked.decision.scaffold.speed,
     source_label,
     completion_label,
@@ -168,8 +170,10 @@ function reviewOptions({
           left.due_at.localeCompare(right.due_at) ||
           left.skill_id.localeCompare(right.skill_id),
       )
-      .flatMap((review) =>
-        byLearningValue(
+      .flatMap((review) => {
+        const skill = nodes.get(review.skill_id)?.label ?? review.skill_id;
+
+        return byLearningValue(
           ranking.filter(
             ({ candidate, decision }) =>
               candidate.available &&
@@ -182,13 +186,12 @@ function reviewOptions({
           optionFor({
             kind: 'review',
             ranked,
-            source_label: `Saved review queue · ${
-              nodes.get(review.skill_id)?.label ?? review.skill_id
-            }`,
-            completion_label: 'One saved review run',
+            title: `Prove yesterday's ${skill}`,
+            source_label: `Saved review queue · ${skill}`,
+            completion_label: 'One target-tempo retrieval',
           }),
-        ),
-      ),
+        );
+      }),
   );
 }
 

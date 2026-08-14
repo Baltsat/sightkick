@@ -141,6 +141,19 @@ describe('SpeedAudioPlayer', () => {
     expect(stream.seek).toHaveBeenCalled();
   });
 
+  it('restarts when speed changes while a loop restart is awaiting its first chunk', async () => {
+    const { player, stream } = await makePlayer();
+    const pending = player.start(0);
+
+    player.setPlaybackSpeed(0.8);
+    await pending;
+    await flush();
+
+    expect(stream.setSpeed).toHaveBeenCalledWith(0.8);
+    expect(player.isInitialised).toBe(true);
+    expect(context.bufferSources.at(-1)?.stopped).toBe(false);
+  });
+
   it('keeps the deferred start when speed changes before playback begins', async () => {
     const { player } = await makePlayer();
     const deferredStart = context.currentTime + 5;
@@ -171,6 +184,38 @@ describe('SpeedAudioPlayer', () => {
     context.bufferSources.forEach((source) =>
       expect(source.stopped).toBe(true),
     );
+  });
+
+  it('does not resume audio or lose the paused position when pause lands mid speed-change restart', async () => {
+    const { player } = await makePlayer();
+
+    await player.start(4);
+    context.currentTime = 6;
+
+    const positionBeforeSpeedChange = player.currentTime;
+    const sourcesBeforePause = context.bufferSources.length;
+
+    // setPlaybackSpeed synchronously stops the player and kicks off an
+    // async restart (still awaiting its stretch-stream re-init) before
+    // yielding - pausing right here reproduces the exact race a real
+    // Transport.pause() call right after a speed change can win.
+    player.setPlaybackSpeed(0.5);
+
+    // The mid-restart position must still read as the real paused
+    // position, not collapse to 0 - Transport reads this before calling
+    // pause() itself, and would otherwise snap the displayed playhead back
+    // to bar one.
+    expect(player.currentTime).toBeCloseTo(positionBeforeSpeedChange, 5);
+
+    player.pause();
+
+    await flush();
+
+    expect(player.currentTime).toBeCloseTo(positionBeforeSpeedChange, 5);
+    // The stale restart must not un-suspend the context the user just
+    // paused, nor schedule any new audio behind the paused UI.
+    expect(context.resume).not.toHaveBeenCalled();
+    expect(context.bufferSources.length).toBe(sourcesBeforePause);
   });
 
   it('destroys the stream and closes the context on destroy', async () => {

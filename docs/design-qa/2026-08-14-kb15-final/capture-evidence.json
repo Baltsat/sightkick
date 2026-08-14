@@ -1,0 +1,34 @@
+{
+  "installed_executable": "/Applications/Drumroll.app/Contents/MacOS/Drumroll",
+  "viewport": {
+    "width": 1225,
+    "height": 768
+  },
+  "captures": [
+    {
+      "name": "01-home-labelled-doors",
+      "screenshot": "01-home-labelled-doors.png"
+    },
+    {
+      "name": "02-songs-library",
+      "screenshot": "02-songs-library.png"
+    },
+    {
+      "name": "03-journey",
+      "screenshot": "03-journey.png"
+    },
+    {
+      "name": "04-practice-ready",
+      "screenshot": "04-practice-ready.png"
+    },
+    {
+      "name": "05-result",
+      "screenshot": "05-result.png"
+    },
+    {
+      "name": "06-statistics",
+      "screenshot": "06-statistics.png"
+    }
+  ],
+  "page_errors": []
+}

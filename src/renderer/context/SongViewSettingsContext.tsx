@@ -17,8 +17,6 @@ interface SongViewSettingsValue {
   setShowBarNumbers: (v: boolean) => void;
   showTempo: boolean;
   setShowTempo: (v: boolean) => void;
-  showReference: boolean;
-  setShowReference: (v: boolean) => void;
   countIn: boolean;
   setCountIn: (v: boolean) => void;
   zoom: number;
@@ -47,10 +45,6 @@ export function SongViewSettingsProvider({
     false,
   );
   const [showTempo, setShowTempo] = usePersisted('settings.showTempo', false);
-  const [showReference, setShowReference] = usePersisted(
-    'settings.showReference',
-    true,
-  );
   const [countIn, setCountIn] = usePersisted('settings.countIn', true);
   const [zoom, setZoom] = usePersisted<number>('settings.zoom', 1);
 
@@ -70,8 +64,6 @@ export function SongViewSettingsProvider({
       setShowBarNumbers,
       showTempo,
       setShowTempo,
-      showReference,
-      setShowReference,
       countIn,
       setCountIn,
       zoom,
@@ -86,8 +78,6 @@ export function SongViewSettingsProvider({
       setShowBarNumbers,
       showTempo,
       setShowTempo,
-      showReference,
-      setShowReference,
       countIn,
       setCountIn,
       zoom,

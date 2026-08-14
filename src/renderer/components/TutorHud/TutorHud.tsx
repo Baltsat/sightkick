@@ -1,17 +1,17 @@
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faBolt,
-  faDrum,
-  faEarListen,
-  faHeart,
-  faPause,
-  faRotateLeft,
-} from '@fortawesome/free-solid-svg-icons';
-import { CSSProperties, useId } from 'react';
+import { CSSProperties, useId, useMemo } from 'react';
+import { Button } from 'antd';
 import { TutorHudMessage } from '../../hooks/useTutorSession';
 import { TutorState } from '../../services/tutor';
-import type { MidiInputTelemetry } from '../../services/practice-stats';
-import { KitCommandPrompt, KitCommandPromptModel } from '../KitCommandPrompt';
+import {
+  KIT_ELEMENT_COLOR_VAR,
+  KIT_ELEMENT_LABEL,
+  MistakeEvidence,
+  describeMistake,
+  lastScoreableMistake,
+} from '../../services/pedagogy';
+import type { KitElement } from '../../services/practice-stats';
+import { KitCommandPromptModel } from '../KitCommandPrompt';
+import '../PracticeEdgeCaption/PracticeEdgeCaption.css';
 import './TutorHud.css';
 
 interface TutorHudProps {
@@ -24,41 +24,152 @@ interface TutorHudProps {
     | 'recovery-explain'
     | 'remediation';
   controlPrompt?: KitCommandPromptModel;
-  controlPromptCompact?: boolean;
-  midiTelemetry?: MidiInputTelemetry;
-  timingWindowMs?: number;
-  timingWindowReason?: string;
-  remediation?: {
-    currentTask: number;
-    totalTasks: number;
-    cleanRepetitions: number;
-    requiredCleanRepetitions: number;
-  };
   recoveryCaption?: {
     title: string;
     detail: string;
   };
+  tempoSuggestion?: {
+    current: number;
+    suggested: number;
+    onAccept: () => void;
+    onKeepCurrent: () => void;
+  };
+}
+
+function ElementChip({
+  element,
+  roleLabel,
+}: {
+  element: KitElement;
+  roleLabel: string;
+}) {
+  return (
+    <span
+      className="drumroll-tutor-hud__mistake-chip"
+      data-kit-element={element}
+    >
+      <span
+        className="drumroll-tutor-hud__mistake-swatch"
+        style={
+          {
+            '--mistake-swatch-color': KIT_ELEMENT_COLOR_VAR[element],
+          } as CSSProperties
+        }
+        aria-hidden="true"
+      />
+      <span className="drumroll-tutor-hud__mistake-chip-role">{roleLabel}</span>
+      <strong>{KIT_ELEMENT_LABEL[element]}</strong>
+    </span>
+  );
+}
+
+/**
+ * The player's own resume/correction instruction is the primary message and
+ * must never be displaced. This disclosure is deliberately quiet and
+ * collapsed by default — see the design acceptance rule "detail is
+ * reachable, never preloaded". It only renders once real, judged evidence
+ * exists (`describeMistake` returning undefined means Judge itself couldn't
+ * say anything truthful about the strike).
+ */
+function TutorMistakeDisclosure({ mistake }: { mistake: MistakeEvidence }) {
+  return (
+    <details
+      className="drumroll-tutor-hud__mistake"
+      data-testid="tutor-mistake"
+    >
+      <summary data-testid="tutor-mistake-summary">
+        <span className="drumroll-tutor-hud__mistake-summary-label">Why</span>
+        <span className="drumroll-tutor-hud__mistake-summary-title">
+          {mistake.title}
+        </span>
+      </summary>
+      <div className="drumroll-tutor-hud__mistake-body">
+        {mistake.expectedElement && (
+          <ElementChip
+            element={mistake.expectedElement}
+            roleLabel="Chart calls for"
+          />
+        )}
+        {mistake.actualElement && (
+          <ElementChip element={mistake.actualElement} roleLabel="You hit" />
+        )}
+        <p>{mistake.detail}</p>
+        <p className="drumroll-tutor-hud__mistake-check">{mistake.check}</p>
+      </div>
+    </details>
+  );
 }
 
 function labelForPhase(phase: TutorState['phase']) {
   if (phase === 'recovering') {
-    return 'Focused recovery';
+    return 'One focused repair';
   }
 
   if (phase === 'complete') {
-    return 'Session complete';
+    return 'Phrase complete';
   }
 
-  return 'Adaptive tutor';
+  return 'Practice guide';
 }
 
-function isCompactDisplayState(displayState: TutorHudProps['displayState']) {
-  return (
-    displayState === 'inactivity-paused' ||
-    displayState === 'kit-paused' ||
-    displayState === 'kit-ready' ||
-    displayState === 'recovery-explain'
-  );
+function kitLabel(value: string | undefined): string | undefined {
+  return value !== undefined && value in KIT_ELEMENT_LABEL
+    ? KIT_ELEMENT_LABEL[value as KitElement]
+    : undefined;
+}
+
+function tutorNextReason(
+  state: TutorState,
+  displayState: TutorHudProps['displayState'],
+  recoveryCaption: TutorHudProps['recoveryCaption'],
+): string | undefined {
+  const recovery = state.recovery;
+
+  if (recovery) {
+    const pair = recovery.trigger.wrongPadPair;
+    const expected = kitLabel(pair?.expectedElement)?.toLowerCase();
+    const actual = kitLabel(pair?.actualElement)?.toLowerCase();
+    const skill =
+      recovery.trigger.reason === 'repeated-wrong-pad-pair'
+        ? expected
+          ? `${expected} placement`
+          : 'the intended drum placement'
+        : recovery.trigger.reason === 'timing-spread'
+        ? 'a steadier pulse'
+        : 'the phrase handoff';
+    const observation =
+      recovery.trigger.reason === 'repeated-wrong-pad-pair' &&
+      actual &&
+      expected
+        ? `the ${actual} → ${expected} switch repeated`
+        : recovery.trigger.reason === 'timing-spread'
+        ? 'the pulse spread across this phrase'
+        : 'this phrase needs a smaller, musical return';
+    const nextAction =
+      recovery.approach === 'return-context'
+        ? 'carry it through one more bar so it survives the return to the song.'
+        : 'settle the anchor phrase, then carry it into the next bar.';
+
+    return `Build ${skill}: ${observation}; ${nextAction}`;
+  }
+
+  if (displayState === 'remediation') {
+    if (recoveryCaption?.title === 'First anchor acquired') {
+      return 'The anchor is in. Settle one more quality pass at this tempo before the next planned step.';
+    }
+
+    if (recoveryCaption?.title === 'Near-clean quality retained') {
+      return 'The phrase is close. Keep the same target and settle one full pass.';
+    }
+
+    if (recoveryCaption?.title === 'Loop released') {
+      return 'Take this phrase back into the song now; the next context is the useful proof.';
+    }
+
+    return 'Settle this observed phrase first. One clean anchor earns a nearby-tempo return.';
+  }
+
+  return undefined;
 }
 
 export function TutorHud({
@@ -66,270 +177,119 @@ export function TutorHud({
   message,
   displayState,
   controlPrompt,
-  controlPromptCompact = false,
-  midiTelemetry,
-  timingWindowMs,
-  timingWindowReason,
-  remediation,
   recoveryCaption,
+  tempoSuggestion,
 }: TutorHudProps) {
   const titleId = useId();
   const detailId = useId();
-  const lastMidiTime = midiTelemetry?.lastMidiTimestamp
-    ? new Date(midiTelemetry.lastMidiTimestamp).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })
-    : 'none';
+  const mistake = useMemo(() => {
+    const judgement = lastScoreableMistake(state.judgementsByMeasure);
+    const evidence = judgement ? describeMistake(judgement) : undefined;
 
-  if (recoveryCaption) {
-    return (
-      <aside
-        className="drumroll-tutor-hud drumroll-tutor-hud--caption"
-        data-testid="tutor-recovery-caption"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        aria-labelledby={titleId}
-        aria-describedby={detailId}
-      >
-        <span className="drumroll-tutor-hud__caption-kicker">Coach</span>
-        <strong id={titleId}>{recoveryCaption.title}</strong>
-        <span id={detailId}>{recoveryCaption.detail}</span>
-      </aside>
-    );
-  }
+    return evidence && judgement
+      ? {
+          key: JSON.stringify(state.judgementsByMeasure),
+          evidence,
+        }
+      : undefined;
+  }, [state.judgementsByMeasure]);
 
   if (
     state.phase === 'off' &&
-    !remediation &&
     !displayState &&
-    !controlPrompt
+    !controlPrompt &&
+    !recoveryCaption &&
+    !tempoSuggestion
   ) {
     return null;
   }
 
-  if (isCompactDisplayState(displayState)) {
-    return (
-      <aside
-        className="drumroll-tutor-hud drumroll-tutor-hud--compact"
-        data-tone={message.tone}
-        data-phase={state.phase}
-        data-display-state={displayState}
-        data-testid="tutor-hud"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        aria-labelledby={titleId}
-        aria-describedby={detailId}
-      >
-        <div className="drumroll-tutor-hud__signal" aria-hidden="true">
-          <FontAwesomeIcon
-            icon={
-              displayState === 'inactivity-paused' ||
-              displayState === 'kit-paused'
-                ? faPause
-                : displayState === 'kit-ready'
-                ? faDrum
-                : faRotateLeft
-            }
-            fixedWidth
-          />
-        </div>
-        <div className="drumroll-tutor-hud__compact-copy">
-          <strong id={titleId}>{message.title}</strong>
-          <span id={detailId}>{message.detail}</span>
-          {midiTelemetry && (
-            <span
-              className="drumroll-tutor-hud__input-telemetry"
-              data-testid="tutor-midi-telemetry"
-              title={`MIDI ${
-                midiTelemetry.rawMessageCount
-              }; last message: ${lastMidiTime}; selected port epoch ${
-                midiTelemetry.selectedPortEpoch
-              }; last mapped lane: ${midiTelemetry.lastMappedLane ?? 'none'}`}
-            >
-              MIDI {midiTelemetry.rawMessageCount} · last {lastMidiTime} · E
-              {midiTelemetry.selectedPortEpoch} ·{' '}
-              {midiTelemetry.lastMappedLane ?? 'unmapped'}
-            </span>
-          )}
-        </div>
-        {controlPrompt && <KitCommandPrompt model={controlPrompt} compact />}
-      </aside>
-    );
-  }
-
-  const recovery = state.recovery;
-  const completedRecovery = recovery ? undefined : state.lastRecoveryOutcome;
-  const checkpointLivesRefilled =
-    completedRecovery?.status === 'deferred' &&
-    state.settings.livesEnabled &&
-    state.livesRemaining === state.settings.startingLives;
-  const phaseLabel =
+  const caption = recoveryCaption ?? {
+    title:
+      displayState === 'inactivity-paused'
+        ? 'Paused — input check'
+        : message.title,
+    detail:
+      displayState === 'kit-paused'
+        ? controlPrompt?.label ?? 'Use Play to count in again.'
+        : message.detail,
+  };
+  const nextReason = tutorNextReason(state, displayState, recoveryCaption);
+  const kicker =
     displayState === 'remediation'
-      ? 'Coach remediation'
+      ? 'Coach loop'
+      : displayState === 'recovery-explain' || recoveryCaption
+      ? 'Recovery'
+      : displayState === 'kit-paused' || displayState === 'inactivity-paused'
+      ? 'Paused'
       : labelForPhase(state.phase);
-  const speedLabel = `${state.currentSpeed.toFixed(1)}×`;
-  const qualityProgress =
-    recovery?.qualityProgress ?? completedRecovery?.qualityProgress;
-  const bestQuality = recovery?.bestQuality ?? completedRecovery?.bestQuality;
-  const progressRatio =
-    qualityProgress === undefined
-      ? 0
-      : Math.min(1, qualityProgress / state.settings.requiredCleanRepetitions);
-  const formLabel = recovery
-    ? 'Finding shape'
-    : completedRecovery?.status === 'mastered'
-    ? 'Locked in'
-    : completedRecovery?.status === 'deferred'
-    ? 'Reset'
-    : 'Open';
+  const tone =
+    message.tone === 'success'
+      ? 'earned'
+      : message.tone === 'warning'
+      ? 'warning'
+      : message.tone === 'recovery'
+      ? 'recovery'
+      : 'neutral';
 
   return (
     <aside
-      className="drumroll-tutor-hud"
-      data-tone={message.tone}
+      className="drumroll-practice-edge-caption drumroll-tutor-hud"
+      data-tone={tone}
       data-phase={state.phase}
       data-display-state={displayState}
-      data-testid="tutor-hud"
+      data-testid={recoveryCaption ? 'tutor-recovery-caption' : 'tutor-hud'}
+      data-edge-caption="tutor"
       role="status"
       aria-live="polite"
       aria-atomic="true"
       aria-labelledby={titleId}
       aria-describedby={detailId}
     >
-      <div className="drumroll-tutor-hud__signal" aria-hidden="true">
-        <FontAwesomeIcon
-          icon={recovery || remediation ? faRotateLeft : faEarListen}
-          fixedWidth
-        />
-      </div>
-      <div className="drumroll-tutor-hud__copy">
-        <span className="drumroll-tutor-hud__phase">{phaseLabel}</span>
-        <strong id={titleId}>{message.title}</strong>
-        <span id={detailId}>{message.detail}</span>
-        {!remediation && qualityProgress !== undefined && (
-          <div
-            className="drumroll-tutor-hud__runway"
-            style={
-              {
-                '--runway-progress': `${progressRatio * 100}%`,
-              } as CSSProperties
-            }
-            role="progressbar"
-            aria-label="Retained pattern progress"
-            aria-valuemin={0}
-            aria-valuemax={state.settings.requiredCleanRepetitions}
-            aria-valuenow={Number(qualityProgress.toFixed(2))}
+      <span className="drumroll-practice-edge-caption__kicker drumroll-tutor-hud__kicker">
+        {kicker}
+      </span>
+      <strong id={titleId} className="drumroll-practice-edge-caption__title">
+        {caption.title}
+      </strong>
+      <span id={detailId} className="drumroll-practice-edge-caption__detail">
+        {caption.detail}
+      </span>
+      {nextReason && (
+        <span
+          className="drumroll-tutor-hud__reason"
+          data-testid="tutor-next-reason"
+        >
+          {nextReason}
+        </span>
+      )}
+      {tempoSuggestion && (
+        <>
+          <span
+            className="drumroll-practice-edge-caption__detail"
+            data-testid="coach-tempo-suggestion"
           >
-            <span aria-hidden="true" />
-          </div>
-        )}
-        {controlPrompt && (
-          <KitCommandPrompt
-            model={controlPrompt}
-            compact={controlPromptCompact}
-          />
-        )}
-      </div>
-      <dl className="drumroll-tutor-hud__telemetry" aria-label="Tutor status">
-        <div className="drumroll-tutor-hud__metric drumroll-tutor-hud__speed">
-          <dt>Speed</dt>
-          <dd data-testid="tutor-speed">
-            <FontAwesomeIcon icon={faBolt} aria-hidden="true" />
-            {speedLabel}
-          </dd>
-        </div>
-        {timingWindowMs !== undefined && (
-          <div
-            className="drumroll-tutor-hud__metric"
-            title={timingWindowReason}
+            Coach suggests {tempoSuggestion.suggested.toFixed(1)}× for this
+            loop.
+          </span>
+          <Button
+            type="primary"
+            data-testid="accept-coach-speed"
+            onClick={tempoSuggestion.onAccept}
           >
-            <dt>Timing window</dt>
-            <dd data-testid="tutor-timing-window">±{timingWindowMs} ms</dd>
-          </div>
-        )}
-        {remediation && (
-          <div className="drumroll-tutor-hud__metric">
-            <dt>Phrase</dt>
-            <dd data-testid="remediation-task">
-              {remediation.currentTask} / {remediation.totalTasks}
-            </dd>
-          </div>
-        )}
-        {remediation && (
-          <div className="drumroll-tutor-hud__metric">
-            <dt>Pattern</dt>
-            <dd data-testid="remediation-repetition">
-              {remediation.cleanRepetitions} /{' '}
-              {remediation.requiredCleanRepetitions}
-            </dd>
-          </div>
-        )}
-        {!remediation && (recovery || completedRecovery) && (
-          <div className="drumroll-tutor-hud__metric">
-            <dt>
-              {completedRecovery?.status === 'mastered' ? 'Ready' : 'Pattern'}
-            </dt>
-            <dd data-testid="tutor-repetition">
-              {(qualityProgress ?? 0).toFixed(1)} /{' '}
-              {state.settings.requiredCleanRepetitions}
-            </dd>
-            {bestQuality !== undefined && (
-              <span className="drumroll-tutor-hud__quality">
-                Best {Math.round(bestQuality * 100)}%
-              </span>
-            )}
-          </div>
-        )}
-        {!remediation && !state.settings.livesEnabled && (
-          <div className="drumroll-tutor-hud__metric">
-            <dt>Form</dt>
-            <dd data-testid="tutor-form">
-              <FontAwesomeIcon icon={faDrum} aria-hidden="true" />
-              {formLabel}
-            </dd>
-          </div>
-        )}
-        {!remediation && state.settings.livesEnabled && (
-          <div className="drumroll-tutor-hud__metric">
-            <dt>{checkpointLivesRefilled ? 'Lives reset' : 'Lives'}</dt>
-            <dd>
-              <span
-                className="drumroll-tutor-hud__lives"
-                aria-label={`${state.livesRemaining} of ${
-                  state.settings.startingLives
-                } lives ${
-                  checkpointLivesRefilled
-                    ? 'available after checkpoint reset'
-                    : 'remaining'
-                }`}
-                data-testid="tutor-lives"
-              >
-                <strong>{state.livesRemaining}</strong>
-                <span aria-hidden="true">/ {state.settings.startingLives}</span>
-                <span
-                  className="drumroll-tutor-hud__life-icons"
-                  aria-hidden="true"
-                >
-                  {Array.from(
-                    { length: state.settings.startingLives },
-                    (_, index) => (
-                      <FontAwesomeIcon
-                        key={index}
-                        icon={faHeart}
-                        data-active={index < state.livesRemaining}
-                      />
-                    ),
-                  )}
-                </span>
-              </span>
-            </dd>
-          </div>
-        )}
-      </dl>
+            Try {tempoSuggestion.suggested.toFixed(1)}×
+          </Button>
+          <Button
+            data-testid="keep-learner-speed"
+            onClick={tempoSuggestion.onKeepCurrent}
+          >
+            Keep my {tempoSuggestion.current.toFixed(1)}×
+          </Button>
+        </>
+      )}
+      {mistake && (
+        <TutorMistakeDisclosure key={mistake.key} mistake={mistake.evidence} />
+      )}
     </aside>
   );
 }

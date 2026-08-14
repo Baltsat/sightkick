@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="field" x1="130" y1="108" x2="888" y2="934" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff8eb"/>
+      <stop offset="1" stop-color="#e9bf78"/>
+    </linearGradient>
+    <radialGradient id="head" cx="512" cy="450" r="400" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffdf6"/>
+      <stop offset=".8" stop-color="#f5dfb5"/>
+      <stop offset="1" stop-color="#d9954a"/>
+    </radialGradient>
+    <linearGradient id="stick" x1="340" y1="306" x2="684" y2="722" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffe4aa"/>
+      <stop offset=".5" stop-color="#d87835"/>
+      <stop offset="1" stop-color="#fff1cb"/>
+    </linearGradient>
+    <radialGradient id="ember" cx="512" cy="512" r="74" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff6cd"/>
+      <stop offset=".36" stop-color="#ffb948"/>
+      <stop offset="1" stop-color="#e65a24"/>
+    </radialGradient>
+  </defs>
+  <rect x="48" y="48" width="928" height="928" rx="226" fill="url(#field)"/>
+  <rect x="70" y="70" width="884" height="884" rx="206" fill="none" stroke="#fffaf0" stroke-opacity=".9" stroke-width="20"/>
+  <circle cx="512" cy="512" r="394" fill="#251d18"/>
+  <circle cx="512" cy="512" r="340" fill="url(#head)"/>
+  <circle cx="512" cy="512" r="306" fill="none" stroke="#fff8e8" stroke-opacity=".82" stroke-width="13"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 326 326 L 698 698" stroke="#39261b" stroke-width="88"/>
+    <path d="M 326 326 L 698 698" stroke="url(#stick)" stroke-width="46"/>
+    <path d="M 698 326 L 326 698" stroke="#39261b" stroke-width="88"/>
+    <path d="M 698 326 L 326 698" stroke="url(#stick)" stroke-width="46"/>
+  </g>
+  <circle cx="512" cy="512" r="73" fill="#55281c"/>
+  <circle cx="512" cy="512" r="56" fill="url(#ember)"/>
+  <circle cx="512" cy="512" r="17" fill="#fff6cf"/>
+</svg>

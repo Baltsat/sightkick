@@ -5,6 +5,7 @@ import type {
   LibrarySourceTrackProvenance,
   PlayabilityEvidence,
   SongData,
+  YoutubeFetchedAudioProvenance,
 } from '../types';
 import {
   isPlayableEvidence,
@@ -119,6 +120,57 @@ export function createLocalAutoChartEvidence(
   };
 }
 
+export function createYoutubeAutoChartEvidence(
+  sourceDir: string,
+  source: LibrarySourceTrackProvenance,
+  video: YoutubeFetchedAudioProvenance,
+  chartId: string,
+  verifiedAt = new Date().toISOString(),
+): PlayabilityEvidence {
+  if (!source.durationSeconds) {
+    throw new Error(
+      'Source row has no duration, so it cannot be auto-charted safely',
+    );
+  }
+
+  const song = buildSongFromDir(sourceDir);
+
+  if (!song || song.audio.length === 0 || !song.drumDifficulties?.length) {
+    throw new Error('Prepared song failed the scan-chart drum gate');
+  }
+
+  const { chartPath, audioPaths } = preparedFiles(sourceDir, song);
+
+  return {
+    identity: {
+      title: source.title,
+      artists: [...source.artists],
+      durationSeconds: source.durationSeconds,
+    },
+    audio: {
+      source: 'youtube-fetched',
+      sha256: hashFiles(audioPaths),
+      youtube: video,
+    },
+    chart: {
+      source: 'local-auto-chart',
+      id: chartId,
+      sha256: hashFiles([chartPath]),
+      reviewed: true,
+    },
+    scan: {
+      passed: true,
+      format: song.format,
+      drumDifficulties: [...song.drumDifficulties],
+    },
+    launch: {
+      passed: true,
+      mode: 'headless-load',
+      verifiedAt,
+    },
+  };
+}
+
 export function validatePlayabilityEvidence(
   sourceDir: string,
   evidence: PlayabilityEvidence,
@@ -138,6 +190,17 @@ export function validatePlayabilityEvidence(
 
   if (!exactIdentity(source, evidence)) {
     throw new Error('Playable proof does not match the source row identity');
+  }
+
+  if (
+    evidence.audio.source === 'youtube-fetched' &&
+    evidence.audio.youtube &&
+    Math.abs(evidence.audio.youtube.durationSeconds - source.durationSeconds) >
+      8
+  ) {
+    throw new Error(
+      'YouTube fetched-audio provenance does not match the source duration',
+    );
   }
 
   const { chartPath, audioPaths } = preparedFiles(sourceDir, song);

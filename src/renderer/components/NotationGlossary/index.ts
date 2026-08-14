@@ -1,8 +1,15 @@
 export {
-  NOTATION_GLOSSARY_DELAY_MS,
   NotationGlossary,
+  NotationKitKey,
+  notationElementForTarget,
   notationKindForTarget,
+  placeNotationGlossary,
   useNotationGlossaryIntent,
 } from './NotationGlossary';
 
-export type { NotationGlossaryIntent, NotationKind } from './NotationGlossary';
+export type {
+  NotationAnchor,
+  NotationGlossaryIntent,
+  NotationGlossaryPlacement,
+  NotationKind,
+} from './NotationGlossary';

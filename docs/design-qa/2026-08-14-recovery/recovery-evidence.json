@@ -1,0 +1,84 @@
+{
+  "lifecycle": "Electron process launched from out/main/index.js, then its main process received SIGKILL and relaunched with the same isolated user-data directory.",
+  "songId": "lesson:01.01",
+  "recordedProgress": {
+    "sessionId": "ebefc839-5289-4689-918b-885616976b94",
+    "recordCount": 8,
+    "positionTick": 3012,
+    "recordsPreserved": true,
+    "tickPreserved": true
+  },
+  "resumedUi": "Ready Resume bar 2 · kick to count in The first beat is armed.",
+  "expectedResumeCue": "Ready Resume bar N · kick to count in",
+  "loadedCheckpoints": [
+    {
+      "songId": "lesson:01.01",
+      "checkpoints": [
+        {
+          "schemaVersion": 1,
+          "state": "in-progress",
+          "songId": "lesson:01.01",
+          "sessionId": "ebefc839-5289-4689-918b-885616976b94",
+          "startedAt": "2026-08-13T19:34:06.484Z",
+          "updatedAt": "2026-08-13T19:34:10.488Z",
+          "chartRevision": "lesson:01.01:expert:mid:fnv1a64-d54c6645c869d012-1257",
+          "mode": "practice",
+          "difficulty": "expert",
+          "playbackSpeed": 0.7,
+          "positionTick": 3012,
+          "records": [
+            {
+              "tick": 0,
+              "deltaMs": 0,
+              "element": "hihat",
+              "verdict": "miss"
+            },
+            {
+              "tick": 480,
+              "deltaMs": 0,
+              "element": "hihat",
+              "verdict": "miss"
+            },
+            {
+              "tick": 960,
+              "deltaMs": 0,
+              "element": "hihat",
+              "verdict": "miss"
+            },
+            {
+              "tick": 1440,
+              "deltaMs": 0,
+              "element": "hihat",
+              "verdict": "miss"
+            },
+            {
+              "tick": 1920,
+              "deltaMs": 0,
+              "element": "snare",
+              "verdict": "miss"
+            },
+            {
+              "tick": 2160,
+              "deltaMs": 0,
+              "element": "snare",
+              "verdict": "miss"
+            },
+            {
+              "tick": 2400,
+              "deltaMs": 0,
+              "element": "snare",
+              "verdict": "miss"
+            },
+            {
+              "tick": 2640,
+              "deltaMs": 0,
+              "element": "snare",
+              "verdict": "miss"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "passed": true
+}

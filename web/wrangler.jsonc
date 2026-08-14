@@ -2,5 +2,11 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "drumroll",
   "compatibility_date": "2026-08-08",
-  "pages_build_output_dir": "./dist"
+  "pages_build_output_dir": "./dist",
+  "kv_namespaces": [
+    {
+      "binding": "DRUMROLL_LIBRARY",
+      "id": "965d0dcfe73b403f9cb6af38e22e9b39"
+    }
+  ]
 }

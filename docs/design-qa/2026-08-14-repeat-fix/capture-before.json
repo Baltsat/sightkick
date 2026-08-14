@@ -1,0 +1,125 @@
+{
+  "capture_kind": "before",
+  "song": "ODESZA – Loyal",
+  "viewports": [
+    {
+      "score": {
+        "x": 228,
+        "y": 68,
+        "width": 1490.390625,
+        "height": 7805.390625,
+        "top": 68,
+        "right": 1718.390625,
+        "bottom": 7873.390625,
+        "left": 228
+      },
+      "credits": {
+        "x": 1526.3671875,
+        "y": 137.9921875,
+        "width": 136.828125,
+        "height": 27.1015625,
+        "top": 137.9921875,
+        "right": 1663.1953125,
+        "bottom": 165.09375,
+        "left": 1526.3671875
+      },
+      "repeatBands": [
+        {
+          "testId": "notation-pattern-43-45",
+          "rect": {
+            "x": 1094.2890625,
+            "y": 174.2890625,
+            "width": 568.8984375,
+            "height": 7606.109375,
+            "top": 174.2890625,
+            "right": 1663.1875,
+            "bottom": 7780.3984375,
+            "left": 1094.2890625
+          },
+          "background": "color(srgb 0.486275 0.227451 0.929412 / 0.06)",
+          "noteheadOverlap": true
+        },
+        {
+          "testId": "notation-pattern-47-51",
+          "rect": {
+            "x": 973.1953125,
+            "y": 174.2890625,
+            "width": 690,
+            "height": 7606.109375,
+            "top": 174.2890625,
+            "right": 1663.1953125,
+            "bottom": 7780.3984375,
+            "left": 973.1953125
+          },
+          "background": "color(srgb 0.486275 0.227451 0.929412 / 0.06)",
+          "noteheadOverlap": true
+        }
+      ],
+      "noteheadCount": 1051,
+      "viewport": {
+        "width": 1225,
+        "height": 768
+      }
+    },
+    {
+      "score": {
+        "x": 84,
+        "y": 68,
+        "width": 1490.390625,
+        "height": 7805.390625,
+        "top": 68,
+        "right": 1574.390625,
+        "bottom": 7873.390625,
+        "left": 84
+      },
+      "credits": {
+        "x": 1382.3671875,
+        "y": 137.9921875,
+        "width": 136.828125,
+        "height": 27.1015625,
+        "top": 137.9921875,
+        "right": 1519.1953125,
+        "bottom": 165.09375,
+        "left": 1382.3671875
+      },
+      "repeatBands": [
+        {
+          "testId": "notation-pattern-43-45",
+          "rect": {
+            "x": 950.2890625,
+            "y": 174.2890625,
+            "width": 568.8984375,
+            "height": 7606.109375,
+            "top": 174.2890625,
+            "right": 1519.1875,
+            "bottom": 7780.3984375,
+            "left": 950.2890625
+          },
+          "background": "color(srgb 0.486275 0.227451 0.929412 / 0.06)",
+          "noteheadOverlap": true
+        },
+        {
+          "testId": "notation-pattern-47-51",
+          "rect": {
+            "x": 829.1953125,
+            "y": 174.2890625,
+            "width": 690,
+            "height": 7606.109375,
+            "top": 174.2890625,
+            "right": 1519.1953125,
+            "bottom": 7780.3984375,
+            "left": 829.1953125
+          },
+          "background": "color(srgb 0.486275 0.227451 0.929412 / 0.06)",
+          "noteheadOverlap": true
+        }
+      ],
+      "noteheadCount": 1051,
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      }
+    }
+  ],
+  "pageErrors": []
+}

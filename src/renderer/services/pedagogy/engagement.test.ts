@@ -176,6 +176,10 @@ describe('engagement evidence', () => {
     expect(cards.cards[0]?.options[0]?.source_label).toContain(
       'Saved review queue',
     );
+    expect(cards.cards[0]?.options[0]).toMatchObject({
+      title: "Prove yesterday's Eighth-note pulse",
+      completion_label: 'One target-tempo retrieval',
+    });
     expect(cards.cards[1]?.options[0]?.completion_label).toBe(
       'One saved loop or lesson block',
     );

@@ -3,19 +3,22 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#111722" />
+    <meta name="theme-color" content="#f4efe5" />
     <link rel="canonical" href="https://drumroll.pages.dev/" />
     <link rel="icon" href="favicon.png" />
-    <title>Drumroll — Practice that listens back</title>
+    <title>Drumroll — Your music service for drums</title>
     <meta
       name="description"
-      content="Drumroll is a hands-free drum-learning game for electronic kits: Flow notation, adaptive practice, a 170-exercise Journey, and evidence-backed coaching."
+      content="A personal music service that teaches you drums. Sit at your kit, hit a pad, and keep playing."
     />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Drumroll — Practice that listens back" />
+    <meta
+      property="og:title"
+      content="Drumroll — Your music service for drums"
+    />
     <meta
       property="og:description"
-      content="A bright, focused drum-learning game for an electronic kit."
+      content="Sit at your kit, hit a pad, and keep playing."
     />
     <meta
       property="og:image"
@@ -34,20 +37,12 @@
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
-    <!--
-  THESIS: A real kit session gets one decisive next action, not another practice dashboard.
-  OWN-WORLD: Daybreak pearl, deep ink, amber, coral, magenta, cyan, exact product captures and editorial type.
-  STORY: See the kit, understand the learning loop, then take the verified desktop release.
-  FIRST VIEWPORT: Monumental promise at left, current cockpit capture at right, local desktop release below.
-  FORM: Editorial studio tour, position 1: proof before promise, seed drumroll-daybreak-site-20260809.
-  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md.
-  -->
-
+  <body class="site-page">
     <header class="site-header">
-      <a class="wordmark" href="#top" aria-label="Drumroll home"
-        >Drumroll<span>Daybreak Arena</span></a
-      >
+      <a class="wordmark" href="#top" aria-label="Drumroll home">
+        Drumroll
+        <span>music, taught through drums</span>
+      </a>
       <button
         class="nav-toggle"
         type="button"
@@ -57,9 +52,9 @@
         Menu
       </button>
       <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
-        <a href="#practice">Practice</a>
-        <a href="#journey">Journey</a>
-        <a href="#coach">Coach</a>
+        <a href="#your-music">Your music</a>
+        <a href="#at-the-kit">At the kit</a>
+        <a href="#your-path">Your path</a>
         <a class="nav-download" href="#download">Get Drumroll</a>
       </nav>
     </header>
@@ -67,188 +62,128 @@
     <main id="top">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="hero-kicker">Practice that listens back.</p>
-          <h1 id="hero-title">
-            Sit down.<br />Hit the cue.<br /><em>Keep playing.</em>
-          </h1>
+          <p class="eyebrow">Drumroll</p>
+          <h1 id="hero-title">Your music<br />service for <em>drums.</em></h1>
           <p class="hero-deck">
-            Drumroll is a hands-free drum-learning game for an electronic kit.
-            It holds the session together while your playing shows what comes
-            next.
+            Sit at your kit, hit a pad, and keep playing. Drumroll keeps your
+            practice wave, your songs, and your next step in one room.
           </p>
           <div class="hero-actions">
             <a class="button button-primary" href="#download"
-              >Get the desktop release</a
+              >Get Drumroll for Mac</a
             >
-            <a class="button button-text" href="#practice"
-              >See the practice loop</a
-            >
+            <a class="text-link" href="#your-music">See the room</a>
           </div>
-          <p class="hero-proof">
-            Public preview: Drumroll 1.2.0-kb.10 for Apple Silicon macOS,
-            Developer ID signed and Apple notarized.
+          <p class="hero-note">
+            Designed around MIDI input from an electronic kit.
           </p>
         </div>
-        <figure class="hero-proof-image media-frame media-frame-hero">
+        <figure class="hero-stage">
           <img
-            src="design-qa/daybreak-arena/implementation-home.png"
-            alt="The current Drumroll home cockpit with a drum kit, song context, kit-lane accuracy, and a play action."
+            src="design-qa/2026-08-14-kb15-final/01-home-labelled-doors.png"
+            alt="Drumroll home with a full kit in a sunlit room and labelled zones for a personal wave, songs, lessons, and continuing practice."
           />
-          <figcaption>
-            Current desktop cockpit. The kit is the controller.
-          </figcaption>
+          <figcaption>Home is a kit, not a dashboard.</figcaption>
         </figure>
       </section>
 
-      <section class="intro-band" aria-labelledby="intro-title">
-        <p class="section-index">The promise</p>
+      <section class="manifest" aria-labelledby="manifest-title">
+        <p class="eyebrow">One place to play</p>
         <div>
-          <h2 id="intro-title">
-            Practice lives in the music, not in the menu.
+          <h2 id="manifest-title">Less setup. More music.</h2>
+          <p>
+            Open Drumroll to a real next move: a song, a lesson, or My Wave. The
+            kit stays in front; the detail waits nearby until it changes the
+            next hit.
+          </p>
+        </div>
+      </section>
+
+      <section
+        class="story story-library"
+        id="your-music"
+        aria-labelledby="library-title"
+      >
+        <div class="story-copy">
+          <p class="eyebrow">Your music</p>
+          <h2 id="library-title">
+            Keep the songs you care about within reach.
           </h2>
           <p>
-            Start with a clear goal. Let Flow notation keep the next notes in
-            view. In Practice, Drumroll can return to a safe checkpoint after a
-            material pattern of misses; in Perform, it records one uninterrupted
-            pass.
+            Favourites, ready-to-play tracks, and new charts share one personal
+            library. The next playable choice stays close enough to begin when
+            you sit down.
           </p>
-        </div>
-      </section>
-
-      <section
-        class="practice-section"
-        id="practice"
-        aria-labelledby="practice-title"
-      >
-        <div class="section-heading section-heading-wide">
-          <p class="section-index">The practice loop</p>
-          <h2 id="practice-title">Make the next bar legible.</h2>
-          <p>
-            Flow keeps the playhead fixed while the chart moves. Practice
-            controls let you choose speed, notation, loops, checkpoint recovery,
-            and lives without losing the musical thread.
-          </p>
-        </div>
-        <figure class="media-frame media-frame-wide practice-capture">
-          <img
-            src="design-qa/daybreak-arena/implementation-flow-playing.png"
-            alt="Drumroll Flow notation in a live Practice session with colored drum notes and a fixed playhead."
-          />
-          <figcaption>
-            Current Flow notation in a Drumroll Practice session.
-          </figcaption>
-        </figure>
-        <div class="sequence" aria-label="Drumroll practice sequence">
-          <article>
-            <span>01</span>
-            <h3>Choose a reachable challenge.</h3>
-            <p>
-              The next-practice selector balances prerequisites, recent mastery,
-              kit-lane weakness, speed, spacing, and variety.
-            </p>
-          </article>
-          <article>
-            <span>02</span>
-            <h3>Stay in the phrase.</h3>
-            <p>
-              When a material trouble window is resolved, Practice can recover
-              to the latest safe musical checkpoint and lower the pace.
-            </p>
-          </article>
-          <article>
-            <span>03</span>
-            <h3>Return with evidence.</h3>
-            <p>
-              A successful recovery releases the player back into the original
-              path in bounded speed steps.
-            </p>
-          </article>
-        </div>
-      </section>
-
-      <section
-        class="journey-section"
-        id="journey"
-        aria-labelledby="journey-title"
-      >
-        <div class="journey-copy">
-          <p class="section-index">The method</p>
-          <h2 id="journey-title">A route through 170 playable exercises.</h2>
-          <p>
-            Fundamentals, rudiments, coordination, grooves, fills, and musical
-            applications are arranged as a Journey. Each lesson carries its real
-            title, prerequisite state, skill focus, tempo, and mastery rule.
-          </p>
-          <a class="inline-link" href="#download"
-            >Take the next lesson on desktop</a
+          <a class="text-link" href="#download"
+            >Bring your library to the kit</a
           >
         </div>
-        <figure class="media-frame journey-capture">
+        <figure class="story-image story-image-paper">
           <img
-            src="design-qa/daybreak-arena/implementation-journey.png"
-            alt="The current Drumroll Journey showing the Foundations season and Lesson 01.01 as the next exercise."
+            src="design-qa/2026-08-14-library-shelves/01-actionable-shelves-1440x900.png"
+            alt="Drumroll's personal song library with a search field, ready choices, favourites, and recently imported music."
           />
           <figcaption>
-            Current Journey view with the Foundations season.
+            A personal library with a playable next choice.
           </figcaption>
         </figure>
       </section>
 
-      <section class="coach-section" id="coach" aria-labelledby="coach-title">
-        <div class="coach-art">
-          <figure class="media-frame coach-capture">
+      <section
+        class="score-section"
+        id="at-the-kit"
+        aria-labelledby="score-title"
+      >
+        <div class="score-stage">
+          <figure class="story-image story-image-score">
             <img
-              src="design-qa/daybreak-arena/implementation-coach.png"
-              alt="Drumroll's practice coach explaining a saved run and the evidence it has available."
+              src="design-qa/2026-08-13-legend/01-score-default-1225x768.png"
+              alt="Drumroll practice score with a fixed playhead and coloured drum-lane markers for the upcoming beats."
             />
             <figcaption>
-              Coach reports what a saved run actually contains.
+              The score gives the kit one clear cue at a time.
             </figcaption>
           </figure>
-        </div>
-        <div class="coach-copy">
-          <p class="section-index">The evidence</p>
-          <h2 id="coach-title">Advice is only as good as the run behind it.</h2>
-          <p>
-            Drumroll turns saved hit records, resolved misses, wrong-pad hits,
-            timing offsets, speed, streaks, and recovery attempts into a next
-            useful rep. If bar-level history is absent, Coach says so rather
-            than inventing a weak bar.
-          </p>
-          <details>
-            <summary>What a saved session can explain</summary>
+          <div class="story-copy">
+            <p class="eyebrow">At the kit</p>
+            <h2 id="score-title">See the music while you play it.</h2>
             <p>
-              Session mode and configuration, score and streak, lane summaries,
-              timing, wrong-pad hits, resolved misses, recovery summaries,
-              checkpoints, and life events. Full hit records enable exact
-              trouble bars and targeted loops for new runs.
+              A fixed playhead and consistent drum-lane colours keep the next
+              hit easy to find. Flow turns the score into a direct cue for hands
+              and feet.
             </p>
-          </details>
+            <p class="score-note">
+              Keyboard and pointer controls remain available for setup and
+              accessibility.
+            </p>
+          </div>
         </div>
       </section>
 
-      <section class="platform-section" aria-labelledby="platform-title">
-        <p class="section-index">Built for the kit</p>
-        <h2 id="platform-title">Your drums remain the fastest way forward.</h2>
-        <div class="platform-grid">
+      <section
+        class="story story-journey"
+        id="your-path"
+        aria-labelledby="journey-title"
+      >
+        <div class="story-copy">
+          <p class="eyebrow">Your path</p>
+          <h2 id="journey-title">A practice path with a memory.</h2>
           <p>
-            <strong>Ready cue</strong> starts an eligible session with one
-            deliberate kick after the quiet readiness window.
+            Journey keeps the next lesson in context. Saved sessions give
+            Drumroll a factual record of your work, and Coach keeps its advice
+            tied to the evidence it has.
           </p>
-          <p>
-            <strong>Practice</strong> protects learning quality with checkpoint
-            recovery and repeatable focused loops.
-          </p>
-          <p>
-            <strong>Perform</strong> protects continuity with one canonical,
-            uninterrupted pass.
-          </p>
+          <a class="text-link" href="#download">Start with the next lesson</a>
         </div>
-        <p class="platform-note">
-          Keyboard and pointer controls remain available for setup and
-          accessibility. Local files, native MIDI, and the full practice setup
-          are desktop-first.
-        </p>
+        <figure class="story-image story-image-journey">
+          <img
+            src="design-qa/2026-08-14-kb15-final/03-journey.png"
+            alt="Drumroll Journey showing the Foundations path and Alternating Singles Warm-Up as the next lesson."
+          />
+          <figcaption>
+            A route through the skills that make the next phrase easier.
+          </figcaption>
+        </figure>
       </section>
 
       <section
@@ -257,70 +192,74 @@
         aria-labelledby="download-title"
       >
         <div class="download-copy">
-          <p class="section-index">The desktop release</p>
-          <h2 id="download-title">Bring the studio to the kit.</h2>
+          <p class="eyebrow">The desktop app</p>
+          <h2 id="download-title">Put the room beside your kit.</h2>
           <p>
-            Drumroll 1.2.0-kb.10 is the Apple Silicon macOS preview. The public
-            artifact is Developer ID signed, Apple notarized, and published with
-            a reproducible SHA-256 checksum.
+            Drumroll runs on Apple Silicon Macs. An electronic kit with MIDI
+            input gives you the full kit-led experience; keyboard and pointer
+            controls are there for setup and accessibility.
           </p>
         </div>
         <div class="download-action">
           <a
             id="desktop-download"
             class="button button-primary button-download"
-            href="https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.10/Drumroll-1.2.0-kb.10-arm64.dmg"
-            >Download Drumroll for Apple Silicon</a
+            href="https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.16/Drumroll-1.2.0-kb.16-arm64.dmg"
+            >Download for Apple Silicon</a
           >
-          <p>
-            Notarized DMG ·
+          <p class="release-note">
+            Developer ID signed · Apple notarized ·
             <a
-              href="https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.10/SHA256SUMS.txt"
+              href="https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.16/SHA256SUMS.txt"
               >verify SHA-256</a
             >
           </p>
+          <a class="browser-link" href="https://drumroll.pages.dev"
+            >Open the browser demo</a
+          >
         </div>
       </section>
 
-      <section class="faq-section" aria-labelledby="faq-title">
-        <p class="section-index">Clear boundaries</p>
-        <h2 id="faq-title">What Drumroll can say today.</h2>
-        <div class="faq-list">
-          <details>
-            <summary>Does it require an electronic drum kit?</summary>
-            <p>
+      <section class="requirements" aria-labelledby="requirements-title">
+        <div class="requirements-heading">
+          <p class="eyebrow">Clear by design</p>
+          <h2 id="requirements-title">What Drumroll can do today.</h2>
+        </div>
+        <dl class="requirement-list">
+          <div>
+            <dt>At the kit</dt>
+            <dd>
               Drumroll is designed around MIDI input from an electronic kit.
-              Keyboard and pointer controls remain available for setup and
+              Keyboard and pointer controls stay available for setup and
               accessibility.
-            </p>
-          </details>
-          <details>
-            <summary>Will Coach always show trouble bars?</summary>
-            <p>
-              No. Exact trouble bars and targeted loops require a saved run with
-              full hit records. Summary-only runs can still report their
-              recorded accuracy, timing, lane, wrong-hit, speed, and date.
-            </p>
-          </details>
-          <details>
-            <summary>Is a browser version offered here?</summary>
-            <p>
-              Yes. The shared learning surface is available at
+            </dd>
+          </div>
+          <div>
+            <dt>In a saved run</dt>
+            <dd>
+              Coach can explain the evidence a run contains. Exact trouble bars
+              and targeted loops need full hit records.
+            </dd>
+          </div>
+          <div>
+            <dt>In a browser</dt>
+            <dd>
+              The shared learning surface is available at
               <a href="https://drumroll.pages.dev">drumroll.pages.dev</a>.
               Native MIDI, local files, and the complete kit-first setup remain
               desktop capabilities.
-            </p>
-          </details>
-        </div>
+            </dd>
+          </div>
+        </dl>
       </section>
     </main>
 
     <footer class="site-footer">
-      <a class="wordmark" href="#top">Drumroll<span>Daybreak Arena</span></a>
-      <p>
-        A focused, evidence-backed practice game for an electronic drum kit.
-      </p>
-      <a href="#download">Get the desktop release</a>
+      <a class="wordmark" href="#top"
+        >Drumroll<span>music, taught through drums</span></a
+      >
+      <p>A personal music service that teaches you drums.</p>
+      <a class="text-link" href="#download">Get Drumroll for Mac</a>
     </footer>
 
     <script src="main.js"></script>

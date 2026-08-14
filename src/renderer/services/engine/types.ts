@@ -82,6 +82,14 @@ export interface FalseHitRecord {
   actualTick?: number;
   expectedElement?: InputElement;
   actualElement?: InputElement;
+  /**
+   * Mirrors Judge's own scoreability rule (see `maybeRecordFalseHit`): false
+   * when the strike landed in a silent region with no real note nearby. It
+   * is still shown to the player at the timing it was struck, but must never
+   * be persisted as scored evidence (a warm-up tap during a rest should not
+   * corrupt mastery/wrong-hit tallies).
+   */
+  scoreable: boolean;
 }
 
 export type JudgeFalseHitHandler = (record: FalseHitRecord) => void;

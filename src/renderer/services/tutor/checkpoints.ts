@@ -62,3 +62,29 @@ export function planRecoveryRegion(
         : measures[resumeMeasure].startTick,
   };
 }
+
+export function planRecoveryReturnContext(
+  chart: TutorChartPlan,
+  region: TutorRecoveryRegion,
+): TutorRecoveryRegion | undefined {
+  const nextEndMeasure = region.endMeasure + 1;
+  const nextEnd = chart.measures[nextEndMeasure];
+
+  if (!nextEnd) {
+    return undefined;
+  }
+
+  const resumeMeasure =
+    nextEndMeasure + 1 < chart.measures.length ? nextEndMeasure + 1 : undefined;
+
+  return {
+    ...region,
+    endMeasure: nextEndMeasure,
+    endTick: nextEnd.endTick,
+    resumeMeasure,
+    resumeTick:
+      resumeMeasure === undefined
+        ? undefined
+        : chart.measures[resumeMeasure].startTick,
+  };
+}

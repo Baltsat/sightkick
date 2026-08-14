@@ -4,8 +4,13 @@ import type {
   RunSummary,
 } from '../../renderer/services/practice-stats';
 import type { DayRollup, PracticeDays } from '../../renderer/services/streaks';
+import type { SkillEvidenceEvent } from '../../renderer/services/pedagogy/types';
 import { appState } from '../AppState';
-import { PRACTICE_RUN_ARCHIVE_STORE_KEY } from './practiceStats';
+import {
+  PRACTICE_RUN_ARCHIVE_STORE_KEY,
+  PRACTICE_RUN_SKILL_EVIDENCE_ARCHIVE_STORE_KEY,
+  readSkillEvidenceArchive,
+} from './practiceStats';
 import { readPracticeRunArchive } from '../../renderer/services/practice-stats';
 
 /**
@@ -59,6 +64,15 @@ export interface IpcLoadAllPracticeRunsResponse {
   runsBySong: Record<string, RunSummary[]>;
   /** Compact per-song evidence for history older than recent summary caps. */
   archiveBySong: PracticeRunArchiveBySong;
+  /**
+   * Atomic per-item skill evidence (Bayesian mastery/spaced-review) carried
+   * by summaries evicted past each song's recent-summary cap - see
+   * `PRACTICE_RUN_SKILL_EVIDENCE_ARCHIVE_STORE_KEY` in practiceStats.ts.
+   * Mastery replay must read this alongside each song's
+   * `runsBySong[songId][].atomicSkillEvidence` rather than in place of it:
+   * this map only ever holds evidence for runs no longer present there.
+   */
+  atomicSkillEvidenceArchiveBySong: Record<string, SkillEvidenceEvent[]>;
 }
 
 function toErrorMessage(error: unknown): string {
@@ -160,12 +174,26 @@ export function loadAllPracticeRuns(event: IpcMainEvent): void {
         readPracticeRunArchive(archive),
       ]),
     );
+    const rawSkillEvidenceArchiveBySong =
+      (appState.store.get(PRACTICE_RUN_SKILL_EVIDENCE_ARCHIVE_STORE_KEY) as
+        | Record<string, unknown>
+        | undefined) ?? {};
+    const atomicSkillEvidenceArchiveBySong: Record<
+      string,
+      SkillEvidenceEvent[]
+    > = Object.fromEntries(
+      Object.entries(rawSkillEvidenceArchiveBySong).map(([songId, archive]) => [
+        songId,
+        readSkillEvidenceArchive(archive),
+      ]),
+    );
 
     event.reply('load-all-practice-runs', {
       runs,
       runsBySong: bySong,
       archiveBySong,
-    });
+      atomicSkillEvidenceArchiveBySong,
+    } satisfies IpcLoadAllPracticeRunsResponse);
   } catch (error) {
     event.reply('load-all-practice-runs', { error: toErrorMessage(error) });
   }

@@ -5,8 +5,10 @@ import {
   createRef,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
+  useState,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../../cn';
@@ -16,18 +18,19 @@ import { SheetMusicLayout } from '../../../chart-parser/renderer';
 import { Engine } from '../../services/engine';
 import { TimeStore } from '../../services/time-store';
 import { Song } from '../../../types';
-import { Reference } from './Reference';
 import { GameMode, PracticeRange } from '../../types';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRepeat, faXmark } from '@fortawesome/free-solid-svg-icons';
-import { IconButton } from '../IconButton';
 import { getScrollParent } from '../../services/engine/helpers';
-import { autoScrollSpeed } from './helpers';
+import {
+  autoScrollSpeed,
+  flowAutoZoomMultiplier,
+  FLOW_AUTO_ZOOM_MIN_MULTIPLIER,
+} from './helpers';
 import {
   ContinuousNotationCamera,
   FlowMeter,
   LoopEscapeRunway,
   LoopEscapeRunwayModel,
+  PatternBands,
 } from '../ContinuousNotation';
 import {
   NotationGlossary,
@@ -46,10 +49,7 @@ export interface SheetMusicProps {
   isLooping?: boolean;
   onPracticeRangeChange?: (range?: PracticeRange) => void;
   onLoopRangeSelect?: (range: PracticeRange) => void;
-  onClearLoop?: () => void;
   onSelectMeasure: (measure: Measure, event: MouseEvent) => void;
-  enableColors: boolean;
-  showReference: boolean;
   zoom: number;
   layout?: SheetMusicLayout;
   timeStore?: TimeStore;
@@ -70,10 +70,7 @@ export function SheetMusic({
   isLooping,
   onPracticeRangeChange,
   onLoopRangeSelect,
-  onClearLoop,
   onSelectMeasure,
-  showReference,
-  enableColors,
   zoom,
   layout = 'classic',
   timeStore,
@@ -95,7 +92,7 @@ export function SheetMusic({
   const dragAnchorRef = useRef<number | undefined>(undefined);
   const {
     intent: notationGlossaryIntent,
-    observe: observeNotation,
+    summon: summonNotation,
     dismiss: dismissNotation,
   } = useNotationGlossaryIntent();
   // The scroll container a selection drag is happening over, cached for
@@ -170,17 +167,30 @@ export function SheetMusic({
   );
   const handleScorePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.altKey) {
+        summonNotation(event.target, event.clientX, event.clientY);
+        event.preventDefault();
+
+        return;
+      }
+
+      dismissNotation();
+
       const index = measureIndexAtPoint(event.clientX, event.clientY);
 
       if (index === undefined) {
         return;
       }
 
-      dismissNotation();
       event.preventDefault();
       handleMeasureMouseDown(index);
     },
-    [dismissNotation, handleMeasureMouseDown, measureIndexAtPoint],
+    [
+      dismissNotation,
+      handleMeasureMouseDown,
+      measureIndexAtPoint,
+      summonNotation,
+    ],
   );
   const handleScorePointerMove = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -195,15 +205,8 @@ export function SheetMusic({
 
         return;
       }
-
-      observeNotation(event.target, event.clientX, event.clientY);
     },
-    [
-      dismissNotation,
-      handleMeasureMouseEnter,
-      measureIndexAtPoint,
-      observeNotation,
-    ],
+    [dismissNotation, handleMeasureMouseEnter, measureIndexAtPoint],
   );
 
   // Keeps the sheet scrollable by mouse wheel / trackpad, and auto-scrolls
@@ -363,17 +366,15 @@ export function SheetMusic({
             height: stave.getHeight() + 30,
           }}
           className={cn(
-            'absolute z-[-3] rounded-[11px] border-0 bg-transparent',
+            'drumroll-measure-overlay',
             {
-              'bg-accent-soft-bg-solid border-2! border-accent-bright!':
-                selected,
-              'border-l-0! rounded-l-none': mergeLeft,
-              'border-r-0! rounded-r-none': mergeRight,
-              'bg-accent-medium-bg shadow-accent-soft border border-accent-soft-border z-[-1]!':
-                focused,
+              'drumroll-measure-overlay--selected': selected,
+              'drumroll-measure-overlay--merge-left': mergeLeft,
+              'drumroll-measure-overlay--merge-right': mergeRight,
+              'drumroll-measure-overlay--focused': focused,
             },
             (isDev || gameMode === 'practice') &&
-              'cursor-pointer touch-none hover:bg-accent-medium-bg hover:shadow-accent-soft hover:border hover:border-accent-soft-border hover:z-[-1]',
+              'drumroll-measure-overlay--selectable',
           )}
           onMouseDown={() => handleMeasureMouseDown(index)}
           onPointerDown={(event) => {
@@ -406,6 +407,14 @@ export function SheetMusic({
     handleMeasureMouseEnter,
   ]);
   const isFlow = layout === 'flow';
+  const scoreCredits = songData.lesson
+    ? []
+    : [
+        songData.artist ? `Music by ${songData.artist}` : undefined,
+        songData.charter && songData.charter !== songData.artist
+          ? `Arranged by ${songData.charter}`
+          : undefined,
+      ].filter((credit): credit is string => Boolean(credit));
   const flowPlayhead = !isFlow ? null : (
     <div
       ref={fixedFlowPlayheadRef}
@@ -426,12 +435,101 @@ export function SheetMusic({
       <span className="drumroll-flow-fixed-playhead__beat" />
     </div>
   );
-  // Both layouts use the exact same canonical VexFlow glyph scale. Flow
-  // changes only the camera and viewport; switching modes must never make
-  // the score subtly smaller or force the drummer to relearn its proportions.
-  // `zoom` remains the player's multiplier; the shared 1.15 baseline makes
-  // 1.0 readable from the drum throne without taking that control away.
-  const presentationZoom = zoom * 1.15;
+  const [flowAutoZoom, setFlowAutoZoom] = useState(
+    FLOW_AUTO_ZOOM_MIN_MULTIPLIER,
+  );
+  const [classicHeaderWidth, setClassicHeaderWidth] = useState<number>();
+
+  // Flow deliberately renders larger than Classic's fixed browsing scale:
+  // notation is the one dominant object on the practice screen (see
+  // visual-system-v3's "one dominant object" rule - the score earns at
+  // least 58-65% of the usable area, not roughly a third of a mostly-empty
+  // canvas), so it claims a deliberate share of its own real viewport
+  // height instead of sitting small in a big empty room. Classic keeps the
+  // stable, always-1.15x reference scale - it's a full-page browsable
+  // sheet, not a live single-row performance stage, so there is no
+  // "relearn the size when the mode changes" hazard between the two.
+  useLayoutEffect(() => {
+    if (!isFlow) {
+      return undefined;
+    }
+
+    const viewport = wrapperRef.current?.parentElement;
+    const notation = vexflowContainerRef.current;
+
+    if (!viewport || !notation) {
+      return undefined;
+    }
+
+    const recompute = () => {
+      // notation.offsetHeight is in local, pre-zoom units (Chromium's
+      // non-standard `zoom` does not change a descendant's own offsetWidth/
+      // offsetHeight, only its on-screen size - see the visualScale ratio
+      // ContinuousNotationCamera already relies on for the same reason) -
+      // so measuring it here while some presentationZoom is already
+      // applied is not circular with the value this effect produces.
+      setFlowAutoZoom(
+        flowAutoZoomMultiplier(notation.offsetHeight, viewport.clientHeight),
+      );
+    };
+
+    recompute();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return undefined;
+    }
+
+    const observer = new ResizeObserver(recompute);
+
+    observer.observe(viewport);
+    observer.observe(notation);
+
+    return () => observer.disconnect();
+  }, [isFlow, renderData, vexflowContainerRef]);
+
+  const presentationZoom = isFlow ? flowAutoZoom * zoom : zoom * 1.15;
+
+  useLayoutEffect(() => {
+    if (isFlow) {
+      return undefined;
+    }
+
+    const viewport = wrapperRef.current?.parentElement;
+    const score = flowStageRef.current;
+
+    if (!viewport || !score) {
+      return undefined;
+    }
+
+    const updateHeaderWidth = () => {
+      const scoreStyle = window.getComputedStyle(score);
+      const scorePadding =
+        Number.parseFloat(scoreStyle.paddingLeft) +
+        Number.parseFloat(scoreStyle.paddingRight);
+      const nextWidth = Math.max(
+        0,
+        viewport.clientWidth / presentationZoom - scorePadding,
+      );
+
+      setClassicHeaderWidth((currentWidth) =>
+        currentWidth !== undefined && Math.abs(currentWidth - nextWidth) < 0.5
+          ? currentWidth
+          : nextWidth,
+      );
+    };
+
+    updateHeaderWidth();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return undefined;
+    }
+
+    const observer = new ResizeObserver(updateHeaderWidth);
+
+    observer.observe(viewport);
+
+    return () => observer.disconnect();
+  }, [isFlow, presentationZoom]);
 
   return (
     <div
@@ -456,59 +554,38 @@ export function SheetMusic({
         (typeof document === 'undefined'
           ? flowPlayhead
           : createPortal(flowPlayhead, document.body))}
-      {gameMode === 'practice' &&
-        isLooping &&
-        practiceRange &&
-        !(isFlow && loopEscape) && (
-          <div className="fixed top-35 ml-10 bg-bg rounded-md z-100 px-4 py-3 flex items-center gap-2">
-            <div className="text-accent bg-accent-soft-bg p-2 border border-accent-soft-border rounded-md w-10 h-10 flex items-center justify-center">
-              <FontAwesomeIcon icon={faRepeat} />
-            </div>
-            <div>
-              <div className="text-[16px] font-semibold">Looping Section</div>
-              <div className="text-xs text-text-muted">
-                Measure{' '}
-                {practiceRange.start === practiceRange.end
-                  ? practiceRange.start + 1
-                  : `${practiceRange.start + 1} - ${practiceRange.end + 1}`}
-              </div>
-            </div>
-            <IconButton
-              icon={faXmark}
-              data-testid="clear-loop"
-              onClick={() => {
-                if (onClearLoop) {
-                  onClearLoop();
-
-                  return;
-                }
-
-                onPracticeRangeChange?.(undefined);
-              }}
-            />
-          </div>
-        )}
       <div
         ref={flowStageRef}
         className={cn(
-          'flex flex-col items-center min-w-max',
+          'drumroll-score-surface',
           isFlow
             ? cn(
                 'drumroll-flow-stage',
                 loopEscape && 'drumroll-flow-stage--loop-escape',
               )
-            : 'bg-paper rounded-[11px] p-10',
+            : 'drumroll-classic-score',
         )}
       >
         {!isFlow && (
           <>
-            <h1 className="my-0 mx-auto text-4xl text-ink font-semibold">
+            <h1
+              className="drumroll-classic-score-header drumroll-classic-score-title my-0 text-xl text-ink font-semibold"
+              data-testid="sheet-score-title"
+              style={{ width: classicHeaderWidth }}
+            >
               {songData.name}
             </h1>
-            <div className="ml-auto text-[15px] italic font-bold flex flex-col items-end text-ink">
-              <div>Music by {songData.artist}</div>
-              <div>Arranged by {songData.charter}</div>
-            </div>
+            {scoreCredits.length > 0 && (
+              <div
+                className="drumroll-classic-score-header drumroll-classic-score-credits text-[15px] italic font-bold flex flex-col items-end text-ink"
+                data-testid="sheet-score-credits"
+                style={{ width: classicHeaderWidth }}
+              >
+                {scoreCredits.map((credit) => (
+                  <div key={credit}>{credit}</div>
+                ))}
+              </div>
+            )}
           </>
         )}
         <div
@@ -516,8 +593,8 @@ export function SheetMusic({
           className="min-w-max relative z-0"
           onPointerDownCapture={handleScorePointerDown}
           onPointerMoveCapture={handleScorePointerMove}
-          onPointerLeave={dismissNotation}
         >
+          {gameMode === 'practice' && <PatternBands renderData={renderData} />}
           {isFlow && <FlowMeter renderData={renderData} />}
           {isFlow && loopEscape && (
             <LoopEscapeRunway renderData={renderData} model={loopEscape} />
@@ -525,7 +602,7 @@ export function SheetMusic({
           <div
             ref={vexflowContainerRef}
             className={cn(
-              'min-w-max drumroll-sheet-music__notation',
+              'min-w-max relative z-1 drumroll-sheet-music__notation',
               isFlow && 'drumroll-flow-score',
             )}
           />
@@ -550,17 +627,6 @@ export function SheetMusic({
           />
         </div>
       </div>
-
-      {enableColors && showReference && (
-        <Reference
-          className={cn(
-            'fixed left-1/2 -translate-x-1/2',
-            gameMode === 'practice'
-              ? 'drumroll-reference--above-tutor'
-              : 'bottom-10',
-          )}
-        />
-      )}
     </div>
   );
 }

@@ -1,0 +1,50 @@
+{
+  "notes": [],
+  "pageErrors": [],
+  "headingBounds": [
+    {
+      "viewport": {
+        "width": 1225,
+        "height": 768
+      },
+      "heading": {
+        "left": 346.7109375,
+        "top": 23.0390625,
+        "right": 1086.2890625,
+        "bottom": 101.4140625
+      },
+      "band": {
+        "x": 208,
+        "y": 0,
+        "width": 1017,
+        "height": 101.6171875,
+        "top": 0,
+        "right": 1225,
+        "bottom": 101.6171875,
+        "left": 208
+      }
+    },
+    {
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "heading": {
+        "left": 214.09375,
+        "top": 19.59375,
+        "right": 873.8984375,
+        "bottom": 92.109375
+      },
+      "band": {
+        "x": 64,
+        "y": 0,
+        "width": 960,
+        "height": 91.5625,
+        "top": 0,
+        "right": 1024,
+        "bottom": 91.5625,
+        "left": 64
+      }
+    }
+  ]
+}

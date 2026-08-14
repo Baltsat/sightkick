@@ -195,8 +195,8 @@ export function AutoChart({ disabled, onImported }: Props) {
   // "queued" notify — would clobber whichever job the user is actually
   // watching. Adopt a new job only once the slot is free: nothing is
   // displayed yet, the update is for the job already being displayed, or
-  // the displayed job has finished importing (its own panel is hidden by
-  // then, so there's nothing left to steal).
+  // the displayed job has reached a terminal state (its own panel is hidden
+  // by then, so there's nothing left to steal).
   const jobs = useAutoChartJobs((nextJob) => {
     if (nextJob.stage === 'imported') {
       if (nextJob.song) {
@@ -213,7 +213,7 @@ export function AutoChart({ disabled, onImported }: Props) {
     const displayingAnotherLiveJob =
       current !== undefined &&
       current.id !== nextJob.id &&
-      current.stage !== 'imported';
+      !['imported', 'failed', 'cancelled'].includes(current.stage);
 
     if (displayingAnotherLiveJob) {
       return;
@@ -561,23 +561,25 @@ export function AutoChart({ disabled, onImported }: Props) {
         </div>
       )}
 
-      <SongImportReview
-        preview={job?.stage === 'preview-ready' ? job.preview : undefined}
-        importing={job?.stage === 'importing'}
-        artworkUrl={artworkUrl}
-        title="Add this song to your library"
-        allowArtworkUrl={false}
-        onArtworkUrlChange={setArtworkUrl}
-        onConfirm={() => {
-          if (job) {
-            window.electron.ipcRenderer.sendMessage(
-              'import-auto-chart',
-              job.id,
-            );
-          }
-        }}
-        onCancel={dismiss}
-      />
+      {!job?.autoImport && (
+        <SongImportReview
+          preview={job?.stage === 'preview-ready' ? job.preview : undefined}
+          importing={job?.stage === 'importing'}
+          artworkUrl={artworkUrl}
+          title="Add this song to your library"
+          allowArtworkUrl={false}
+          onArtworkUrlChange={setArtworkUrl}
+          onConfirm={() => {
+            if (job) {
+              window.electron.ipcRenderer.sendMessage(
+                'import-auto-chart',
+                job.id,
+              );
+            }
+          }}
+          onCancel={dismiss}
+        />
+      )}
     </>
   );
 }

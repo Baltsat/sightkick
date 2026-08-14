@@ -51,6 +51,7 @@ storybook-static
 # local working noise (kb.7 hygiene)
 /tmp/
 /scratchpad/
+/.wrangler/
 /release/kb*/
 /release/installed-backups/
 /index.js

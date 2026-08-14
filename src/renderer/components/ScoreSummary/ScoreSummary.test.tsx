@@ -2,7 +2,10 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { App as AntdApp } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 import { Song } from '../../../types';
-import { multiLaneRunFixture } from '../PracticeStats/test-fixtures';
+import {
+  emptyRunFixture,
+  multiLaneRunFixture,
+} from '../PracticeStats/test-fixtures';
 import {
   RecordRunResult,
   UseGamificationResult,
@@ -61,9 +64,13 @@ describe('ScoreSummary', () => {
     expect(modal.getByTestId('score-no-musical-input')).toHaveTextContent(
       'Nothing from the kit reached the app',
     );
-    expect(modal.getByTestId('score-persistence-status')).toHaveTextContent(
-      'No musical input reached Drumroll',
-    );
+    // The no-musical-input statement above is the one honest thing this
+    // screen says about the run; the footer's generic "no scored notes"
+    // persistence banner would just repeat it in different words, so it
+    // does not also render here.
+    expect(
+      modal.queryByTestId('score-persistence-status'),
+    ).not.toBeInTheDocument();
     expect(modal.queryByText('0% accuracy')).not.toBeInTheDocument();
     expect(modal.queryByTestId('practice-stats')).not.toBeInTheDocument();
   });
@@ -75,6 +82,19 @@ describe('ScoreSummary', () => {
 
     expect(modal.getByText('Perfect')).toBeInTheDocument();
     expect(modalEl.querySelectorAll('[data-filled]')).toHaveLength(5);
+  });
+
+  it('does not claim Perfect / Every note landed on a near-100% run that actually missed a note', () => {
+    // Regression: calculateAccuracy rounds to 2dp, so 249/250 (falseHits 0)
+    // rounds to "1.00" and the pre-fix `=== 1` check called that Perfect,
+    // contradicting the "1 missed" tile on the same screen.
+    const { modal } = renderSummary({
+      scoreData: { hitNotes: 249, totalNotes: 250, falseHits: 0 },
+    });
+
+    expect(modal.queryByText('Perfect')).not.toBeInTheDocument();
+    expect(modal.queryByText('Every note landed.')).not.toBeInTheDocument();
+    expect(modal.getByText('1 note missed')).toBeInTheDocument();
   });
 
   it('renders real practice stats for a Perform run that also carries a practice summary', () => {
@@ -255,7 +275,7 @@ describe('ScoreSummary', () => {
     },
   );
 
-  it('shows a visible countdown and automatically starts the next Practice task', async () => {
+  it('never starts another Practice task from an elapsed timer', async () => {
     vi.useFakeTimers();
 
     try {
@@ -267,42 +287,9 @@ describe('ScoreSummary', () => {
         autoContinueSeconds: 3,
         practiceSummary: multiLaneRunFixture(),
       });
-
-      expect(modal.getByTestId('score-auto-continue')).toHaveTextContent(
-        'Next practice starts in 3s',
-      );
-
-      for (let second = 0; second < 3; second += 1) {
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(1000);
-        });
-      }
-
-      await act(async () => Promise.resolve());
-
-      expect(onNextSong).toHaveBeenCalledOnce();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('lets the player cancel auto-continue without leaving the result', async () => {
-    vi.useFakeTimers();
-
-    try {
-      const onNextSong = vi.fn();
-      const { modal } = renderSummary({
-        onNextSong,
-        nextLabel: 'Next practice',
-        autoContinueEnabled: true,
-        autoContinueSeconds: 3,
-        practiceSummary: multiLaneRunFixture(),
-      });
-
-      fireEvent.click(modal.getByTestId('score-auto-continue-cancel'));
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(5000);
+        await vi.advanceTimersByTimeAsync(10_000);
       });
 
       expect(onNextSong).not.toHaveBeenCalled();
@@ -314,7 +301,7 @@ describe('ScoreSummary', () => {
     }
   });
 
-  it('drops the star/accuracy chrome for a Practice run (no scoreData) and shows the practice stats instead', () => {
+  it('drops the star/accuracy chrome for a Practice run (no scoreData) and shows an honest statement instead', () => {
     const summary: ReturnType<typeof multiLaneRunFixture> = {
       ...multiLaneRunFixture(),
       mode: 'practice',
@@ -327,10 +314,66 @@ describe('ScoreSummary', () => {
 
     expect(screen.queryByText(/accuracy$/)).not.toBeInTheDocument();
     expect(screen.queryByText('Perfect')).not.toBeInTheDocument();
-    expect(modal.getByText('Nice reps')).toBeInTheDocument();
+    // No generic congratulatory headline - the statement is derived from
+    // musicalReceipt, which for this fixture (no previous run, no saved
+    // bar/recovery evidence) is the honest "nothing to compare yet" case,
+    // never a canned "Nice reps".
+    expect(screen.queryByText('Nice reps')).not.toBeInTheDocument();
+    expect(modal.getByTestId('musical-receipt')).toHaveTextContent(
+      'This run is saved for comparison',
+    );
     expect(modal.getByTestId('practice-stats')).toBeInTheDocument();
     expect(modal.getByTestId('practice-run-mode')).toHaveTextContent(
       'Practice run at 0.7x',
+    );
+    // Speed must not disappear the way it did from the transport line
+    // (bug-hunt-20260812.md) - the at-a-glance cell carries it too, not
+    // just the collapsed evidence.
+    expect(modal.getByTestId('score-cell-accuracy')).toHaveTextContent(
+      '88% at 0.7×',
+    );
+  });
+
+  it('never congratulates an all-miss run, even when it also saves a loop target', () => {
+    // The exact defect the hostile critique caught: a headline reading as
+    // praise directly above 0% accuracy on every scored lane. See
+    // musicalReceipt.test.ts for the underlying priority-order proof; this
+    // asserts the same truth actually reaches the rendered screen.
+    const summary: ReturnType<typeof multiLaneRunFixture> = {
+      ...multiLaneRunFixture(),
+      totalHits: 0,
+      totalMisses: 132,
+      totalWrong: 0,
+      overallAccuracy: 0,
+      laneAccuracy: [
+        { element: 'hihat' as const, hits: 0, misses: 4, accuracy: 0 },
+        { element: 'snare' as const, hits: 0, misses: 128, accuracy: 0 },
+      ],
+      coachEvidence: [
+        {
+          id: 'bars-1-17',
+          kind: 'timing',
+          severity: 'medium' as const,
+          skillTag: 'timing',
+          sampleCount: 12,
+          barStart: 1,
+          barEnd: 17,
+        },
+      ],
+    };
+    const { modal } = renderSummary({
+      scoreData: undefined,
+      practiceSummary: summary,
+    });
+
+    expect(screen.queryByText('Nice reps')).not.toBeInTheDocument();
+    expect(modal.queryByText(/ready for a loop/)).not.toBeInTheDocument();
+    expect(modal.getByTestId('musical-receipt')).toHaveTextContent(
+      'This pass did not connect',
+    );
+    expect(modal.getByTestId('musical-receipt')).toHaveAttribute(
+      'data-changed',
+      'false',
     );
   });
 
@@ -440,6 +483,68 @@ describe('ScoreSummary', () => {
     expect(modal.getByTestId('score-retry')).toHaveTextContent(
       'Replay this loop',
     );
+  });
+
+  it('never congratulates a run where nothing was played at all', () => {
+    const { modal } = renderSummary({
+      scoreData: undefined,
+      practiceSummary: emptyRunFixture(),
+    });
+
+    expect(screen.queryByText('Nice reps')).not.toBeInTheDocument();
+    expect(modal.getByTestId('musical-receipt')).toHaveTextContent(
+      'No hits recorded this pass',
+    );
+  });
+
+  it('keeps the evidence detail out of view until the player opens it', () => {
+    const { modal } = renderSummary({
+      scoreData: undefined,
+      practiceSummary: multiLaneRunFixture(),
+    });
+    const evidence = modal
+      .getByTestId('score-evidence-expand')
+      .closest('details') as HTMLDetailsElement;
+
+    // Present for out-of-scope integration tests (SongView.test.tsx reads
+    // `practice-stats` unconditionally after a run), but closed by
+    // default - a native <details> keeps its content in the DOM while
+    // visually collapsed, which is exactly "one intentional expand".
+    expect(evidence.open).toBe(false);
+    expect(modal.getByTestId('practice-stats')).toBeInTheDocument();
+
+    fireEvent.click(modal.getByTestId('score-evidence-expand'));
+
+    expect(evidence.open).toBe(true);
+  });
+
+  it('replaces the raw chart-difficulty tag with the curriculum unit on a lesson run', () => {
+    const { modal } = renderSummary({
+      songData: {
+        ...songData,
+        artist: 'Drumroll Method',
+        lesson: {
+          id: '01.01',
+          starsToUnlock: 0,
+          unit: 'Foundations',
+          title: 'Alternating Singles Warm-Up',
+        },
+      } as Song,
+      scoreData: { hitNotes: 70, totalNotes: 100, falseHits: 5 },
+    });
+
+    expect(modal.queryByText(/expert/i)).not.toBeInTheDocument();
+    expect(
+      modal.getByText('Drumroll Method · Foundations'),
+    ).toBeInTheDocument();
+  });
+
+  it('capitalises the chart difficulty for a real (non-lesson) song', () => {
+    const { modal } = renderSummary({
+      scoreData: { hitNotes: 70, totalNotes: 100, falseHits: 5 },
+    });
+
+    expect(modal.getByText('Metallica · Expert')).toBeInTheDocument();
   });
 
   describe('gamification', () => {

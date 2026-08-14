@@ -166,6 +166,12 @@ describe('composeHomeSession', () => {
   it('keeps a wave receipt explicit when atomic evidence is absent', () => {
     const lesson = ranked('lesson:focus', 'lesson', 'Saved Coach evidence.');
     const song = ranked('song:apply', 'song', 'A liked song is available.');
+
+    song.candidate.itemManifest = {
+      ...song.candidate.itemManifest!,
+      section: { start_bar: 9, end_bar: 12 },
+    };
+
     const wave: PracticeWaveResult = {
       strategy: 'skill-linked',
       stops: [
@@ -200,6 +206,52 @@ describe('composeHomeSession', () => {
         title: 'Build the phrase',
       },
       payoff: { title: song.candidate.title },
+    });
+    expect(session?.payoff.detail).toBe(
+      'Apply the focused skill in a liked song. Play bars 9–12 at 0.8×.',
+    );
+  });
+
+  it('keeps the current task visible when My Wave has no saved favourite payoff', () => {
+    const lesson = ranked('lesson:focus', 'lesson', 'Saved Coach evidence.');
+    const song = ranked(
+      'song:available',
+      'song',
+      'A playable song is available.',
+    );
+
+    song.candidate.liked = false;
+
+    const wave: PracticeWaveResult = {
+      strategy: 'evidence-ranked',
+      stops: [
+        {
+          role: 'focus',
+          recommendation: lesson,
+          reason: lesson.reason,
+          linkedSkills: ['pulse.quarter'],
+        },
+        {
+          role: 'apply',
+          recommendation: song,
+          reason:
+            'Apply the focused skill in a different song with matching authored skill tags.',
+          linkedSkills: ['pulse.quarter'],
+        },
+      ],
+      focusSkills: ['pulse.quarter'],
+    };
+    const session = composeHomeSession({
+      intent: 'learning',
+      ranking: [lesson, song],
+      practiceWave: wave,
+    });
+
+    expect(session?.payoff).toEqual({
+      unavailable: true,
+      title: 'No favourite-song payoff is ready',
+      detail:
+        'Today’s work is lesson:focus. My Wave has no playable saved favourite linked to this session.',
     });
   });
 

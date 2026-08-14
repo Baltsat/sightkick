@@ -10,6 +10,9 @@
   display: grid;
   height: 100%;
   width: 100%;
+  /* Ported from the retired daybreak-journey.css (`.daybreak-journey-shell`)
+   * so an ultra-wide window doesn't stretch the season stage unbounded. */
+  max-width: 1680px;
   min-height: 0;
   min-width: 0;
   grid-template-columns: minmax(10.5rem, 14rem) minmax(0, 1fr);
@@ -159,10 +162,13 @@
   display: inline-flex;
   min-width: 0;
   flex: 0 0 auto;
-  align-items: center;
+  /* flex-start (not center): a wrapped two-line label needs the number
+   * badge and the state dot to sit at the top of the row, level with the
+   * label's first line, not centred against the whole two-line block. */
+  align-items: flex-start;
   gap: 0.45rem;
   justify-content: flex-start;
-  padding: 0.58rem 0.8rem;
+  padding: 0.5rem 0.8rem;
   border: 0;
   border-left: 2px solid transparent;
   border-radius: 0;
@@ -173,15 +179,23 @@
   font-weight: 670;
   letter-spacing: 0;
   text-transform: none;
+  text-align: left;
   cursor: pointer;
-  overflow: hidden;
   transition:
     border-color 180ms ease,
     color 180ms ease;
 }
 
 .daybreak-season-tab__number {
+  /* Flex items shrink by default even with nowrap content - without this,
+   * the row's squeeze at compact widths clips the two-digit badge itself
+   * ("02" -> "0.") instead of only the label truncating. It never needs to
+   * shrink; it is always exactly two characters. Ported from the retired
+   * daybreak-journey.css, whose equivalent rule already documented and
+   * fixed this. */
+  flex: none;
   overflow: hidden;
+  padding-top: 0.16rem;
   color: var(--ink-muted);
   font-size: 0.68rem;
   font-weight: 740;
@@ -191,11 +205,28 @@
   white-space: nowrap;
 }
 
+/*
+ * 2026-08-13 truth critique, item 16: a season name that ran past the
+ * available width used to hard-truncate mid-word with no way to read the
+ * rest ("Rudiment Gym I: Sticki..."), even with a full-length aria-label on
+ * the button for screen readers - a sighted player at the kit had no
+ * recourse at all. Rather than truncate, let the label fit itself onto up
+ * to three lines: at the narrowest proven rail width (1024px) the two
+ * longest real season names ("Rudiment Gym I: Sticking Foundations",
+ * "Rudiment Gym II: The Paradiddle Family") need all three lines to read in
+ * full; every shorter name settles on one or two and never reaches the
+ * clamp. The rail is independently scrollable
+ * (`.daybreak-season-rail { overflow-y: auto }`), so a taller row costs
+ * nothing.
+ */
 .daybreak-season-tab__label {
+  display: -webkit-box;
   overflow: hidden;
   max-width: 10rem;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-word;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 .daybreak-season-tab__state {
@@ -203,6 +234,7 @@
   width: 0.42rem;
   height: 0.42rem;
   flex: 0 0 auto;
+  margin-top: 0.22rem;
   border-radius: 50%;
   color: transparent;
   background: var(--line-soft);
@@ -249,49 +281,33 @@
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  background-color: var(--surface-studio);
-  background-position: center;
-  background-size: cover;
+  background: transparent;
   box-shadow: none;
   isolation: isolate;
 }
 
-.daybreak-journey-stage::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  content: '';
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--surface-studio) 88%, transparent) 0%,
-      color-mix(in srgb, var(--surface-studio) 54%, transparent) 33%,
-      transparent 70%
-    ),
-    linear-gradient(
-      0deg,
-      color-mix(in srgb, var(--surface-studio) 56%, transparent) 0%,
-      transparent 40%
-    );
-}
-
+/* The stage sits directly on the AppShell's persistent warm-paper field
+   (see AppShell.css) instead of a bespoke photographic backdrop - visual-
+   system-v3 "the canvas is continuous": journey is a choosing/planning
+   route, not a studio-dusk performance surface. */
 .journey-venue-plaque {
   position: absolute;
   z-index: 3;
   top: 1rem;
   right: 1rem;
   display: grid;
+  width: max-content;
   gap: 0.15rem;
-  max-width: min(16rem, 34%);
+  max-width: min(20rem, calc(100% - 2rem));
   padding: 0.15rem 0 0.15rem 0.7rem;
   border-left: 2px solid var(--signal-ember);
-  color: var(--surface-raised);
+  color: var(--ink-strong);
   background: transparent;
 }
 
 .journey-venue-plaque span,
 .journey-venue-plaque small {
-  color: color-mix(in srgb, var(--surface-raised) 68%, transparent);
+  color: var(--ink-muted);
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -299,14 +315,14 @@
 }
 
 .journey-venue-plaque strong {
-  overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
   font-family: var(--font-display);
   font-size: clamp(1.1rem, 1.7vw, 1.5rem);
   font-weight: 620;
   letter-spacing: -0.035em;
   line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .daybreak-season-card {
@@ -351,19 +367,53 @@
   filter: none;
 }
 
+/*
+ * A real chip, not bare text over the photograph - unstyled it read as
+ * leftover debug copy, not a control (2026-08-13 critique, journey item
+ * 3/15). The icon rotates and the fill switches to wine when the hint
+ * panel is open, so the button carries its own expanded/collapsed state
+ * instead of relying on the reader to notice the panel above it.
+ */
 .daybreak-lesson-path__controls-toggle {
   position: absolute;
   right: 1rem;
   bottom: 0.9rem;
   z-index: 6;
-  padding: 0;
-  border: 0;
-  color: color-mix(in srgb, var(--surface-raised) 78%, transparent);
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  color: var(--ink-strong);
+  background: var(--surface-raised);
   font: inherit;
-  font-size: 0.76rem;
-  font-weight: 680;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.daybreak-lesson-path__controls-toggle:hover {
+  border-color: var(--signal-wine);
+  background: var(--surface-raised);
+}
+
+.daybreak-lesson-path__controls-toggle svg {
+  transition: transform 160ms ease;
+}
+
+.daybreak-lesson-path__controls-toggle[aria-expanded='true'] {
+  border-color: var(--signal-wine);
+  color: var(--surface-raised);
+  background: var(--signal-wine);
+}
+
+.daybreak-lesson-path__controls-toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
 }
 
 .daybreak-lesson-path__kit-hint {
@@ -375,9 +425,11 @@
   max-width: min(28rem, 60%);
   gap: 0.3rem;
   padding: 0.65rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--surface-raised) 26%, transparent);
-  color: var(--surface-raised);
-  background: color-mix(in srgb, var(--surface-studio) 84%, transparent);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  color: var(--ink-strong);
+  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  box-shadow: var(--shadow-paper-strong);
   opacity: 0;
   pointer-events: none;
   transform: translateY(0.35rem);
@@ -394,7 +446,7 @@
 
 .daybreak-lesson-path__kit-hint > span,
 .daybreak-lesson-path__kit-hint small {
-  color: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+  color: var(--ink-muted);
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -445,10 +497,12 @@
 .daybreak-lesson-node__glow {
   position: absolute;
   inset: 14%;
-  border: 1px solid var(--line-soft);
+  border: 1px solid
+    color-mix(in srgb, var(--lesson-lane-color) 82%, var(--surface-raised));
   border-radius: 50%;
-  background: color-mix(in srgb, var(--surface-raised) 18%, transparent);
-  box-shadow: none;
+  background: color-mix(in srgb, var(--lesson-lane-color) 13%, transparent);
+  box-shadow: 0 0.55rem 1.25rem -0.7rem
+    color-mix(in srgb, var(--lesson-lane-dark) 88%, transparent);
 }
 
 .daybreak-lesson-node__image {
@@ -458,7 +512,7 @@
   height: 100%;
   object-fit: contain;
   filter: drop-shadow(
-    0 0.5rem 0.55rem color-mix(in srgb, var(--surface-studio) 48%, transparent)
+    0 0.5rem 0.55rem color-mix(in srgb, var(--ink-strong) 30%, transparent)
   );
 }
 
@@ -504,9 +558,31 @@
   border-radius: 4px;
   color: var(--ink-strong);
   background: var(--surface-raised);
+  /*
+   * Quiet until the node is the kit-selected target or the pointer/keyboard
+   * focus is on it - visual-system-v3's "node labels show title... lock
+   * metadata... reveal on focus/selection." Four plaques floating over the
+   * scene at once read as a second dashboard inside the map (2026-08-13
+   * critique, journey item 1/7); the badge on the instrument (number, lock,
+   * or check) still gives every off-window node a baseline identity, and
+   * the full aria-label carries the whole sentence regardless of opacity.
+   */
+  opacity: 0;
+  transform: translateY(0.3rem);
+  pointer-events: none;
   transition:
+    opacity 160ms ease,
+    transform 160ms ease,
     border-color 140ms ease,
     background-color 140ms ease;
+}
+
+.daybreak-lesson-node[data-kit-focused='true'] .daybreak-lesson-node__plaque,
+.daybreak-lesson-node:hover .daybreak-lesson-node__plaque,
+.daybreak-lesson-node:focus-visible .daybreak-lesson-node__plaque {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .daybreak-lesson-node__meta {
@@ -727,7 +803,10 @@
 @media (prefers-reduced-motion: reduce) {
   .daybreak-season-tab,
   .daybreak-lesson-node,
+  .daybreak-lesson-node__plaque,
   .daybreak-lesson-path__kit-hint,
+  .daybreak-lesson-path__controls-toggle,
+  .daybreak-lesson-path__controls-toggle svg,
   .daybreak-lesson-node__strike-stick {
     transition: none;
     animation: none;

@@ -3,6 +3,9 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+release_version="$(node -e 'const package_json = require(process.argv[1]); process.stdout.write(package_json.version)' "$repo_root/package.json")"
+expected_short_version="$(node -e 'const package_json = require(process.argv[1]); process.stdout.write(package_json.build.mac.bundleShortVersion)' "$repo_root/package.json")"
+expected_build_version="$(node -e 'const package_json = require(process.argv[1]); process.stdout.write(package_json.build.mac.bundleVersion)' "$repo_root/package.json")"
 target_path="${1:-$repo_root/release/build/mac-arm64/Drumroll.app}"
 dmg_path=""
 mount_dir=""
@@ -25,7 +28,7 @@ if [[ "$target_path" == *.dmg ]]; then
     fi
 
     dmg_path="$(cd "$(dirname "$target_path")" && pwd)/$(basename "$target_path")"
-    if [[ "$(basename "$dmg_path")" != 'Drumroll-1.2.0-kb.11-arm64.dmg' ]]; then
+    if [[ "$(basename "$dmg_path")" != "Drumroll-$release_version-arm64.dmg" ]]; then
         echo "Unexpected disk image name: $dmg_path" >&2
         exit 1
     fi
@@ -75,12 +78,12 @@ build_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info_plis
 bundle_identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info_plist")"
 minimum_system_version="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$info_plist")"
 
-if [[ "$short_version" != '1.2.0' ]]; then
-    echo "Expected CFBundleShortVersionString 1.2.0, got $short_version" >&2
+if [[ "$short_version" != "$expected_short_version" ]]; then
+    echo "Expected CFBundleShortVersionString $expected_short_version, got $short_version" >&2
     exit 1
 fi
-if [[ "$build_version" != '1.2.11' ]]; then
-    echo "Expected CFBundleVersion 1.2.11, got $build_version" >&2
+if [[ "$build_version" != "$expected_build_version" ]]; then
+    echo "Expected CFBundleVersion $expected_build_version, got $build_version" >&2
     exit 1
 fi
 if [[ "$bundle_identifier" != 'org.sk.SightKick' ]]; then
@@ -100,6 +103,12 @@ const path = require('node:path');
 const resourcesPath = process.argv[2];
 const repoRoot = process.argv[3];
 const integrityPath = path.join(resourcesPath, 'distribution-integrity.json');
+const packageJson = JSON.parse(
+  fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'),
+);
+const expectedReleaseVersion = packageJson.version;
+const expectedShortVersion = packageJson.build?.mac?.bundleShortVersion;
+const expectedBuildVersion = packageJson.build?.mac?.bundleVersion;
 
 function assert(condition, message) {
   if (!condition) {
@@ -163,9 +172,9 @@ assert(fs.existsSync(integrityPath), 'Missing distribution-integrity.json');
 const integrity = JSON.parse(fs.readFileSync(integrityPath, 'utf8'));
 assert(integrity.schemaVersion === 2, 'Unsupported distribution integrity schema');
 assert(integrity.application.productName === 'Drumroll', 'Wrong product name');
-assert(integrity.application.releaseVersion === '1.2.0-kb.11', 'Wrong release version');
-assert(integrity.application.shortVersion === '1.2.0', 'Wrong short version');
-assert(integrity.application.buildVersion === '1.2.11', 'Wrong build version');
+assert(integrity.application.releaseVersion === expectedReleaseVersion, 'Wrong release version');
+assert(integrity.application.shortVersion === expectedShortVersion, 'Wrong short version');
+assert(integrity.application.buildVersion === expectedBuildVersion, 'Wrong build version');
 
 const lessonRoot = path.join(resourcesPath, 'lesson-library');
 const lessonManifestPath = path.join(lessonRoot, 'manifest.json');

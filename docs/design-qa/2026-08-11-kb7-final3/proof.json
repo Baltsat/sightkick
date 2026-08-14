@@ -1,0 +1,95 @@
+{
+  "home": {
+    "viewport": {
+      "width": 1728,
+      "height": 1117
+    },
+    "document": {
+      "width": 1728,
+      "height": 1117
+    }
+  },
+  "journey": {
+    "viewport": {
+      "width": 1728,
+      "height": 1117
+    },
+    "document": {
+      "width": 1728,
+      "height": 1117
+    }
+  },
+  "profile": {
+    "viewport": {
+      "width": 1728,
+      "height": 1117
+    },
+    "document": {
+      "width": 1728,
+      "height": 1117
+    }
+  },
+  "flowReady": {
+    "viewport": {
+      "width": 1728,
+      "height": 1117
+    },
+    "document": {
+      "width": 1728,
+      "height": 1117
+    },
+    "fixedPlayheadVisible": true,
+    "location": "NOW\nBar 1 / 17 · Beat 1 / 4",
+    "hiddenNotes": 0
+  },
+  "classicReady": {
+    "viewport": {
+      "width": 1728,
+      "height": 1117
+    },
+    "document": {
+      "width": 1728,
+      "height": 1117
+    },
+    "location": "Bar 1 / 17\nBeat 1 / 4",
+    "hiddenNotes": 0
+  },
+  "flowPlaying": {
+    "viewport": {
+      "width": 1728,
+      "height": 1117
+    },
+    "document": {
+      "width": 1728,
+      "height": 1117
+    },
+    "fixedPlayheadVisible": true,
+    "location": "NOW\nBar 1 / 17 · Beat 2 / 4",
+    "hiddenNotes": 0,
+    "geometry": {
+      "viewport": {
+        "left": 0,
+        "top": 91,
+        "width": 1728,
+        "height": 1026
+      },
+      "notation": {
+        "left": -265.5,
+        "top": 169,
+        "width": 10933.890625,
+        "height": 478.3984375
+      },
+      "playhead": {
+        "left": -47.09375,
+        "top": 59,
+        "width": 4.59375,
+        "height": 298.5
+      },
+      "viewportClientWidth": 1728,
+      "scrollLeft": 265.5,
+      "notationOffsetWidth": 9508,
+      "computedPlayheadLeft": "191.916px",
+      "notationZoom": "1.15"
+    }
+  }
+}

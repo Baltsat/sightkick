@@ -7,7 +7,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { faHeart } from '@fortawesome/free-regular-svg-icons';
 import { faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
-import appIcon from '../../../../assets/icon.png';
+import songArtPlaceholder from '../../../../assets/song-art-placeholder.svg';
 import { Song } from '../../../types';
 import { cn } from '../../cn';
 import { Button, Tooltip } from 'antd';
@@ -40,6 +40,7 @@ export interface SongListItemProps {
   preview?: SongHoverPreviewState;
   onPreviewStart?: () => void;
   onPreviewEnd?: () => void;
+  tasteSeeded?: boolean;
 }
 
 export function SongListItem({
@@ -58,11 +59,33 @@ export function SongListItem({
   preview,
   onPreviewStart,
   onPreviewEnd,
+  tasteSeeded = false,
 }: SongListItemProps) {
   const local = 'source' in songData ? undefined : songData;
+  const hasAudio = (local?.audio?.length ?? 0) > 0;
+  const hasChart = (local?.drumDifficulties?.length ?? 0) > 0;
+  const isSourceLinked = Boolean(
+    local?.sourceLinked || local?.sourceProvenance,
+  );
+  // An online (not-yet-downloaded) row has no `local` shape to check and is
+  // handled entirely by the download button below, so it stays "playable"
+  // here. For anything already in the library, missing audio or a missing
+  // drum chart makes a song unplayable regardless of source-link status —
+  // this is the same gate the main process already enforces before ever
+  // storing a song (see src/main/playability.ts).
   const playable =
-    !(local?.sourceLinked || local?.sourceProvenance) ||
-    isPlayableEvidence(local.playability);
+    !local ||
+    (hasAudio &&
+      hasChart &&
+      (!isSourceLinked || isPlayableEvidence(local.playability)));
+  const unplayableReason =
+    !local || playable
+      ? undefined
+      : !hasAudio
+      ? 'audio'
+      : !hasChart
+      ? 'chart'
+      : 'proof';
   const { albumCover, id, name, artist, charter, drumDifficulty } = songData;
   const autoChartTool =
     'autoChartTool' in songData ? songData.autoChartTool : undefined;
@@ -188,21 +211,21 @@ export function SongListItem({
         data-focused={focused ? 'true' : undefined}
         data-previewing={preview ? 'true' : undefined}
         className={cn(
-          'flex min-w-0 border border-border-soft grow no-underline bg-surface rounded-xl duration-100 ease-out cursor-default p-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+          'group flex min-w-0 items-center border-b border-border-soft grow no-underline bg-transparent px-2 py-2 duration-100 ease-out cursor-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
           {
-            'hover:bg-accent-soft-bg hover:border-accent-soft-border cursor-pointer transition-[background-color,border-color,box-shadow]':
+            'hover:bg-[var(--dr-paper-low)] cursor-pointer transition-[background-color,border-color,box-shadow]':
               Boolean(local && playable),
-            'bg-accent-soft-bg border-accent-soft-border outline-2 outline-accent shadow-accent-soft':
+            'bg-[var(--dr-paper-low)] outline-2 outline-accent shadow-accent-soft':
               focused,
           },
         )}
       >
         <div className="flex min-w-0 items-center">
           <img
-            src={albumCover ?? appIcon}
+            src={albumCover ?? songArtPlaceholder}
             alt={albumCover ? `${name} album cover` : ''}
             onError={(e) => {
-              e.currentTarget.src = appIcon;
+              e.currentTarget.src = songArtPlaceholder;
             }}
             className="size-14 shrink-0 object-cover rounded-lg shadow-frame outline outline-1 -outline-offset-1 outline-white/10"
           />
@@ -221,6 +244,14 @@ export function SongListItem({
               >
                 {artist}
               </div>
+              {tasteSeeded && !local?.liked && (
+                <span
+                  className="shrink-0 text-xs font-medium text-text-muted"
+                  data-testid="song-yandex-taste-seed"
+                >
+                  Saved on Yandex Music
+                </span>
+              )}
               {preview && (
                 <div
                   className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-soft-bg px-1.5 py-0.5 font-ui text-[10px] font-semibold text-accent"
@@ -304,12 +335,24 @@ export function SongListItem({
           )}
 
           {local && !playable && (
-            <Tooltip title="This source-linked song still needs identity, lawful audio, reviewed chart, scan-chart, and launch proof">
+            <Tooltip
+              title={
+                unplayableReason === 'audio'
+                  ? "No audio file was found for this song, so it can't be played yet."
+                  : unplayableReason === 'chart'
+                  ? "No drum chart was found for this song, so it can't be played yet."
+                  : 'This source-linked song still needs identity, lawful audio, reviewed chart, scan-chart, and launch proof'
+              }
+            >
               <span
                 className="text-xs text-orange"
                 aria-label={`${name} is not playable yet`}
               >
-                Needs proof
+                {unplayableReason === 'audio'
+                  ? 'No audio'
+                  : unplayableReason === 'chart'
+                  ? 'No chart'
+                  : 'Needs proof'}
               </span>
             </Tooltip>
           )}

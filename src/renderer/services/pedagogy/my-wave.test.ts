@@ -7,6 +7,7 @@ import {
   build_my_wave,
   build_my_wave_item_profile,
   extract_drum_chart_features,
+  score_my_wave_affection,
   score_my_wave_difficulty,
 } from './my-wave';
 
@@ -101,6 +102,25 @@ function fill_bar(): string {
     '1680 snare yellow',
   ]);
 }
+
+describe('My Wave affection', () => {
+  it('keeps an explicit favourite stronger than any replay-only signal', () => {
+    const favourite = score_my_wave_affection({
+      liked: true,
+      replay_count: 0,
+      max_replay_count: 48,
+    });
+    const replayed = score_my_wave_affection({
+      liked: false,
+      replay_count: 48,
+      max_replay_count: 48,
+    });
+
+    expect(favourite).toMatchObject({ favourite: true, value: 0.68 });
+    expect(replayed).toMatchObject({ favourite: false, value: 0.32 });
+    expect(favourite.value).toBeGreaterThan(replayed.value);
+  });
+});
 
 function manifest(
   item_id: string,
@@ -242,7 +262,7 @@ describe('my wave', () => {
     expect(result.strategy).toBe('skill_zpd_wave');
     expect(first).toMatchObject({
       candidate: { id: 'same-16ths-faster' },
-      reason: 'same 16th-hat groove, one notch faster.',
+      reason: 'a saved favourite; same 16th-hat groove, one notch faster.',
       receipt: {
         source_item_id: 'played-16ths',
         candidate_item_id: 'same-16ths-faster',
@@ -394,6 +414,142 @@ describe('my wave', () => {
     expect(result.recommendations[0]?.candidate).toMatchObject({
       id: 'lesson-application',
     });
+  });
+
+  it('lets a loved, replayed song just beyond the frontier beat a neutral exercise that is perfectly placed', () => {
+    const source = {
+      id: 'played-foundation',
+      title: 'played foundation',
+      kind: 'song' as const,
+      chart: chart_fixture([eighth_groove()], 108),
+      manifest: manifest('played-foundation', 'hand.singles', 108),
+    };
+    const result = build_my_wave({
+      played: source,
+      candidates: [
+        {
+          id: 'neutral-exercise',
+          title: 'neutral exercise',
+          kind: 'lesson',
+          available: true,
+          chart: chart_fixture([eighth_groove()], 118),
+          manifest: manifest('neutral-exercise', 'hand.singles', 118),
+        },
+        {
+          id: 'beloved-next-step',
+          title: 'beloved next step',
+          kind: 'song',
+          available: true,
+          liked: true,
+          replay_count: 9,
+          chart: chart_fixture([sixteenth_groove()], 124),
+          manifest: manifest('beloved-next-step', 'hand.singles', 124),
+        },
+      ],
+      atomic_states: [state('hand.singles', 6, 2, 112)],
+      now: NOW,
+      intent: 'learning',
+      limit: 1,
+    });
+
+    expect(result.recommendations[0]).toMatchObject({
+      candidate: { id: 'beloved-next-step' },
+      receipt: {
+        affection: {
+          favourite: true,
+          replay_count: 9,
+          replay_share: 1,
+        },
+      },
+    });
+    expect(result.recommendations[0]?.reason).toContain('saved favourite');
+  });
+
+  it('keeps a beloved song that is far beyond reach behind a neutral exercise in the current step', () => {
+    const source = {
+      id: 'played-foundation',
+      title: 'played foundation',
+      kind: 'song' as const,
+      chart: chart_fixture([eighth_groove()], 108),
+      manifest: manifest('played-foundation', 'hand.singles', 108),
+    };
+    const result = build_my_wave({
+      played: source,
+      candidates: [
+        {
+          id: 'neutral-exercise',
+          title: 'neutral exercise',
+          kind: 'lesson',
+          available: true,
+          chart: chart_fixture([eighth_groove()], 118),
+          manifest: manifest('neutral-exercise', 'hand.singles', 118),
+        },
+        {
+          id: 'beloved-too-far',
+          title: 'beloved too far',
+          kind: 'song',
+          available: true,
+          liked: true,
+          replay_count: 24,
+          chart: chart_fixture([sixteenth_groove(), fill_bar()], 220),
+          manifest: manifest('beloved-too-far', 'hand.singles', 220),
+        },
+      ],
+      atomic_states: [state('hand.singles', 6, 2, 112)],
+      now: NOW,
+      intent: 'learning',
+      limit: 1,
+    });
+
+    expect(result.recommendations[0]?.candidate.id).toBe('neutral-exercise');
+  });
+
+  it('uses replay history when favourites alone do not distinguish two reachable songs', () => {
+    const source = {
+      id: 'played-foundation',
+      title: 'played foundation',
+      kind: 'song' as const,
+      chart: chart_fixture([eighth_groove()], 108),
+      manifest: manifest('played-foundation', 'hand.singles', 108),
+    };
+    const result = build_my_wave({
+      played: source,
+      candidates: [
+        {
+          id: 'a-neutral-song',
+          title: 'neutral song',
+          kind: 'song',
+          available: true,
+          chart: chart_fixture([sixteenth_groove()], 124),
+          manifest: manifest('a-neutral-song', 'hand.singles', 124),
+        },
+        {
+          id: 'z-replayed-song',
+          title: 'replayed song',
+          kind: 'song',
+          available: true,
+          replay_count: 8,
+          chart: chart_fixture([sixteenth_groove()], 124),
+          manifest: manifest('z-replayed-song', 'hand.singles', 124),
+        },
+      ],
+      atomic_states: [state('hand.singles', 6, 2, 112)],
+      now: NOW,
+      intent: 'songs',
+      limit: 1,
+    });
+
+    expect(result.recommendations[0]).toMatchObject({
+      candidate: { id: 'z-replayed-song' },
+      receipt: {
+        affection: {
+          favourite: false,
+          replay_count: 8,
+          replay_share: 1,
+        },
+      },
+    });
+    expect(result.recommendations[0]?.reason).toContain('keep returning');
   });
 
   it('degrades honestly when chart and atomic evidence are thin', () => {

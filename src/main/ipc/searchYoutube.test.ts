@@ -9,6 +9,7 @@ const spawnHolder = vi.hoisted(() => ({ procs: [] as FakeProc[] }));
 
 interface FakeEmitter {
   on: (event: string, cb: (...args: unknown[]) => void) => FakeEmitter;
+  once: (event: string, cb: (...args: unknown[]) => void) => FakeEmitter;
   emit: (event: string, ...args: unknown[]) => void;
 }
 
@@ -33,6 +34,18 @@ vi.mock('child_process', () => {
 
         return this;
       },
+      once(event, cb) {
+        const once = (...args: unknown[]) => {
+          listeners[event] = (listeners[event] ?? []).filter(
+            (listener) => listener !== once,
+          );
+          cb(...args);
+        };
+
+        (listeners[event] ??= []).push(once);
+
+        return this;
+      },
       emit(event, ...args) {
         (listeners[event] ?? []).forEach((cb) => cb(...args));
       },
@@ -53,8 +66,13 @@ vi.mock('child_process', () => {
   return { spawn, default: { spawn } };
 });
 
-const { resolveYtDlpPath, parseYoutubeSearchLine, searchYoutube } =
-  await import('./searchYoutube');
+const {
+  inspectYoutubeCandidate,
+  parseYoutubeInspection,
+  parseYoutubeSearchLine,
+  resolveYtDlpPath,
+  searchYoutube,
+} = await import('./searchYoutube');
 
 function venvBinDir(dataDir: string): string {
   return path.join(dataDir, 'transcriber', '.venv', 'bin');
@@ -97,14 +115,14 @@ describe('resolveYtDlpPath', () => {
     expect(resolveYtDlpPath()).toBe(venvYtDlp);
   });
 
-  it('falls back to yt-dlp on PATH when the venv copy is missing', () => {
+  it('does not trust a system yt-dlp outside the pinned transcriber venv', () => {
     const pathDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yt-dlp-path-'));
     const onPath = path.join(pathDir, 'yt-dlp');
 
     makeExecutable(onPath);
     process.env.PATH = pathDir;
 
-    expect(resolveYtDlpPath()).toBe(onPath);
+    expect(resolveYtDlpPath()).toBeUndefined();
 
     fs.rmSync(pathDir, { recursive: true, force: true });
   });
@@ -115,6 +133,74 @@ describe('resolveYtDlpPath', () => {
     );
 
     expect(resolveYtDlpPath()).toBeUndefined();
+  });
+});
+
+describe('YouTube identity inspection', () => {
+  beforeEach(() => {
+    makeExecutable(path.join(venvBinDir(userDataHolder.current), 'yt-dlp'));
+  });
+
+  it('parses only a complete inspected recording identity', () => {
+    expect(
+      parseYoutubeInspection(
+        JSON.stringify({
+          id: 'abcdefghijk',
+          title: '  Exact recording  ',
+          uploader: 'Artist',
+          duration: 199,
+        }),
+      ),
+    ).toEqual({
+      videoId: 'abcdefghijk',
+      title: 'Exact recording',
+      uploader: 'Artist',
+      durationSeconds: 199,
+      watchUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+    });
+    expect(
+      parseYoutubeInspection(
+        JSON.stringify({ id: 'abcdefghijk', title: 'Missing duration' }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('revalidates with the pinned venv executable before a download can start', async () => {
+    const url = 'https://www.youtube.com/watch?v=abcdefghijk';
+    const inspection = inspectYoutubeCandidate(url);
+
+    await vi.waitFor(() => expect(spawnHolder.procs).toHaveLength(1));
+
+    const proc = currentProc();
+
+    expect(proc.spawnArgs.command).toBe(
+      path.join(venvBinDir(userDataHolder.current), 'yt-dlp'),
+    );
+    expect(proc.spawnArgs.args).toEqual([
+      '--dump-single-json',
+      '--no-download',
+      '--no-warnings',
+      '--quiet',
+      url,
+    ]);
+    proc.stdout.emit(
+      'data',
+      Buffer.from(
+        JSON.stringify({
+          id: 'abcdefghijk',
+          title: 'Exact recording',
+          uploader: 'Artist',
+          duration: 199,
+        }),
+      ),
+    );
+    proc.emit('close', 0);
+
+    await expect(inspection).resolves.toMatchObject({
+      videoId: 'abcdefghijk',
+      title: 'Exact recording',
+      durationSeconds: 199,
+    });
   });
 });
 
@@ -311,7 +397,7 @@ describe('searchYoutube', () => {
     }
   });
 
-  it('replies with an honest error when the process exits non-zero with no results', async () => {
+  it('replies with an honest error when the process exits non-zero after partial result output', async () => {
     const event = makeEvent();
 
     searchYoutube(event as never, { query: 'broken' });
@@ -319,6 +405,10 @@ describe('searchYoutube', () => {
 
     const proc = currentProc();
 
+    proc.stdout.emit(
+      'data',
+      Buffer.from(ndjson([{ id: 'abcdefghijk', title: 'Partial result' }])),
+    );
     proc.stderr.emit('data', Buffer.from('ERROR: no internet\nmore detail\n'));
     proc.emit('close', 1);
 
@@ -327,10 +417,12 @@ describe('searchYoutube', () => {
     );
 
     const reply = lastReply(event, 'search-youtube')!.args[0] as {
-      error: string;
+      error?: string;
+      results?: unknown[];
     };
 
     expect(reply.error).toContain('ERROR: no internet');
+    expect(reply.results).toBeUndefined();
   });
 
   it('replies with an honest error and never spawns when yt-dlp is unavailable', async () => {

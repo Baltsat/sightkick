@@ -1,0 +1,28 @@
+{
+  "fixture": "isolated local QA fixture with exact Yandex source provenance for two saved tracks",
+  "yandexSeeds": [
+    {
+      "id": "yandex-favourite",
+      "trackId": "yandex:lk.9162a721-150b-4ad8-a0f4-a30ce4be2efe:1",
+      "collection": "Favorites"
+    },
+    {
+      "id": "drums-taste",
+      "trackId": "yandex:f37c90e8-ddab-5270-9379-4a72d66e0cac:6",
+      "collection": "Drums"
+    }
+  ],
+  "captures": [
+    "01-actionable-shelves-1440x900.png",
+    "01-actionable-shelves-1024x700.png",
+    "02-rest-door-1440x900.png",
+    "02-rest-door-1024x700.png",
+    "03-full-library-1440x900.png",
+    "03-full-library-1024x700.png"
+  ],
+  "checks": {
+    "sourceSeedLabels": 2,
+    "restDoor": "Browse the rest of your library (241)",
+    "pageErrors": []
+  }
+}

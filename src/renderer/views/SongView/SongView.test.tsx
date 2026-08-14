@@ -18,7 +18,6 @@ import {
 import { multiLaneRunFixture } from '../../components/PracticeStats/test-fixtures';
 import { chartContentRevision } from '../../services/chart-revision';
 import { remediationQueueSlotKey } from '../../services/remediation';
-import { canAutoContinuePractice } from './SongView';
 
 const TEST_CHART_REVISION = chartContentRevision({
   songId: 'song-1',
@@ -48,6 +47,38 @@ afterEach(() => {
 });
 
 describe('opening a song', () => {
+  it('keeps the kit key closed until asked for and persists dismissal', async () => {
+    const view = setupSongView();
+
+    await view.loadSong();
+
+    const toggle = screen.getByTestId('notation-kit-key-toggle');
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('notation-kit-key')).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('notation-kit-key')).toBeInTheDocument();
+    expect(
+      JSON.parse(
+        window.localStorage.getItem('settings.notationKitKeyVisible') ??
+          'false',
+      ),
+    ).toBe(true);
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('notation-kit-key')).not.toBeInTheDocument();
+    expect(
+      JSON.parse(
+        window.localStorage.getItem('settings.notationKitKeyVisible') ?? 'true',
+      ),
+    ).toBe(false);
+  });
+
   it('shows the song header and real rendered sheet music', async () => {
     const view = setupSongView({
       settings: { handsFreeControlsEnabled: true },
@@ -60,11 +91,12 @@ describe('opening a song', () => {
     await waitFor(() => {
       expect(document.querySelectorAll('svg').length).toBeGreaterThan(0);
     });
-    expect(
-      within(screen.getByTestId('perform-kit-control-prompt')).getByTestId(
-        'kit-command-prompt',
-      ),
-    ).toHaveAccessibleName('Kick to start the count-in: Kick');
+
+    const caption = screen.getByTestId('perform-kit-control-prompt');
+
+    expect(caption).toHaveAttribute('data-edge-caption', 'perform-command');
+    expect(caption).toHaveTextContent('Kick to start the count-in');
+    expect(caption).toHaveTextContent('Kick');
   });
 
   it('prevents display sleep while open and releases it on leave', () => {
@@ -101,7 +133,10 @@ describe('opening a song', () => {
 
     await view.loadSong();
 
-    expect(screen.getByText('hard')).toBeInTheDocument();
+    view.openSettings();
+    expect(screen.getByTestId('song-difficulty-select')).toHaveTextContent(
+      'hard',
+    );
   });
 
   it('switches the same chart between continuous Flow and Classic notation', async () => {
@@ -112,7 +147,6 @@ describe('opening a song', () => {
     await view.loadSong();
 
     const flowNotation = screen.getByTestId('flow-notation');
-    const flowHud = screen.getByTestId('flow-viewport-hud');
 
     expect(flowNotation).toBeInTheDocument();
     expect(flowNotation).toHaveAttribute('data-presentation-zoom', '1.15');
@@ -134,13 +168,13 @@ describe('opening a song', () => {
         .getByTestId('flow-fixed-playhead')
         .querySelector('[data-flow-location]'),
     ).toHaveTextContent(/Bar 1 \/ \d+ · Beat 1/);
-    expect(flowHud).toHaveAttribute('data-mode', 'perform');
+    expect(screen.queryByTestId('flow-viewport-hud')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('group', { name: 'Notation view' }),
     ).not.toBeInTheDocument();
-    expect(within(flowHud).getByText('Master of Puppets')).toBeInTheDocument();
-    expect(within(flowHud).getByText('Metallica')).toBeInTheDocument();
-    expect(within(flowHud).getByText('Perform flow')).toBeInTheDocument();
+    expect(screen.getByTestId('practice-mode-indicator')).toHaveTextContent(
+      'Perform',
+    );
     expect(
       within(flowNotation).queryByRole('heading', {
         name: 'Master of Puppets',
@@ -164,7 +198,6 @@ describe('opening a song', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('flow-notation')).not.toBeInTheDocument();
     });
-    expect(screen.queryByTestId('flow-viewport-hud')).not.toBeInTheDocument();
     expect(screen.getByTestId('notation-classic-toggle')).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -173,23 +206,59 @@ describe('opening a song', () => {
       /Bar 1 of \d+, beat 1 of 4/,
     );
 
-    const classicHeading = screen
-      .getAllByRole('heading', { name: 'Master of Puppets' })
-      .find((heading) => heading.classList.contains('text-4xl'));
+    const classicHeading = screen.getByTestId('sheet-score-title');
 
-    expect(classicHeading).toBeDefined();
-    expect(classicHeading?.parentElement?.parentElement).toHaveStyle({
+    expect(classicHeading).toHaveClass('text-xl');
+    expect(classicHeading.parentElement?.parentElement).toHaveStyle({
       zoom: '1.15',
     });
     expect(screen.getByTestId('classic-notation')).toHaveAttribute(
       'data-presentation-zoom',
       '1.15',
     );
+    expect(document.querySelector('.drumroll-classic-viewport')).toHaveClass(
+      'items-start',
+    );
+    expect(
+      document.querySelector('.drumroll-classic-viewport'),
+    ).not.toHaveClass('items-center');
     expect(
       JSON.parse(
         window.localStorage.getItem('settings.practiceNotationLayout') ?? '""',
       ),
     ).toBe('classic');
+  });
+
+  it('removes duplicate method credits from an own lesson score header', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      settings: { practiceNotationLayout: 'classic' },
+    });
+
+    await view.loadSong(
+      makeSong({
+        name: 'Lesson 01.01 — Alternating Singles Warm-Up',
+        artist: 'Drumroll Method',
+        charter: 'Drumroll Method',
+        lesson: {
+          id: '01.01',
+          starsToUnlock: 0,
+          unit: 'Foundations',
+          title: 'Alternating Singles Warm-Up',
+        },
+      }),
+    );
+
+    expect(screen.getByTestId('sheet-score-title')).toHaveTextContent(
+      'Lesson 01.01 — Alternating Singles Warm-Up',
+    );
+    expect(screen.queryByTestId('sheet-score-credits')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Music by Drumroll Method'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Arranged by Drumroll Method'),
+    ).not.toBeInTheDocument();
   });
 
   it('opens Coach from a Home deep link without consuming any loop params', async () => {
@@ -335,7 +404,7 @@ describe('playhead', () => {
 });
 
 describe('sheet appearance', () => {
-  it('keeps Flow lane colors readable and lets Classic colors be switched off', async () => {
+  it('keeps kit lane colours on every practice notation layout', async () => {
     const view = setupSongView();
 
     await view.loadSong();
@@ -360,9 +429,9 @@ describe('sheet appearance', () => {
 
     await waitFor(() => {
       expect(
-        document.querySelectorAll('.vf-note-uncolored').length,
+        document.querySelectorAll('.vf-note-snare').length,
       ).toBeGreaterThan(0);
-      expect(document.querySelectorAll('.vf-note-snare')).toHaveLength(0);
+      expect(document.querySelectorAll('.vf-note-uncolored')).toHaveLength(0);
     });
   });
 });
@@ -931,16 +1000,21 @@ describe('practice mode', () => {
     await view.pressKey('ArrowRight');
     await view.pressKey('Enter');
 
-    expect(screen.getByText('Looping Section')).toBeInTheDocument();
-    expect(screen.getByText('Measure 1')).toBeInTheDocument();
+    expect(screen.getByTestId('practice-loop-caption')).toHaveTextContent(
+      'Bars 1–1',
+    );
 
     await view.pressKey('ArrowRight');
 
-    expect(screen.getByText('Measure 1 - 2')).toBeInTheDocument();
+    expect(screen.getByTestId('practice-loop-caption')).toHaveTextContent(
+      'Bars 1–2',
+    );
 
     await view.pressKey('Escape');
 
-    expect(screen.queryByText('Looping Section')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('practice-loop-caption'),
+    ).not.toBeInTheDocument();
   });
 
   it('adjusts and clamps the practice speed', async () => {
@@ -1040,7 +1114,9 @@ describe('practice loop selection', () => {
     fireEvent.pointerEnter(b);
     fireEvent.pointerUp(document.body);
 
-    expect(screen.getByText('Measure 1 - 2')).toBeInTheDocument();
+    expect(screen.getByTestId('practice-loop-caption')).toHaveTextContent(
+      'Bars 1–2',
+    );
     expect(a).toHaveAttribute('data-selected', 'true');
     expect(b).toHaveAttribute('data-selected', 'true');
     expect(screen.getByTestId('practice-mode-indicator')).toHaveAttribute(
@@ -1060,7 +1136,9 @@ describe('practice loop selection', () => {
     fireEvent.mouseDown(b);
     fireEvent.mouseEnter(a);
 
-    expect(screen.getByText('Measure 1 - 2')).toBeInTheDocument();
+    expect(screen.getByTestId('practice-loop-caption')).toHaveTextContent(
+      'Bars 1–2',
+    );
   });
 
   it('stops extending the range once the drag ends', async () => {
@@ -1075,7 +1153,9 @@ describe('practice loop selection', () => {
     fireEvent.mouseUp(document.body);
     fireEvent.mouseEnter(b);
 
-    expect(screen.getByText('Measure 1')).toBeInTheDocument();
+    expect(screen.getByTestId('practice-loop-caption')).toHaveTextContent(
+      'Bars 1–1',
+    );
   });
 
   it('arms looping directly from a score gesture', async () => {
@@ -1085,7 +1165,7 @@ describe('practice loop selection', () => {
 
     fireEvent.mouseDown(view.measureHighlights()[0]);
 
-    expect(screen.getByText('Looping Section')).toBeInTheDocument();
+    expect(screen.getByTestId('practice-loop-caption')).toBeInTheDocument();
   });
 
   it('clears the selected range from the loop control', async () => {
@@ -1095,11 +1175,13 @@ describe('practice loop selection', () => {
     view.clickTestId('loop-toggle');
 
     fireEvent.mouseDown(view.measureHighlights()[0]);
-    expect(screen.getByText('Looping Section')).toBeInTheDocument();
+    expect(screen.getByTestId('practice-loop-caption')).toBeInTheDocument();
 
     view.clickTestId('clear-loop');
 
-    expect(screen.queryByText('Looping Section')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('practice-loop-caption'),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('practice-mode-indicator')).not.toHaveAttribute(
       'data-looping',
       'true',
@@ -1314,27 +1396,6 @@ describe('the stem mixer', () => {
 });
 
 describe('the score summary', () => {
-  it('keeps a completed lesson on its own result instead of auto-jumping to songs', () => {
-    expect(
-      canAutoContinuePractice(
-        'practice',
-        true,
-        'saved',
-        makeSong({
-          lesson: {
-            id: '01.01',
-            starsToUnlock: 0,
-            unit: 'Unit 1',
-            title: 'First beat',
-          },
-        }),
-      ),
-    ).toBe(false);
-    expect(canAutoContinuePractice('practice', true, 'saved', makeSong())).toBe(
-      true,
-    );
-  });
-
   it('shows the current My Wave reason while a practice stop is open', async () => {
     const view = setupSongView({
       route: '/song-1?gameMode=practice',
@@ -1423,7 +1484,7 @@ describe('the score summary', () => {
     expect(within(modal).getByTestId('practice-stats')).toBeInTheDocument();
   });
 
-  it('opens the coach with stored findings and presets a targeted practice loop', async () => {
+  it('opens the coach with stored findings and waits for tempo acceptance', async () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
 
     await view.loadSong();
@@ -1473,7 +1534,7 @@ describe('the score summary', () => {
       );
       expect(screen.getByTestId('practice-mode-indicator')).toHaveAttribute(
         'data-speed',
-        '0.7',
+        '1.0',
       );
       expect(view.measureHighlights()[0]).toHaveAttribute(
         'data-selected',
@@ -1486,7 +1547,27 @@ describe('the score summary', () => {
       expect(screen.getByTestId('tutor-recovery-caption')).toHaveTextContent(
         'Coach loop armed',
       );
+      expect(screen.getByTestId('coach-tempo-suggestion')).toHaveTextContent(
+        'Coach suggests 0.7× for this loop.',
+      );
+      expect(screen.getByTestId('accept-coach-speed')).toHaveTextContent(
+        'Try 0.7×',
+      );
+      expect(screen.getByTestId('keep-learner-speed')).toHaveTextContent(
+        'Keep my 1.0×',
+      );
     });
+    fireEvent.click(screen.getByTestId('accept-coach-speed'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('practice-mode-indicator')).toHaveAttribute(
+        'data-speed',
+        '0.7',
+      );
+    });
+    expect(
+      window.localStorage.getItem('song.song-1.learnerPlaybackSpeed'),
+    ).toBe('0.7');
     expect(window.localStorage.getItem(TEST_REMEDIATION_STORAGE_KEY)).toContain(
       '"status":"active"',
     );
@@ -1506,42 +1587,6 @@ describe('the playback time display', () => {
     await waitFor(() => {
       expect(view.currentTimeText()).toBe('00:04');
     });
-  });
-});
-
-describe('the reference legend', () => {
-  it('shows the drum reference and hides it when switched off', async () => {
-    const view = setupSongView();
-
-    await view.loadSong();
-
-    const reference = within(screen.getByTestId('drum-reference'));
-
-    expect(reference.getByText('Snare')).toBeInTheDocument();
-    expect(reference.getByText('Kick')).toBeInTheDocument();
-
-    view.openSettings();
-    view.openMoreSettings();
-    view.toggleSetting('reference');
-
-    await waitFor(() => {
-      expect(screen.queryByTestId('drum-reference')).not.toBeInTheDocument();
-    });
-  });
-
-  it('docks the color key above the adaptive Tutor instead of behind it', async () => {
-    const view = setupSongView({
-      route: '/song-1?gameMode=practice',
-      settings: { countIn: false },
-    });
-
-    await view.loadSong();
-    view.clickPlay();
-
-    expect(
-      document.querySelector('.drumroll-reference--above-tutor'),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('tutor-hud')).toBeInTheDocument();
   });
 });
 
@@ -1802,12 +1847,14 @@ describe('in-practice difficulty switching', () => {
     fireEvent.mouseDown(highlights[1]);
     fireEvent.mouseUp(document.body);
 
-    expect(screen.getByText('Looping Section')).toBeInTheDocument();
+    expect(screen.getByTestId('practice-loop-caption')).toBeInTheDocument();
 
     pickDifficulty('medium');
 
     await waitFor(() => {
-      expect(screen.queryByText('Looping Section')).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId('practice-loop-caption'),
+      ).not.toBeInTheDocument();
     });
   });
 });

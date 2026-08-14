@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { installIpcMock, IpcMock } from '../../hooks/test-support';
 import { Song } from '../../../types';
@@ -67,6 +67,10 @@ beforeEach(() => {
   ipc = installIpcMock();
 });
 
+function openScale(id: 'today' | '30d' | 'history') {
+  fireEvent.click(screen.getByTestId(`profile-scale-${id}`));
+}
+
 describe('ProfileView', () => {
   it('shows a loading state before goals load', () => {
     render(
@@ -97,11 +101,14 @@ describe('ProfileView', () => {
 
     expect(screen.getByTestId('no-goals-empty-state')).toBeInTheDocument();
     expect(
-      screen.getByTestId('profile-lane-accuracy-definition'),
-    ).toHaveTextContent('Accuracy from your scored notes in the last 30 days.');
-    expect(
       screen.getByRole('button', { name: /set your first goal/i }),
     ).toBeInTheDocument();
+
+    openScale('30d');
+
+    expect(
+      screen.getByTestId('profile-lane-accuracy-definition'),
+    ).toHaveTextContent('Accuracy from your scored notes in the last 30 days.');
   });
 
   it('renders the all-history archive model supplied by the shared gamification hook', () => {
@@ -132,6 +139,8 @@ describe('ProfileView', () => {
         })}
       />,
     );
+
+    openScale('history');
 
     expect(screen.getByTestId('profile-practice-history')).toHaveTextContent(
       '2 archived + 1 recent',
@@ -167,9 +176,13 @@ describe('ProfileView', () => {
       ipc.emit('load-all-practice-runs', { runs: [] });
     });
 
-    expect(screen.getByTestId('goal-card')).toBeInTheDocument();
     expect(screen.getAllByTestId('profile-stat-chip')).toHaveLength(3);
+
+    openScale('30d');
     expect(screen.getByTestId('xp-skill-line')).toBeInTheDocument();
+
+    openScale('history');
+    expect(screen.getByTestId('goal-card')).toBeInTheDocument();
   });
 
   it('shows the September 10 runway without inventing a weekly pace before retained evidence exists', () => {
@@ -190,6 +203,8 @@ describe('ProfileView', () => {
         }}
       />,
     );
+
+    openScale('30d');
 
     expect(screen.getByTestId('profile-deadline-targets')).toHaveTextContent(
       'Target pace',
@@ -213,6 +228,8 @@ describe('ProfileView', () => {
         gamification={gamification()}
       />,
     );
+
+    openScale('history');
 
     expect(screen.getByTestId('goal-switcher')).toBeInTheDocument();
     expect(screen.getByTestId('goal-tab-g1')).toHaveAttribute(
@@ -302,9 +319,12 @@ describe('ProfileView', () => {
     expect(screen.getByTestId('insights-skill-spine')).toHaveTextContent(
       'Mid-to-floor tom movement',
     );
+
+    openScale('history');
     expect(screen.getByTestId('atomic-radar-disclosure')).not.toHaveAttribute(
       'open',
     );
+    openScale('today');
 
     screen.getByTestId('profile-target-action').click();
 
@@ -349,6 +369,8 @@ describe('ProfileView', () => {
       });
       ipc.emit('load-all-practice-runs', { runs: [] });
     });
+
+    openScale('history');
 
     expect(screen.getByTestId('retired-goal-notice')).toHaveTextContent(
       'does not unlock the new Journey',
@@ -419,6 +441,8 @@ describe('ProfileView', () => {
       />,
     );
 
+    openScale('30d');
+
     expect(screen.getByTestId('weekly-practice-rhythm')).toHaveTextContent(
       'Next available session: Thursday',
     );
@@ -432,7 +456,10 @@ describe('ProfileView', () => {
       'missed',
     );
 
+    openScale('today');
     screen.getByTestId('practice-card-review-start').click();
+
+    openScale('30d');
     screen.getByTestId('practice-rhythm-daily').click();
 
     expect(onStartPracticeCard).toHaveBeenCalledWith(card);

@@ -2,9 +2,14 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { LibrarySourceTrackProvenance, SongData } from '../types';
+import type {
+  LibrarySourceTrackProvenance,
+  SongData,
+  YoutubeFetchedAudioProvenance,
+} from '../types';
 import {
   createLocalAutoChartEvidence,
+  createYoutubeAutoChartEvidence,
   persistPlayabilityEvidence,
   sourceSongIsPlayable,
   validatePlayabilityEvidence,
@@ -20,6 +25,20 @@ const source: LibrarySourceTrackProvenance = {
   artists: ['ODESZA'],
   durationSeconds: 208,
 };
+
+function youtubeProvenance(): YoutubeFetchedAudioProvenance {
+  return {
+    provider: 'youtube',
+    videoId: 'abcdefghijk',
+    watchUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+    title: 'ODESZA - Loyal (Official Audio)',
+    uploader: 'ODESZA',
+    durationSeconds: 208,
+    downloader: 'yt-dlp',
+    downloaderVersion: '2026.7.4',
+    fetchedAt: '2026-08-13T00:00:00.000Z',
+  };
+}
 
 function writePreparedSong(root: string): void {
   fs.writeFileSync(
@@ -104,5 +123,67 @@ describe('source-linked auto-chart evidence', () => {
 
     expect(rescanned?.playability).toEqual(evidence);
     expect(rescanned && sourceSongIsPlayable(rescanned)).toBe(true);
+  });
+
+  it('persists verified YouTube-fetched evidence and rejects altered provenance', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'playability-'));
+
+    roots.push(root);
+    writePreparedSong(root);
+
+    const evidence = createYoutubeAutoChartEvidence(
+      root,
+      source,
+      youtubeProvenance(),
+      'job-1',
+      '2026-08-13T00:00:00.000Z',
+    );
+
+    expect(() => validatePlayabilityEvidence(root, evidence)).not.toThrow();
+    persistPlayabilityEvidence(root, evidence);
+    expect(buildSongFromDir(root)?.playability).toEqual(evidence);
+
+    const alteredAudio = structuredClone(evidence);
+
+    alteredAudio.audio.sha256 = 'c'.repeat(64);
+    expect(() => validatePlayabilityEvidence(root, alteredAudio)).toThrow(
+      'audio hash',
+    );
+
+    const alteredChart = structuredClone(evidence);
+
+    alteredChart.chart.sha256 = 'd'.repeat(64);
+    expect(() => validatePlayabilityEvidence(root, alteredChart)).toThrow(
+      'chart hash',
+    );
+
+    const alteredUrl = structuredClone(evidence);
+
+    alteredUrl.audio.youtube!.watchUrl =
+      'https://www.youtube.com/watch?v=wrong000001';
+    expect(() => validatePlayabilityEvidence(root, alteredUrl)).toThrow(
+      'lawful-audio',
+    );
+
+    const alteredVideoId = structuredClone(evidence);
+
+    alteredVideoId.audio.youtube!.videoId = 'wrong000001';
+    expect(() => validatePlayabilityEvidence(root, alteredVideoId)).toThrow(
+      'lawful-audio',
+    );
+
+    const alteredDuration = structuredClone(evidence);
+
+    alteredDuration.audio.youtube!.durationSeconds = 217;
+    expect(() => validatePlayabilityEvidence(root, alteredDuration)).toThrow(
+      'source duration',
+    );
+
+    const alteredDownloader = structuredClone(evidence);
+
+    alteredDownloader.audio.youtube!.downloader = 'other' as 'yt-dlp';
+    expect(() => validatePlayabilityEvidence(root, alteredDownloader)).toThrow(
+      'lawful-audio',
+    );
   });
 });

@@ -3,6 +3,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+release_version="$(node -e 'const package_json = require(process.argv[1]); process.stdout.write(package_json.version)' "$repo_root/package.json")"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 requested_output="${1:-$repo_root/release/local-api-key-$timestamp}"
 output_dir="$(node -e 'process.stdout.write(require("node:path").resolve(process.argv[1]))' "$requested_output")"
@@ -62,7 +63,7 @@ if [[ "${#disk_images[@]}" -ne 1 ]]; then
     echo "Expected exactly one DMG after the local release build." >&2
     exit 1
 fi
-expected_disk_image="$output_dir/Drumroll-1.2.0-kb.11-arm64.dmg"
+expected_disk_image="$output_dir/Drumroll-$release_version-arm64.dmg"
 if [[ "${disk_images[0]}" != "$expected_disk_image" ]]; then
     echo "Unexpected DMG name: ${disk_images[0]}" >&2
     echo "Expected: $expected_disk_image" >&2

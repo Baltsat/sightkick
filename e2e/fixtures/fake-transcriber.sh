@@ -14,6 +14,12 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+if [ -n "${SIGHTKICK_FAKE_TRANSCRIBER_FAIL_ONCE_FILE:-}" ] && [ ! -e "$SIGHTKICK_FAKE_TRANSCRIBER_FAIL_ONCE_FILE" ]; then
+    : >"$SIGHTKICK_FAKE_TRANSCRIBER_FAIL_ONCE_FILE"
+    printf '%s\n' '__SK_EVENT__ {"kind":"error","message":"Forced sidecar failure for retry proof"}'
+    exit 1
+fi
+
 song_dir="$out/Тестовый артист - 夜のドラム 🥁"
 mkdir -p "$song_dir"
 printf '%s\n' \
@@ -44,7 +50,11 @@ printf '%s\n' \
     '  480 = N 1 0' \
     '}' \
     >"$song_dir/notes.chart"
-printf 'fake audio' >"$song_dir/song.mp3"
+if [ "$(uname)" = 'Darwin' ]; then
+    /usr/bin/base64 -D -i "$(dirname "$0")/fake-song.mp3.base64" -o "$song_dir/song.mp3"
+else
+    base64 --decode "$(dirname "$0")/fake-song.mp3.base64" >"$song_dir/song.mp3"
+fi
 
 printf '%s\n' '__SK_EVENT__ {"kind":"progress","stage":"download","percent":10,"message":"Downloading fake audio"}'
 sleep 1

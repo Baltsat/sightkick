@@ -8,6 +8,7 @@ import {
 import { StemToolsPanel } from '../../context/StemToolsContext';
 import { useApp } from '../../context/AppContext';
 import { Tooltip } from '../Tooltip';
+import { KitSignalCheck } from './KitSignalCheck';
 
 interface Props {
   scanPercent?: number;
@@ -81,6 +82,8 @@ export function SongListSettings({
           {currentInputName ?? 'Setup input'}
         </Button>
       </Tooltip>
+
+      <KitSignalCheck onSetupInput={onSetupInput} />
 
       {onHoverPreviewEnabledChange && (
         <div className="flex items-center justify-between gap-4 rounded-lg border border-border-soft bg-surface-muted px-3 py-2">

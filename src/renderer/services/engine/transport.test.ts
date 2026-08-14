@@ -871,6 +871,32 @@ describe('Transport', () => {
 
       expect(onLoopRestart).toHaveBeenCalledTimes(1);
     });
+
+    it('does not re-trigger a count-in on a natural loop wrap even when Count In is enabled', async () => {
+      const { engine, player } = await setup({}, { countInEnabled: true });
+
+      engine.setLoopRegion({ startTick: 0, endTick: 1920 });
+      engine.playFromTick(0);
+      expect(engine.getSnapshot().state).toBe('counting-in');
+
+      // Let the initial count-in finish so the loop is genuinely playing.
+      advanceClockTo(player, 3);
+      expect(engine.getSnapshot().state).toBe('playing');
+
+      player.start.mockClear();
+
+      // Pass the loop's end - a natural wrap.
+      player.currentTime = 3;
+      flushFrame();
+
+      // The wrap must resume the phrase immediately, not defer behind a
+      // fresh musical count-in - that would insert a silence-then-clicks
+      // gap on every single repetition of a practice loop, and drop any
+      // pad hits made during it (Judge is disabled while counting-in).
+      expect(engine.getSnapshot().state).toBe('playing');
+      expect(player.start).toHaveBeenCalledTimes(1);
+      expect(player.start).toHaveBeenCalledWith(0);
+    });
   });
 
   describe('playback speed', () => {

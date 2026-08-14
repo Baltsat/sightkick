@@ -1,0 +1,62 @@
+{
+  "home": {
+    "animation_name": "none",
+    "data_view": "home",
+    "has_wave_destination": false,
+    "is_transitioning": false,
+    "reduced_motion": false,
+    "scroll": {
+      "height": 820,
+      "width": 1365
+    },
+    "viewport": {
+      "height": 820,
+      "width": 1365
+    }
+  },
+  "rest": {
+    "animation_name": "none",
+    "data_view": "songs",
+    "has_wave_destination": false,
+    "is_transitioning": false,
+    "reduced_motion": false,
+    "scroll": {
+      "height": 820,
+      "width": 1365
+    },
+    "viewport": {
+      "height": 820,
+      "width": 1365
+    }
+  },
+  "transition": {
+    "animation_name": "arena-field-arrive",
+    "data_view": "journey",
+    "has_wave_destination": false,
+    "is_transitioning": true,
+    "reduced_motion": false,
+    "scroll": {
+      "height": 820,
+      "width": 1365
+    },
+    "viewport": {
+      "height": 820,
+      "width": 1365
+    }
+  },
+  "reduced_motion": {
+    "animation_name": "none",
+    "data_view": "songs",
+    "has_wave_destination": false,
+    "is_transitioning": false,
+    "reduced_motion": true,
+    "scroll": {
+      "height": 820,
+      "width": 1365
+    },
+    "viewport": {
+      "height": 820,
+      "width": 1365
+    }
+  }
+}

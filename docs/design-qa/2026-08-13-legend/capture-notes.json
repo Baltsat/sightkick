@@ -1,0 +1,29 @@
+{
+  "notes": [
+    {
+      "viewport": {
+        "width": 1225,
+        "height": 768
+      },
+      "key_box": {
+        "x": 246.3984375,
+        "y": 636.1875,
+        "width": 464,
+        "height": 67.8125
+      }
+    },
+    {
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "key_box": {
+        "x": 102.3984375,
+        "y": 568.1875,
+        "width": 464,
+        "height": 67.8125
+      }
+    }
+  ],
+  "page_errors": []
+}

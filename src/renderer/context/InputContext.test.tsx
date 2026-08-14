@@ -486,6 +486,49 @@ describe('InputContext DTX default mapping', () => {
     expect(result.current.inputMapping.kick).toEqual(['midi:35', 'midi:36']);
   });
 
+  it('removing one default-mapped note trims just that note, not the whole lane', () => {
+    // Regression for the "removing a single default-mapped MIDI note wipes
+    // the entire lane's default mapping" bug: snare's default is
+    // [38, 40, 37] and has never been explicitly stored for this device, so
+    // the pre-fix `without(undefined ?? [], controlId)` stored `[]` and
+    // silently dropped 38 and 37 too.
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(DEVICE_A));
+    act(() => result.current.removeControl('snare', 'midi:40'));
+
+    expect(result.current.inputMapping.snare).toEqual(['midi:38', 'midi:37']);
+    expect(result.current.kitControlIds.has('midi:38')).toBe(true);
+    expect(result.current.kitControlIds.has('midi:37')).toBe(true);
+  });
+
+  it('moving a note off its still-default lane stops the old lane from also scoring it', () => {
+    // Regression for "remapping a MIDI note to a new lane leaves it silently
+    // active on its old default lane too": tom1 has never been configured,
+    // so before the fix, Learning midi:38 (snare's default note) onto tom1
+    // left it matching both lanes.
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(DEVICE_A));
+    act(() => result.current.assignControl('tom1', 'midi:38'));
+
+    expect(result.current.inputMapping.tom1).toEqual(['midi:38']);
+    expect(result.current.inputMapping.snare).toEqual(['midi:40', 'midi:37']);
+  });
+
+  it('does not let a caller mutating a returned lane array corrupt the shared DTX default for other devices', () => {
+    const { result } = renderHook(() => useInput(), { wrapper });
+
+    act(() => result.current.setSelectedDevice(DEVICE_A));
+    // Simulate a hypothetical downstream in-place mutation of the array
+    // handed out for a never-configured lane.
+    result.current.inputMapping.kick!.push('midi:999');
+
+    act(() => result.current.setSelectedDevice(DEVICE_B));
+
+    expect(result.current.inputMapping.kick).toEqual(['midi:35', 'midi:36']);
+  });
+
   it('scores a hit on the default snare note with no manual configuration', () => {
     const { result } = renderHook(() => useInput(), { wrapper });
 

@@ -12,7 +12,12 @@ import {
 import Store from 'electron-store';
 import { StorageSchema } from '../types';
 import MenuBuilder from './menu';
-import { ASSET_PROTOCOL, resolveAssetFilePath, resolveHtmlPath } from './util';
+import {
+  ASSET_PROTOCOL,
+  resolveAssetFilePath,
+  resolveHtmlPath,
+  toSong,
+} from './util';
 import { AppUpdater } from './AppUpdater';
 import { PracticePresenceController } from './practicePresence';
 import { loadSong } from './ipc/loadSong';
@@ -41,6 +46,12 @@ import {
   getRemoteAutoChartSettings,
   saveAndTestRemoteAutoChart,
 } from './ipc/remoteAutoChart';
+import {
+  configureLibraryMirror,
+  getLibraryMirrorSettings,
+  saveLibraryMirrorSettings,
+  syncLibraryMirror,
+} from './libraryMirror';
 import { searchYoutube } from './ipc/searchYoutube';
 import { fetchMyMusic } from './ipc/myMusic';
 import { loadLibraryCandidates } from './ipc/loadLibraryCandidates';
@@ -78,6 +89,8 @@ class AppState {
   private static instance: AppState;
   private mainWindow: BrowserWindow | null = null;
   private powerSaveBlockerId: number = -1;
+  private cleanupPromise: Promise<void> | undefined;
+  private quitting = false;
   readonly store = new Store();
   readonly practicePresence = new PracticePresenceController({
     store: this.store,
@@ -126,9 +139,19 @@ class AppState {
         app.quit();
       }
     });
-    app.on('before-quit', () => {
+    app.on('before-quit', (event) => {
+      if (this.quitting) {
+        return;
+      }
+
+      event.preventDefault();
       this.practicePresence.dispose();
-      this.cleanup();
+      void this.cleanup()
+        .catch(() => undefined)
+        .finally(() => {
+          this.quitting = true;
+          app.quit();
+        });
     });
     app
       .whenReady()
@@ -165,6 +188,10 @@ class AppState {
 
     configureRemoteAutoChartStore(this.store);
     configureCoachStore(this.store);
+    configureLibraryMirror(
+      this.store,
+      path.join(app.getPath('userData'), 'library-mirror-outbox'),
+    );
 
     ipcMain.on('load-song', loadSong);
     ipcMain.on('load-song-list', loadSongList);
@@ -180,6 +207,15 @@ class AppState {
     ipcMain.on('import-auto-chart', importAutoChart);
     ipcMain.on('get-auto-chart-remote-settings', getRemoteAutoChartSettings);
     ipcMain.on('save-test-auto-chart-remote', saveAndTestRemoteAutoChart);
+    ipcMain.on('get-library-mirror-settings', getLibraryMirrorSettings);
+    ipcMain.on('save-library-mirror-settings', saveLibraryMirrorSettings);
+    ipcMain.on('sync-library-mirror', (event) => {
+      const songs = Object.values(
+        this.store.get('songs') as StorageSchema['songs'],
+      ).map(toSong);
+
+      void syncLibraryMirror(event, songs);
+    });
     ipcMain.on('search-youtube', searchYoutube);
     ipcMain.on('my-music-fetch', fetchMyMusic);
     ipcMain.on('load-library-candidates', (event) => {
@@ -380,12 +416,20 @@ class AppState {
     }
   }
 
-  cleanup(): void {
+  cleanup(): Promise<void> {
+    if (this.cleanupPromise) {
+      return this.cleanupPromise;
+    }
+
     this.resumeSleep();
     stopListenMidi();
     killActiveSplit();
     cancelStemTools();
-    void autoChartQueue.shutdown();
+    this.cleanupPromise = autoChartQueue.shutdown().finally(() => {
+      this.cleanupPromise = undefined;
+    });
+
+    return this.cleanupPromise;
   }
 }
 

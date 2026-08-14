@@ -1,0 +1,129 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="squircleA">
+      <rect x="0" y="0" width="1024" height="1024" rx="225" ry="225" />
+    </clipPath>
+
+    <radialGradient id="fieldA" cx="42%" cy="34%" r="85%">
+      <stop offset="0%" stop-color="#fdf3dd" />
+      <stop offset="45%" stop-color="#f2dcaa" />
+      <stop offset="100%" stop-color="#d9a75c" />
+    </radialGradient>
+
+    <linearGradient id="topGlossA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.16" />
+      <stop offset="55%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+
+    <linearGradient id="bottomVignetteA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="70%" stop-color="#241f19" stop-opacity="0" />
+      <stop offset="100%" stop-color="#241f19" stop-opacity="0.14" />
+    </linearGradient>
+
+    <radialGradient id="headFillA" cx="46%" cy="38%" r="75%">
+      <stop offset="0%" stop-color="#fffdf6" />
+      <stop offset="100%" stop-color="#ecdab4" />
+    </radialGradient>
+
+    <linearGradient id="shellFillA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4a392a" />
+      <stop offset="100%" stop-color="#1d160f" />
+    </linearGradient>
+
+    <linearGradient id="stickFillA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#332619" />
+      <stop offset="100%" stop-color="#1d160f" />
+    </linearGradient>
+
+    <linearGradient id="waveGradA" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#e85a36" />
+      <stop offset="38%" stop-color="#ef8a3f" />
+      <stop offset="50%" stop-color="#f7d24a" />
+      <stop offset="62%" stop-color="#ef8a3f" />
+      <stop offset="100%" stop-color="#e85a36" />
+    </linearGradient>
+
+    <radialGradient id="sparkGlowA" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff4d6" stop-opacity="0.95" />
+      <stop offset="45%" stop-color="#f7d24a" stop-opacity="0.55" />
+      <stop offset="100%" stop-color="#f7d24a" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <g clip-path="url(#squircleA)">
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#fieldA)" />
+
+    <!-- crossed sticks, behind the drum -->
+    <g fill="url(#stickFillA)">
+      <path d="M 224 96
+               L 300 96
+               C 322 96 340 112 350 132
+               L 706 452
+               C 690 476 662 486 636 476
+               L 300 158
+               C 258 148 224 128 224 96 Z" />
+      <circle cx="256" cy="118" r="46" />
+
+      <path d="M 800 96
+               L 724 96
+               C 702 96 684 112 674 132
+               L 318 452
+               C 334 476 362 486 388 476
+               L 724 158
+               C 766 148 800 128 800 96 Z" />
+      <circle cx="768" cy="118" r="46" />
+    </g>
+
+    <!-- shell barrel -->
+    <path d="M 190 452
+             A 322 196 0 0 0 834 452
+             L 834 612
+             A 322 92 0 0 1 190 612
+             Z" fill="url(#shellFillA)" />
+    <path d="M 190 452 A 322 196 0 0 0 834 452"
+          fill="none" stroke="#0f0b07" stroke-width="6" stroke-opacity="0.5" />
+
+    <!-- lugs -->
+    <g fill="#c9962c">
+      <circle cx="222" cy="486" r="15" />
+      <circle cx="342" cy="556" r="15" />
+      <circle cx="512" cy="580" r="15" />
+      <circle cx="682" cy="556" r="15" />
+      <circle cx="802" cy="486" r="15" />
+    </g>
+    <g fill="#8f6a1c" opacity="0.55">
+      <circle cx="222" cy="486" r="15" />
+      <circle cx="342" cy="556" r="15" />
+      <circle cx="512" cy="580" r="15" />
+      <circle cx="682" cy="556" r="15" />
+      <circle cx="802" cy="486" r="15" />
+    </g>
+
+    <!-- drumhead -->
+    <ellipse cx="512" cy="452" rx="322" ry="196" fill="url(#headFillA)"
+             stroke="#241f19" stroke-width="30" />
+    <ellipse cx="512" cy="452" rx="288" ry="168" fill="none"
+             stroke="#f4bd3d" stroke-width="7" stroke-opacity="0.4" />
+
+    <!-- ember waveform across the head -->
+    <path d="M 226 452
+             C 264 452 288 440 316 452
+             C 344 464 366 452 392 452
+             L 452 452
+             C 470 452 476 340 500 296
+             L 512 296
+             C 528 296 536 424 556 468
+             C 570 498 586 468 602 452
+             L 690 452
+             C 716 452 738 440 762 452
+             C 786 464 780 452 798 452"
+          fill="none" stroke="url(#waveGradA)" stroke-width="20"
+          stroke-linecap="round" stroke-linejoin="round" />
+
+    <circle cx="512" cy="296" r="46" fill="url(#sparkGlowA)" />
+    <circle cx="512" cy="296" r="13" fill="#fff7e4" />
+
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#topGlossA)" />
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#bottomVignetteA)" />
+  </g>
+</svg>

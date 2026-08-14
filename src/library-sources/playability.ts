@@ -17,6 +17,24 @@ function isSha256(value: unknown): value is string {
   return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);
 }
 
+function validYoutubeAudio(audio: PlayabilityEvidence['audio']): boolean {
+  const source = audio.youtube;
+
+  return (
+    audio.source === 'youtube-fetched' &&
+    source?.provider === 'youtube' &&
+    /^[A-Za-z0-9_-]{11}$/.test(source.videoId) &&
+    source.watchUrl === `https://www.youtube.com/watch?v=${source.videoId}` &&
+    presentString(source.title) &&
+    Number.isFinite(source.durationSeconds) &&
+    source.durationSeconds > 0 &&
+    source.downloader === 'yt-dlp' &&
+    source.downloaderVersion === '2026.7.4' &&
+    presentString(source.fetchedAt) &&
+    !Number.isNaN(Date.parse(source.fetchedAt))
+  );
+}
+
 function normalized(value: string): string {
   return value
     .normalize('NFKD')
@@ -69,8 +87,12 @@ export function playabilityBlockers(
 
   if (
     !evidence?.audio ||
-    (evidence.audio.source !== 'local-user-attested' &&
-      evidence.audio.source !== 'public-chart-package') ||
+    (!validYoutubeAudio(evidence.audio) &&
+      !(
+        (evidence.audio.source === 'local-user-attested' ||
+          evidence.audio.source === 'public-chart-package') &&
+        evidence.audio.youtube === undefined
+      )) ||
     !isSha256(evidence.audio.sha256)
   ) {
     blockers.push('lawful-audio');

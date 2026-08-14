@@ -1,0 +1,15 @@
+{
+  "story": "http://localhost:6100/iframe.html?id=insights-profile-view--evidence-backed-route&viewMode=story",
+  "token_proof": {
+    "surface": "ProfileView selected Today tab",
+    "class": "text-surface-raised",
+    "computed_background": "rgb(123, 61, 70)",
+    "computed_text": "rgb(252, 249, 242)",
+    "expected_surface_raised": "#fcf9f2"
+  },
+  "storybook_console": {
+    "waited_for_midi_timeout_ms": 2600,
+    "error_logs": [],
+    "pending_unsubscribe_error": false
+  }
+}

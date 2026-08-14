@@ -145,6 +145,126 @@ interface FlowMeterBar {
   x: number;
   width: number;
   beats: FlowMeterBeat[];
+  pattern?: NotationPatternRun;
+}
+
+export interface NotationPatternRun {
+  startIndex: number;
+  endIndex: number;
+  count: number;
+}
+
+const REPEAT_CUE_GAP = 10;
+const REPEAT_CUE_HEIGHT = 16;
+
+export interface RepeatCueSegment {
+  startIndex: number;
+  endIndex: number;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+function notationPatternKey(measure: RenderData['measure']): string {
+  const duration = Math.max(1, measure.endTick - measure.startTick);
+
+  return JSON.stringify([
+    measure.timeSig,
+    measure.isCompound,
+    (measure.notes ?? []).map((note) => [
+      (note.tick - measure.startTick) / duration,
+      note.duration,
+      note.dots,
+      note.isRest,
+      [...note.notes].sort(),
+      note.tupletId ?? null,
+      note.graceNotes ?? [],
+      [...(note.accents ?? [])].sort(),
+      [...(note.ghosts ?? [])].sort(),
+    ]),
+  ]);
+}
+
+export function repeatedNotationPatterns(
+  renderData: RenderData[],
+): NotationPatternRun[] {
+  const patterns: NotationPatternRun[] = [];
+  let startIndex = 0;
+
+  while (startIndex < renderData.length) {
+    const key = notationPatternKey(renderData[startIndex].measure);
+    let endIndex = startIndex + 1;
+
+    while (
+      endIndex < renderData.length &&
+      notationPatternKey(renderData[endIndex].measure) === key
+    ) {
+      endIndex += 1;
+    }
+
+    if (endIndex - startIndex > 1) {
+      patterns.push({
+        startIndex,
+        endIndex: endIndex - 1,
+        count: endIndex - startIndex,
+      });
+    }
+
+    startIndex = endIndex;
+  }
+
+  return patterns;
+}
+
+export function repeatCueSegments(
+  renderData: RenderData[],
+  pattern: NotationPatternRun,
+): RepeatCueSegment[] {
+  const segments: RepeatCueSegment[] = [];
+  let segment: RepeatCueSegment | undefined;
+
+  for (
+    let measureIndex = pattern.startIndex;
+    measureIndex <= pattern.endIndex;
+    measureIndex += 1
+  ) {
+    const measureData = renderData[measureIndex];
+
+    if (!measureData) {
+      continue;
+    }
+
+    const left = measureData.stave.getX();
+    const width = measureData.stave.getWidth();
+    const top =
+      measureData.yOffset +
+      measureData.stave.getY() +
+      measureData.stave.getHeight() +
+      REPEAT_CUE_GAP;
+
+    if (!segment || segment.top !== top) {
+      segment = {
+        startIndex: measureIndex,
+        endIndex: measureIndex,
+        left,
+        top,
+        width,
+        height: REPEAT_CUE_HEIGHT,
+      };
+      segments.push(segment);
+
+      continue;
+    }
+
+    const right = Math.max(segment.left + segment.width, left + width);
+
+    segment.left = Math.min(segment.left, left);
+    segment.width = right - segment.left;
+    segment.endIndex = measureIndex;
+  }
+
+  return segments;
 }
 
 /**
@@ -198,6 +318,18 @@ export function flowLocationForTick(
 }
 
 export function flowMeterBars(renderData: RenderData[]): FlowMeterBar[] {
+  const patternsByMeasure = new Map<number, NotationPatternRun>();
+
+  repeatedNotationPatterns(renderData).forEach((pattern) => {
+    for (
+      let measureIndex = pattern.startIndex;
+      measureIndex <= pattern.endIndex;
+      measureIndex += 1
+    ) {
+      patternsByMeasure.set(measureIndex, pattern);
+    }
+  });
+
   return renderData.map((measureData, measureIndex) => {
     const { measure, stave } = measureData;
     const beatCount = flowBeatCount(measure);
@@ -219,8 +351,43 @@ export function flowMeterBars(renderData: RenderData[]): FlowMeterBar[] {
       x: stave.getX(),
       width: stave.getWidth(),
       beats,
+      pattern: patternsByMeasure.get(measureIndex),
     };
   });
+}
+
+export function PatternBands({ renderData }: { renderData: RenderData[] }) {
+  const patterns = repeatedNotationPatterns(renderData);
+
+  return (
+    <div className="drumroll-pattern-bands" aria-hidden="true">
+      {patterns.flatMap((pattern) =>
+        repeatCueSegments(renderData, pattern).map((segment, segmentIndex) => (
+          <div
+            key={`${pattern.startIndex}:${pattern.endIndex}:${segment.startIndex}:${segment.endIndex}`}
+            className="drumroll-pattern-band"
+            data-repeat-count={pattern.count}
+            data-repeat-label={segmentIndex === 0 ? 'true' : undefined}
+            data-repeat-start={segment.startIndex}
+            data-repeat-end={segment.endIndex}
+            data-testid={
+              segmentIndex === 0
+                ? `notation-pattern-${pattern.startIndex}-${pattern.endIndex}`
+                : `notation-pattern-${pattern.startIndex}-${pattern.endIndex}-${segment.startIndex}-${segment.endIndex}`
+            }
+            style={{
+              left: segment.left,
+              top: segment.top,
+              width: segment.width,
+              height: segment.height,
+            }}
+          >
+            {segmentIndex === 0 && <span>repeat ×{pattern.count}</span>}
+          </div>
+        )),
+      )}
+    </div>
+  );
 }
 
 export type LoopEscapePhase = 'control' | 'lock' | 'release';
@@ -379,6 +546,7 @@ export function FlowMeter({ renderData }: { renderData: RenderData[] }) {
           key={bar.measureIndex}
           className="drumroll-flow-meter__bar"
           data-flow-bar={bar.measureIndex}
+          data-flow-repeat={bar.pattern?.count}
           style={{ left: bar.x, width: bar.width }}
         >
           <span className="drumroll-flow-meter__bar-label">
@@ -508,7 +676,7 @@ export function ContinuousNotationCamera({
       const stageRect = stage.getBoundingClientRect();
       const notationRect = notation.getBoundingClientRect();
       const anchor = flowPlayheadOffset(viewport.clientWidth);
-      const scoreTop = Math.max(stageRect.top + 82, notationRect.top - 32);
+      const scoreTop = Math.max(stageRect.top + 32, notationRect.top - 20);
       const scoreBottom = Math.min(
         stageRect.bottom - 20,
         notationRect.bottom + 48,

@@ -11,6 +11,7 @@ import {
   recordRemediationPass,
   remediationQueueStorageKey,
   remediationQueueSlotKey,
+  remediationTaskWhy,
   restoreRemediationQueue,
   serializeRemediationQueue,
 } from './index';
@@ -52,6 +53,36 @@ function createQueue() {
   });
 }
 
+function recordCleanPass(
+  queue: NonNullable<ReturnType<typeof createQueue>>,
+  minute: number,
+) {
+  const task = getActiveRemediationTask(queue);
+
+  if (!task) {
+    return queue;
+  }
+
+  return recordRemediationPass(queue, {
+    completedAt: `2026-08-10T09:${String(minute).padStart(2, '0')}:00.000Z`,
+    resolvedNotes: task.minimumResolvedNotes,
+    misses: 0,
+    wrongHits: 0,
+  });
+}
+
+function completeQueue(queue: NonNullable<ReturnType<typeof createQueue>>) {
+  let current = queue;
+  let minute = 40;
+
+  while (!isRemediationComplete(current)) {
+    current = recordCleanPass(current, minute);
+    minute += 1;
+  }
+
+  return current;
+}
+
 describe('remediation queue', () => {
   it('builds deterministic bar tasks from Coach findings and retains the source review identity', () => {
     const queue = createRemediationQueue({
@@ -73,13 +104,16 @@ describe('remediation queue', () => {
       status: 'active',
       activeTaskIndex: 0,
     });
-    expect(queue?.tasks).toEqual([
+    expect(
+      queue?.tasks.filter(({ approach }) => approach === 'anchor'),
+    ).toEqual([
       expect.objectContaining({
         id: 'bars:4-5',
         barStart: 4,
         barEnd: 5,
         minimumResolvedNotes: 7,
         playbackSpeed: 0.7,
+        approach: 'anchor',
         status: 'active',
         findings: [
           expect.objectContaining({ id: 'same-bars-a' }),
@@ -91,6 +125,31 @@ describe('remediation queue', () => {
         minimumResolvedNotes: 6,
         status: 'pending',
       }),
+    ]);
+  });
+
+  it('plans each tempo step through an explicit target-tempo probe', () => {
+    const queue = createQueue();
+
+    expect(
+      queue?.tasks.map(({ id, playbackSpeed, approach }) => ({
+        id,
+        playbackSpeed,
+        approach,
+      })),
+    ).toEqual([
+      { id: 'bars:4-5', playbackSpeed: 0.7, approach: 'anchor' },
+      {
+        id: 'bars:4-5:tempo-0.8',
+        playbackSpeed: 0.8,
+        approach: 'tempo-variation',
+      },
+      {
+        id: 'bars:4-5:tempo-0.9',
+        playbackSpeed: 0.9,
+        approach: 'tempo-variation',
+      },
+      { id: 'bars:4-5:target', playbackSpeed: 1, approach: 'target-probe' },
     ]);
   });
 
@@ -110,7 +169,12 @@ describe('remediation queue', () => {
       playbackSpeedForRange: () => 4,
     });
 
-    expect(queue?.tasks[0].playbackSpeed).toBe(2);
+    expect(queue?.tasks).toEqual([
+      expect.objectContaining({
+        playbackSpeed: 1,
+        approach: 'anchor',
+      }),
+    ]);
     expect(
       deserializeRemediationQueue(serializeRemediationQueue(queue!)),
     ).toEqual(queue);
@@ -126,7 +190,9 @@ describe('remediation queue', () => {
     });
 
     expect(MAX_REMEDIATION_BARS).toBe(4);
-    expect(queue?.tasks).toEqual([
+    expect(
+      queue?.tasks.filter(({ approach }) => approach === 'anchor'),
+    ).toEqual([
       expect.objectContaining({
         id: 'bars:76-79',
         barStart: 76,
@@ -157,6 +223,7 @@ describe('remediation queue', () => {
         status: 'pending',
       }),
     ]);
+    expect(queue?.tasks).toHaveLength(16);
   });
 
   it('accepts a developing one-miss pass and reaches a finite terminal state', () => {
@@ -191,20 +258,21 @@ describe('remediation queue', () => {
       wrongHits: 0,
     });
     const secondClean = recordRemediationPass(firstClean, {
-      completedAt: '2026-08-10T09:35:00.000Z',
+      completedAt: '2026-08-10T09:34:00.000Z',
       resolvedNotes: 6,
       misses: 0,
       wrongHits: 0,
     });
 
-    expect(getActiveRemediationTask(firstClean)).toBeNull();
+    expect(getActiveRemediationTask(firstClean)).toMatchObject({
+      id: 'bars:4-5:tempo-0.8',
+      status: 'active',
+    });
     expect(firstClean).toMatchObject({
-      status: 'completed',
+      status: 'active',
       activeTaskIndex: 1,
       source,
-      completedAt: '2026-08-10T09:34:00.000Z',
     });
-    expect(secondClean).toEqual(firstClean);
     expect(firstClean.tasks[0]).toMatchObject({
       status: 'completed',
       consecutiveCleanPasses: REQUIRED_CONSECUTIVE_CLEAN_PASSES,
@@ -229,7 +297,64 @@ describe('remediation queue', () => {
         consecutiveCleanPassesAfter: 2,
       }),
     ]);
-    expect(isRemediationComplete(firstClean)).toBe(true);
+
+    const completed = completeQueue(secondClean);
+
+    expect(getActiveRemediationTask(secondClean)).toMatchObject({
+      id: 'bars:4-5:tempo-0.8',
+      consecutiveCleanPasses: 1,
+    });
+    expect(isRemediationComplete(completed)).toBe(true);
+  });
+
+  it('requires two quality passes at each planned tempo step', () => {
+    const queue = createQueue();
+
+    expect(queue).not.toBeNull();
+    expect(remediationTaskWhy(queue!.tasks[0])).toBe(
+      'Build timing in this phrase first; two good-enough passes unlock the next planned tempo probe.',
+    );
+
+    const anchor = recordRemediationPass(queue!, {
+      completedAt: '2026-08-10T09:32:00.000Z',
+      resolvedNotes: 6,
+      misses: 0,
+      wrongHits: 0,
+    });
+    const varied = getActiveRemediationTask(anchor);
+
+    expect(varied).toMatchObject({
+      id: 'bars:4-5',
+      approach: 'anchor',
+      playbackSpeed: 0.7,
+      consecutiveCleanPasses: 1,
+      attempts: [expect.objectContaining({ approach: 'anchor' })],
+    });
+
+    const nextStep = recordRemediationPass(anchor, {
+      completedAt: '2026-08-10T09:33:00.000Z',
+      resolvedNotes: 6,
+      misses: 0,
+      wrongHits: 0,
+    });
+
+    expect(nextStep.tasks[0]).toMatchObject({
+      id: 'bars:4-5',
+      approach: 'anchor',
+      status: 'completed',
+    });
+    expect(getActiveRemediationTask(nextStep)).toMatchObject({
+      id: 'bars:4-5:tempo-0.8',
+      approach: 'tempo-variation',
+      playbackSpeed: 0.8,
+      consecutiveCleanPasses: 0,
+    });
+    expect(remediationTaskWhy(getActiveRemediationTask(nextStep)!)).toBe(
+      'The anchor is in. Keep timing through this phrase at 0.8× before the next planned tempo probe.',
+    );
+    expect(
+      deserializeRemediationQueue(serializeRemediationQueue(nextStep)),
+    ).toEqual(nextStep);
   });
 
   it('advances through multiple phrases only after each phrase is mastered', () => {
@@ -242,46 +367,26 @@ describe('remediation queue', () => {
 
     expect(queue).not.toBeNull();
 
-    const afterFirstPhrase = [
-      '2026-08-10T09:32:00.000Z',
-      '2026-08-10T09:33:00.000Z',
-    ].reduce(
-      (state, completedAt) =>
-        recordRemediationPass(state, {
-          completedAt,
-          resolvedNotes: 4,
-          misses: 0,
-          wrongHits: 0,
-        }),
-      queue!,
-    );
+    let afterFirstPhrase = queue!;
+
+    for (let minute = 32; minute < 40; minute += 1) {
+      afterFirstPhrase = recordCleanPass(afterFirstPhrase, minute);
+    }
 
     expect(afterFirstPhrase).toMatchObject({
       status: 'active',
-      activeTaskIndex: 1,
+      activeTaskIndex: 4,
     });
     expect(getActiveRemediationTask(afterFirstPhrase)).toMatchObject({
       id: 'bars:7-7',
       status: 'active',
     });
 
-    const completed = [
-      '2026-08-10T09:34:00.000Z',
-      '2026-08-10T09:35:00.000Z',
-    ].reduce(
-      (state, completedAt) =>
-        recordRemediationPass(state, {
-          completedAt,
-          resolvedNotes: 4,
-          misses: 0,
-          wrongHits: 0,
-        }),
-      afterFirstPhrase,
-    );
+    const completed = completeQueue(afterFirstPhrase);
 
     expect(completed).toMatchObject({
       status: 'completed',
-      activeTaskIndex: 2,
+      activeTaskIndex: 8,
       source,
     });
   });
@@ -308,11 +413,12 @@ describe('remediation queue', () => {
       misses: 0,
       wrongHits: 0,
     });
+    const completed = completeQueue(secondClean);
 
-    expect(secondClean.status).toBe('completed');
+    expect(completed.status).toBe('completed');
     expect(
-      deserializeRemediationQueue(serializeRemediationQueue(secondClean)),
-    ).toEqual(secondClean);
+      deserializeRemediationQueue(serializeRemediationQueue(completed)),
+    ).toEqual(completed);
   });
 
   it('round-trips only current versioned state and refuses unsafe recovery', () => {

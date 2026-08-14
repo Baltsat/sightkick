@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RunSummary } from '../../renderer/services/practice-stats';
 import { PracticeDays } from '../../renderer/services/streaks';
+import type { SkillEvidenceEvent } from '../../renderer/services/pedagogy/types';
 import { FakeStore, lastReply, makeEvent, makeStore } from './test-support';
 
 const storeHolder = vi.hoisted(() => ({
@@ -43,6 +44,22 @@ function fakeRun(overallAccuracy = 1): RunSummary {
       onTimeCount: 0,
       sampleCount: 0,
     },
+  };
+}
+
+function fakeSkillEvidenceEvent(runId: string): SkillEvidenceEvent {
+  return {
+    run_id: runId,
+    chart_revision: 'chart-revision-1',
+    manifest_revision: 'manifest-1',
+    skill_id: 'skill-1',
+    item_id: 'item-1',
+    context_signature: 'context-1',
+    evidence_kind: 'acquisition',
+    quality: 0.9,
+    weight: 1,
+    playback_speed: 1,
+    completed_at: '2026-08-01T00:00:00.000Z',
   };
 }
 
@@ -223,6 +240,7 @@ describe('loadAllPracticeRuns', () => {
       runs: [runA, runB, runC],
       runsBySong: { 'song-1': [runA, runB], 'song-2': [runC] },
       archiveBySong: {},
+      atomicSkillEvidenceArchiveBySong: {},
     });
   });
 
@@ -267,6 +285,23 @@ describe('loadAllPracticeRuns', () => {
     });
   });
 
+  it('exposes archived atomic skill evidence by song - the mastery replay path this run history actually feeds', () => {
+    const archivedEvent = fakeSkillEvidenceEvent('run-evicted-1');
+
+    storeHolder.current = makeStore({
+      practiceRuns: { 'song-1': [fakeRun()] },
+      practiceRunSkillEvidenceArchive: { 'song-1': [archivedEvent] },
+    });
+
+    const event = makeEvent();
+
+    loadAllPracticeRuns(event as never);
+
+    expect(lastReply(event, 'load-all-practice-runs')!.args[0]).toMatchObject({
+      atomicSkillEvidenceArchiveBySong: { 'song-1': [archivedEvent] },
+    });
+  });
+
   it('replies with an empty list when no runs exist yet', () => {
     storeHolder.current = makeStore({});
 
@@ -278,6 +313,7 @@ describe('loadAllPracticeRuns', () => {
       runs: [],
       runsBySong: {},
       archiveBySong: {},
+      atomicSkillEvidenceArchiveBySong: {},
     });
   });
 });

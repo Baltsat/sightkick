@@ -39,6 +39,8 @@ export class SpeedAudioPlayer
   private outputProducedSeconds: number = 0;
   private totalOutputSeconds: number = 0;
   private pumping: boolean = false;
+  private startPending: boolean = false;
+  private pendingStartAt: number | undefined;
   private epoch: number = 0;
 
   constructor(
@@ -73,11 +75,15 @@ export class SpeedAudioPlayer
     }
 
     const running = this.isInitialised && this.context.state === 'running';
-    const resumeAt = running ? this.currentTime : undefined;
+    const resumeAt = running
+      ? this.currentTime
+      : this.startPending
+      ? this.offset
+      : undefined;
     const deferredStart =
       running && this.startedAt > this.context.currentTime
         ? this.startedAt
-        : undefined;
+        : this.pendingStartAt;
 
     this._playbackSpeed = speed;
     this.prepare();
@@ -144,11 +150,20 @@ export class SpeedAudioPlayer
     }
 
     this.offset = offset;
+    this.startPending = true;
+    this.pendingStartAt = requestedStartAt;
     this.epoch += 1;
 
     const epoch = this.epoch;
 
     await this.prepared;
+
+    // Bail before touching the AudioContext at all once superseded (e.g. by
+    // an explicit `pause()` landing in this gap - see `pause()` below): a
+    // stale restart must not un-suspend a context the user just paused.
+    if (epoch !== this.epoch) {
+      return;
+    }
 
     if (this.context.state === 'suspended') {
       await this.context.resume().catch(() => {});
@@ -197,6 +212,8 @@ export class SpeedAudioPlayer
     }
 
     this.timer = setInterval(this.pump, SCHEDULER_INTERVAL_MS);
+    this.startPending = false;
+    this.pendingStartAt = undefined;
   }
 
   /**
@@ -334,6 +351,20 @@ export class SpeedAudioPlayer
     }
   };
 
+  /**
+   * Invalidates any in-flight `start()` (e.g. one a speed change just
+   * kicked off, still awaiting its stretch-stream re-init) before
+   * suspending the context. Without this, that stale restart can resume
+   * past its own epoch guard after this explicit pause resolves, audibly
+   * un-pausing the song behind a UI that still says paused.
+   */
+  pause(): void {
+    this.startPending = false;
+    this.pendingStartAt = undefined;
+    this.epoch += 1;
+    super.pause();
+  }
+
   stop() {
     if (this.timer !== undefined) {
       clearInterval(this.timer);
@@ -343,12 +374,21 @@ export class SpeedAudioPlayer
     this.audioTracks.forEach((track) => track.stop());
     this.isInitialised = false;
     this.startedAt = -1;
+    this.startPending = false;
+    this.pendingStartAt = undefined;
     this.epoch += 1;
   }
 
   get currentTime() {
     if (this.startedAt < 0) {
-      return 0;
+      // Not just "never started": `start()` also transits through here
+      // synchronously (via its own `stop()`) before its `await this.prepared`
+      // gap, e.g. while restarting for a speed change. `this.offset` is
+      // already set to the real resume position by then (`start()` sets it
+      // before its first await), so it's the correct paused/resume position
+      // to report - not a hard 0, which would make a pause landing in that
+      // gap snap the displayed position back to the very start of the song.
+      return this.offset;
     }
 
     const latency = this.context.state === 'running' ? this.outputLatency : 0;

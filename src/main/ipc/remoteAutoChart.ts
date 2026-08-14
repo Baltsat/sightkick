@@ -115,35 +115,47 @@ function remoteUrl(endpoint: string, relativePath: string): string {
   return new URL(relativePath, `${endpoint}/`).toString();
 }
 
-export function getRemoteAutoChartRuntime(): RemoteAutoChartRuntime {
-  const store = requireStore();
-  const endpointValue = store.get(ENDPOINT_KEY);
-  const tokenValue = store.get(TOKEN_KEY);
+function configuredValue(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
 
-  if (typeof endpointValue !== 'string' || typeof tokenValue !== 'string') {
-    throw new Error(
-      'Configure the remote transcriber endpoint and token first',
-    );
+  return value.trim() || undefined;
+}
+
+function configuredRemoteValues(): {
+  endpoint?: string;
+  token?: string;
+} {
+  return {
+    endpoint:
+      configuredValue(process.env.TRANSCRIBER_URL) ??
+      configuredValue(settingsStore?.get(ENDPOINT_KEY)),
+    token:
+      configuredValue(process.env.TRANSCRIBER_TOKEN) ??
+      configuredValue(settingsStore?.get(TOKEN_KEY)),
+  };
+}
+
+export function getRemoteAutoChartRuntime(): RemoteAutoChartRuntime {
+  const { endpoint: endpointValue, token: tokenValue } =
+    configuredRemoteValues();
+
+  if (!endpointValue || !tokenValue) {
+    throw new Error('Drumroll remote transcriber is unavailable');
   }
 
   const endpoint = canonicalizeRemoteEndpoint(endpointValue);
-  const token = tokenValue.trim();
 
-  if (!token) {
-    throw new Error('Configure the remote transcriber token first');
-  }
-
-  return { endpoint, token };
+  return { endpoint, token: tokenValue };
 }
 
 export function getRemoteAutoChartSettings(event: IpcMainEvent): void {
-  const store = requireStore();
-  const endpoint = store.get(ENDPOINT_KEY);
-  const token = store.get(TOKEN_KEY);
+  const { endpoint, token } = configuredRemoteValues();
 
   event.reply('auto-chart-remote-settings', {
-    endpoint: typeof endpoint === 'string' ? endpoint : '',
-    tokenConfigured: typeof token === 'string' && token.trim().length > 0,
+    endpoint: endpoint ? canonicalizeRemoteEndpoint(endpoint) : '',
+    tokenConfigured: Boolean(token),
   } satisfies IpcAutoChartRemoteSettings);
 }
 
@@ -214,9 +226,7 @@ export async function saveAndTestRemoteAutoChart(
 
 function remoteError(status: number): Error {
   if (status === 401) {
-    return new Error(
-      'Remote transcriber rejected the saved token (401). Update it and try again',
-    );
+    return new Error('Remote transcriber rejected its credentials (401)');
   }
 
   return new Error(`Remote transcriber request failed (${status})`);

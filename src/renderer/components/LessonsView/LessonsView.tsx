@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowsRotate } from '@fortawesome/free-solid-svg-icons';
-import { App, Button, Progress } from 'antd';
+import { Button, Progress } from 'antd';
 import {
   currentSeasonInfo,
   HeaderStrip,
@@ -12,13 +12,12 @@ import {
   LESSON_METHOD_DISPLAY_NAME,
   LessonEntry,
   LessonProgress,
-  lockedHint,
 } from '../../hooks/useLessons';
 import { useInput } from '../../context/InputContext';
 import { useInputControls } from '../../hooks/useInputControls';
 import journeyStudio from '../../assets/daybreak/journey-studio.png';
+import { makeLessonsOpen } from '../../services/lesson-progression';
 import { resolveJourneyControls } from './journey-controls';
-import '../LessonsJourney/daybreak-journey.css';
 import '../LessonsJourney/JourneyV2.css';
 
 export interface LessonsViewProps {
@@ -45,19 +44,20 @@ export function LessonsView({
   onRescan,
   onBack,
 }: LessonsViewProps) {
-  const { notification } = App.useApp();
   const { controlMapping, inputMapping } = useInput();
   const journeyControls = useMemo(
     () => resolveJourneyControls(controlMapping, inputMapping),
     [controlMapping, inputMapping],
   );
-  const { groups, totalLessons } = progress;
+  const openProgress = useMemo(() => makeLessonsOpen(progress), [progress]);
+  const { groups, totalLessons } = openProgress;
   const isScanning = scanPercent !== undefined;
   // The season the "where am I" pointer sits in opens by default; once the
   // whole curriculum is cleared (no pointer left) the finale season opens
   // instead of leaving everything collapsed.
   const currentUnit =
-    currentSeasonInfo(progress)?.group.unit ?? groups[groups.length - 1]?.unit;
+    currentSeasonInfo(openProgress)?.group.unit ??
+    groups[groups.length - 1]?.unit;
   const [selectedUnit, setSelectedUnit] = useState(currentUnit);
   const visibleUnit = useMemo(
     () =>
@@ -77,7 +77,7 @@ export function LessonsView({
   );
   const preferredFocusedLessonId =
     focusableEntries.find(
-      (entry) => entry.song.id === progress.continueEntry?.song.id,
+      (entry) => entry.song.id === openProgress.continueEntry?.song.id,
     )?.song.id ?? focusableEntries[0]?.song.id;
   const [focusedLessonId, setFocusedLessonId] = useState<string | undefined>(
     preferredFocusedLessonId,
@@ -94,16 +94,25 @@ export function LessonsView({
       const unlocked = group?.entries.filter((entry) => entry.unlocked) ?? [];
       const nextFocusedId =
         unlocked.find(
-          (entry) => entry.song.id === progress.continueEntry?.song.id,
+          (entry) => entry.song.id === openProgress.continueEntry?.song.id,
         )?.song.id ?? unlocked[0]?.song.id;
 
       setSelectedUnit(unit);
       setFocusedLessonId(nextFocusedId);
     },
-    [groups, progress.continueEntry?.song.id],
+    [groups, openProgress.continueEntry?.song.id],
   );
   const revealJourneyControls = useCallback(() => {
     setJourneyControlsVisible(true);
+  }, []);
+  // Kit/keyboard navigation (moveKitFocus, moveSeason, confirm, back) always
+  // *reveals* the hint - a player mid-navigation should never have it flicker
+  // shut. The visible "Controls" chip is the one place that should actually
+  // toggle, so a player who opened it can close it again (2026-08-13
+  // critique, journey item 3: an `aria-expanded` control that can only ever
+  // expand isn't a real toggle).
+  const toggleJourneyControls = useCallback(() => {
+    setJourneyControlsVisible((current) => !current);
   }, []);
   const moveKitFocus = useCallback(
     (delta: number) => {
@@ -193,17 +202,6 @@ export function LessonsView({
       : visibleState === 'locked'
       ? 'Venue locked'
       : 'Current stage';
-  const handleLockedClick = (entry: LessonEntry) => {
-    const readableHint = lockedHint(entry);
-
-    notification.info({
-      title: 'This lesson is locked',
-      description: `${readableHint} to unlock “${
-        entry.song.name || entry.lesson.title
-      }.”`,
-      placement: 'bottomRight',
-    });
-  };
 
   if (totalLessons === 0) {
     if (isScanning) {
@@ -250,8 +248,21 @@ export function LessonsView({
       className="daybreak-journey-root journey-route overflow-hidden"
       data-testid="lessons-scroll-root"
     >
+      <style data-testid="lesson-open-path-styles">{`
+        .daybreak-journey-stage--open-lessons .daybreak-node-lane {
+          display: inline;
+        }
+
+        .daybreak-journey-stage--open-lessons .daybreak-node-lane::before {
+          content: 'builds · ';
+        }
+
+        .daybreak-journey-stage--open-lessons .daybreak-lesson-node__stars:has([data-filled='true']) {
+          display: flex;
+        }
+      `}</style>
       <div className="daybreak-journey-shell journey-route__shell">
-        <HeaderStrip progress={progress} onPlay={onPlay} />
+        <HeaderStrip progress={openProgress} onPlay={onPlay} />
 
         <nav
           className="daybreak-season-rail"
@@ -280,7 +291,9 @@ export function LessonsView({
                 >
                   {String(index + 1).padStart(2, '0')}
                 </span>
-                <span className="daybreak-season-tab__label">{group.unit}</span>
+                <span className="daybreak-season-tab__label" title={group.unit}>
+                  {group.unit}
+                </span>
                 <span
                   className="daybreak-season-tab__state"
                   data-state={state}
@@ -299,9 +312,11 @@ export function LessonsView({
         </nav>
 
         <div
-          className="daybreak-journey-stage journey-route__stage grow"
+          className="daybreak-journey-stage daybreak-journey-stage--open-lessons journey-route__stage grow"
           style={{
-            backgroundImage: `url(${journeyStudio})`,
+            backgroundImage: `linear-gradient(100deg, color-mix(in srgb, var(--surface-canvas) 88%, transparent) 0%, color-mix(in srgb, var(--surface-canvas) 48%, transparent) 44%, transparent 72%), linear-gradient(0deg, color-mix(in srgb, var(--surface-canvas) 48%, transparent) 0%, transparent 42%), url(${journeyStudio})`,
+            backgroundPosition: 'center',
+            backgroundSize: 'cover',
           }}
           data-testid="lesson-season-stage"
           data-selected-season-state={visibleState}
@@ -316,7 +331,9 @@ export function LessonsView({
               <span>
                 Season {String(visibleSeasonIndex + 1).padStart(2, '0')}
               </span>
-              <strong>{visibleGroup.unit}</strong>
+              <strong data-testid="journey-world-title">
+                {visibleGroup.unit}
+              </strong>
               <small>{visibleStateLabel}</small>
             </div>
           )}
@@ -325,7 +342,7 @@ export function LessonsView({
               key={group.unit}
               group={group}
               seasonNumber={index + 1}
-              progress={progress}
+              progress={openProgress}
               isCurrent={group.unit === currentUnit}
               isFeatured={group.unit === visibleUnit}
               focusedLessonId={resolvedFocusedLessonId}
@@ -334,8 +351,9 @@ export function LessonsView({
               kitActions={journeyControls.kitActions}
               controlsVisible={journeyControlsVisible}
               onRevealControls={revealJourneyControls}
+              onToggleControls={toggleJourneyControls}
               onPlay={onPlay}
-              onLockedClick={handleLockedClick}
+              onLockedClick={onPlay}
             />
           ))}
         </div>

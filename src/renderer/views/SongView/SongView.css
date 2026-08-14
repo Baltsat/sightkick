@@ -1,74 +1,26 @@
 .drumroll-practice-shell {
   height: 100%;
   min-height: 0;
+  margin-left: 13rem;
   overflow: hidden;
-  color: var(--color-ink);
-  background: var(--color-paper-light);
+  color: var(--dr-ink, var(--color-ink));
+  background: transparent;
 }
 
 .drumroll-notation-stage {
   position: relative;
-  transition: background-color 180ms ease;
+  min-height: 0;
+  background: transparent;
 }
 
-.drumroll-practice-shell[data-session-phase='ready']
-  .drumroll-notation-stage
-  [class*='vf-note-'],
-.drumroll-practice-shell[data-session-phase='ready']
-  .drumroll-notation-stage
-  [class*='vf-note-']
-  *,
-.drumroll-practice-shell[data-session-phase='ready']
-  .drumroll-notation-stage
-  [class*='vf-accent-'],
-.drumroll-practice-shell[data-session-phase='ready']
-  .drumroll-notation-stage
-  [class*='vf-accent-']
-  * {
-  fill: var(--color-text-muted) !important;
-  stroke: color-mix(in srgb, var(--color-text-muted) 82%, white) !important;
-}
-
-.drumroll-practice-shell[data-session-phase='ready']
-  .drumroll-notation-stage
-  .vf-note-active,
-.drumroll-practice-shell[data-session-phase='ready']
-  .drumroll-notation-stage
-  .vf-note-active
-  * {
-  fill: var(--color-coral) !important;
-  stroke: color-mix(in srgb, var(--color-coral) 70%, white) !important;
-}
-
-.drumroll-practice-shell[data-session-phase='ready']
-  .drumroll-flow-meter__bar[data-flow-current='true'] {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--color-coral) 14%, transparent),
-    transparent 72%
-  );
-}
-
-.drumroll-practice-shell[data-session-phase='ready']
-  .drumroll-flow-meter__bar[data-flow-current='true']
-  .drumroll-flow-meter__bar-label,
-.drumroll-practice-shell[data-session-phase='ready']
-  .drumroll-flow-meter__beat[data-flow-current='true']
-  > span {
-  color: var(--color-coral);
-  font-weight: 700;
-}
-
-.drumroll-practice-shell[data-session-phase='ready']
-  .drumroll-flow-meter__beat[data-flow-current='true'] {
-  width: 2px;
-  border-left: 0;
-  background: var(--color-coral);
-  box-shadow: 0 0 0 3px rgb(255 104 79 / 12%);
+.drumroll-flow-viewport {
+  overflow: hidden;
 }
 
 .drumroll-classic-viewport {
-  padding: 1rem 1rem 10rem;
+  padding: 1.25rem 1.25rem 4.25rem;
+  overflow: auto;
+  background: transparent;
   scrollbar-width: none;
 }
 
@@ -79,22 +31,61 @@
 .drumroll-practice-toolbar {
   position: relative;
   z-index: 24;
-  border-bottom: 1px solid rgb(17 23 34 / 10%);
-  background: var(--color-paper-light);
+  border-bottom: 1px solid var(--dr-line, rgb(36 31 25 / 16%));
+  background: color-mix(
+    in srgb,
+    var(--dr-paper, var(--color-paper-light)) 58%,
+    transparent
+  );
 }
 
 .drumroll-practice-toolbar > .ant-btn {
   border-color: transparent;
-  border-radius: 4px;
+  border-radius: 6px;
+  color: var(--dr-ink, var(--color-ink));
   background: transparent;
   box-shadow: none;
 }
 
 .drumroll-practice-toolbar > .ant-btn-primary {
-  border-color: transparent;
-  color: white;
-  background: var(--color-coral);
-  box-shadow: none;
+  border-color: var(--dr-ember, var(--color-coral));
+  color: var(--dr-ink, var(--color-ink));
+  background: var(--dr-ember, var(--color-coral));
+}
+
+.drumroll-practice-toolbar__identity {
+  flex: 0 1 17rem;
+}
+
+/* He practices at 0.7x and needs the mode and speed at a glance - never
+ * drop .drumroll-practice-toolbar__mode-label/layout-label/speed-label at
+ * any captured width. This block is shrink-0 and the Playback scrubber
+ * next to it is grow, so the scrubber absorbs width first; nothing here
+ * needs to degrade down to the 1024px minimum. */
+.drumroll-practice-toolbar__session-state {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--dr-ink-muted, var(--color-text-muted));
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.drumroll-practice-toolbar__session-state
+  > span:not(.drumroll-practice-input-readiness)
+  + span:not(.drumroll-practice-input-readiness)::before {
+  margin-right: 0.4rem;
+  color: var(--dr-line, rgb(36 31 25 / 34%));
+  content: '·';
+}
+
+.drumroll-practice-toolbar__session-state[data-looping='true'] {
+  color: var(--dr-ember, var(--color-coral));
 }
 
 .drumroll-practice-input-readiness {
@@ -102,68 +93,25 @@
   min-width: 0;
   align-items: center;
   gap: 0.32rem;
-  color: var(--color-text-muted);
-  font-family: var(--font-ui);
-  font-size: 0.68rem;
-  font-weight: 680;
-  line-height: 1;
+  color: inherit;
+  font: inherit;
   white-space: nowrap;
 }
 
 .drumroll-practice-input-readiness > span {
-  width: 0.4rem;
-  height: 0.4rem;
+  width: 0.42rem;
+  height: 0.42rem;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: var(--color-green);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-green) 16%, transparent);
+  background: var(--dr-earned, var(--color-green));
 }
 
 .drumroll-practice-input-readiness[data-state='reconnecting'] > span {
-  background: var(--color-amber);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-amber) 18%, transparent);
+  background: var(--dr-warning, var(--color-amber));
 }
 
 .drumroll-practice-input-readiness[data-state='waiting'] > span {
-  background: var(--color-text-faint);
-  box-shadow: 0 0 0 3px rgb(17 23 34 / 8%);
-}
-
-.drumroll-practice-input-telemetry {
-  color: color-mix(in srgb, var(--color-cyan) 76%, var(--color-text-muted));
-  font-variant-numeric: tabular-nums;
-  text-transform: none;
-}
-
-.drumroll-practice-toolbar__identity {
-  flex: 0 1 16rem;
-}
-
-.drumroll-practice-toolbar__session-state {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.42rem;
-  color: var(--color-text-muted);
-  font-family: var(--font-ui);
-  font-size: 0.68rem;
-  font-weight: 720;
-  letter-spacing: 0.04em;
-  line-height: 1;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.drumroll-practice-toolbar__session-state
-  > span:not(.drumroll-practice-input-readiness)
-  + span:not(.drumroll-practice-input-readiness)::before {
-  margin-right: 0.42rem;
-  color: rgb(17 23 34 / 24%);
-  content: '·';
-}
-
-.drumroll-practice-toolbar__session-state[data-looping='true'] {
-  color: color-mix(in srgb, var(--color-coral) 72%, var(--color-text-muted));
+  background: var(--dr-line, var(--color-text-faint));
 }
 
 .drumroll-performance-inspector {
@@ -174,6 +122,12 @@
   max-width: min(28rem, calc(100vw - 1.5rem));
   max-height: calc(100vh - 5rem);
   overflow: auto;
+}
+
+.drumroll-performance-inspector .ant-popover-inner {
+  border: 1px solid var(--dr-line, rgb(36 31 25 / 16%));
+  border-radius: 6px;
+  box-shadow: none;
 }
 
 .drumroll-performance-inspector__body {
@@ -189,8 +143,6 @@
   min-width: 0;
 }
 
-/* Keep motivational feedback in the quiet left rail. The prior centered
- * overlay occupied the same coordinates as Flow's title/location HUD. */
 .drumroll-practice-streak {
   inset-inline: 1rem auto !important;
   top: 1rem;
@@ -198,19 +150,16 @@
   justify-content: flex-start;
 }
 
-.drumroll-perform-kit-prompt {
-  position: absolute;
-  right: clamp(1rem, 2.4vw, 2.25rem);
-  bottom: clamp(1rem, 2.1vw, 1.75rem);
-  z-index: 16;
-  max-width: min(44rem, calc(100vw - 2rem));
-  padding: 0.85rem 1rem;
-  border: 1px solid rgb(17 23 34 / 10%);
-  border-radius: 16px;
-  background: rgb(255 252 246 / 94%);
-  box-shadow: 0 22px 42px -28px rgb(17 23 34 / 42%);
-  backdrop-filter: blur(16px);
-  pointer-events: none;
+.drumroll-loop-caption {
+  --edge-caption-signal: var(--dr-ember, var(--color-coral));
+}
+
+.drumroll-transport-caption {
+  --edge-caption-signal: var(--dr-ink-muted, var(--color-text-muted));
+}
+
+.drumroll-transport-caption .drumroll-practice-edge-caption__title {
+  color: var(--edge-caption-signal);
 }
 
 @media (max-width: 1100px) {
@@ -221,23 +170,18 @@
 
   .drumroll-practice-toolbar__identity {
     width: 11rem;
-    min-width: 11rem;
+    min-width: 0;
     max-width: 11rem;
-    flex-basis: 12rem;
-  }
-
-  .drumroll-practice-toolbar__session-state > span:nth-child(3),
-  .drumroll-practice-toolbar__session-state > span:nth-child(4) {
-    display: none;
+    flex-basis: 11rem;
   }
 
   .drumroll-practice-streak {
-    top: 5.4rem;
+    top: 0.75rem;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .drumroll-notation-stage {
-    transition: none;
+@media (max-width: 1120px) {
+  .drumroll-practice-shell {
+    margin-left: 4rem;
   }
 }

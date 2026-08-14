@@ -23,45 +23,57 @@
 }
 
 .vf-note-kick {
-  fill: var(--color-orange);
-
-  & path {
-    stroke: var(--color-orange-dark);
-  }
+  --vf-note-lane-color: var(--color-orange);
+  --vf-note-lane-stroke: var(--color-orange-dark);
 }
 
 .vf-note-snare {
-  fill: var(--color-red);
-
-  & path {
-    stroke: var(--color-red-dark);
-  }
+  --vf-note-lane-color: var(--color-red);
+  --vf-note-lane-stroke: var(--color-red-dark);
 }
 
-.vf-note-hihat,
 .vf-note-tom1 {
-  fill: var(--color-yellow);
-
-  & path {
-    stroke: var(--color-yellow-dark);
-  }
+  --vf-note-lane-color: var(--color-yellow);
+  --vf-note-lane-stroke: var(--color-yellow-dark);
 }
 
-.vf-note-ride,
 .vf-note-tom2 {
-  fill: var(--color-blue);
-
-  & path {
-    stroke: var(--color-blue-dark);
-  }
+  --vf-note-lane-color: var(--color-blue);
+  --vf-note-lane-stroke: var(--color-blue-dark);
 }
 
-.vf-note-crash,
 .vf-note-tom3 {
-  fill: var(--color-green);
+  --vf-note-lane-color: var(--color-green);
+  --vf-note-lane-stroke: var(--color-green-dark);
+}
+
+.vf-note-hihat {
+  --vf-note-lane-color: var(--color-yellow);
+  --vf-note-lane-stroke: var(--color-yellow-dark);
+}
+
+.vf-note-ride {
+  --vf-note-lane-color: var(--color-blue);
+  --vf-note-lane-stroke: var(--color-blue-dark);
+}
+
+.vf-note-crash {
+  --vf-note-lane-color: var(--color-green);
+  --vf-note-lane-stroke: var(--color-green-dark);
+}
+
+.vf-note-kick,
+.vf-note-snare,
+.vf-note-hihat,
+.vf-note-tom1,
+.vf-note-tom2,
+.vf-note-tom3,
+.vf-note-ride,
+.vf-note-crash {
+  fill: var(--vf-note-lane-color);
 
   & path {
-    stroke: var(--color-green-dark);
+    stroke: var(--vf-note-lane-stroke);
   }
 }
 
@@ -110,7 +122,8 @@
  * original lane colour and full opacity; feedback never removes score data.
  */
 .vf-note-missed {
-  fill: var(--color-red-dark, #8b1c1c);
+  fill: var(--vf-note-lane-color, var(--color-red-dark, #8b1c1c));
+  opacity: 0.68;
 }
 
 .vf-note-rest path,
@@ -133,18 +146,9 @@
   transform: scale(1.35);
 }
 
-.drumroll-practice-shell[data-session-phase='playing'] .vf-note-active {
-  animation: sk-note-pulse 0.7s ease-in-out infinite;
-}
-
-@keyframes sk-note-pulse {
-  0%,
-  100% {
-    transform: scale(1.35);
-  }
-  50% {
-    transform: scale(1.62);
-  }
+.vf-note-active path {
+  stroke: var(--vf-note-lane-color);
+  stroke-width: 3px;
 }
 
 .vf-note-pop {
@@ -246,7 +250,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .drumroll-practice-shell[data-session-phase='playing'] .vf-note-active,
   .vf-note-active,
   .vf-note-pop,
   .vf-note-miss,

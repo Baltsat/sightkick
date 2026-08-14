@@ -159,6 +159,65 @@ const gamification = {
   runsBySong: {},
   recentLaneSignals: [],
 } as unknown as UseGamificationResult;
+const launcherLesson = {
+  ...song,
+  id: 'lesson:pulse',
+  name: 'Eighth-note pulse',
+  artist: 'Drumroll Method',
+  lesson: { id: '01.02', title: 'Eighth-note pulse' },
+} as Song;
+const launcherSongTwo = {
+  ...song,
+  id: 'song:night-drive',
+  name: 'Night Drive',
+} as Song;
+const launcherSongThree = {
+  ...song,
+  id: 'song:paper-lanterns',
+  name: 'Paper Lanterns',
+} as Song;
+const launcherRun = (completedAt: string) =>
+  ({
+    completedAt,
+    totalHits: 100,
+    totalMisses: 0,
+    totalWrong: 0,
+    overallAccuracy: 1,
+    laneAccuracy: [],
+    laneBias: [],
+    timingBias: {
+      meanMs: 0,
+      medianMs: 0,
+      spreadMs: 0,
+      earlyCount: 0,
+      lateCount: 0,
+      onTimeCount: 100,
+      sampleCount: 100,
+    },
+    wrongHitCounts: [],
+    playbackSpeed: 0.8,
+    bestStreak: 16,
+  }) as never;
+const launcherGamification = {
+  ...gamification,
+  runsBySong: {
+    [song.id]: Array.from({ length: 9 }, (_, index) =>
+      launcherRun(
+        `2026-08-${String(index + 1).padStart(2, '0')}T12:00:00.000Z`,
+      ),
+    ),
+    [launcherSongTwo.id]: Array.from({ length: 6 }, (_, index) =>
+      launcherRun(
+        `2026-07-${String(index + 1).padStart(2, '0')}T12:00:00.000Z`,
+      ),
+    ),
+    [launcherSongThree.id]: Array.from({ length: 3 }, (_, index) =>
+      launcherRun(
+        `2026-06-${String(index + 1).padStart(2, '0')}T12:00:00.000Z`,
+      ),
+    ),
+  },
+} as unknown as UseGamificationResult;
 const meta: Meta<typeof HomeCockpit> = {
   title: 'Home cockpit/Evidence cards',
   component: HomeCockpit,
@@ -198,3 +257,18 @@ export default meta;
 type Story = StoryObj<typeof HomeCockpit>;
 
 export const P1EvidenceCards: Story = {};
+
+export const KitLauncherArmed: Story = {
+  render: (args) => (
+    <div className="h-screen overflow-hidden bg-bg">
+      <HomeCockpit
+        {...args}
+        songList={[launcherLesson, song, launcherSongTwo, launcherSongThree]}
+        gamification={launcherGamification}
+        onOpenJourney={() => {}}
+        onFindNewMusic={() => {}}
+        onStartSong={() => {}}
+      />
+    </div>
+  ),
+};

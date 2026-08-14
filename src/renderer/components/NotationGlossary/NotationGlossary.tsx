@@ -1,7 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  CSSProperties,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
+import { createPortal } from 'react-dom';
+import {
+  KIT_ELEMENT_COLOR_VAR,
+  KIT_ELEMENT_LABEL,
+} from '../../services/pedagogy';
+import type { KitElement } from '../../services/practice-stats';
 import './NotationGlossary.css';
-
-export const NOTATION_GLOSSARY_DELAY_MS = 500;
 
 export const NOTATION_KINDS = [
   'dot',
@@ -18,10 +29,117 @@ export const NOTATION_KINDS = [
 
 export type NotationKind = (typeof NOTATION_KINDS)[number];
 
+function isKitElement(value: string): value is KitElement {
+  return value in KIT_ELEMENT_LABEL;
+}
+
+const KIT_ELEMENTS = Object.keys(KIT_ELEMENT_LABEL) as KitElement[];
+const NOTATION_KIT_KEY: ReadonlyArray<{
+  element: KitElement;
+  head: 'round' | 'cross';
+  position: 'low' | 'lower-middle' | 'middle' | 'upper-middle' | 'high';
+}> = [
+  { element: 'kick', head: 'round', position: 'low' },
+  { element: 'snare', head: 'round', position: 'lower-middle' },
+  { element: 'hihat', head: 'cross', position: 'high' },
+  { element: 'tom1', head: 'round', position: 'upper-middle' },
+  { element: 'tom2', head: 'round', position: 'middle' },
+  { element: 'tom3', head: 'round', position: 'lower-middle' },
+  { element: 'ride', head: 'cross', position: 'high' },
+  { element: 'crash', head: 'cross', position: 'high' },
+];
+const POSITION_MARK: Record<
+  (typeof NOTATION_KIT_KEY)[number]['position'],
+  string
+> = {
+  low: '↓',
+  'lower-middle': '↙',
+  middle: '↔',
+  'upper-middle': '↗',
+  high: '↑',
+};
+
+export function NotationKitKey({ layout }: { layout: 'classic' | 'flow' }) {
+  return (
+    <aside
+      id="notation-kit-key"
+      className="drumroll-notation-key"
+      data-testid="notation-kit-key"
+      data-layout={layout}
+      aria-label="Drum kit notation key"
+    >
+      <div className="drumroll-notation-key__heading">
+        <strong>kit key</strong>
+        <span>● drums · × cymbals · low → high</span>
+      </div>
+      <ul>
+        {NOTATION_KIT_KEY.map(({ element, head, position }) => (
+          <li
+            key={element}
+            data-kit-element={element}
+            aria-label={`${KIT_ELEMENT_LABEL[element]}: ${
+              head === 'round' ? 'round head' : 'cross head'
+            }, ${position} on the staff`}
+            style={
+              {
+                '--notation-key-color': KIT_ELEMENT_COLOR_VAR[element],
+              } as CSSProperties
+            }
+          >
+            <span
+              className="drumroll-notation-key__head"
+              data-head={head}
+              aria-hidden="true"
+            >
+              {head === 'round' ? '●' : '×'}
+            </span>
+            <span>{KIT_ELEMENT_LABEL[element]}</span>
+            <span
+              className="drumroll-notation-key__position"
+              aria-hidden="true"
+            >
+              {POSITION_MARK[position]}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  );
+}
+
+export function notationElementForTarget(
+  target: EventTarget | null,
+): KitElement | undefined {
+  if (!(target instanceof Element)) {
+    return undefined;
+  }
+
+  const raw = target
+    .closest('[data-notation-element]')
+    ?.getAttribute('data-notation-element');
+
+  if (raw && isKitElement(raw)) {
+    return raw;
+  }
+
+  return KIT_ELEMENTS.find((element) =>
+    Boolean(target.closest(`.vf-note-${element}`)),
+  );
+}
+
+export interface NotationAnchor {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
 export interface NotationGlossaryIntent {
   kind: NotationKind;
   x: number;
   y: number;
+  element?: KitElement;
+  anchor?: NotationAnchor;
 }
 
 const notationCopy: Record<NotationKind, { title: string; detail: string }> = {
@@ -120,55 +238,201 @@ export function notationKindForTarget(
   return pluralPriority.find((kind) => kinds?.includes(kind));
 }
 
-export function useNotationGlossaryIntent(
-  delayMs: number = NOTATION_GLOSSARY_DELAY_MS,
-) {
-  const [intent, setIntent] = useState<NotationGlossaryIntent>();
-  const timerRef = useRef<number | undefined>(undefined);
-  const pendingRef = useRef<NotationGlossaryIntent | undefined>(undefined);
-  const clear = useCallback(() => {
-    if (timerRef.current !== undefined) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = undefined;
-    }
+function anchorForTarget(
+  target: EventTarget | null,
+): NotationAnchor | undefined {
+  if (!(target instanceof Element)) {
+    return undefined;
+  }
 
-    pendingRef.current = undefined;
-    setIntent(undefined);
-  }, []);
-  const observe = useCallback(
+  const rect = target
+    .closest('[data-notation-kind], [data-notation-kinds]')
+    ?.getBoundingClientRect();
+
+  if (!rect || rect.width <= 0 || rect.height <= 0) {
+    return undefined;
+  }
+
+  return {
+    left: rect.left,
+    right: rect.right,
+    top: rect.top,
+    bottom: rect.bottom,
+  };
+}
+
+export function useNotationGlossaryIntent() {
+  const [intent, setIntent] = useState<NotationGlossaryIntent>();
+  const dismiss = useCallback(() => setIntent(undefined), []);
+  const summon = useCallback(
     (target: EventTarget | null, x: number, y: number) => {
       const kind = notationKindForTarget(target);
 
       if (!kind) {
-        clear();
+        dismiss();
 
         return;
       }
 
-      if (intent?.kind === kind || pendingRef.current?.kind === kind) {
-        return;
-      }
+      const element = notationElementForTarget(target);
+      const anchor = anchorForTarget(target);
 
-      clear();
-
-      const next = { kind, x, y };
-
-      pendingRef.current = next;
-      timerRef.current = window.setTimeout(() => {
-        pendingRef.current = undefined;
-        timerRef.current = undefined;
-        setIntent(next);
-      }, delayMs);
+      setIntent({
+        kind,
+        x,
+        y,
+        ...(element ? { element } : {}),
+        ...(anchor ? { anchor } : {}),
+      });
     },
-    [clear, delayMs, intent?.kind],
+    [dismiss],
   );
 
-  useEffect(() => clear, [clear]);
+  useEffect(() => {
+    if (!intent) {
+      return;
+    }
 
-  return { intent, observe, dismiss: clear };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        dismiss();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [dismiss, intent]);
+
+  return { intent, summon, dismiss };
 }
 
-function NotationGlyph({ kind }: { kind: NotationKind }) {
+export interface NotationGlossaryPlacement {
+  left: number;
+  top: number;
+  side: 'right' | 'left' | 'bottom' | 'top';
+}
+
+interface GlossarySize {
+  width: number;
+  height: number;
+}
+
+interface GlossaryViewport {
+  width: number;
+  height: number;
+}
+
+const GLOSSARY_GUTTER = 16;
+const GLOSSARY_GAP = 18;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), Math.max(min, max));
+}
+
+function overlaps(left: NotationAnchor, right: NotationAnchor) {
+  return (
+    left.left < right.right &&
+    left.right > right.left &&
+    left.top < right.bottom &&
+    left.bottom > right.top
+  );
+}
+
+function anchorForIntent(intent: NotationGlossaryIntent): NotationAnchor {
+  return (
+    intent.anchor ?? {
+      left: intent.x - 10,
+      right: intent.x + 10,
+      top: intent.y - 10,
+      bottom: intent.y + 10,
+    }
+  );
+}
+
+export function placeNotationGlossary(
+  intent: NotationGlossaryIntent,
+  size: GlossarySize,
+  viewport: GlossaryViewport,
+): NotationGlossaryPlacement {
+  const anchor = anchorForIntent(intent);
+  const anchorCenterX = (anchor.left + anchor.right) / 2;
+  const anchorCenterY = (anchor.top + anchor.bottom) / 2;
+  const candidates: NotationGlossaryPlacement[] = [
+    {
+      side: 'right',
+      left: anchor.right + GLOSSARY_GAP,
+      top: anchorCenterY - size.height / 2,
+    },
+    {
+      side: 'left',
+      left: anchor.left - GLOSSARY_GAP - size.width,
+      top: anchorCenterY - size.height / 2,
+    },
+    {
+      side: 'bottom',
+      left: anchorCenterX - size.width / 2,
+      top: anchor.bottom + GLOSSARY_GAP,
+    },
+    {
+      side: 'top',
+      left: anchorCenterX - size.width / 2,
+      top: anchor.top - GLOSSARY_GAP - size.height,
+    },
+  ];
+  const maxLeft = viewport.width - GLOSSARY_GUTTER - size.width;
+  const maxTop = viewport.height - GLOSSARY_GUTTER - size.height;
+  const fits = (placement: NotationGlossaryPlacement) =>
+    placement.left >= GLOSSARY_GUTTER &&
+    placement.left <= maxLeft &&
+    placement.top >= GLOSSARY_GUTTER &&
+    placement.top <= maxTop;
+  const cardRect = (placement: NotationGlossaryPlacement): NotationAnchor => ({
+    left: placement.left,
+    right: placement.left + size.width,
+    top: placement.top,
+    bottom: placement.top + size.height,
+  });
+  const fitting = candidates.find(
+    (placement) => fits(placement) && !overlaps(cardRect(placement), anchor),
+  );
+
+  if (fitting) {
+    return fitting;
+  }
+
+  return candidates
+    .map((placement) => ({
+      ...placement,
+      left: clamp(placement.left, GLOSSARY_GUTTER, maxLeft),
+      top: clamp(placement.top, GLOSSARY_GUTTER, maxTop),
+    }))
+    .sort((left, right) => {
+      const leftOverlaps = overlaps(cardRect(left), anchor) ? 1 : 0;
+      const rightOverlaps = overlaps(cardRect(right), anchor) ? 1 : 0;
+
+      if (leftOverlaps !== rightOverlaps) {
+        return leftOverlaps - rightOverlaps;
+      }
+
+      const leftDistance =
+        Math.abs(left.left - anchorCenterX) +
+        Math.abs(left.top - anchorCenterY);
+      const rightDistance =
+        Math.abs(right.left - anchorCenterX) +
+        Math.abs(right.top - anchorCenterY);
+
+      return leftDistance - rightDistance;
+    })[0];
+}
+
+function NotationGlyph({
+  kind,
+  element,
+}: {
+  kind: NotationKind;
+  element?: KitElement;
+}) {
   if (kind === 'accent') {
     return (
       <svg viewBox="0 0 96 64" aria-hidden="true">
@@ -237,6 +501,13 @@ function NotationGlyph({ kind }: { kind: NotationKind }) {
   const dot = kind === 'dot';
   const colors = kind === 'colored-head';
   const grace = kind === 'grace';
+  const laneStyle =
+    colors && element
+      ? ({
+          fill: KIT_ELEMENT_COLOR_VAR[element],
+          stroke: KIT_ELEMENT_COLOR_VAR[element],
+        } as CSSProperties)
+      : undefined;
 
   return (
     <svg viewBox="0 0 96 64" aria-hidden="true">
@@ -264,6 +535,7 @@ function NotationGlyph({ kind }: { kind: NotationKind }) {
         ry="7"
         transform="rotate(-20 42 47)"
         className={colors ? 'drumroll-notation-glyph__lane' : undefined}
+        style={laneStyle}
       />
       {beams.map((y) => (
         <path key={y} d={`M68 ${y}h20`} />
@@ -282,10 +554,24 @@ function NotationGlyph({ kind }: { kind: NotationKind }) {
           cy="45"
           r="6"
           className="drumroll-notation-glyph__lane"
+          style={laneStyle}
         />
       )}
     </svg>
   );
+}
+
+function coloredHeadCopy(element: KitElement | undefined) {
+  if (!element) {
+    return notationCopy['colored-head'];
+  }
+
+  const label = KIT_ELEMENT_LABEL[element];
+
+  return {
+    title: `${label} note head`,
+    detail: `This colour is the ${label.toLowerCase()} lane. Match it to the ${label.toLowerCase()} zone on the kit, then hit that voice.`,
+  };
 }
 
 export function NotationGlossary({
@@ -293,20 +579,52 @@ export function NotationGlossary({
 }: {
   intent: NotationGlossaryIntent | undefined;
 }) {
+  const cardRef = useRef<HTMLElement>(null);
+  const [size, setSize] = useState<GlossarySize>({ width: 340, height: 140 });
+  const [, setViewportRevision] = useState(0);
+
+  useLayoutEffect(() => {
+    const rect = cardRef.current?.getBoundingClientRect();
+
+    if (rect && rect.width > 0 && rect.height > 0) {
+      setSize({ width: rect.width, height: rect.height });
+    }
+  }, [intent]);
+
+  useEffect(() => {
+    const refresh = () => setViewportRevision((revision) => revision + 1);
+
+    window.addEventListener('resize', refresh);
+    window.visualViewport?.addEventListener('resize', refresh);
+
+    return () => {
+      window.removeEventListener('resize', refresh);
+      window.visualViewport?.removeEventListener('resize', refresh);
+    };
+  }, []);
+
   if (!intent) {
     return null;
   }
 
-  const copy = notationCopy[intent.kind];
-
-  return (
+  const placement = placeNotationGlossary(intent, size, {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+  const copy =
+    intent.kind === 'colored-head'
+      ? coloredHeadCopy(intent.element)
+      : notationCopy[intent.kind];
+  const card = (
     <aside
+      ref={cardRef}
       className="drumroll-notation-glossary"
       data-testid="notation-glossary"
+      data-placement={placement.side}
       role="tooltip"
-      style={{ left: intent.x + 18, top: intent.y + 18 }}
+      style={{ left: placement.left, top: placement.top }}
     >
-      <NotationGlyph kind={intent.kind} />
+      <NotationGlyph kind={intent.kind} element={intent.element} />
       <div>
         <span className="drumroll-notation-glossary__eyebrow">
           notation guide
@@ -315,5 +633,14 @@ export function NotationGlossary({
         <p>{copy.detail}</p>
       </div>
     </aside>
+  );
+
+  if (typeof document === 'undefined') {
+    return card;
+  }
+
+  return createPortal(
+    card,
+    document.querySelector('.drumroll-practice-shell') ?? document.body,
   );
 }

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LessonEntry } from '../../hooks/useLessons';
@@ -53,6 +55,23 @@ describe('LessonNode kit color maturity', () => {
     expect(node.style.getPropertyValue('--lesson-lane-color')).toContain(
       'var(--color-red) var(--kit-color-vividness)',
     );
+  });
+
+  it('uses the published lane properties for node chrome', () => {
+    const css = readFileSync(
+      resolve(
+        process.cwd(),
+        'src/renderer/components/LessonsJourney/JourneyV2.css',
+      ),
+      'utf8',
+    );
+    const glow = css.match(
+      /\.daybreak-lesson-node__glow\s*\{(?<rules>[^}]*)\}/s,
+    )?.groups?.rules;
+
+    expect(glow).toMatch(/border:[\s\S]*var\(--lesson-lane-color\)/);
+    expect(glow).toMatch(/background:[\s\S]*var\(--lesson-lane-color\)/);
+    expect(glow).toMatch(/box-shadow:[\s\S]*var\(--lesson-lane-dark\)/);
   });
 
   it('names the action a hover is about to reveal', () => {

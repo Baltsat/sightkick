@@ -1,6 +1,6 @@
 import { clamp } from 'es-toolkit';
 import { ResolvedJudgement } from '../engine';
-import { planRecoveryRegion } from './checkpoints';
+import { planRecoveryRegion, planRecoveryReturnContext } from './checkpoints';
 import {
   detectTutorTrigger,
   isCleanRecovery,
@@ -123,16 +123,26 @@ function recordJudgement(
   }
 
   const existing = state.judgementsByMeasure[measureIndex] ?? [];
-
-  if (existing.some((item) => item.id === judgement.id)) {
-    return state;
-  }
+  const existingIndex = existing.findIndex((item) => item.id === judgement.id);
+  // Judge's note-judgement ids are deterministic by chart position, not by
+  // pass (`note:${tick}:${prefix}` - see judge.ts's noteJudgementId), so the
+  // same id can legitimately arrive twice in one run: once, then again after
+  // a rewind (a Tutor-initiated retry, or one the Tutor didn't initiate at
+  // all, like a natural loop wrap) re-resolves that exact note. The newest
+  // resolution is authoritative - a corrected hit after an earlier miss
+  // must replace the stale verdict, not be silently dropped behind it.
+  const nextMeasureJudgements =
+    existingIndex === -1
+      ? [...existing, judgement]
+      : existing.map((item, index) =>
+          index === existingIndex ? judgement : item,
+        );
 
   return {
     ...state,
     judgementsByMeasure: {
       ...state.judgementsByMeasure,
-      [measureIndex]: [...existing, judgement],
+      [measureIndex]: nextMeasureJudgements,
     },
   };
 }
@@ -251,6 +261,7 @@ function beginRecovery(
     ),
     trigger,
     region,
+    approach: 'anchor',
     repetition: 1,
     cleanRepetitions: 0,
     qualityProgress: 0,
@@ -332,6 +343,7 @@ function finishRecoveryAttempt(
     id: nextId(state, 'attempt'),
     recoveryId: recovery.id,
     repetition: recovery.repetition,
+    approach: recovery.approach ?? 'anchor',
     speed: state.currentSpeed,
     result: clean ? 'clean' : shouldDefer ? 'deferred' : 'retry',
     qualityScore,
@@ -443,8 +455,15 @@ function finishRecoveryAttempt(
     };
   }
 
+  const returnContext =
+    clean && (recovery.approach ?? 'anchor') === 'anchor'
+      ? planRecoveryReturnContext(chart, recovery.region)
+      : undefined;
   const nextRecovery: TutorRecovery = {
     ...recovery,
+    ...(returnContext
+      ? { region: returnContext, approach: 'return-context' as const }
+      : {}),
     repetition: recovery.repetition + 1,
     cleanRepetitions,
     qualityProgress,
@@ -498,6 +517,21 @@ export function transitionTutor(
         targetSpeed,
         currentSpeed: targetSpeed,
       },
+      commands: [],
+    };
+  }
+
+  if (event.type === 'speed-changed') {
+    // The learner's own speed control is the single source of truth for
+    // tempo. This only refreshes the reducer's bookkeeping value so later
+    // messaging/evidence (e.g. a recovery attempt's recorded `speed`) never
+    // contradicts what is actually playing - it never resets progress and
+    // never itself commands the engine (see useTutorSession.executeCommand,
+    // which no longer applies any tutor-computed speed to playback).
+    const speed = speedToTenth(clamp(event.speed, 0.3, 2));
+
+    return {
+      state: { ...state, currentSpeed: speed, targetSpeed: speed },
       commands: [],
     };
   }

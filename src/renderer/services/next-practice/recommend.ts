@@ -17,6 +17,7 @@ import {
   curriculumItemManifest,
   dueReviews,
   rankZpdFrontier,
+  score_my_wave_affection,
 } from '../pedagogy';
 import type { ItemSkillManifest, PracticeDecision } from '../pedagogy/types';
 import {
@@ -555,6 +556,50 @@ function zpdFit(predictedSuccess: number): number {
   return Math.max(0.35, 1 - ((predictedSuccess - 0.9) / 0.1) * 0.65);
 }
 
+function max_replay_count(history: readonly PracticeHistoryEntry[]): number {
+  const counts = new Map<string, number>();
+
+  history.forEach(({ candidateId }) => {
+    counts.set(candidateId, (counts.get(candidateId) ?? 0) + 1);
+  });
+
+  return Math.max(0, ...counts.values());
+}
+
+function music_preference_detail({
+  favourite,
+  replay_count,
+  within_zone,
+}: {
+  favourite: boolean;
+  replay_count: number;
+  within_zone: number;
+}): string {
+  if (favourite && replay_count > 0) {
+    return within_zone > 0
+      ? `A saved favourite with ${replay_count} prior replay${
+          replay_count === 1 ? '' : 's'
+        } is still inside the current practice zone.`
+      : 'A saved favourite is outside the current practice zone, so it gets no selection boost.';
+  }
+
+  if (favourite) {
+    return within_zone > 0
+      ? 'A saved favourite is still inside the current practice zone.'
+      : 'A saved favourite is outside the current practice zone, so it gets no selection boost.';
+  }
+
+  if (replay_count > 0) {
+    return within_zone > 0
+      ? `${replay_count} prior replay${
+          replay_count === 1 ? '' : 's'
+        } show that you return to this song.`
+      : 'Past replays do not override a song outside the current practice zone.';
+  }
+
+  return 'No favourite or replay signal is available.';
+}
+
 function familiarity(runCount: number): number {
   if (runCount === 0) {
     return 0.35;
@@ -793,6 +838,12 @@ function rankCandidate({
     (sameRecentCount / 3) * 0.7 +
       (lastThreeIds.at(-1) === candidate.id ? 0.3 : 0),
   );
+  const affection = score_my_wave_affection({
+    liked: candidate.liked,
+    replay_count: candidateHistory.length,
+    max_replay_count: max_replay_count(history),
+  });
+  const preference_fit = round(affection.value * zpdFit(predictedSuccess), 3);
   const positives: RawFactor[] = [
     {
       key: 'zone-fit',
@@ -854,11 +905,13 @@ function rankCandidate({
     {
       key: 'preference',
       label: 'Music preference',
-      value: candidate.liked ? 1 : 0,
-      weight: 4,
-      detail: candidate.liked
-        ? 'A liked item increases the chance of a sustained session.'
-        : 'No explicit preference boost is available.',
+      value: preference_fit,
+      weight: 16,
+      detail: music_preference_detail({
+        favourite: affection.favourite,
+        replay_count: affection.replay_count,
+        within_zone: zpdFit(predictedSuccess),
+      }),
     },
   ];
 
@@ -1116,16 +1169,25 @@ function atomicRecommendation(
   decision: PracticeDecision,
 ): RankedPracticeCandidate {
   const confidence = 1 - decision.uncertainty;
+  const preference = baseline.factors.find(({ key }) => key === 'preference');
+  const preference_contribution = preference?.contribution ?? 0;
+  const preference_reason =
+    preference_contribution > 0 ? preference?.detail : undefined;
+  const practice_zone_fit =
+    baseline.factors.find(({ key }) => key === 'zone-fit')?.value ?? 0;
 
   return {
     ...baseline,
-    score: round(decision.learning_value * 100),
+    score: round(
+      decision.learning_value * 100 * practice_zone_fit +
+        preference_contribution,
+    ),
     predictedSuccess: round(decision.predicted_success, 3),
     suggestedSpeed: decision.scaffold.speed,
     reason:
       baseline.directRemediation || baseline.deadlinePacing
         ? baseline.reason
-        : decision.explanation,
+        : preference_reason ?? decision.explanation,
     factors: [...baseline.factors, ...atomicFactors(decision)],
     confidence: {
       value: round(confidence, 3),

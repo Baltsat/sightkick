@@ -12,6 +12,7 @@ import {
   StorageSchema,
 } from '../../types';
 import { appState } from '../AppState';
+import { queueLibraryMirror } from '../libraryMirror';
 import { ingestSongCover, previewSongCover } from '../songCover';
 import {
   buildSongFromDir,
@@ -207,10 +208,14 @@ export async function importPreparedSong({
 
     appState.store.set('songs', { ...songs, [id]: songData });
 
-    return toSong({
+    const song = toSong({
       ...songData,
       updatedAt: fs.statSync(outputDir).mtime.toISOString(),
     });
+
+    void queueLibraryMirror(song);
+
+    return song;
   } catch (error) {
     if (outputCreated && outputDir && fs.existsSync(outputDir)) {
       fs.rmSync(outputDir, { recursive: true, force: true });

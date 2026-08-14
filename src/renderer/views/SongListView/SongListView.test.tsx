@@ -5,11 +5,11 @@ import yandexSource from '../../../../resources/library-sources/yandex-drums-202
 import { parseYandexPlaylistCandidates } from '../../../library-sources/yandex';
 import { MidiMessageType } from '../../../types';
 import {
-  makeEnchorChart,
   makeLessonSong,
   makeListSong,
   setupSongListView as mountSongListView,
 } from '../test-support';
+import { candidateDifficulty } from './SongListView';
 
 const { playKitPreviewMock } = vi.hoisted(() => ({
   playKitPreviewMock: vi.fn(),
@@ -51,6 +51,10 @@ function setupSongListView(...args: Parameters<typeof mountSongListView>) {
   return view;
 }
 
+function browseAllLibrary(): void {
+  fireEvent.click(screen.getByTestId('browse-all-library'));
+}
+
 describe('SongListView — loading the library', () => {
   it('opens on the playfield-first Home cockpit', () => {
     mountSongListView();
@@ -89,12 +93,83 @@ describe('SongListView — loading the library', () => {
     expect(screen.getByTestId('open-profile-button')).toHaveTextContent(
       'Profile',
     );
-    expect(screen.getByTestId('home-choose-song')).toBeEnabled();
+    expect(screen.queryByTestId('home-choose-song')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('kit-hotspot-hihat'));
 
     expect(playKitPreviewMock).toHaveBeenCalledOnce();
     expect(playKitPreviewMock).toHaveBeenCalledWith('hihat');
+  });
+
+  it('wires the kit doors to Journey, songs, discovery, and a top song', async () => {
+    const view = mountSongListView({ freshProfile: true });
+    const lesson = makeLessonSong('lesson-next', {
+      id: '01.02',
+      title: 'Eighth-note pulse',
+      starsToUnlock: 0,
+    });
+    const topSong = makeListSong('top-song', { liked: true });
+    const run = {
+      completedAt: '2026-08-13T12:00:00.000Z',
+      totalHits: 10,
+      totalMisses: 0,
+      totalWrong: 0,
+      overallAccuracy: 0.9,
+      laneAccuracy: [],
+      laneBias: [],
+      wrongHitCounts: [],
+      timingBias: {
+        meanMs: 0,
+        medianMs: 0,
+        spreadMs: 0,
+        earlyCount: 0,
+        lateCount: 0,
+        onTimeCount: 0,
+        sampleCount: 0,
+      },
+      mode: 'practice' as const,
+    };
+
+    view.loadSongs([lesson, topSong], '/music');
+    await waitFor(() =>
+      expect(view.sentChannels()).toContain('load-all-practice-runs'),
+    );
+    view.emit('load-all-practice-runs', {
+      runs: [run],
+      runsBySong: { [topSong.id]: [run] },
+      archiveBySong: {},
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('kit-hotspot-tom1')).toHaveTextContent(
+        topSong.name,
+      ),
+    );
+
+    fireEvent.click(screen.getByTestId('kit-hotspot-hihat'));
+    expect(
+      await screen.findByTestId('lesson-season-stage'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('view-home'));
+    expect(await screen.findByTestId('home-cockpit')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('kit-hotspot-ride'));
+    expect(await screen.findByTestId('library-toolbar')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('view-home'));
+    expect(await screen.findByTestId('home-cockpit')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('kit-hotspot-crash'));
+    expect(await screen.findByTestId('library-toolbar')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('song-search')).toHaveFocus(),
+    );
+
+    fireEvent.click(screen.getByTestId('view-home'));
+    expect(await screen.findByTestId('home-cockpit')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('kit-hotspot-tom1'));
+    expect(await screen.findByTestId('song-view-stub')).toHaveAttribute(
+      'data-song-id',
+      topSong.id,
+    );
   });
 
   it('keeps physical MIDI feedback silent and separate from the pointer stick', async () => {
@@ -153,7 +228,7 @@ describe('SongListView — loading the library', () => {
     expect(opened.getAttribute('data-search')).toContain('autoStart=1');
   });
 
-  it('keeps a quiet mouse-ready state when no kit is selected', () => {
+  it('states honest kit availability when no kit is selected', () => {
     mountSongListView({ settings: { selectedDevice: null } });
 
     expect(screen.getByTestId('home-input-readiness')).toHaveAttribute(
@@ -161,7 +236,7 @@ describe('SongListView — loading the library', () => {
       'waiting',
     );
     expect(screen.getByTestId('home-input-readiness')).toHaveTextContent(
-      'Mouse works now',
+      'No MIDI kit found',
     );
     expect(screen.getByTestId('kit-hotspot-kick')).not.toHaveTextContent(
       'Waiting',
@@ -214,7 +289,7 @@ describe('SongListView — loading the library', () => {
     ]);
 
     expect(screen.getByTestId('home-input-readiness')).toHaveTextContent(
-      'Kit reconnecting',
+      'Reconnecting · Yamaha DTX402',
     );
     expect(screen.getByTestId('home-session-status')).toHaveTextContent(
       'Pulse and posture is armed',
@@ -234,7 +309,7 @@ describe('SongListView — loading the library', () => {
 
     await waitFor(() =>
       expect(screen.getByTestId('home-input-readiness')).toHaveTextContent(
-        'Yamaha DTX402 mapped · ready',
+        'Connected · Yamaha DTX402',
       ),
     );
     expect(screen.getByTestId('kit-hotspot-kick')).toBeEnabled();
@@ -262,21 +337,89 @@ describe('SongListView — loading the library', () => {
     const view = setupSongListView();
 
     expect(screen.queryByTestId('add-music-actions')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('song-search-input')).not.toBeInTheDocument();
     expect(screen.queryByTestId('import-song-trigger')).not.toBeInTheDocument();
     expect(screen.queryByTestId('my-music-trigger')).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('create-chart-trigger'),
     ).not.toBeInTheDocument();
-    expect(screen.queryByTestId('mode-online')).not.toBeInTheDocument();
-    expect(screen.getByTestId('mode-local')).toHaveAttribute(
-      'aria-pressed',
-      'true',
+
+    // The single search field still browses the player's own library on a
+    // YouTube-import-free platform — only the YouTube fallback is gone.
+    expect(screen.getByTestId('song-search')).toBeInTheDocument();
+    view.search('nonexistent song');
+    expect(view.sentChannels()).not.toContain('search-youtube');
+  });
+
+  it('keeps the shelves while one-search imports open the new song directly', async () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('a', { name: 'First shelf song' }),
+      makeListSong('b', { name: 'Second shelf song', liked: true }),
+      makeListSong('c', { name: 'Third shelf song' }),
+      makeListSong('d', { name: 'Fourth shelf song' }),
+    ]);
+
+    expect(screen.getByTestId('library-shelf-ready-now')).toBeInTheDocument();
+    expect(screen.getByTestId('library-shelf-favourites')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('library-shelf-recently-imported'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('browse-all-library')).toBeInTheDocument();
+    expect(screen.queryByTestId('add-music-actions')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('import-song-trigger')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('my-music-trigger')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('create-chart-trigger'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auto-chart-progress')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Choose a local audio file instead'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Remote transcriber endpoint'),
+    ).not.toBeInTheDocument();
+
+    view.search('Some Great Drum Song');
+    await waitFor(() =>
+      expect(view.sentChannels()).toContain('search-youtube'),
     );
-    view.press('library');
-    expect(screen.getByTestId('mode-local')).toHaveAttribute(
-      'aria-pressed',
-      'true',
+    view.emit('search-youtube', {
+      results: [
+        {
+          videoId: 'abcdefghijk',
+          title: 'Some Great Drum Song',
+          uploader: 'Some Channel',
+          durationSeconds: 125,
+          watchUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByTestId('song-search-result-abcdefghijk'));
+    expect(screen.getByTestId('song-search-import-row')).toHaveTextContent(
+      'Queued "Some Great Drum Song"',
+    );
+
+    const importedSong = makeListSong('imported-song', {
+      name: 'Some Great Drum Song',
+    });
+
+    view.emit('auto-chart-update', {
+      id: 'job-1',
+      attempt: 1,
+      stage: 'imported',
+      message: 'Added Some Great Drum Song to your library',
+      backend: 'sightkick',
+      youtubeUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+      autoImport: true,
+      jobs: [],
+      song: importedSong,
+    });
+
+    expect(await screen.findByTestId('song-view-stub')).toHaveAttribute(
+      'data-song-id',
+      importedSong.id,
     );
   });
 
@@ -402,7 +545,11 @@ describe('SongListView — loading the library', () => {
     expect(screen.getByTestId('home-session-manifest')).toHaveTextContent(
       'Mid and Floor Tom Signals',
     );
-    fireEvent.click(screen.getByTestId('kit-hotspot-tom2'));
+    // The kit is the launcher (docs/kit-launcher-design.md): kick continues
+    // the armed target. Tom 2 now starts the second top-played song, not a
+    // coach remediation route, so the armed-target/prerequisite assertion
+    // above is what this test protects; kick is how a player reaches it.
+    fireEvent.click(screen.getByTestId('kit-hotspot-kick'));
 
     const opened = await screen.findByTestId('song-view-stub');
 
@@ -535,12 +682,12 @@ describe('SongListView — loading the library', () => {
     );
   });
 
-  it('starts the recommendation from one deliberate Home kick and unmounts the background cockpit', async () => {
+  it('starts the recommendation from one deliberate Home snare and unmounts the background cockpit', async () => {
     const view = mountSongListView({
       settings: {
         inputMappings: {
           keyboard: {
-            kick: ['keyboard:KeyK'],
+            snare: ['keyboard:KeyK'],
           },
         },
       },
@@ -565,42 +712,120 @@ describe('SongListView — loading the library', () => {
     expect(view.sentChannels()).toContain('check-stem-tools');
   });
 
-  it('shows the songs the backend returns', () => {
+  it('shows the songs the backend returns on one continuous shelf', () => {
     const view = setupSongListView();
 
     view.loadSongs([makeListSong('a'), makeListSong('b')]);
 
     expect(screen.getByText('Name a')).toBeInTheDocument();
     expect(screen.getByText('Name b')).toBeInTheDocument();
-    expect(screen.getByText('2 results')).toBeInTheDocument();
+    expect(
+      screen.getByText('2 in your library · 2 ready to play'),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { level: 1, name: 'Your drum library' }),
     ).toBeInTheDocument();
   });
 
-  it('names every library source visibly and exposes captured playlist counts', () => {
-    setupSongListView();
+  it('never counts lesson songs in the header — they never appear on this shelf', () => {
+    // Regression for docs/design-qa/2026-08-13-finish/critique.md, Songs
+    // finding 2: the default shelf hides every lesson song (Journey owns
+    // the curriculum), so counting them into "N in your library · M ready
+    // to play" makes a claim this screen can never back up. A library
+    // whose only songs are lessons must read as empty here, not "170
+    // ready to play" over a shelf that shows none of them.
+    const view = setupSongListView();
 
-    const sources = screen.getByRole('group', { name: 'Library source' });
+    view.loadSongs([
+      makeLessonSong('lesson-1', { id: '01.01', title: 'Warm-Up Groove' }),
+      makeLessonSong('lesson-2', { id: '01.02', title: 'Second Lesson' }),
+    ]);
 
-    expect(within(sources).getByTestId('mode-local')).toHaveTextContent(
-      'Local',
-    );
-    expect(within(sources).getByTestId('mode-drums')).toHaveTextContent(
-      'Drums',
-    );
-    expect(within(sources).getByTestId('mode-drums-count')).toHaveTextContent(
-      '13',
-    );
-    expect(within(sources).getByTestId('mode-favorites')).toHaveTextContent(
-      'Favorites',
+    expect(
+      screen.getByText('0 in your library · 0 ready to play'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Build your practice library')).toBeInTheDocument();
+    expect(screen.queryByText('Warm-Up Groove')).not.toBeInTheDocument();
+
+    view.search('Warm-Up Groove');
+    expect(screen.getByText('Warm-Up Groove')).toBeInTheDocument();
+  });
+
+  it('merges Drums and Favorites into the same shelf as local songs, labelled by source', () => {
+    const view = setupSongListView();
+    const drums = parseYandexPlaylistCandidates(yandexSource);
+    const favorites = parseYandexPlaylistCandidates(yandexFavoritesSource);
+
+    view.loadSongs([makeListSong('a', { name: 'Master of Puppets' })]);
+    view.loadLibraryCandidates({ yandex: { drums, favorites } });
+
+    expect(view.sentChannels()).toContain('load-library-candidates');
+    // One shelf, one search — no mode tabs to switch between local, Drums,
+    // Favorites, or an online browser.
+    expect(screen.queryByTestId('mode-local')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mode-drums')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mode-favorites')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mode-online')).not.toBeInTheDocument();
+
+    browseAllLibrary();
+
+    expect(screen.getByText('Master of Puppets')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('library-candidate-state-Drums-1'),
+    ).toHaveTextContent('Not in your library yet');
+    expect(screen.getByTestId('library-candidate-Drums-1')).toHaveTextContent(
+      'From Drums',
     );
     expect(
-      within(sources).getByTestId('mode-favorites-count'),
-    ).toHaveTextContent('230');
-    expect(within(sources).getByTestId('mode-online')).toHaveTextContent(
-      'Online',
-    );
+      screen.getByTestId('library-candidate-Favorites-1'),
+    ).toHaveTextContent('From Favorites');
+  });
+
+  it("never counts an unresolved suggestion as 'in your library' — the header must not argue with its own rows", () => {
+    // Regression: naming every row "Not in your library yet" while the
+    // header folded those same rows into "N in your library" was a second,
+    // freshly introduced version of critique finding 2 (docs/design-qa/
+    // 2026-08-13-finish/critique.md) — fixing the row order/copy must not
+    // trade one header/row contradiction for another.
+    const view = setupSongListView();
+    const drums = parseYandexPlaylistCandidates(yandexSource);
+    const favorites = parseYandexPlaylistCandidates(yandexFavoritesSource);
+
+    view.loadSongs([makeListSong('a', { name: 'Master of Puppets' })]);
+    view.loadLibraryCandidates({ yandex: { drums, favorites } });
+
+    const suggestionCount = drums.tracks.length + favorites.tracks.length;
+
+    expect(
+      screen.getByText(
+        `1 in your library · 1 ready to play · ${suggestionCount} to add from your playlists`,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('persists a favourite from one press on an actionable row', () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('favourite', {
+        updatedAt: '2026-08-14T09:00:00.000Z',
+      }),
+    ]);
+
+    const row = screen.getByTestId('song-item-favourite');
+    const likeButton = within(row).getByTestId('like-toggle');
+
+    fireEvent.click(likeButton);
+
+    expect(view.ipc.sent).toContainEqual({
+      channel: 'like-song',
+      args: ['favourite', true],
+    });
+    expect(
+      within(screen.getByTestId('song-item-favourite')).getByTestId(
+        'like-toggle',
+      ),
+    ).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('selects all 13 Drums candidates with honest metadata-only states', () => {
@@ -616,14 +841,14 @@ describe('SongListView — loading the library', () => {
       },
     });
 
-    expect(view.sentChannels()).toContain('load-library-candidates');
-    expect(screen.getByTestId('mode-drums')).toBeEnabled();
-    view.selectMode('drums');
+    browseAllLibrary();
 
-    const surface = screen.getByTestId('playlist-candidate-surface');
-    const rows = within(surface).getAllByTestId(
-      /^library-candidate-(?:[1-9]|1[0-3])$/,
+    const drumsRows = drums.tracks.map((track) =>
+      screen.getByTestId(`library-candidate-Drums-${track.ordinal}`),
     );
+
+    expect(drumsRows).toHaveLength(13);
+
     const expectedTitles = [
       'Pendant que les champs brûlent',
       'Natural Villain',
@@ -640,34 +865,42 @@ describe('SongListView — loading the library', () => {
       'Low',
     ];
 
-    expect(rows).toHaveLength(13);
-
-    expectedTitles.forEach((title, index) => {
-      expect(within(rows[index]).getByText(title)).toBeInTheDocument();
+    expect([...drums.tracks.map((track) => track.title)].sort()).toEqual(
+      [...expectedTitles].sort(),
+    );
+    // Favorites overlaps some Drums titles for real (e.g. "Loyal"), so check
+    // each Drums row against its own exact ordinal rather than a page-wide
+    // text search that would match either copy.
+    drums.tracks.forEach((track, index) => {
+      expect(
+        within(drumsRows[index]).getByText(track.title),
+      ).toBeInTheDocument();
     });
     expect(
-      within(surface).getAllByText(
-        'Needs proof · local audio + reviewed chart',
+      drumsRows.filter((row) =>
+        within(row).queryByText('Not in your library yet'),
       ),
     ).toHaveLength(11);
     expect(
-      within(screen.getByTestId('library-candidate-6')).getByText(
-        'Unavailable · reference only',
+      within(screen.getByTestId('library-candidate-Drums-6')).getByText(
+        'No longer available',
       ),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('library-candidate-6')).toHaveAttribute(
+    expect(screen.getByTestId('library-candidate-Drums-6')).toHaveAttribute(
       'data-practice-status',
       'unavailable',
     );
     expect(
-      within(surface).getAllByRole('button', {
-        name: /check reviewed public drum charts/i,
-      }),
-    ).toHaveLength(13);
+      within(screen.getByTestId('library-candidate-Drums-1')).getByRole(
+        'button',
+        { name: /check reviewed public drum charts/i },
+      ),
+    ).toBeEnabled();
     fireEvent.click(
-      within(screen.getByTestId('library-candidate-1')).getByRole('button', {
-        name: /check reviewed public drum charts/i,
-      }),
+      within(screen.getByTestId('library-candidate-Drums-1')).getByRole(
+        'button',
+        { name: /check reviewed public drum charts/i },
+      ),
     );
     expect(view.ipc.sent).toContainEqual({
       channel: 'resolve-library-candidates',
@@ -690,20 +923,14 @@ describe('SongListView — loading the library', () => {
         },
       ],
     });
-    expect(screen.getByText('13 results')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByTestId('song-search'), {
-      target: { value: 'living in fiction' },
-    });
+    view.search('living in fiction');
 
+    expect(screen.getByText('Heat Waves')).toBeInTheDocument();
+    expect(screen.queryByText('Natural Villain')).not.toBeInTheDocument();
     expect(
-      within(surface).getAllByTestId(/^library-candidate-(?:[1-9]|1[0-3])$/),
-    ).toHaveLength(1);
-    expect(within(surface).getByText('Heat Waves')).toBeInTheDocument();
-    expect(
-      within(surface).queryByText('Natural Villain'),
+      screen.queryByTestId(/^library-candidate-Favorites-/),
     ).not.toBeInTheDocument();
-    expect(screen.getByText('1 result')).toBeInTheDocument();
   });
 
   it('marks only an exactly linked source row as resolved by a local chart', () => {
@@ -765,26 +992,25 @@ describe('SongListView — loading the library', () => {
         favorites: parseYandexPlaylistCandidates(yandexFavoritesSource),
       },
     });
-    view.selectMode('drums');
 
-    const linkedRow = within(screen.getByTestId('library-candidate-1'));
-    const unresolvedRow = within(screen.getByTestId('library-candidate-2'));
+    browseAllLibrary();
 
-    expect(linkedRow.getByText('Playable · proof gates green')).toBeVisible();
-    expect(screen.getByTestId('library-candidate-1')).toHaveAttribute(
-      'data-practice-status',
-      'linked',
-    );
+    // A linked track never appears as a source row at all — it is the
+    // playable song row, merged and deduplicated by the unified model.
+    expect(screen.getByTestId('song-item-linked-chart')).toBeInTheDocument();
     expect(
-      linkedRow.getByRole('button', { name: /is playable/i }),
-    ).toBeDisabled();
-    expect(
-      unresolvedRow.getByText('Needs proof · local audio + reviewed chart'),
-    ).toBeVisible();
-    expect(screen.getByTestId('library-candidate-2')).toHaveAttribute(
-      'data-practice-status',
-      'needs-local-chart',
+      screen.queryByTestId(`library-candidate-Drums-${linkedTrack.ordinal}`),
+    ).not.toBeInTheDocument();
+
+    const unresolvedTrack = drums.tracks[1];
+    const unresolvedRow = within(
+      screen.getByTestId(`library-candidate-Drums-${unresolvedTrack.ordinal}`),
     );
+
+    expect(unresolvedRow.getByText('Not in your library yet')).toBeVisible();
+    expect(
+      screen.getByTestId(`library-candidate-Drums-${unresolvedTrack.ordinal}`),
+    ).toHaveAttribute('data-practice-status', 'needs-local-chart');
     expect(
       unresolvedRow.getByRole('button', {
         name: /check reviewed public drum charts/i,
@@ -792,7 +1018,7 @@ describe('SongListView — loading the library', () => {
     ).toBeEnabled();
   });
 
-  it('carries the selected collection and track identity into local auto-charting', () => {
+  it('does not expose local-audio auto-charting from a source row', () => {
     const view = setupSongListView();
     const drums = parseYandexPlaylistCandidates(yandexSource);
     const track = drums.tracks[0];
@@ -804,38 +1030,20 @@ describe('SongListView — loading the library', () => {
         favorites: parseYandexPlaylistCandidates(yandexFavoritesSource),
       },
     });
-    view.selectMode('drums');
-    fireEvent.click(
-      within(screen.getByTestId('library-candidate-1')).getByRole('button', {
-        name: /use lawful local audio/i,
-      }),
-    );
 
-    expect(view.ipc.sent).toContainEqual({
-      channel: 'create-auto-chart',
-      args: [
-        {
-          localFile: true,
-          sourceProvenance: {
-            provider: 'yandex-music',
-            collectionId: drums.playlist.id,
-            collectionName: drums.playlist.name,
-            trackId: track.id,
-            title: track.title,
-            artists: track.artists,
-            ...(track.durationSeconds !== null
-              ? { durationSeconds: track.durationSeconds }
-              : {}),
-            ...(track.sourceTrackUrl
-              ? { sourceUrl: track.sourceTrackUrl }
-              : {}),
-          },
-        },
-      ],
-    });
+    browseAllLibrary();
+
+    expect(
+      within(
+        screen.getByTestId(`library-candidate-Drums-${track.ordinal}`),
+      ).queryByRole('button', { name: /local audio/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      view.ipc.sent.some((message) => message.channel === 'create-auto-chart'),
+    ).toBe(false);
   });
 
-  it('selects Favorites and keeps private source metadata eligible for exact chart checks', () => {
+  it('keeps a private Favorites row eligible for an exact chart check', () => {
     const view = setupSongListView();
     const favorites = parseYandexPlaylistCandidates(yandexFavoritesSource);
     const privateTrack = favorites.tracks[87];
@@ -847,23 +1055,16 @@ describe('SongListView — loading the library', () => {
         favorites,
       },
     });
-    view.selectMode('favorites');
+    view.search(privateTrack.title);
 
-    fireEvent.change(screen.getByTestId('song-search'), {
-      target: { value: privateTrack.title },
-    });
+    const row = within(
+      screen.getByTestId(`library-candidate-Favorites-${privateTrack.ordinal}`),
+    );
 
-    const surface = screen.getByTestId('playlist-candidate-surface');
+    expect(row.getByText(privateTrack.title)).toBeInTheDocument();
+    expect(row.getByText('Private on Yandex')).toBeInTheDocument();
 
-    expect(
-      screen.getByText('230 source rows · 0 playable'),
-    ).toBeInTheDocument();
-    expect(within(surface).getByText(privateTrack.title)).toBeInTheDocument();
-    expect(
-      within(surface).getByText('Private · metadata only'),
-    ).toBeInTheDocument();
-
-    const checkButton = within(surface).getByRole('button', {
+    const checkButton = row.getByRole('button', {
       name: /check reviewed public drum charts/i,
     });
 
@@ -891,18 +1092,15 @@ describe('SongListView — loading the library', () => {
     });
   });
 
-  it('keeps filters and add-music controls on a wrapping toolbar with width floors', () => {
-    const view = setupSongListView();
-
-    view.loadSongs([makeListSong('a')]);
+  it('keeps the toolbar wrapping with sane width floors', () => {
+    setupSongListView();
 
     expect(screen.getByTestId('library-toolbar')).toHaveClass('flex-col');
     expect(screen.getByTestId('library-song-controls')).toHaveClass(
       'flex-wrap',
     );
-    expect(screen.getByTestId('library-filters')).toHaveClass('flex-wrap');
     expect(screen.getByTestId('library-name-filter')).toHaveClass('min-w-64');
-    expect(screen.getByTestId('add-music-actions')).toHaveClass('flex-wrap');
+    expect(screen.queryByTestId('add-music-actions')).not.toBeInTheDocument();
   });
 
   it('surfaces existing progress as a continue-practicing moment', () => {
@@ -929,6 +1127,28 @@ describe('SongListView — loading the library', () => {
     ).toBeEnabled();
   });
 
+  it('never features a scored song that is no longer playable as continue-practicing', () => {
+    // Regression: a song can carry a real past score yet lose its audio or
+    // chart afterwards (a bad download/rescan — see
+    // docs/bug-hunt-20260812.md). Every row on the shelf already hides its
+    // Play action once `ready` is false; the featured continue-practicing
+    // strip must honor the same rule instead of handing the most prominent
+    // Play button in the view to a song that cannot actually play.
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('broken', {
+        name: 'Broken Audio',
+        audio: [],
+        scoreData: {
+          expert: { hitNotes: 92, totalNotes: 100, falseHits: 0 },
+        },
+      }),
+    ]);
+
+    expect(screen.queryByTestId('continue-practicing')).not.toBeInTheDocument();
+  });
+
   it('guides to select a folder when none is chosen', () => {
     const view = setupSongListView();
 
@@ -937,17 +1157,44 @@ describe('SongListView — loading the library', () => {
     expect(screen.getByText('Select folder')).toBeInTheDocument();
   });
 
-  it('guides to download songs when the folder is empty', () => {
+  it('guides to search for music when the folder is empty', () => {
     const view = setupSongListView();
 
     view.loadSongs([], '/music');
 
     expect(screen.getByText('Build your practice library')).toBeInTheDocument();
-    expect(screen.getByText('Browse online songs')).toBeInTheDocument();
     expect(screen.queryByText('Select folder')).not.toBeInTheDocument();
   });
 
-  it('reports when nothing matches the active filter', () => {
+  it('offers YouTube candidates the moment nothing in the library matches', async () => {
+    const view = setupSongListView();
+
+    view.loadSongs([
+      makeListSong('a', { name: 'Master of Puppets' }),
+      makeListSong('b', { name: 'Enter Sandman' }),
+    ]);
+    view.search('boulevard of broken dreams');
+
+    await waitFor(() =>
+      expect(view.sentChannels()).toContain('search-youtube'),
+    );
+    expect(view.ipc.sent).toContainEqual({
+      channel: 'search-youtube',
+      args: [{ query: 'boulevard of broken dreams' }],
+    });
+    expect(
+      screen.getByText(
+        'No matches in your library for “boulevard of broken dreams”',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('reports an honest dead end when nothing matches and YouTube import is unavailable', () => {
+    vi.stubGlobal('drumrollPlatform', {
+      kind: 'web',
+      capabilities: { youtubeImport: false },
+    });
+
     const view = setupSongListView();
 
     view.loadSongs([
@@ -973,70 +1220,6 @@ describe('SongListView — loading the library', () => {
 
     expect(screen.queryByText('Name a')).not.toBeInTheDocument();
     expect(screen.getByText('Name c')).toBeInTheDocument();
-  });
-
-  it('validates, previews and imports a prepared local chart folder', async () => {
-    const view = setupSongListView();
-
-    view.loadSongs([], '/music');
-    fireEvent.click(screen.getByTestId('import-song-trigger'));
-
-    expect(view.sentChannels()).toContain('select-import-song');
-
-    view.emit('select-import-song', {
-      preview: {
-        sourceDir: '/incoming/Raging',
-        name: 'Raging',
-        artist: 'Kygo feat. Kodaline',
-        album: 'Cloud Nine',
-        charter: '',
-        autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
-        chartFormat: 'mid',
-        audioCount: 7,
-        drumDifficulties: ['easy', 'medium', 'hard', 'expert'],
-        albumCoverDataUrl: 'data:image/jpeg;base64,cHJldmlldw==',
-        coverSource: 'embedded',
-      },
-    });
-
-    expect(screen.getByText('Review song import')).toBeInTheDocument();
-    expect(screen.getByText('Raging')).toBeInTheDocument();
-    expect(screen.getByText('Auto-charted with STRUM')).toBeInTheDocument();
-    expect(screen.getByText(/Embedded artwork found/)).toBeInTheDocument();
-
-    fireEvent.change(screen.getByTestId('import-artwork-url'), {
-      target: { value: 'https://example.com/permitted-cover.jpg' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add to library' }));
-
-    expect(view.ipc.sent).toContainEqual({
-      channel: 'import-song',
-      args: [
-        {
-          sourceDir: '/incoming/Raging',
-          artworkUrl: 'https://example.com/permitted-cover.jpg',
-        },
-      ],
-    });
-
-    view.emit('import-song', {
-      success: true,
-      song: makeListSong('raging', {
-        name: 'Raging',
-        charter: '',
-        autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
-      }),
-    });
-
-    expect(screen.getByTestId('song-item-raging')).toBeInTheDocument();
-  });
-
-  it('disables local import until a library folder is selected', () => {
-    const view = setupSongListView();
-
-    view.loadSongs([], null);
-
-    expect(screen.getByTestId('import-song-trigger')).toBeDisabled();
   });
 });
 
@@ -1067,47 +1250,97 @@ describe('SongListView — filtering and sorting', () => {
     expect(screen.queryByText('Two')).not.toBeInTheDocument();
   });
 
-  it('searches local album, charter provenance and folded diacritics', () => {
+  it('finds a Drums/Favorites source row by its source label', () => {
     const view = setupSongListView();
+    const drums = parseYandexPlaylistCandidates(yandexSource);
 
-    view.loadSongs([
-      makeListSong('raging', {
-        name: 'Raging',
-        artist: 'Kygo feat. Kodaliné',
-        album: 'Cloud Nine',
-        charter: '',
-        autoChartTool: 'STRUM (OCTAVE AI auto-charter)',
-      }),
-      makeListSong('other', { name: 'Other' }),
-    ]);
+    view.loadSongs([makeListSong('a', { name: 'Local Only Song' })]);
+    view.loadLibraryCandidates({
+      yandex: {
+        drums,
+        favorites: parseYandexPlaylistCandidates(yandexFavoritesSource),
+      },
+    });
+    view.search('drums');
 
-    for (const query of ['kodaline', 'cloud nine', 'strum']) {
-      view.search(query);
-
-      expect(screen.getByText('Raging')).toBeInTheDocument();
-      expect(screen.queryByText('Other')).not.toBeInTheDocument();
-    }
+    expect(screen.queryByText('Local Only Song')).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId(`library-candidate-Drums-${drums.tracks[0].ordinal}`),
+    ).toBeInTheDocument();
   });
 
-  it('reorders the list when a sort option is chosen', () => {
+  it('reorders the list to the most recently touched song first', () => {
     const view = setupSongListView();
 
     view.loadSongs([
-      makeListSong('a', { name: 'Charlie' }),
-      makeListSong('b', { name: 'Alpha' }),
+      makeListSong('a', {
+        name: 'Older Add',
+        updatedAt: '2026-08-01T00:00:00.000Z',
+      }),
+      makeListSong('b', {
+        name: 'Newer Add',
+        updatedAt: '2026-08-10T00:00:00.000Z',
+      }),
     ]);
-    view.chooseSort('name');
+    fireEvent.click(screen.getByTestId('sort-option-recent'));
 
     const rendered = screen
-      .getAllByText(/Charlie|Alpha/)
+      .getAllByText(/Older Add|Newer Add/)
       .map((el) => el.textContent);
 
-    expect(rendered).toEqual(['Alpha', 'Charlie']);
+    expect(rendered).toEqual(['Newer Add', 'Older Add']);
+  });
+
+  it('puts every playable song ahead of not-ready rows under the default Difficulty sort, not alphabetical order', () => {
+    // Regression for docs/design-qa/2026-08-13-finish/critique.md, Songs
+    // finding 2: with no per-song chart fed into the shelf, every entry's
+    // computed difficulty ties, so the 'Difficulty' sort used to fall back
+    // to pure alphabetical order regardless of whether a row could play —
+    // a header that says "N ready to play" while the very first rows are
+    // all unplayable. Pick titles where honest readiness and alphabetical
+    // order disagree, so this only passes if readiness actually wins.
+    const view = setupSongListView();
+    const drums = parseYandexPlaylistCandidates(yandexSource);
+
+    view.loadSongs([
+      makeListSong('unready', {
+        name: 'Aardvark Waits',
+        audio: [],
+        drumDifficulties: undefined,
+      }),
+      makeListSong('ready', { name: 'Zzyzx Road' }),
+    ]);
+    view.loadLibraryCandidates({
+      yandex: {
+        drums,
+        favorites: parseYandexPlaylistCandidates(yandexFavoritesSource),
+      },
+    });
+
+    browseAllLibrary();
+
+    const readyRow = screen.getByTestId('song-item-ready');
+    const unreadyRow = screen.getByTestId('song-item-unready');
+    const firstCandidateRow = screen.getByTestId(
+      `library-candidate-Drums-${drums.tracks[0].ordinal}`,
+    );
+
+    expect(readyRow).toHaveAttribute('aria-label', 'Play Zzyzx Road');
+    // Node.compareDocumentPosition: bit 4 (0x04, DOCUMENT_POSITION_FOLLOWING)
+    // set on the argument means `readyRow` precedes it in the DOM.
+    expect(
+      readyRow.compareDocumentPosition(unreadyRow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      readyRow.compareDocumentPosition(firstCandidateRow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });
 
 describe('SongListView — difficulty', () => {
-  it('re-filters to songs charted at the chosen difficulty', () => {
+  it('keeps every song on the shelf regardless of which difficulties it is charted at', () => {
     const view = setupSongListView();
 
     view.loadSongs([
@@ -1115,12 +1348,15 @@ describe('SongListView — difficulty', () => {
       makeListSong('b', { name: 'Hard Only', drumDifficulties: ['hard'] }),
     ]);
 
+    // The shelf is one continuous list now — a chart's difficulty no longer
+    // hides it. Practice launch still picks the right chart via the game
+    // mode selector's own difficulty control.
     expect(screen.getByText('Expert Only')).toBeInTheDocument();
-    expect(screen.queryByText('Hard Only')).not.toBeInTheDocument();
+    expect(screen.getByText('Hard Only')).toBeInTheDocument();
 
-    view.selectDifficulty('hard');
+    view.press('difficulty');
 
-    expect(screen.queryByText('Expert Only')).not.toBeInTheDocument();
+    expect(screen.getByText('Expert Only')).toBeInTheDocument();
     expect(screen.getByText('Hard Only')).toBeInTheDocument();
   });
 
@@ -1131,14 +1367,16 @@ describe('SongListView — difficulty', () => {
       makeListSong('a', {
         scoreData: {
           expert: { hitNotes: 100, totalNotes: 100, falseHits: 0 },
-          hard: { hitNotes: 45, totalNotes: 100, falseHits: 0 },
+          easy: { hitNotes: 45, totalNotes: 100, falseHits: 0 },
         },
       }),
     ]);
 
     expect(view.filledStars('a')).toBe(5);
 
-    view.selectDifficulty('hard');
+    // The default global difficulty is Expert; one hi-hat press cycles to
+    // Easy (see helpers.test.ts's nextDifficulty coverage).
+    view.press('difficulty');
 
     expect(view.filledStars('a')).toBe(2);
   });
@@ -1185,19 +1423,32 @@ describe('SongListView — difficulty', () => {
     expect(document.querySelector('.ant-tag')).not.toBeInTheDocument();
     expect(screen.queryByText('charter')).not.toBeInTheDocument();
   });
-});
 
-describe('SongListView — liking', () => {
-  it('toggles a like and tells the backend', () => {
-    const view = setupSongListView();
+  it('never fabricates a practice-candidate difficulty for a song with no charted drum part', () => {
+    // Regression for docs/bug-hunt-20260812.md's "Song grid and My Wave
+    // fabricate a playable difficulty for songs with zero charted
+    // difficulties": an uncharted/broken song used to pass through with the
+    // globally selected difficulty, letting it reach My Wave with
+    // `available: true` and auto-launch into a chart-parse failure. It must
+    // resolve to `undefined` instead, so the recommender's own
+    // `if (!targetDifficulty) return []` guard drops it before it is ever
+    // offered as playable.
+    const uncharted = makeListSong('broken', { drumDifficulties: [] });
 
-    view.loadSongs([makeListSong('a', { liked: false })]);
-    view.like('a');
+    expect(candidateDifficulty(uncharted, 'expert')).toBeUndefined();
 
-    expect(view.ipc.sent).toContainEqual({
-      channel: 'like-song',
-      args: ['a', true],
+    const untypedDifficulties = makeListSong('legacy', {
+      drumDifficulties: undefined,
     });
+
+    expect(candidateDifficulty(untypedDifficulties, 'expert')).toBeUndefined();
+
+    // A charted song keeps its honest fallback behaviour: the selected
+    // difficulty when charted, otherwise the closest lower charted one.
+    const charted = makeListSong('charted', { drumDifficulties: ['hard'] });
+
+    expect(candidateDifficulty(charted, 'expert')).toBe('hard');
+    expect(candidateDifficulty(charted, 'hard')).toBe('hard');
   });
 });
 
@@ -1263,6 +1514,7 @@ describe('SongListView — opening a song', () => {
 
     view.loadSongs([makeListSong('hard-song')]);
     await loadFailedHardPractice(view);
+    browseAllLibrary();
     view.clickSong('hard-song');
     view.chooseGameMode('practice');
 
@@ -1277,6 +1529,7 @@ describe('SongListView — opening a song', () => {
 
     view.loadSongs([makeListSong('hard-song')]);
     await loadFailedHardPractice(view);
+    browseAllLibrary();
     view.clickSong('hard-song');
     view.chooseGameMode('perform');
 
@@ -1360,185 +1613,19 @@ describe('SongListView — opening a song', () => {
   });
 });
 
-describe('SongListView — stem splitting', () => {
-  it('queues a split, shows progress, then reports success', () => {
-    const view = setupSongListView();
+// Splitting stems and the per-row three-dot menu that triggered it are
+// dropped from the Songs shelf for the same reason liking is (see the note
+// above "SongListView — opening a song"): the row grammar allows exactly
+// one right-side evidence mark, and split/goal-setting fought that. The
+// split engine itself (useSongList's handleSplit, SplittingQueue) is
+// untouched — only this view's trigger is gone. Left for a follow-up lane.
 
-    view.loadSongs([makeListSong('a')]);
-    view.setStemTools('ready');
-
-    view.openSongMenu('a');
-    fireEvent.click(screen.getByText('Split stems'));
-
-    expect(view.ipc.sent).toContainEqual({
-      channel: 'split-song',
-      args: ['a'],
-    });
-    expect(screen.getByText('Processing queue')).toBeInTheDocument();
-
-    view.emit('split-song', { id: 'a', progress: 50 });
-    view.emit('split-song', {
-      id: 'a',
-      success: true,
-      song: makeListSong('a', { audio: [] }),
-    });
-
-    expect(screen.getByText(/split successfully/)).toBeInTheDocument();
-    expect(screen.queryByText('Processing queue')).not.toBeInTheDocument();
-  });
-
-  it('reports a failed split', () => {
-    const view = setupSongListView();
-
-    view.loadSongs([makeListSong('a')]);
-    view.setStemTools('ready');
-
-    view.openSongMenu('a');
-    fireEvent.click(screen.getByText('Split stems'));
-
-    view.emit('split-song', { id: 'a', success: false, error: 'boom' });
-
-    expect(screen.getByText('Split failed')).toBeInTheDocument();
-    expect(screen.getByText('boom')).toBeInTheDocument();
-  });
-
-  it('cancels a queued split', () => {
-    const view = setupSongListView();
-
-    view.loadSongs([makeListSong('a')]);
-    view.setStemTools('ready');
-
-    view.openSongMenu('a');
-    fireEvent.click(screen.getByText('Split stems'));
-
-    const queueRoot = screen.getByText('Processing queue').parentElement!;
-
-    fireEvent.click(within(queueRoot).getByRole('button'));
-
-    expect(view.sentChannels()).toContain('cancel-split');
-
-    view.emit('split-song', { id: 'a', cancelled: true });
-
-    expect(screen.getByText('Split cancelled')).toBeInTheDocument();
-    expect(screen.queryByText('Processing queue')).not.toBeInTheDocument();
-  });
-});
-
-describe('SongListView — online mode', () => {
-  it('shows online results when switched', async () => {
-    const view = setupSongListView({
-      online: [makeEnchorChart('x'), makeEnchorChart('y')],
-    });
-
-    view.loadSongs([]);
-    view.selectMode('online');
-
-    expect(await screen.findByText('Name x')).toBeInTheDocument();
-    expect(screen.getByText('Name y')).toBeInTheDocument();
-  });
-
-  it('ranks exact normalized metadata matches before fuzzy results', async () => {
-    const view = setupSongListView({
-      online: [
-        makeEnchorChart('fuzzy', {
-          name: 'Kyoukai',
-          artist: 'Ho-kago Tea Time',
-        }),
-        makeEnchorChart('exact', {
-          name: 'Stop and Stare',
-          artist: 'OneRépublic',
-        }),
-      ],
-    });
-
-    view.loadSongs([]);
-    view.selectMode('online');
-    view.search('ONEREPUBLIC');
-
-    await screen.findByText('Stop and Stare');
-
-    const names = screen
-      .getAllByText(/Stop and Stare|Kyoukai/)
-      .map((element) => element.textContent);
-
-    expect(names).toEqual(['Stop and Stare', 'Kyoukai']);
-    expect(screen.queryByText(/No exact matches/)).not.toBeInTheDocument();
-  });
-
-  it('says when online results are fuzzy-only', async () => {
-    const view = setupSongListView({
-      online: [
-        makeEnchorChart('fuzzy', {
-          name: 'Kyoukai',
-          artist: 'Ho-kago Tea Time',
-        }),
-      ],
-    });
-
-    view.loadSongs([]);
-    view.selectMode('online');
-    view.search('Kygo');
-
-    expect(await screen.findByText('Kyoukai')).toBeInTheDocument();
-    expect(screen.getByText(/No exact matches for “Kygo”/)).toBeInTheDocument();
-  });
-
-  it('downloads an online song and marks it downloaded', async () => {
-    const view = setupSongListView({ online: [makeEnchorChart('x')] });
-
-    view.loadSongs([], '/music');
-    view.selectMode('online');
-
-    await screen.findByText('Name x');
-    fireEvent.click(
-      within(screen.getByTestId('song-item-x')).getByTestId('download-button'),
-    );
-
-    expect(view.sentChannels()).toContain('download-song');
-
-    view.emit('download-song', {
-      success: true,
-      md5: 'x',
-      song: makeListSong('x'),
-    });
-
-    expect(
-      within(screen.getByTestId('song-item-x')).getByTestId(
-        'downloaded-indicator',
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it('reports a failed download', async () => {
-    const view = setupSongListView({ online: [makeEnchorChart('x')] });
-
-    view.loadSongs([], '/music');
-    view.selectMode('online');
-
-    await screen.findByText('Name x');
-    fireEvent.click(
-      within(screen.getByTestId('song-item-x')).getByTestId('download-button'),
-    );
-
-    view.emit('download-song', { success: false, md5: 'x', error: 'no space' });
-
-    expect(screen.getByText('Download failed')).toBeInTheDocument();
-    expect(screen.getByText('no space')).toBeInTheDocument();
-  });
-
-  it('disables downloads until a folder is selected', async () => {
-    const view = setupSongListView({ online: [makeEnchorChart('x')] });
-
-    view.loadSongs([], null);
-    view.selectMode('online');
-
-    await screen.findByText('Name x');
-
-    expect(
-      within(screen.getByTestId('song-item-x')).getByTestId('download-button'),
-    ).toBeDisabled();
-  });
-});
+// The separate Online-songs browser (Enchor search, download-to-library)
+// is gone with the mode split it lived in: "search what he already has,
+// and when nothing matches offer YouTube candidates" replaces it outright
+// rather than keeping a fifth source alongside the merged shelf. Picking a
+// YouTube result already runs the real auto-import queue — see
+// SongSearch.test.tsx and the "offers YouTube candidates" test above.
 
 describe('SongListView — settings', () => {
   it('rescans the folder from settings', () => {
@@ -1679,34 +1766,47 @@ describe('SongListView — keyboard navigation', () => {
     expect(view.isFocused('a')).toBe(false);
   });
 
-  it('toggles online mode with the library control', async () => {
-    const view = setupSongListView({ online: [makeEnchorChart('x')] });
-
-    view.loadSongs([]);
-    view.press('library');
-
-    expect(await screen.findByText('Name x')).toBeInTheDocument();
-  });
-
-  it('cycles the difficulty filter with the difficulty control', () => {
+  it('cycles the global difficulty with the difficulty control', async () => {
     const view = setupSongListView();
 
-    view.loadSongs([
-      makeListSong('a', { name: 'Easy Only', drumDifficulties: ['easy'] }),
-      makeListSong('b', { name: 'Expert Only', drumDifficulties: ['expert'] }),
-    ]);
-
-    expect(screen.getByText('Expert Only')).toBeInTheDocument();
-    expect(screen.queryByText('Easy Only')).not.toBeInTheDocument();
-
+    view.loadSongs([makeListSong('a')]);
+    // Default global difficulty is Expert; one hi-hat press cycles to Easy.
     view.press('difficulty');
+    view.clickSong('a');
+    view.chooseGameMode('practice');
 
-    expect(screen.getByText('Easy Only')).toBeInTheDocument();
-    expect(screen.queryByText('Expert Only')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('song-view-stub')).toHaveAttribute(
+      'data-difficulty',
+      'easy',
+    );
   });
 });
 
 describe('SongListView — fresh-profile kit navigation', () => {
+  it('says nothing about unmapped navigation, instead of the raw config string, before any control is mapped', () => {
+    // Regression for docs/design-qa/2026-08-13-finish/critique.md, Songs
+    // finding 3: "Navigation unavailable · Set library controls in
+    // Configure input" is a debug string about missing settings, not
+    // something he would ever say, and it must never reach the primary
+    // library view. The real fact belongs in Settings, one intentional
+    // action away — the library route says nothing at all instead.
+    const view = setupSongListView({
+      freshProfile: true,
+      settings: { controlMappings: {} },
+    });
+
+    view.loadSongs([makeListSong('a')]);
+    view.selectView('songs');
+
+    expect(
+      screen.queryByTestId('library-control-legend'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Navigation unavailable/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Configure input/i)).not.toBeInTheDocument();
+  });
+
   it('auto-connects a DTX, moves focus, filters, and launches the chosen song directly in Practice', async () => {
     const view = setupSongListView({
       freshProfile: true,
@@ -1738,55 +1838,48 @@ describe('SongListView — fresh-profile kit navigation', () => {
 
     expect(legend).toHaveAttribute('data-control-source', 'kit-lanes');
     expect(legend).toHaveTextContent(
-      'Tom 1 / Tom 2 move · Snare chooses · Hi-hat filters difficulty · Ride changes source · Tom 3 opens sort · Crash backs',
+      'Tom 1 / Tom 2 move · Snare chooses · Hi-hat filters difficulty · Tom 3 opens sort · Crash backs',
     );
     expect(
       screen.getByTestId('library-kit-control-commands'),
     ).toHaveTextContent('Move');
     expect(
       screen.getByTestId('library-kit-control-commands'),
-    ).toHaveTextContent('Source');
+    ).toHaveTextContent('Sort');
     expect(legend).toHaveTextContent('Local choices open directly in Practice');
 
-    for (const expectedMode of ['drums', 'favorites', 'online', 'local']) {
-      view.emit('listen-midi', {
-        type: MidiMessageType.NoteOn,
-        note: 51,
-        velocity: 100,
-      });
-      expect(screen.getByTestId(`mode-${expectedMode}`)).toHaveAttribute(
-        'aria-pressed',
-        'true',
-      );
-    }
-
+    // Tom 3 arms sort-focus mode; Tom 1/Tom 2 then move the highlighted
+    // sort option and apply it live instead of moving song focus.
     view.emit('listen-midi', {
       type: MidiMessageType.NoteOn,
       note: 43,
       velocity: 100,
     });
-    expect(screen.getByTestId('sort-option-name')).toBeInTheDocument();
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 47,
+      velocity: 100,
+    });
+    expect(screen.getByTestId('sort-option-recent')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    // Crash backs out of sort-focus mode; Tom 1/Tom 2 return to moving
+    // song focus.
     view.emit('listen-midi', {
       type: MidiMessageType.NoteOn,
       note: 49,
       velocity: 100,
     });
-    await waitFor(() =>
-      expect(screen.getByTestId('sort-trigger')).toHaveAttribute(
-        'aria-expanded',
-        'false',
-      ),
-    );
 
+    // Hi-hat cycles the global difficulty (Expert -> Easy) — no visible
+    // chip anymore, so the opened song's own difficulty is the proof.
     view.emit('listen-midi', {
       type: MidiMessageType.NoteOn,
       note: 42,
       velocity: 100,
     });
-    expect(screen.getByTestId('difficulty-easy')).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
 
     view.emit('listen-midi', {
       type: MidiMessageType.NoteOn,
@@ -1831,6 +1924,56 @@ describe('SongListView — fresh-profile kit navigation', () => {
       velocity: 100,
     });
     expect(opened).toHaveAttribute('data-difficulty', 'easy');
+  });
+
+  it('launches a kit-confirmed song on its own charted difficulty, not the stale global tab', async () => {
+    // Regression: a row is `ready` once it has any charted difficulty, but
+    // the kit-confirm path used to skip straight to Practice on whatever
+    // difficulty tab was globally selected. A song charted only at 'hard'
+    // while the global tab sits at the default 'expert' must still open on
+    // 'hard' — the honest chart it actually has — never a track it was
+    // never charted at.
+    const view = setupSongListView({
+      freshProfile: true,
+      settings: { controlMappings: {} },
+    });
+
+    view.loadSongs([
+      makeListSong('hard-only', {
+        name: 'Hard Only Song',
+        drumDifficulties: ['hard'],
+      }),
+    ]);
+    view.selectView('songs');
+    view.emit('midi-device-list', [{ name: 'Yamaha DTX402', port: 2 }]);
+
+    await waitFor(() =>
+      expect(view.ipc.sent).toContainEqual({
+        channel: 'listen-midi',
+        args: [2],
+      }),
+    );
+    view.emit('midi-ready', { port: 2 });
+
+    // Tom 1 focuses the one song on the shelf.
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 47,
+      velocity: 100,
+    });
+    expect(view.isFocused('hard-only')).toBe(true);
+
+    // Snare confirms — the kit-only path straight into Practice.
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 38,
+      velocity: 100,
+    });
+
+    const opened = await screen.findByTestId('song-view-stub');
+
+    expect(opened).toHaveAttribute('data-song-id', 'hard-only');
+    expect(opened).toHaveAttribute('data-difficulty', 'hard');
   });
 
   it('uses crash to return from Songs to Home', () => {
@@ -1883,7 +2026,7 @@ describe('SongListView — fresh-profile kit navigation', () => {
       'Explicit: 91 move',
     );
     expect(screen.getByTestId('library-control-legend')).toHaveTextContent(
-      'Kit fallback: Tom 1 / Tom 2 move · Snare chooses · Hi-hat filters difficulty · Ride changes source · Tom 3 opens sort · Crash backs',
+      'Kit fallback: Tom 1 / Tom 2 move · Snare chooses · Hi-hat filters difficulty · Tom 3 opens sort · Crash backs',
     );
     view.emit('listen-midi', {
       type: MidiMessageType.NoteOn,
@@ -1918,46 +2061,63 @@ describe('SongListView — fresh-profile kit navigation', () => {
 });
 
 describe('SongListView — sort menu navigation', () => {
-  it('opens the sort menu with the sort control', () => {
+  it('arms sort-focus mode so up/down changes the applied sort instead of song focus', () => {
     const view = setupSongListView();
 
     view.loadSongs([makeListSong('a'), makeListSong('b')]);
-
-    expect(screen.queryByText('Last added')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sort-option-difficulty')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
 
     view.press('sort');
+    view.press('down');
 
-    expect(screen.getByText('Last added')).toBeInTheDocument();
+    expect(screen.getByTestId('sort-option-recent')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(view.isFocused('a')).toBe(false);
   });
 
   it('reorders the list by navigating the sort menu', () => {
     const view = setupSongListView();
 
     view.loadSongs([
-      makeListSong('a', { name: 'Charlie', liked: true }),
-      makeListSong('b', { name: 'Alpha', liked: false }),
+      makeListSong('a', {
+        name: 'Alpha',
+        updatedAt: '2026-08-01T00:00:00.000Z',
+      }),
+      makeListSong('b', {
+        name: 'Zulu',
+        updatedAt: '2026-08-10T00:00:00.000Z',
+      }),
     ]);
 
+    // Default sort is difficulty; neither song has a chart or manifest, so
+    // both tie and fall back to alphabetical order.
     expect(
-      screen.getAllByText(/Charlie|Alpha/).map((el) => el.textContent),
-    ).toEqual(['Charlie', 'Alpha']);
+      screen.getAllByText(/Alpha|Zulu/).map((el) => el.textContent),
+    ).toEqual(['Alpha', 'Zulu']);
 
     view.press('sort');
-    view.press('up');
+    view.press('down');
 
     expect(
-      screen.getAllByText(/Charlie|Alpha/).map((el) => el.textContent),
-    ).toEqual(['Alpha', 'Charlie']);
+      screen.getAllByText(/Alpha|Zulu/).map((el) => el.textContent),
+    ).toEqual(['Zulu', 'Alpha']);
   });
 
-  it('does not open the sort menu in online mode', () => {
+  it('leaves sort-focus mode on back, returning up/down to song focus', () => {
     const view = setupSongListView();
 
-    view.loadSongs([], '/music');
-    view.selectMode('online');
-    view.press('sort');
+    view.loadSongs([makeListSong('a'), makeListSong('b')]);
 
-    expect(screen.queryByText('Last added')).not.toBeInTheDocument();
+    view.press('sort');
+    view.press('back');
+    view.press('down');
+
+    expect(view.isFocused('a')).toBe(true);
   });
 });
 
@@ -2049,6 +2209,8 @@ describe('SongListView — lessons filter split', () => {
       makeLessonSong('lesson-1', { id: '01.01', title: 'Warm-Up Groove' }),
     ]);
 
+    browseAllLibrary();
+
     expect(screen.getByText('Master of Puppets')).toBeInTheDocument();
     expect(screen.queryByText('Warm-Up Groove')).not.toBeInTheDocument();
   });
@@ -2139,7 +2301,7 @@ describe('SongListView — Lessons surface', () => {
     expect(within(card).getByText('Warm-Up Groove')).toBeInTheDocument();
   });
 
-  it('greys out a locked lesson with a clear-count hint', () => {
+  it('keeps a formerly gated lesson open with no clear-count gate', () => {
     const view = setupSongListView();
 
     view.loadSongs([
@@ -2157,15 +2319,15 @@ describe('SongListView — Lessons surface', () => {
 
     view.selectView('lessons');
 
-    const locked = screen.getByTestId('lesson-item-01.02');
+    const formerlyGated = screen.getByTestId('lesson-item-01.02');
 
-    expect(locked).toHaveAttribute('data-locked', 'true');
+    expect(formerlyGated).not.toHaveAttribute('data-locked');
     expect(
-      within(locked).getByText('Clear 12 more lessons'),
-    ).toBeInTheDocument();
+      within(formerlyGated).queryByText(/Clear \d+ more lesson/),
+    ).not.toBeInTheDocument();
   });
 
-  it('shows an honest message instead of a dead click on a locked lesson', () => {
+  it('opens a formerly gated lesson straight into practice', async () => {
     const view = setupSongListView();
 
     view.loadSongs([
@@ -2184,8 +2346,11 @@ describe('SongListView — Lessons surface', () => {
     view.selectView('lessons');
     view.clickLesson('01.02');
 
-    expect(screen.getByText('This lesson is locked')).toBeInTheDocument();
-    expect(screen.queryByTestId('song-view-stub')).not.toBeInTheDocument();
+    expect(screen.queryByText('This lesson is locked')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('song-view-stub')).toHaveAttribute(
+      'data-song-id',
+      'lesson-2',
+    );
   });
 
   it('keeps lessons visible in the Lessons tab regardless of the selected difficulty', () => {
@@ -2200,7 +2365,7 @@ describe('SongListView — Lessons surface', () => {
     ]);
     // Lesson charts only carry an Expert track — pick a difficulty the
     // lesson was never charted for while still in the Songs view.
-    view.selectDifficulty('easy');
+    view.press('difficulty');
 
     view.selectView('lessons');
 

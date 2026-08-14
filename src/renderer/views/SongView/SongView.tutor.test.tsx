@@ -1,4 +1,10 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BEAT_SECONDS,
@@ -97,7 +103,9 @@ describe('adaptive tutor surfaces', () => {
     expect(
       screen.getByRole('switch', { name: 'Challenge lives' }),
     ).not.toBeChecked();
-    expect(screen.getByRole('switch', { name: 'Auto-continue' })).toBeChecked();
+    expect(
+      screen.queryByRole('switch', { name: 'Auto-continue' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Kit controls' })).toBeChecked();
     expect(screen.getByTestId('setup-input')).toHaveTextContent(
       'Configure Keyboard',
@@ -118,7 +126,34 @@ describe('adaptive tutor surfaces', () => {
 });
 
 describe('safe hands-free run intent', () => {
-  it('keeps the active-play pause command visible without a full-size prompt', async () => {
+  it('pauses before Configure Input can capture a live strike', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice',
+      settings: { countIn: false },
+      keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+    });
+
+    await view.loadSong();
+    view.clickPlay();
+
+    expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+      'aria-label',
+      'Pause',
+    );
+
+    view.openSettings();
+    fireEvent.click(screen.getByTestId('setup-input'));
+    fireEvent.click(screen.getByTestId('learn-snare'));
+    await view.pressKey('KeyJ');
+
+    expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+      'aria-label',
+      'Play',
+    );
+    expect(view.audio.state).toBe('suspended');
+  });
+
+  it('keeps active play focused on notation instead of a persistent tutor prompt', async () => {
     const view = setupSongView({
       route: '/song-1?gameMode=practice',
       settings: { countIn: false },
@@ -133,14 +168,11 @@ describe('safe hands-free run intent', () => {
     await view.loadSong();
     await view.pressKey('KeyK');
 
-    const prompt = within(screen.getByTestId('tutor-hud')).getByTestId(
-      'kit-command-prompt',
+    expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+      'aria-label',
+      'Pause',
     );
-
-    expect(prompt).toHaveAccessibleName(
-      'Pause from the kit: Kick, then Crash, then Kick, then Crash',
-    );
-    expect(prompt).toHaveAttribute('data-compact', 'true');
+    expect(screen.queryByTestId('tutor-hud')).not.toBeInTheDocument();
   });
 
   it('surfaces an interrupted attempt and resumes it from the kit with a fresh count-in', async () => {
@@ -274,9 +306,9 @@ describe('safe hands-free run intent', () => {
     expect((screen.getByRole('spinbutton') as HTMLInputElement).value).toBe(
       '0.7',
     );
-    expect(
-      within(screen.getByTestId('tutor-hud')).getByText('0.7×'),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('practice-mode-indicator')).toHaveTextContent(
+      '0.7×',
+    );
   });
 
   it('stamps the run start at first playback rather than component mount', async () => {
@@ -422,6 +454,11 @@ describe('safe hands-free run intent', () => {
       await strikeCommand(view, clock, ['KeyK', 'KeyC', 'KeyK', 'KeyC']);
 
       expect(view.audio.state).toBe('suspended');
+      expect(screen.getByTestId('tutor-hud')).toHaveAttribute(
+        'data-edge-caption',
+        'tutor',
+      );
+      expect(document.querySelectorAll('[data-edge-caption]')).toHaveLength(1);
 
       clock.advance(1200);
       await strikeCommand(view, clock, ['KeyK', 'KeyC', 'KeyK', 'KeyC']);
@@ -431,7 +468,105 @@ describe('safe hands-free run intent', () => {
 
     expect(view.audio.state).toBe('running');
     expect(screen.queryByTestId('song-list-stub')).not.toBeInTheDocument();
+    expect(screen.getByTestId('count-in')).toHaveAttribute(
+      'data-edge-caption',
+      'count-in',
+    );
+    expect(document.querySelectorAll('[data-edge-caption]')).toHaveLength(1);
   });
+
+  it('keeps a fallback caption once the inactivity veil steps aside from pointer activity', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice',
+        settings: { countIn: false, handsFreeControlsEnabled: true },
+      });
+
+      await view.loadSong();
+      view.clickPlay();
+
+      // DRUM_CHART's quarter notes are 0.5s apart at 120bpm - let ~3s of
+      // real song time pass without a single hit so the kit inactivity
+      // recovery hook genuinely parks (INACTIVITY_MIN_SECONDS = 2.25s,
+      // INACTIVITY_MIN_EXPECTED_HEADS = 3 abandoned heads - both cross
+      // well before 3s of untouched playback).
+      for (let index = 0; index < 6; index += 1) {
+        view.audio.currentTime += 0.5;
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(150);
+        });
+      }
+
+      const veil = screen.getByTestId('inactivity-pause-veil');
+
+      expect(screen.queryByTestId('tutor-hud')).not.toBeInTheDocument();
+
+      // An ordinary trackpad brush over the practice view - not a hit on
+      // any pad - steps the veil aside without ending the real park.
+      fireEvent.pointerDown(veil);
+
+      expect(
+        screen.queryByTestId('inactivity-pause-veil'),
+      ).not.toBeInTheDocument();
+
+      const hud = screen.getByTestId('tutor-hud');
+
+      expect(hud).toHaveAttribute('data-display-state', 'inactivity-paused');
+      expect(hud).toHaveTextContent('Paused — input check');
+      expect(document.querySelectorAll('[data-edge-caption]')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 30000);
+
+  it('does not reopen MIDI when inactivity parks a run awaiting its resume strike', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice',
+        settings: {
+          countIn: false,
+          handsFreeControlsEnabled: true,
+          selectedDevice: {
+            id: 'midi:Yamaha DTX402',
+            name: 'Yamaha DTX402',
+            sourceId: 'midi',
+            port: 0,
+          },
+          inputMappings: {
+            'midi:Yamaha DTX402': { kick: ['midi:36'] },
+          },
+        },
+      });
+
+      await view.loadSong();
+
+      const requestsBeforePark = view.ipc.sent.filter(
+        ({ channel }) => channel === 'midi-device-list',
+      ).length;
+
+      view.clickPlay();
+
+      for (let index = 0; index < 6; index += 1) {
+        view.audio.currentTime += 0.5;
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(150);
+        });
+      }
+
+      expect(screen.getByTestId('inactivity-pause-veil')).toBeInTheDocument();
+      expect(
+        view.ipc.sent.filter(({ channel }) => channel === 'midi-device-list'),
+      ).toHaveLength(requestsBeforePark);
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 30000);
 
   it('gives kit gestures sole ownership when a pad also has a transport mapping', async () => {
     const view = setupSongView({

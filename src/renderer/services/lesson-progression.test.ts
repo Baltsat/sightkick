@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { decideLessonProgression } from './lesson-progression';
+import type { LessonEntry, LessonProgress } from '../hooks/useLessons';
+import { decideLessonProgression, makeLessonsOpen } from './lesson-progression';
 
 const score = { hitNotes: 9, totalNotes: 10, falseHits: 0 };
 const completeTargetSpeedTraversal = {
@@ -7,6 +8,17 @@ const completeTargetSpeedTraversal = {
   uninterrupted: true,
   minimumPlaybackSpeed: 1,
 };
+
+function makeEntry(id: string, unlocked: boolean): LessonEntry {
+  return {
+    song: { id } as LessonEntry['song'],
+    lesson: { id } as LessonEntry['lesson'],
+    bestStars: 0,
+    cleared: false,
+    unlocked,
+    clearsNeeded: unlocked ? 0 : 1,
+  };
+}
 
 describe('lesson progression', () => {
   it('clears a complete good-enough lesson Practice pass', () => {
@@ -93,5 +105,29 @@ describe('lesson progression', () => {
       meetsAccuracyTarget: false,
       accuracy: 0.8,
     });
+  });
+
+  it('opens all 170 lessons while retaining the authored next recommendation', () => {
+    const entries = Array.from({ length: 170 }, (_, index) =>
+      makeEntry(`lesson-${String(index + 1).padStart(3, '0')}`, index === 0),
+    );
+    const progress: LessonProgress = {
+      entries,
+      groups: [{ unit: 'Method', entries }],
+      totalLessons: entries.length,
+      unlockedCount: 1,
+      totalStars: 0,
+      clearedCount: 0,
+      continueEntry: entries[0],
+      nextLockedEntry: entries[1],
+    };
+    const open = makeLessonsOpen(progress);
+
+    expect(open.unlockedCount).toBe(170);
+    expect(open.entries.every((entry) => entry.unlocked)).toBe(true);
+    expect(open.entries.every((entry) => entry.clearsNeeded === 0)).toBe(true);
+    expect(open.continueEntry?.song.id).toBe('lesson-001');
+    expect(open.nextLockedEntry).toBeUndefined();
+    expect(progress.entries[169].unlocked).toBe(false);
   });
 });

@@ -22,6 +22,7 @@ export interface HomeSessionReceipt {
   title: string;
   detail: string;
   candidateId?: string;
+  unavailable?: true;
 }
 
 export interface ComposeHomeSessionInput {
@@ -181,18 +182,60 @@ function buildReceipt({
   });
 }
 
+function detailWithSection(
+  detail: string,
+  section: { start: number; end: number } | undefined,
+  speed: number,
+): string {
+  return section
+    ? `${detail} Play bars ${section.start}–${section.end} at ${speed.toFixed(
+        1,
+      )}×.`
+    : detail;
+}
+
+function favouriteWavePayoff(
+  practiceWave: PracticeWaveResult | undefined,
+): HomeSessionReceipt | undefined {
+  const stop = practiceWave?.stops.find(
+    ({ role, recommendation }) =>
+      role === 'apply' &&
+      recommendation.candidate.kind === 'song' &&
+      recommendation.candidate.liked === true,
+  );
+
+  if (!stop) {
+    return undefined;
+  }
+
+  const { candidate } = stop.recommendation;
+  const section = candidate.itemManifest?.section;
+
+  return {
+    title: candidate.title,
+    detail: detailWithSection(
+      stop.reason,
+      section ? { start: section.start_bar, end: section.end_bar } : undefined,
+      stop.recommendation.suggestedSpeed,
+    ),
+    candidateId: candidate.id,
+  };
+}
+
 function payoffReceipt({
   plan,
   ranking,
   practiceWave,
   goalPath,
   goalPayoffCandidate,
+  launch,
 }: {
   plan: SessionPlan | undefined;
   ranking: readonly RankedPracticeCandidate[];
   practiceWave: PracticeWaveResult | undefined;
   goalPath: UnlockPath | undefined;
   goalPayoffCandidate: PracticeCandidate | undefined;
+  launch: RankedPracticeCandidate;
 }): HomeSessionReceipt {
   const probe = goalPath?.next_song_probe;
   const goalSong = byCandidateId(ranking, probe?.song_id);
@@ -220,30 +263,32 @@ function payoffReceipt({
     plan?.blocks.find(({ role }) => role === 'celebrate') ??
     plan?.blocks.at(-1);
   const planned = byCandidateId(ranking, payoffBlock?.candidate_id);
+  const wavePayoff = favouriteWavePayoff(practiceWave);
 
-  if (planned?.candidate.kind === 'song' && payoffBlock) {
+  if (wavePayoff) {
+    return wavePayoff;
+  }
+
+  if (
+    planned?.candidate.kind === 'song' &&
+    planned.candidate.liked === true &&
+    payoffBlock
+  ) {
     return {
       title: planned.candidate.title,
-      detail: payoffBlock.why,
+      detail: detailWithSection(
+        payoffBlock.why,
+        payoffBlock.bar_range,
+        payoffBlock.speed,
+      ),
       candidateId: planned.candidate.id,
     };
   }
 
-  const waveSong = practiceWave?.stops.find(
-    ({ recommendation }) => recommendation.candidate.kind === 'song',
-  );
-
-  if (waveSong) {
-    return {
-      title: waveSong.recommendation.candidate.title,
-      detail: waveSong.reason,
-      candidateId: waveSong.recommendation.candidate.id,
-    };
-  }
-
   return {
-    title: 'No musical payoff yet',
-    detail: 'No playable favourite-song section is currently ranked.',
+    unavailable: true,
+    title: 'No favourite-song payoff is ready',
+    detail: `Today’s work is ${launch.candidate.title}. My Wave has no playable saved favourite linked to this session.`,
   };
 }
 
@@ -380,6 +425,7 @@ export function composeHomeSession(
     practiceWave: input.practiceWave,
     goalPath,
     goalPayoffCandidate: input.goalPayoffCandidate,
+    launch,
   });
 
   return {

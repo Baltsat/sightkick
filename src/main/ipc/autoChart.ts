@@ -12,15 +12,21 @@ import {
   IpcAutoChartMetadata,
   IpcCreateAutoChartRequest,
   IpcImportSongPreview,
+  IpcYoutubeCandidate,
   LibrarySourceTrackProvenance,
   PlayabilityEvidence,
   Song,
+  YoutubeFetchedAudioProvenance,
 } from '../../types';
 import { caCertEnv, getBinaryPath } from '../stemTools';
 import { ingestSongCover } from '../songCover';
 import { normalizeLibrarySourceProvenance } from '../../library-sources/provenance';
-import { createLocalAutoChartEvidence } from '../playability';
+import {
+  createLocalAutoChartEvidence,
+  createYoutubeAutoChartEvidence,
+} from '../playability';
 import { importPreparedSong, previewPreparedSong } from './importSong';
+import { inspectYoutubeCandidate } from './searchYoutube';
 import {
   createRemoteAutoChartRunner,
   getRemoteAutoChartRuntime,
@@ -32,6 +38,21 @@ const EVENT_PREFIX = '__OCTAVE_EVENT__';
 const SK_EVENT_PREFIX = '__SK_EVENT__ ';
 const MAX_AUDIO_BYTES = 2 * 1024 * 1024 * 1024;
 const AUDIO_EXTENSIONS = new Set(['.wav', '.mp3', '.ogg', '.opus', '.flac']);
+const YOUTUBE_DURATION_TOLERANCE_SECONDS = 8;
+const YOUTUBE_VARIANTS: ReadonlyArray<readonly [string, RegExp]> = [
+  ['live', /\blive\b/i],
+  ['cover', /\bcover\b/i],
+  ['karaoke', /\bkaraoke\b/i],
+  ['tribute', /\btribute\b/i],
+  ['instrumental', /\binstrumental\b/i],
+  ['remix', /\bremix\b/i],
+  ['acoustic', /\bacoustic\b/i],
+  ['sped up', /\bsped\s+up\b/i],
+  ['slowed', /\bslowed\b/i],
+  ['nightcore', /\bnightcore\b/i],
+];
+const YOUTUBE_PRESENTATION_SUFFIX =
+  /\s*(?:\((?:official\s+(?:music\s+)?(?:video|audio|lyric\s+video)|official\s+visuali[sz]er|lyric\s+video|official\s+audio)\)|(?:official\s+(?:music\s+)?(?:video|audio|lyric\s+video)|official\s+visuali[sz]er|lyric\s+video|official\s+audio))\s*$/i;
 const REQUIRED_CHECKPOINTS = [
   'drums_cymbal_onset/best_union_f1.pt',
   'drums_mc_onset/best.pt',
@@ -139,6 +160,9 @@ interface AutoChartDependencies {
     youtubeUrl?: string,
   ) => Promise<IpcAutoChartMetadata | undefined>;
   validateAudio: (filePath: string) => string;
+  inspectYoutubeCandidate: (
+    canonicalUrl: string,
+  ) => Promise<IpcYoutubeCandidate>;
   createTempDir: (id: string) => Promise<string>;
   detectBackends: () => AutoChartBackends | Promise<AutoChartBackends>;
   preflightOctave: () => OctaveRuntime;
@@ -168,6 +192,7 @@ interface AutoChartDependencies {
 interface AutoChartJob extends IpcAutoChartJob {
   event: IpcMainEvent;
   audioPath?: string;
+  youtubeCandidate?: IpcYoutubeCandidate;
   tempDir?: string;
   preparedDir?: string;
   cancelled: boolean;
@@ -183,6 +208,7 @@ function toPublicJob(job: AutoChartJob): IpcAutoChartJob {
   const {
     event: _event,
     audioPath: _audioPath,
+    youtubeCandidate: _youtubeCandidate,
     tempDir: _tempDir,
     preparedDir: _preparedDir,
     cancelled: _cancelled,
@@ -270,6 +296,198 @@ export function canonicalizeYoutubeUrl(value: string): string {
   }
 
   return `https://www.youtube.com/watch?v=${videoId}`;
+}
+
+function normalizedYoutubeTitle(value: string): string {
+  return value
+    .replace(YOUTUBE_PRESENTATION_SUFFIX, '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+function sourceArtistKeys(artists: readonly string[]): string[] {
+  return artists
+    .flatMap((artist) => artist.split(/[,/&]|\b(?:feat|featuring|ft)\.?\b/i))
+    .map(normalizedYoutubeTitle)
+    .filter(Boolean);
+}
+
+function sourceTitleMatchesYoutube(
+  sourceTitle: string,
+  candidateTitle: string,
+): boolean {
+  const source = normalizedYoutubeTitle(sourceTitle);
+  const candidate = normalizedYoutubeTitle(candidateTitle);
+
+  if (!source || !candidate) {
+    return false;
+  }
+
+  if (source === candidate) {
+    return true;
+  }
+
+  return (
+    source.split(' ').length >= 2 &&
+    (candidate.startsWith(`${source} `) || candidate.endsWith(` ${source}`))
+  );
+}
+
+function sourceArtistsMatchYoutube(
+  source: LibrarySourceTrackProvenance,
+  candidate: IpcYoutubeCandidate,
+): boolean {
+  const candidateText = normalizedYoutubeTitle(
+    `${candidate.title} ${candidate.uploader ?? ''}`,
+  );
+
+  return sourceArtistKeys(source.artists).every((artist) =>
+    candidateText.includes(artist),
+  );
+}
+
+function unexpectedYoutubeVariant(
+  candidate: IpcYoutubeCandidate,
+  requestedTitle: string,
+): string | undefined {
+  return YOUTUBE_VARIANTS.find(
+    ([, pattern]) =>
+      pattern.test(candidate.title) && !pattern.test(requestedTitle),
+  )?.[0];
+}
+
+function sourceCandidate(
+  value: unknown,
+  canonicalUrl: string,
+  source?: LibrarySourceTrackProvenance,
+): IpcYoutubeCandidate | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!value || typeof value !== 'object') {
+    throw new Error('Choose a verified YouTube result before auto-charting');
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const videoId =
+    typeof candidate.videoId === 'string' ? candidate.videoId : '';
+  const watchUrl =
+    typeof candidate.watchUrl === 'string' ? candidate.watchUrl : '';
+  const title =
+    typeof candidate.title === 'string' ? candidate.title.trim() : '';
+  const uploader =
+    typeof candidate.uploader === 'string' && candidate.uploader.trim()
+      ? candidate.uploader.trim()
+      : undefined;
+  const durationSeconds = candidate.durationSeconds;
+
+  if (
+    !/^[A-Za-z0-9_-]{11}$/.test(videoId) ||
+    canonicalUrl !== `https://www.youtube.com/watch?v=${videoId}` ||
+    watchUrl !== canonicalUrl ||
+    !title ||
+    (durationSeconds !== undefined &&
+      (typeof durationSeconds !== 'number' ||
+        !Number.isFinite(durationSeconds) ||
+        durationSeconds <= 0)) ||
+    (source &&
+      (typeof durationSeconds !== 'number' ||
+        !Number.isFinite(durationSeconds) ||
+        durationSeconds <= 0))
+  ) {
+    throw new Error('Selected YouTube result has invalid identity metadata');
+  }
+
+  return {
+    videoId,
+    title,
+    uploader,
+    ...(typeof durationSeconds === 'number' ? { durationSeconds } : {}),
+    watchUrl,
+  };
+}
+
+function verifyYoutubeCandidate(
+  selected: IpcYoutubeCandidate,
+  inspected: IpcYoutubeCandidate,
+  source?: LibrarySourceTrackProvenance,
+): IpcYoutubeCandidate {
+  const verified = sourceCandidate(inspected, selected.watchUrl, source);
+
+  if (!verified || verified.videoId !== selected.videoId) {
+    throw new Error('Selected YouTube result no longer matches its video URL');
+  }
+
+  if (
+    normalizedYoutubeTitle(verified.title) !==
+    normalizedYoutubeTitle(selected.title)
+  ) {
+    throw new Error('Selected YouTube result title changed before download');
+  }
+
+  if (
+    selected.durationSeconds !== undefined &&
+    verified.durationSeconds !== undefined &&
+    Math.abs(selected.durationSeconds - verified.durationSeconds) >
+      YOUTUBE_DURATION_TOLERANCE_SECONDS
+  ) {
+    throw new Error('Selected YouTube result duration changed before download');
+  }
+
+  if (!source) {
+    return verified;
+  }
+
+  if (!sourceTitleMatchesYoutube(source.title, verified.title)) {
+    throw new Error('YouTube result title does not match the source record');
+  }
+
+  if (!sourceArtistsMatchYoutube(source, verified)) {
+    throw new Error('YouTube result artist does not match the source record');
+  }
+
+  if (
+    !source.durationSeconds ||
+    !verified.durationSeconds ||
+    Math.abs(source.durationSeconds - verified.durationSeconds) >
+      YOUTUBE_DURATION_TOLERANCE_SECONDS
+  ) {
+    throw new Error('YouTube result duration does not match the source record');
+  }
+
+  const variant = unexpectedYoutubeVariant(verified, source.title);
+
+  if (variant) {
+    throw new Error(
+      `YouTube result is a ${variant} version that was not requested for this source record`,
+    );
+  }
+
+  return verified;
+}
+
+function youtubeFetchedAudioProvenance(
+  candidate: IpcYoutubeCandidate,
+): YoutubeFetchedAudioProvenance {
+  if (!candidate.durationSeconds) {
+    throw new Error('Verified YouTube result has no duration');
+  }
+
+  return {
+    provider: 'youtube',
+    videoId: candidate.videoId,
+    watchUrl: candidate.watchUrl,
+    title: candidate.title,
+    uploader: candidate.uploader,
+    durationSeconds: candidate.durationSeconds,
+    downloader: 'yt-dlp',
+    downloaderVersion: '2026.7.4',
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 function inferTrackIdentity(
@@ -772,11 +990,11 @@ export function validateSightkickRuntime(
   }
 
   return {
-    runnerPath,
-    ffmpegPath,
-    dataDir: runtime.dataDir,
-    uvPath,
-    pythonPath,
+    runnerPath: path.resolve(runnerPath),
+    ffmpegPath: path.resolve(ffmpegPath),
+    dataDir: path.resolve(runtime.dataDir),
+    uvPath: uvPath ? path.resolve(uvPath) : undefined,
+    pythonPath: pythonPath ? path.resolve(pythonPath) : undefined,
   };
 }
 
@@ -1097,6 +1315,7 @@ function defaultDependencies(): AutoChartDependencies {
     },
     resolveMetadata: fetchOfficialYoutubeMetadata,
     validateAudio: validateLocalAudioFile,
+    inspectYoutubeCandidate,
     createTempDir,
     detectBackends,
     preflightOctave: preflightOctaveRuntime,
@@ -1128,6 +1347,7 @@ export class AutoChartQueue {
     event: IpcMainEvent,
     request: IpcCreateAutoChartRequest,
   ): Promise<void> {
+    let youtubeUrl: string | undefined;
     const job: AutoChartJob = {
       id: this.dependencies.makeId(),
       attempt: 1,
@@ -1136,6 +1356,7 @@ export class AutoChartQueue {
       backend: 'sightkick',
       event,
       cancelled: false,
+      autoImport: request?.autoImport === true,
     };
 
     try {
@@ -1143,9 +1364,30 @@ export class AutoChartQueue {
         request?.sourceProvenance,
       );
 
-      if (job.sourceProvenance && !request?.localFile) {
+      youtubeUrl =
+        request && typeof request.youtubeUrl === 'string'
+          ? canonicalizeYoutubeUrl(request.youtubeUrl)
+          : undefined;
+
+      if (request?.youtubeCandidate && !youtubeUrl) {
+        throw new Error('Selected YouTube result has no valid video URL');
+      }
+
+      job.youtubeCandidate = youtubeUrl
+        ? sourceCandidate(
+            request?.youtubeCandidate,
+            youtubeUrl,
+            job.sourceProvenance,
+          )
+        : undefined;
+
+      if (
+        job.sourceProvenance &&
+        !request?.localFile &&
+        !job.youtubeCandidate
+      ) {
         throw new Error(
-          'Source-linked charts require lawful local audio; YouTube search cannot establish that proof',
+          'Choose a verified YouTube result before auto-charting this source-linked song',
         );
       }
 
@@ -1170,10 +1412,15 @@ export class AutoChartQueue {
     this.notify(job);
 
     try {
-      const youtubeUrl =
-        request && typeof request.youtubeUrl === 'string'
-          ? request.youtubeUrl
-          : undefined;
+      if (youtubeUrl && job.youtubeCandidate && !request?.localFile) {
+        job.message = 'Verifying selected YouTube recording';
+        this.notify(job);
+        job.youtubeCandidate = verifyYoutubeCandidate(
+          job.youtubeCandidate,
+          await this.dependencies.inspectYoutubeCandidate(youtubeUrl),
+          job.sourceProvenance,
+        );
+      }
 
       job.metadata = await this.dependencies.resolveMetadata(youtubeUrl);
 
@@ -1203,8 +1450,9 @@ export class AutoChartQueue {
         job.audioPath = this.dependencies.validateAudio(selectedAudio);
         job.sourceName = path.basename(job.audioPath);
       } else {
-        job.youtubeUrl = canonicalizeYoutubeUrl(youtubeUrl!);
-        job.sourceName = job.metadata?.title ?? job.youtubeUrl;
+        job.youtubeUrl = youtubeUrl!;
+        job.sourceName =
+          job.youtubeCandidate?.title ?? job.metadata?.title ?? job.youtubeUrl;
       }
 
       job.tempDir = await this.dependencies.createTempDir(job.id);
@@ -1266,6 +1514,10 @@ export class AutoChartQueue {
       youtubeUrl: previous.youtubeUrl,
       sourceName: previous.sourceName,
       metadata: previous.metadata,
+      autoImport: previous.autoImport,
+      youtubeCandidate: previous.youtubeCandidate
+        ? { ...previous.youtubeCandidate }
+        : undefined,
       sourceProvenance: previous.sourceProvenance
         ? {
             ...previous.sourceProvenance,
@@ -1277,13 +1529,29 @@ export class AutoChartQueue {
     };
 
     try {
+      this.jobs.set(job.id, job);
+
+      if (job.youtubeUrl && job.youtubeCandidate && !job.audioPath) {
+        job.stage = 'resolving';
+        job.message = 'Verifying selected YouTube recording';
+        this.notify(job);
+        job.youtubeCandidate = verifyYoutubeCandidate(
+          job.youtubeCandidate,
+          await this.dependencies.inspectYoutubeCandidate(job.youtubeUrl),
+          job.sourceProvenance,
+        );
+      }
+
       if (job.audioPath) {
         job.audioPath = this.dependencies.validateAudio(job.audioPath);
       }
 
       job.tempDir = await this.dependencies.createTempDir(job.id);
-      this.jobs.set(job.id, job);
-      this.notify(job);
+      this.transition(
+        job,
+        'queued',
+        `Chart queued for ${backendLabel(job.backend)} processing`,
+      );
       this.pending.push(job.id);
       void this.processNext();
     } catch (error) {
@@ -1318,11 +1586,18 @@ export class AutoChartQueue {
 
     try {
       const playability = job.sourceProvenance
-        ? createLocalAutoChartEvidence(
-            job.preparedDir,
-            job.sourceProvenance,
-            job.id,
-          )
+        ? job.youtubeCandidate && !job.audioPath
+          ? createYoutubeAutoChartEvidence(
+              job.preparedDir,
+              job.sourceProvenance,
+              youtubeFetchedAudioProvenance(job.youtubeCandidate),
+              job.id,
+            )
+          : createLocalAutoChartEvidence(
+              job.preparedDir,
+              job.sourceProvenance,
+              job.id,
+            )
         : undefined;
       const song = playability
         ? await this.dependencies.importSong(
@@ -1720,9 +1995,15 @@ export class AutoChartQueue {
     this.transition(
       job,
       'preview-ready',
-      'Chart is ready to review before adding it to your library',
+      job.autoImport
+        ? 'Chart checked. Adding it to your library'
+        : 'Chart is ready to review before adding it to your library',
       100,
     );
+
+    if (job.autoImport) {
+      await this.import(job.id);
+    }
   }
 
   private validOctavePreparedDir(

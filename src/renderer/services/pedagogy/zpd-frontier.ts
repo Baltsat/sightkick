@@ -1,4 +1,5 @@
 import { hardPrerequisitesForManifest } from './item-manifest';
+import { skillNodeById } from './skill-graph';
 import {
   decayedAtomicSkillState,
   lowerConfidenceBound,
@@ -10,6 +11,7 @@ import {
   ItemSkillManifest,
   PracticeDecision,
   PracticeDecisionFactor,
+  SkillNode,
   SkillReview,
   SongGoal,
   ZpdCandidate,
@@ -297,30 +299,101 @@ function transferValue(
   }, 0);
 }
 
-function explanationFor(
-  state: ZpdCandidateState,
-  hard_prerequisites: readonly string[],
-  independent_eligible: boolean,
-): string {
+function joinHuman(items: readonly string[]): string {
+  if (items.length <= 1) {
+    return items[0] ?? '';
+  }
+
+  if (items.length === 2) {
+    return `${items[0]} and ${items[1]}`;
+  }
+
+  return `${items.slice(0, -1).join(', ')}, and ${items.at(-1)}`;
+}
+
+/** The demand this candidate leans on most — the one concrete skill worth
+ * naming in a one-line explanation, rather than the whole weighted list. */
+function topSkillLabel(
+  manifest: ItemSkillManifest,
+  skill_nodes: ReadonlyMap<string, SkillNode>,
+): string | undefined {
+  const top = [...manifest.demands].sort(
+    (left, right) => right.weight - left.weight,
+  )[0];
+
+  return top ? skill_nodes.get(top.skill_id)?.label : undefined;
+}
+
+/** "It's also one of your saved favourites." only when the candidate is
+ * actually marked liked — never claimed for a candidate the player hasn't
+ * favourited. */
+function likedClause(candidate: ZpdCandidate): string {
+  return candidate.liked ? " It's also one of your saved favourites." : '';
+}
+
+/**
+ * One truthful, human-readable line explaining why this candidate was
+ * chosen — the string `MyWave` shows as "why this now". Every clause is
+ * built from data already on `candidate`/`decision`: the skill it targets
+ * (resolved from the skill graph, never a raw `skill_id`), whether it's a
+ * liked song, and whether its scaffold starts slower on purpose. Nothing
+ * here is invented — a candidate with no charted skill demand gets an
+ * honest fallback instead of a name it doesn't have.
+ */
+function explanationFor({
+  candidate,
+  state,
+  hard_prerequisites,
+  independent_eligible,
+  scaffold,
+  skill_nodes,
+}: {
+  candidate: ZpdCandidate;
+  state: ZpdCandidateState;
+  hard_prerequisites: readonly string[];
+  independent_eligible: boolean;
+  scaffold: PracticeDecision['scaffold'];
+  skill_nodes: ReadonlyMap<string, SkillNode>;
+}): string {
+  const skillLabel = topSkillLabel(candidate.manifest, skill_nodes);
+  const liked = likedClause(candidate);
+
   if (state === 'assessment') {
-    return 'Play a short phrase so your next lesson has a clear starting point.';
+    return skillLabel
+      ? `Play a short ${skillLabel.toLowerCase()} phrase so this pattern has real evidence behind it.${liked}`
+      : `Play a short phrase so your next lesson has a clear starting point.${liked}`;
   }
 
   if (state === 'goal_preview_only') {
-    return 'This target is still a preview; the receipt keeps its nearest prerequisite visible without blocking free play.';
+    return `"${candidate.title}" is still ahead of your current evidence, so it stays visible as a target without blocking free play.${liked}`;
   }
 
   if (!independent_eligible) {
-    return `A scaffold is selected because ${hard_prerequisites.join(
-      ', ',
-    )} is not yet retained for independent work.`;
+    const labels = hard_prerequisites.map(
+      (id) => skill_nodes.get(id)?.label ?? id,
+    );
+    const verb = labels.length === 1 ? "isn't" : "aren't";
+
+    return `${joinHuman(
+      labels,
+    )} ${verb} retained yet, so a short scaffold — a slower loop with the Tutor watching — comes first.${liked}`;
   }
 
   if (state === 'too_easy') {
-    return 'This is retained enough for review or confidence restoration, not the main learning block.';
+    return skillLabel
+      ? `${skillLabel} is already retained here — good for a quick confidence pass, not the main block.${liked}`
+      : `This is retained enough for review or confidence restoration, not the main learning block.${liked}`;
   }
 
-  return 'This item fits the current atom-level frontier and its evidence is recorded with the decision.';
+  const slowerOnPurpose = scaffold.steps.includes('slower_tempo')
+    ? ' It starts slower on purpose, then steps up once a pass is clean.'
+    : '';
+
+  if (skillLabel) {
+    return `This keeps working ${skillLabel.toLowerCase()} right where your recent evidence says you're ready for it.${slowerOnPurpose}${liked}`;
+  }
+
+  return `This is the best match for your current evidence, though it doesn't target one named skill yet.${slowerOnPurpose}${liked}`;
 }
 
 export function scoreZpdCandidate(
@@ -443,11 +516,14 @@ export function scoreZpdCandidate(
     hard_prerequisites: prerequisite.ids,
     scaffold,
     factors,
-    explanation: explanationFor(
+    explanation: explanationFor({
+      candidate,
       state,
-      prerequisite.ids,
-      prerequisite.independent_eligible,
-    ),
+      hard_prerequisites: prerequisite.ids,
+      independent_eligible: prerequisite.independent_eligible,
+      scaffold,
+      skill_nodes: skillNodeById(),
+    }),
   };
 
   return { candidate, decision };

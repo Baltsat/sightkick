@@ -38,6 +38,7 @@ export function normalizeLibrarySourceProvenance(
   const artists = Array.isArray(rawArtists)
     ? rawArtists.map(normalizedRequiredString)
     : [];
+  const invalidArtists = artists.some((artist) => !artist);
 
   if (
     source.provider !== 'yandex-music' ||
@@ -46,7 +47,7 @@ export function normalizeLibrarySourceProvenance(
     !trackId ||
     !title ||
     !Array.isArray(rawArtists) ||
-    artists.length !== rawArtists.length ||
+    invalidArtists ||
     invalidDuration ||
     (source.sourceUrl !== undefined && !sourceUrl)
   ) {

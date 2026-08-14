@@ -103,6 +103,55 @@ function normalizedPlaybackSpeed(value: number | undefined): number {
     : DEFAULT_REMEDIATION_SPEED;
 }
 
+export function planRemediationTempoLadder(
+  value: number | undefined,
+): number[] {
+  const start = Math.min(
+    1,
+    Math.round(normalizedPlaybackSpeed(value) * 10) / 10,
+  );
+
+  if (start === 1) {
+    return [1];
+  }
+
+  const steps: number[] = [];
+
+  for (
+    let speed = start;
+    speed < 1;
+    speed = Math.round((speed + 0.1) * 10) / 10
+  ) {
+    steps.push(speed);
+  }
+
+  return [...steps, 1];
+}
+
+function skillLabel(task: RemediationTask): string {
+  const labels = [
+    ...new Set(
+      task.findings.map(({ skillTag }) => skillTag.replaceAll('-', ' ')),
+    ),
+  ];
+
+  return labels.length === 1 ? labels[0] : 'this phrase';
+}
+
+export function remediationTaskWhy(task: RemediationTask): string {
+  const skill = skillLabel(task);
+
+  return task.approach === 'target-probe'
+    ? `This is the target-tempo probe at ${task.playbackSpeed.toFixed(
+        1,
+      )}×. Keep the phrase musical at full speed.`
+    : task.approach === 'tempo-variation'
+    ? `The anchor is in. Keep ${skill} through this phrase at ${task.playbackSpeed.toFixed(
+        1,
+      )}× before the next planned tempo probe.`
+    : `Build ${skill} in this phrase first; two good-enough passes unlock the next planned tempo probe.`;
+}
+
 /**
  * Creates one deterministic task per distinct bar range. Multiple Coach cards
  * about the same phrase deliberately become one loop, with every card id kept
@@ -144,31 +193,49 @@ export function createRemediationQueue(
         ].map(findingReference),
       );
 
-      return splitBarRange(first.evidence.barStart, first.evidence.barEnd).map(
-        ({ barStart, barEnd }) => ({
-          id: taskId(barStart, barEnd),
+      return splitBarRange(
+        first.evidence.barStart,
+        first.evidence.barEnd,
+      ).flatMap(({ barStart, barEnd }) => {
+        const minimumResolvedNotes = normalizedMinimumResolvedNotes(
+          input.minimumResolvedNotesForRange?.(barStart, barEnd, findings),
+        );
+        const tempoLadder = planRemediationTempoLadder(
+          input.playbackSpeedForRange?.(barStart, barEnd, findings) ??
+            findings.find((finding) => finding.evidence.slowSpeed !== undefined)
+              ?.evidence.slowSpeed,
+        );
+        const rangeId = taskId(barStart, barEnd);
+
+        return tempoLadder.map((playbackSpeed, index) => ({
+          id:
+            index === 0
+              ? rangeId
+              : playbackSpeed === 1
+              ? `${rangeId}:target`
+              : `${rangeId}:tempo-${playbackSpeed.toFixed(1)}`,
           barStart,
           barEnd,
           findings: references,
-          minimumResolvedNotes: normalizedMinimumResolvedNotes(
-            input.minimumResolvedNotesForRange?.(barStart, barEnd, findings),
-          ),
-          playbackSpeed: normalizedPlaybackSpeed(
-            input.playbackSpeedForRange?.(barStart, barEnd, findings) ??
-              findings.find(
-                (finding) => finding.evidence.slowSpeed !== undefined,
-              )?.evidence.slowSpeed,
-          ),
+          minimumResolvedNotes,
+          playbackSpeed,
+          approach:
+            index === 0
+              ? ('anchor' as const)
+              : playbackSpeed === 1
+              ? ('target-probe' as const)
+              : ('tempo-variation' as const),
           status: 'pending' as const,
           consecutiveCleanPasses: 0,
           attempts: [],
-        }),
-      );
+        }));
+      });
     })
     .sort(
       (left, right) =>
         left.barStart - right.barStart ||
         left.barEnd - right.barEnd ||
+        left.playbackSpeed - right.playbackSpeed ||
         left.id.localeCompare(right.id),
     )
     .map((task, index) =>
@@ -261,6 +328,7 @@ function makeAttempt(
 
   return {
     ...input,
+    approach: task.approach ?? 'anchor',
     isErrorFree,
     hasSufficientCoverage,
     qualifiesAsCleanPass,
@@ -382,6 +450,15 @@ function isAttempt(
     return false;
   }
 
+  if (
+    value.approach !== undefined &&
+    value.approach !== 'anchor' &&
+    value.approach !== 'tempo-variation' &&
+    value.approach !== 'target-probe'
+  ) {
+    return false;
+  }
+
   const isErrorFree = value.misses === 0 && value.wrongHits === 0;
   const assessment = assessRemediationPass(minimumResolvedNotes, {
     resolvedNotes: value.resolvedNotes,
@@ -442,6 +519,15 @@ function isTask(value: unknown): value is RemediationTask {
       value.status !== 'completed') ||
     !isNonNegativeInteger(value.consecutiveCleanPasses) ||
     !Array.isArray(value.attempts)
+  ) {
+    return false;
+  }
+
+  if (
+    value.approach !== undefined &&
+    value.approach !== 'anchor' &&
+    value.approach !== 'tempo-variation' &&
+    value.approach !== 'target-probe'
   ) {
     return false;
   }

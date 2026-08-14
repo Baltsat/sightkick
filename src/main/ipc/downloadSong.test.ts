@@ -70,7 +70,9 @@ const VALID_SONG = [
     name: 'notes.chart',
     data: '[Song]\n{\n  Resolution = 192\n}\n[ExpertDrums]\n{\n  0 = N 0 0\n}\n',
   },
+  { name: 'song.ogg', data: 'fake-audio' },
 ];
+const NO_AUDIO_SONG = VALID_SONG.filter((file) => file.name !== 'song.ogg');
 
 function okFetch() {
   vi.stubGlobal(
@@ -226,6 +228,97 @@ describe('downloadSong', () => {
     expect(fs.existsSync(path.join(library, 'escaped.txt'))).toBe(false);
     expect(lastReply(event, 'download-song')!.args[0]).toMatchObject({
       success: false,
+      md5: 'hash123',
+    });
+
+    // The partially-unpacked folder must not survive the failure, or the
+    // next attempt for this exact song would be silently blocked forever by
+    // the `fs.existsSync(outputDir)` alreadyExists gate.
+    expect(fs.existsSync(path.join(library, 'Artist - Song (Charter)'))).toBe(
+      false,
+    );
+  });
+
+  it('rejects a package whose archive yields no playable audio and does not add it to the library', async () => {
+    storeHolder.current = makeStore({ lastOpenedPath: library });
+    sngHolder.files = NO_AUDIO_SONG;
+    okFetch();
+
+    const event = makeEvent();
+
+    await downloadSong(event as never, baseProps);
+
+    expect(lastReply(event, 'download-song')!.args[0]).toMatchObject({
+      success: false,
+      md5: 'hash123',
+      error: expect.stringContaining('audio'),
+    });
+    expect(storeHolder.current.get('songs.hash123')).toBeUndefined();
+  });
+
+  it('cleans up the orphaned folder from a no-audio failure so a retry re-fetches instead of replying alreadyExists', async () => {
+    storeHolder.current = makeStore({ lastOpenedPath: library });
+    sngHolder.files = NO_AUDIO_SONG;
+    okFetch();
+
+    const firstEvent = makeEvent();
+
+    await downloadSong(firstEvent as never, baseProps);
+
+    const outputDir = path.join(library, 'Artist - Song (Charter)');
+
+    expect(fs.existsSync(outputDir)).toBe(false);
+
+    // A second attempt (e.g. once a fixed package is available) must retry
+    // the download instead of being permanently blocked by a stray folder.
+    sngHolder.files = VALID_SONG;
+    okFetch();
+
+    const fetchSpy = vi.mocked(fetch);
+
+    fetchSpy.mockClear();
+
+    const secondEvent = makeEvent();
+
+    await downloadSong(secondEvent as never, baseProps);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(lastReply(secondEvent, 'download-song')!.args[0]).toMatchObject({
+      success: true,
+      md5: 'hash123',
+    });
+  });
+
+  it('cleans up the orphaned folder from a failed download so a retry re-fetches instead of replying alreadyExists', async () => {
+    storeHolder.current = makeStore({ lastOpenedPath: library });
+    sngHolder.files = [
+      ...VALID_SONG,
+      { name: '../escaped.txt', data: 'pwned' },
+    ];
+    okFetch();
+
+    const firstEvent = makeEvent();
+
+    await downloadSong(firstEvent as never, baseProps);
+
+    const outputDir = path.join(library, 'Artist - Song (Charter)');
+
+    expect(fs.existsSync(outputDir)).toBe(false);
+
+    sngHolder.files = VALID_SONG;
+    okFetch();
+
+    const fetchSpy = vi.mocked(fetch);
+
+    fetchSpy.mockClear();
+
+    const secondEvent = makeEvent();
+
+    await downloadSong(secondEvent as never, baseProps);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(lastReply(secondEvent, 'download-song')!.args[0]).toMatchObject({
+      success: true,
       md5: 'hash123',
     });
   });

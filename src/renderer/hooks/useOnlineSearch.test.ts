@@ -1,30 +1,32 @@
 import { describe, expect, it } from 'vitest';
+import type { IpcYoutubeSearchResult } from '../../types';
 import { mapSongs } from './useOnlineSearch';
 
-describe('Chorus Encore search mapping', () => {
-  it('marks only response rows explicitly marked drumsReviewed as reviewed', () => {
+describe('YouTube search mapping', () => {
+  it('keeps a YouTube recording identity intact for the automatic chart job', () => {
     const songs = mapSongs([
       {
-        md5: 'reviewed',
-        name: 'Reviewed Drums',
-        artist: 'Charter',
-        charter: 'Charter',
-        diff_drums: 4,
-        drumsReviewed: true,
+        videoId: 'abcdefghijk',
+        title: 'Studio recording',
+        uploader: 'Artist',
+        durationSeconds: 210,
+        thumbnailUrl: 'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg',
+        watchUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
       },
-      {
-        md5: 'unreviewed',
-        name: 'Unreviewed Drums',
-        artist: 'Charter',
-        charter: 'Charter',
-        diff_drums: 4,
-        drumsReviewed: false,
-      },
-    ]);
+    ] satisfies IpcYoutubeSearchResult[]);
 
     expect(songs).toEqual([
-      expect.objectContaining({ id: 'reviewed', reviewed: true }),
-      expect.objectContaining({ id: 'unreviewed', reviewed: false }),
+      {
+        source: 'online',
+        id: 'abcdefghijk',
+        downloadUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+        albumCover: 'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg',
+        name: 'Studio recording',
+        artist: 'Artist',
+        charter: 'YouTube',
+        drumDifficulty: 0,
+        durationSeconds: 210,
+      },
     ]);
   });
 });

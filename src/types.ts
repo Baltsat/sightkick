@@ -400,11 +400,21 @@ export type AutoChartStage =
 
 export type AutoChartBackend = 'sightkick' | 'remote' | 'octave';
 
+export interface IpcYoutubeCandidate {
+  videoId: string;
+  title: string;
+  uploader?: string;
+  durationSeconds?: number;
+  watchUrl: string;
+}
+
 export interface IpcCreateAutoChartRequest {
   youtubeUrl?: string;
   localFile?: boolean;
   backend?: AutoChartBackend;
+  autoImport?: boolean;
   sourceProvenance?: LibrarySourceTrackProvenance;
+  youtubeCandidate?: IpcYoutubeCandidate;
 }
 
 export interface IpcAutoChartBackendsResponse {
@@ -427,6 +437,21 @@ export interface IpcSaveAutoChartRemoteSettingsRequest {
 export interface IpcAutoChartRemoteTestResponse {
   ok: boolean;
   message: string;
+}
+
+export type LibraryMirrorSyncState = 'disabled' | 'synced' | 'queued';
+
+export interface IpcLibraryMirrorSettings {
+  endpoint: string;
+  tokenConfigured: boolean;
+  state: LibraryMirrorSyncState;
+  pendingCount: number;
+  error?: string;
+}
+
+export interface IpcSaveLibraryMirrorSettingsRequest {
+  endpoint: string;
+  token?: string;
 }
 
 export interface IpcAutoChartMetadata {
@@ -455,6 +480,7 @@ export interface IpcAutoChartJob {
   // can recognize its own in-flight jobs by watch URL without a separate
   // lookup channel.
   youtubeUrl?: string;
+  autoImport?: boolean;
   /** Reviewed discovery row that this generated chart will resolve. */
   sourceProvenance?: LibrarySourceTrackProvenance;
   // A snapshot of every currently non-terminal job the queue knows about —
@@ -589,7 +615,20 @@ export interface LibrarySourceTrackProvenance {
 
 export type PlayabilityAudioSource =
   | 'local-user-attested'
+  | 'youtube-fetched'
   | 'public-chart-package';
+
+export interface YoutubeFetchedAudioProvenance {
+  provider: 'youtube';
+  videoId: string;
+  watchUrl: string;
+  title: string;
+  uploader?: string;
+  durationSeconds: number;
+  downloader: 'yt-dlp';
+  downloaderVersion: '2026.7.4';
+  fetchedAt: string;
+}
 
 export type PlayabilityChartSource =
   | 'local-auto-chart'
@@ -605,6 +644,7 @@ export interface PlayabilityEvidence {
   audio: {
     source: PlayabilityAudioSource;
     sha256: string;
+    youtube?: YoutubeFetchedAudioProvenance;
   };
   chart: {
     source: PlayabilityChartSource;

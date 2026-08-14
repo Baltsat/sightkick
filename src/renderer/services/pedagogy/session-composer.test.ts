@@ -156,4 +156,45 @@ describe('intent-aware session composer', () => {
 
     expect(plan?.launch.candidate_id).toBe('song:chosen');
   });
+
+  it('names the target skill in the orient/acquire blocks instead of a canned template', () => {
+    const plan = composePracticeSession({
+      request: request('exercise'),
+      ranking: [ranked('lesson:focus', 'lesson')],
+    });
+    const [orient, acquire] = plan?.blocks ?? [];
+
+    // Every ranked() fixture demands 'pulse.quarter' — its graph label is
+    // "Quarter-note pulse".
+    expect(orient.why.toLowerCase()).toContain('quarter-note pulse');
+    expect(acquire.why.toLowerCase()).toContain('quarter-note pulse');
+    expect(orient.why).not.toBe(
+      'Get one counted phrase before any adjustment.',
+    );
+    expect(acquire.why).not.toBe(
+      'Build the next layer at the selected scaffold.',
+    );
+  });
+
+  it('names the actual payoff song, and only calls it a favourite when it is one', () => {
+    const likedPlan = composePracticeSession({
+      request: request('smart_start', 'short'),
+      ranking: [
+        ranked('lesson:focus', 'lesson'),
+        ranked('song:favourite', 'song', { liked: true }),
+      ],
+    });
+    const unlikedPlan = composePracticeSession({
+      request: request('smart_start', 'short'),
+      ranking: [
+        ranked('lesson:focus', 'lesson'),
+        ranked('song:other', 'song', { liked: false }),
+      ],
+    });
+
+    expect(likedPlan?.blocks.at(-1)?.why).toBe(
+      'Finish in "song:favourite" — one of your saved favourites.',
+    );
+    expect(unlikedPlan?.blocks.at(-1)?.why).toBe('Finish in "song:other".');
+  });
 });

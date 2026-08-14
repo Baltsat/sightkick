@@ -1,5 +1,6 @@
 import { Difficulty } from 'scan-chart';
 import { GameMode } from '../../types';
+import { localDateKey } from '../streaks';
 import { KitElement, RunLearningEvidenceCount, RunSummary } from './types';
 
 /**
@@ -65,7 +66,7 @@ export type HistoricalDetailState =
   | 'available'
   | 'historical-detail-unavailable';
 
-/** Compact, deterministic evidence for all evicted summaries on one UTC day. */
+/** Compact, deterministic evidence for all evicted summaries on one local day. */
 export interface PracticeRunDayArchive {
   date: string;
   runCount: number;
@@ -87,7 +88,11 @@ export interface PracticeRunDayArchive {
   chartRevisions?: Record<string, ArchivedChartRevisionEvidence>;
 }
 
-/** One compact archive per song. Day keys are sorted `YYYY-MM-DD` UTC keys. */
+/**
+ * One compact archive per song. Day keys are sorted `YYYY-MM-DD` strings in
+ * the player's local calendar day (see `archiveDayKey`/`localDateKey`) - not
+ * UTC - so they bucket a run under the same day the streak/XP store does.
+ */
 export interface PracticeRunArchive {
   schemaVersion: typeof PRACTICE_RUN_ARCHIVE_SCHEMA_VERSION;
   days: Record<string, PracticeRunDayArchive>;
@@ -133,16 +138,12 @@ export function emptyPracticeRunArchive(): PracticeRunArchive {
   return { schemaVersion: PRACTICE_RUN_ARCHIVE_SCHEMA_VERSION, days: {} };
 }
 
-/**
- * Completed-at values are persisted ISO instants. Keeping their literal UTC
- * date prefix avoids depending on the current machine timezone during a
- * later archive migration/read. Invalid legacy timestamps remain visible in
- * a stable `unknown` bucket instead of being discarded.
- */
 export function archiveDayKey(completedAt: string): string {
-  const match = /^(\d{4}-\d{2}-\d{2})/.exec(completedAt);
+  const completed = new Date(completedAt);
 
-  return match?.[1] ?? 'unknown';
+  return Number.isNaN(completed.getTime())
+    ? 'unknown'
+    : localDateKey(completed);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

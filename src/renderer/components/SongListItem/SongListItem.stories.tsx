@@ -12,6 +12,7 @@ const songData = {
   drumDifficulty: 5,
   liked: false,
   audio: [{ src: 'song.ogg', name: 'song' }],
+  drumDifficulties: ['expert'],
   scoreData: {
     expert: { hitNotes: 92, totalNotes: 100, falseHits: 3 },
   },
@@ -71,6 +72,14 @@ export const AutoCharted: Story = {
 };
 
 export const Focused: Story = { args: { focused: true } };
+
+export const NoAudioFound: Story = {
+  args: { songData: { ...songData, audio: [] } },
+};
+
+export const NoChartFound: Story = {
+  args: { songData: { ...songData, drumDifficulties: [] } },
+};
 
 export const Previewing: Story = {
   args: {

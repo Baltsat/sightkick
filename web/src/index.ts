@@ -8,9 +8,9 @@ import './web.css';
 
 const root = document.getElementById('root');
 const publicReleaseHref =
-  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.10/Drumroll-1.2.0-kb.10-arm64.dmg';
+  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.16/Drumroll-1.2.0-kb.16-arm64.dmg';
 const publicChecksumHref =
-  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.10/SHA256SUMS.txt';
+  'https://github.com/Baltsat/sightkick/releases/download/v1.2.0-kb.16/SHA256SUMS.txt';
 
 if (!root) {
   throw new Error('Missing app root.');
@@ -44,9 +44,9 @@ function showLanding(): void {
 
       <section class="web-hero" id="top" aria-labelledby="web-hero-title">
         <div class="web-hero-copy">
-          <p class="web-kicker">Practice that listens back.</p>
-          <h1 id="web-hero-title">Sit down.<br />Hit the cue.<br /><em>Keep playing.</em></h1>
-          <p class="web-lede">Drumroll is a hands-free drum-learning game for an electronic kit. It holds the session together while your playing shows what comes next.</p>
+          <p class="web-kicker">Music, taught through drums.</p>
+          <h1 id="web-hero-title">Your music<br />service<br /><em>for drums.</em></h1>
+          <p class="web-lede">Sit at your kit, hit a pad, and keep playing. Drumroll keeps your wave, your songs, and your next step in one room — every drum on the kit is a door.</p>
           <div class="web-actions">
             <a class="web-actions__download" href="${publicReleaseHref}">Download for Apple Silicon</a>
             <button class="web-actions__browser" type="button" data-testid="start-drumroll-primary">Open browser lessons</button>
@@ -129,7 +129,7 @@ function showLanding(): void {
         <div class="web-download-copy">
           <p class="web-section-index">The desktop release</p>
           <h2 id="web-download-title">Bring the studio to the kit.</h2>
-          <p>Drumroll 1.2.0-kb.10 is the Apple Silicon macOS preview. The public artifact is Developer ID signed, Apple notarized, and published with a reproducible SHA-256 checksum.</p>
+          <p>Drumroll 1.2.0-kb.16 is the Apple Silicon macOS release. The public artifact is Developer ID signed, Apple notarized, and published with a reproducible SHA-256 checksum.</p>
         </div>
         <div class="web-download-action">
           <a id="desktop-download" href="${publicReleaseHref}">Download Drumroll for Apple Silicon</a>
@@ -143,7 +143,7 @@ function showLanding(): void {
         <div class="web-faq-list">
           <details><summary>Does it require an electronic drum kit?</summary><p>Drumroll is designed around MIDI input from an electronic kit. Keyboard and pointer controls remain available for setup and accessibility.</p></details>
           <details><summary>Will Coach always show trouble bars?</summary><p>No. Exact trouble bars and targeted loops require a saved run with full hit records. When they exist, every weak loop stays linked to the original review until two consecutive full-coverage, zero-error passes clear it. Summary-only runs can still report their recorded accuracy, timing, lane, wrong-hit, speed, and date.</p></details>
-          <details><summary>Is this download link public?</summary><p>Yes. It points to the exact v1.2.0-kb.10 GitHub release asset; SHA256SUMS.txt is published beside it.</p></details>
+          <details><summary>Is this download link public?</summary><p>Yes. It points to the exact v1.2.0-kb.16 GitHub release asset; SHA256SUMS.txt is published beside it.</p></details>
         </div>
       </section>
 

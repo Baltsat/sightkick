@@ -1,3 +1,4 @@
+import { skillNodeById } from './skill-graph';
 import {
   SessionBlock,
   SessionPlan,
@@ -10,6 +11,54 @@ export interface ComposeSessionInput {
   request: SessionRequest;
   ranking: readonly ZpdRankedCandidate[];
   due_reviews?: readonly SkillReview[];
+}
+
+/** The demand a ranked candidate leans on most — mirrors
+ * `zpd-frontier.ts`'s `topSkillLabel`, kept local since it's a small,
+ * single-use lookup on a different input shape (a full ranked candidate
+ * rather than a bare manifest). */
+function topSkillLabel(ranked: ZpdRankedCandidate): string | undefined {
+  const skill_nodes = skillNodeById();
+  const top = [...ranked.candidate.manifest.demands].sort(
+    (left, right) => right.weight - left.weight,
+  )[0];
+
+  return top ? skill_nodes.get(top.skill_id)?.label : undefined;
+}
+
+/**
+ * One human, candidate-aware reason for the orienting phrase — never the
+ * bare "Get one counted phrase before any adjustment" template regardless
+ * of which skill the session actually targets.
+ */
+function orientWhy(primary: ZpdRankedCandidate): string {
+  const skillLabel = topSkillLabel(primary);
+
+  return skillLabel
+    ? `Get one counted phrase of ${skillLabel.toLowerCase()} before any adjustment.`
+    : 'Get one counted phrase before any adjustment.';
+}
+
+/** One human, candidate-aware reason for the main work block. */
+function acquireWhy(primary: ZpdRankedCandidate): string {
+  const skillLabel = topSkillLabel(primary);
+
+  return skillLabel
+    ? `Build ${skillLabel.toLowerCase()} at the selected scaffold.`
+    : 'Build the next layer at the selected scaffold.';
+}
+
+/** One human, candidate-aware reason for the musical payoff — names the
+ * actual song and, when true, that it's a saved favourite. Never claims a
+ * song is a favourite unless `liked` says so. */
+function celebrateWhy(musical: ZpdRankedCandidate): string {
+  if (musical.candidate.kind !== 'song') {
+    return 'No playable song is available, so finish with the closest musical phrase.';
+  }
+
+  return musical.candidate.liked
+    ? `Finish in "${musical.candidate.title}" — one of your saved favourites.`
+    : `Finish in "${musical.candidate.title}".`;
 }
 
 function firstAvailable(
@@ -164,19 +213,13 @@ function composeShort(
   const musical = application ?? primary;
 
   return [
-    block('orient', primary, 'Get one counted phrase before any adjustment.'),
+    block('orient', primary, orientWhy(primary)),
     block(
       primary.decision.state === 'too_easy' ? 'retain' : 'acquire',
       primary,
-      'Keep this part short and focused.',
+      acquireWhy(primary),
     ),
-    block(
-      'celebrate',
-      musical,
-      musical.candidate.kind === 'song'
-        ? 'Finish with the selected song section, even in a short session.'
-        : 'No playable song is available, so finish with the closest musical phrase.',
-    ),
+    block('celebrate', musical, celebrateWhy(musical)),
   ];
 }
 
@@ -187,12 +230,8 @@ function composeStandard(
   const musical = application ?? primary;
 
   return [
-    block(
-      'orient',
-      primary,
-      'Establish the phrase and pace before the work block.',
-    ),
-    block('acquire', primary, 'Build the next layer at the selected scaffold.'),
+    block('orient', primary, orientWhy(primary)),
+    block('acquire', primary, acquireWhy(primary)),
     block(
       'apply',
       musical,
@@ -205,7 +244,7 @@ function composeStandard(
         ? 'Probe the pattern in an alternate context.'
         : 'Use a delayed or alternate-context probe before calling the layer retained.',
     ),
-    block('celebrate', musical, 'End on the nearest favourite-song payoff.'),
+    block('celebrate', musical, celebrateWhy(musical)),
   ];
 }
 
@@ -228,14 +267,17 @@ function composeDeep(
   const musical = application ?? primary;
 
   return [
-    block('orient', primary, 'Set the pulse and selected scaffold.'),
-    block('acquire', primary, 'Build the first linked prerequisite layer.'),
+    block('orient', primary, orientWhy(primary)),
+    block('acquire', primary, acquireWhy(primary)),
     ...(linked
       ? [
           block(
             'acquire',
             linked,
-            'Add one linked acquisition item, not a random drill.',
+            `Add ${
+              topSkillLabel(linked)?.toLowerCase() ??
+              'one linked acquisition item'
+            }, not a random drill.`,
           ),
         ]
       : []),
@@ -245,11 +287,7 @@ function composeDeep(
       musical,
       'Check whether the layer survives a changed musical context.',
     ),
-    block(
-      'celebrate',
-      musical,
-      'Close on the selected song section or nearest musical payoff.',
-    ),
+    block('celebrate', musical, celebrateWhy(musical)),
   ];
 }
 
