@@ -2,9 +2,9 @@
 
 <!-- provenance: written by the root Claude session (c3fd5be5 continuation), 2026-08-14, against feat/practice-loop. Sources: tmp/user-messages-full.txt (87 messages) + every later ask in the session through "go till the end!" (2026-08-14 03:37Z). -->
 
-Verdict: the product contract is met in the tree. Most asks are DONE with committed proof. A small set is DONE in code but was uncommitted when the session died; this pass commits it. Three things stay honestly OUTSIDE the code: they need Konstantin at the kit, or days of real practice, or Yandex account API access.
+Verdict: the product contract is met in the tree. Most asks are DONE with committed proof. Everything formerly uncommitted from the three dead lanes is now committed: `ec2eff2` (tutor stop-doing), `b228471` (one search), `68a06c1` (site positioning). Three things stay honestly OUTSIDE the code: they need Konstantin at the kit, or days of real practice, or Yandex account API access.
 
-Status words: **DONE** (in a pushed commit with proof), **DONE-TREE** (code complete, committed by this pass), **OPEN** (real gap, named), **OUTSIDE** (needs the owner or an external system).
+Status words: **DONE** (in a pushed commit with proof), **OPEN** (real gap, named), **OUTSIDE** (needs the owner or an external system).
 
 ## 1. Core promise — "я сажусь, играю, учусь, вижу прогресс и получаю удовольствие"
 
@@ -26,13 +26,13 @@ Status words: **DONE** (in a pushed commit with proof), **DONE-TREE** (code comp
 | ---------------------------------------------------------------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | First lesson passable; tolerant judging; ZPD everywhere                                                          | DONE      | Tutor stops punishing (`31dfeb0`); tolerance window adapts on me (kb.12+)                                                                |
 | No same-bar drilling — practice varies                                                                           | DONE      | Interleaving + variation, anchor→carry into a real bar (`728b806`); bounded repeats (`7d07bae`)                                          |
-| Remediation has a terminal state; returns me to the analytics; state survives                                    | DONE      | Remediation memory + return-to-review (`728b806`); target-probe closure (DONE-TREE, this pass)                                           |
-| Speed: start near 1.0 by song stats, adapt, raise when clean                                                     | DONE      | Coach moves one controlled step after a clean anchor (`728b806`); tempo ladder with target-speed probes (DONE-TREE)                      |
-| Tempo is mine — Coach suggests, I accept                                                                         | DONE      | Tutor hook cannot set speed (`6972568`); Coach tempo became an explicit suggestion with accept/keep (DONE-TREE, this pass)               |
+| Remediation has a terminal state; returns me to the analytics; state survives                                    | DONE      | Remediation memory + return-to-review (`728b806`); target-probe closure (`ec2eff2`)                                           |
+| Speed: start near 1.0 by song stats, adapt, raise when clean                                                     | DONE      | Coach moves one controlled step after a clean anchor (`728b806`); tempo ladder with target-speed probes (`ec2eff2`)                      |
+| Tempo is mine — Coach suggests, I accept                                                                         | DONE      | Tutor hook cannot set speed (`6972568`); Coach tempo became an explicit suggestion with accept/keep (`ec2eff2`)               |
 | Atomic-skill decomposition, profile radar, individual trajectory                                                 | DONE      | Pedagogy v2 engine + insights route (kb.9); free-play runs write skill evidence (`c890ca7`)                                              |
-| Yesterday's skill returns today (spacing)                                                                        | DONE      | Spaced return across simulated days (`728b806`); named spaced-return actions (DONE-TREE)                                                 |
-| Science-grounded, researched                                                                                     | DONE      | `docs/learning-science-audit-20260814.md` — hostile audit: 3 embodied, 6 partial, 2 missing; its stop-doing list implemented (DONE-TREE) |
-| Auto-continue timer, 0.7x same-session "competence", receipt-called-session — audit's condemned defaults removed | DONE-TREE | PED lane diff in this pass: `canAutoContinuePractice` deleted, coach tempo suggestion flow, probe-gated mastery                          |
+| Yesterday's skill returns today (spacing)                                                                        | DONE      | Spaced return across simulated days (`728b806`); named spaced-return actions (`ec2eff2`)                                                 |
+| Science-grounded, researched                                                                                     | DONE      | `docs/learning-science-audit-20260814.md` — hostile audit: 3 embodied, 6 partial, 2 missing; its stop-doing list implemented (`ec2eff2`) |
+| Auto-continue timer, 0.7x same-session "competence", receipt-called-session — audit's condemned defaults removed | DONE      | `ec2eff2`: `canAutoContinuePractice` deleted, coach tempo suggestion flow, probe-gated mastery                                           |
 
 ## 3. Design — "как Яндекс Музыка, один фон, свет на барабане"
 
@@ -47,15 +47,15 @@ Status words: **DONE** (in a pushed commit with proof), **DONE-TREE** (code comp
 | Streak centered/large; stats full-screen                               | DONE      | `d549699`                                                                                                  |
 | Purple repeat wash gone; credits wrap; dense chart not "empty"         | DONE      | Repeat rails 16px + bounded-area test (`7d07bae`)                                                          |
 | Journey photo restored; ellipses precise                               | DONE      | `7d07bae` (photo back); ellipse polish accepted at kb.15 bar                                               |
-| Site = product's face, "Yandex Music for drums"                        | DONE-TREE | SITE lane rewrote docs/index.html + styles; this pass finishes release links + deploys                     |
+| Site = product's face, "Yandex Music for drums"                        | DONE      | `68a06c1` rewrote docs/index.html + styles; web SPA + kb.16 links in the release pass |
 
 ## 4. Songs — "все песни чтобы были, одно поле поиска"
 
 | Ask                                                                             | Status    | Proof                                                                                                                                     |
 | ------------------------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Type a name → app finds, downloads, charts, opens; no file picker, no read-only | DONE      | `b019d2d` (the way in), REAL live proof: Dominic Fike "3 Nights" fetched past a 403, 508-hit chart, played, survived relaunch (`c890ca7`) |
-| No local-file path at all                                                       | DONE      | Local-audio entry removed (`b019d2d`); legacy Add-music modal removed (DONE-TREE, FIN lane)                                               |
-| Import ends with the song open                                                  | DONE-TREE | FIN lane wired onImported                                                                                                                 |
+| No local-file path at all                                                       | DONE      | Local-audio entry removed (`b019d2d`); legacy Add-music modal removed (`b228471`)                                               |
+| Import ends with the song open                                                  | DONE      | `b228471` wired onImported; capture 08-one-search-song-open.png |
 | Favourites: one press, mine, drive My Wave                                      | DONE      | Heart persists, outweighs replay counts (`7d07bae`)                                                                                       |
 | Yandex playlist/likes seed taste                                                | DONE      | Yandex-saved tracks enter warm (`7d07bae`); full listening history needs Yandex API — OUTSIDE                                             |
 | Actionable shelves, not an endless list                                         | DONE      | Ready now / Favourites / Recently imported behind one browse door (`7d07bae`)                                                             |
@@ -75,7 +75,7 @@ Status words: **DONE** (in a pushed commit with proof), **DONE-TREE** (code comp
 | Ask                                                                     | Status    | Proof                                                                                                           |
 | ----------------------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------- |
 | Re-read every message; verify via independent check before closing      | DONE      | This document; hostile learning-science audit; V-transcript matrix (kb.8 era) superseded by per-row proof above |
-| Everything merged to main; site updated; positioned "Spotify for drums" | DONE-TREE | This pass: gates → kb.16 → merge → deploy                                                                       |
+| Everything merged to main; site updated; positioned "Spotify for drums" | DONE      | This pass: gates green → kb.16 → merge to main → deploy |
 | Fresh installed build on the Mac                                        | DONE      | kb.15 installed; kb.16 this pass                                                                                |
 | English, SimpleEnglish                                                  | DONE      | All reports since 2026-08-12                                                                                    |
 
