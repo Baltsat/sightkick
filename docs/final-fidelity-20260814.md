@@ -90,3 +90,19 @@ Status words: **DONE** (in a pushed commit with proof), **OPEN** (real gap, name
 - P2 mechanics: menu-bar presence, scheduled notification, performance postcard (ledger "next line").
 - Color-maturity fade toward black surfaces — architecture in `kit-color-maturity`, full fade curve later.
 - Similar-songs discovery beyond My Wave ranking (research-grade recommender) — current joy+fit ranking stands in.
+
+## 7. Coverage — every relevant chat, swept 2026-08-14
+
+All Claude and Codex session archives (2026-08-04 → 2026-08-14) were swept for
+drum content. Four direct owner chats exist; all are audited:
+
+| Chat | Span | Asks | State |
+| --- | --- | --- | --- |
+| Claude `43acf1a6` — SightKick mega-build | Aug 4–9 | 58 | Superseded by the kb line; distinct asks verified in the shipped app: Space pause / arrow ±15s seek with acceleration (`useTransportShortcuts.ts`), mistakes stay dimmed in lane colour instead of letter overlays (`sheet-music.css .vf-note-missed`), rename to Drumroll, YouTube import → type-a-name, upstream v1.2.0 merged + self-update from own releases, Duolingo mechanics, AI error-pattern analysis → Why/Coach evidence, attribution junk removed |
+| Codex `019fe58e` + forks — the epoch contract | Aug 9–11 | 87 rows | Audited row by row above; last message 03:09Z Aug 11, nothing after |
+| Codex `019fea04` — streak visuals | Aug 10 | 5 | Shipped: StreakMeter ten-tier ladder, tier glow, particles, reduced-motion; Resonance Runway; borderless title-first plaques that do not cover the notes |
+| Claude `c3fd5be5` — the kb.11–16 line | Aug 11–14 | ~40 | Audited above; endgame executed to the terminal state |
+
+Every other file that mentions drums is a delegate lane brief, a read-only
+reviewer worker, or an unrelated thread whose drum mentions are agent output —
+each was opened and its user messages checked: zero unaddressed owner asks.
