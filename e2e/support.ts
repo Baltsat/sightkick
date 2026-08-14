@@ -1,4 +1,10 @@
-import { mkdtempSync, writeFileSync, mkdirSync } from 'fs';
+import {
+  chmodSync,
+  copyFileSync,
+  mkdtempSync,
+  writeFileSync,
+  mkdirSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { _electron as electron, ElectronApplication } from '@playwright/test';
@@ -9,6 +15,7 @@ export interface Harness {
   app: ElectronApplication;
   importDir: string;
   libraryDir: string;
+  userDataDir: string;
 }
 
 const ALBUM_PNG = Buffer.from(
@@ -107,13 +114,32 @@ function seedUserData(seed: Record<string, unknown>): string {
 }
 
 export async function launchApp(
-  options: { seedLibrary?: boolean; env?: NodeJS.ProcessEnv } = {},
+  options: {
+    seedLibrary?: boolean;
+    env?: NodeJS.ProcessEnv;
+    ytDlpFixturePath?: string;
+  } = {},
 ): Promise<Harness> {
   const libraryDir = writeFixtureLibrary();
   const importDir = writeImportFixture();
   const userDataDir = seedUserData(
     options.seedLibrary ? { lastOpenedPath: libraryDir } : {},
   );
+
+  if (options.ytDlpFixturePath) {
+    const ytDlpPath = path.join(
+      userDataDir,
+      'transcriber',
+      '.venv',
+      'bin',
+      'yt-dlp',
+    );
+
+    mkdirSync(path.dirname(ytDlpPath), { recursive: true });
+    copyFileSync(options.ytDlpFixturePath, ytDlpPath);
+    chmodSync(ytDlpPath, 0o755);
+  }
+
   const app = await electron.launch({
     args: [MAIN_ENTRY, `--user-data-dir=${userDataDir}`, '--mute-audio'],
     env: {
@@ -124,5 +150,5 @@ export async function launchApp(
     },
   });
 
-  return { app, importDir, libraryDir };
+  return { app, importDir, libraryDir, userDataDir };
 }
