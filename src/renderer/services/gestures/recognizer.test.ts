@@ -52,19 +52,46 @@ describe('drum gesture recognizer', () => {
     });
   });
 
-  it('opens every primary Home destination with one deliberate named pad', () => {
+  it('leaves every Home door other than the kick to HomeCockpit', () => {
+    // The home screen executes its own painted door map (HOME_KIT_DOORS)
+    // straight off the input bus. The recognizer must not answer the same
+    // question with a different lane-to-destination map.
     expect(hit(createDrumGestureState(), 'home', 'snare', 1_000).action).toBe(
-      'open-songs',
+      undefined,
     );
     expect(hit(createDrumGestureState(), 'home', 'tom1', 2_000).action).toBe(
-      'open-journey',
+      undefined,
     );
     expect(hit(createDrumGestureState(), 'home', 'ride', 3_000).action).toBe(
-      'open-coach',
+      undefined,
     );
     expect(hit(createDrumGestureState(), 'home', 'crash', 4_000).action).toBe(
-      'open-profile',
+      undefined,
     );
+  });
+
+  it('gives every result outcome its own single deliberate pad', () => {
+    expect(
+      hit(createDrumGestureState(), 'result', 'crash', 1_000),
+    ).toMatchObject({ action: 'continue', gestureId: 'kit-command-continue' });
+    expect(
+      hit(createDrumGestureState(), 'result', 'snare', 2_000),
+    ).toMatchObject({ action: 'retry', gestureId: 'kit-command-retry' });
+    expect(
+      hit(createDrumGestureState(), 'result', 'ride', 3_000),
+    ).toMatchObject({ action: 'end', gestureId: 'kit-command-end' });
+    expect(
+      hit(createDrumGestureState(), 'result', 'hihat', 4_000),
+    ).toMatchObject({ action: 'open-coach', gestureId: 'kit-command-coach' });
+  });
+
+  it('holds a result command until the run has actually gone quiet', () => {
+    // Entering Results seeds the quiet clock (see useDrumGestures), so the
+    // tail of the run that just ended cannot open the next one.
+    const arrived = createDrumGestureState(1_000);
+
+    expect(hit(arrived, 'result', 'crash', 1_400).action).toBeUndefined();
+    expect(hit(arrived, 'result', 'crash', 2_000).action).toBe('continue');
   });
 
   it('recognizes pause only after silence and the full signature while playing', () => {
@@ -99,23 +126,26 @@ describe('drum gesture recognizer', () => {
   });
 
   it('maps result and paused signatures only on their eligible surfaces', () => {
-    const retry = playSequence(
-      createDrumGestureState(),
-      'result',
-      ['snare', 'kick', 'snare', 'kick'],
-      1000,
+    // Single result pads stay on the result screen: while a run is paused,
+    // one strike must not end or restart it.
+    expect(hit(createDrumGestureState(), 'paused', 'crash', 1000).action).toBe(
+      undefined,
     );
-
-    expect(retry.action).toBe('retry');
+    expect(hit(createDrumGestureState(), 'paused', 'snare', 2000).action).toBe(
+      undefined,
+    );
 
     const end = playSequence(
       createDrumGestureState(),
-      'result',
+      'paused',
       ['ride', 'kick', 'ride', 'crash'],
       3000,
     );
 
-    expect(end.action).toBe('end');
+    expect(end).toMatchObject({
+      action: 'end',
+      gestureId: 'kit-command-paused-end',
+    });
 
     const resume = playSequence(
       createDrumGestureState(),

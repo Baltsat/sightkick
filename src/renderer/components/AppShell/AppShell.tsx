@@ -26,6 +26,14 @@ interface AppShellProps {
   statusSlot?: ReactNode;
   settingsSlot: ReactNode;
   onOpenProfile: () => void;
+  /**
+   * A practice run is open on top of the shell. The run is the whole screen
+   * for as long as it lasts: the rail is withdrawn so the score owns every
+   * pixel of width it can get (a lesson that fits stops scrolling at all,
+   * see ContinuousNotation's scrollWidth check), and navigation is not
+   * something to reach for mid-run anyway.
+   */
+  runOpen?: boolean;
   children: ReactNode;
 }
 
@@ -66,6 +74,7 @@ export function AppShell({
   onViewChange,
   settingsSlot,
   onOpenProfile,
+  runOpen = false,
   children,
 }: AppShellProps) {
   const previousViewRef = useRef(view);
@@ -92,8 +101,13 @@ export function AppShell({
         isFieldTransitioning && 'arena-shell--transitioning',
       )}
       data-view={view}
+      data-run-open={runOpen ? 'true' : undefined}
     >
-      <aside className="arena-shell__rail" aria-label="Drumroll navigation">
+      <aside
+        className="arena-shell__rail"
+        aria-label="Drumroll navigation"
+        aria-hidden={runOpen || undefined}
+      >
         {/*
          * The kit-continuity handoff (see docs/kit-launcher-design.md "The
          * field"): on home, the kit photograph should read as continuing

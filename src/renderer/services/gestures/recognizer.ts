@@ -1,3 +1,4 @@
+import { RESULT_KIT_COMMANDS } from './kit-commands';
 import {
   DrumGestureDefinition,
   DrumGestureHit,
@@ -5,6 +6,25 @@ import {
   DrumGestureSurface,
   DrumGestureTransition,
 } from './types';
+
+/** Result-screen commands, one strike each — see RESULT_KIT_COMMANDS. */
+const RESULT_GESTURES: DrumGestureDefinition[] = RESULT_KIT_COMMANDS.map(
+  ({ id, action, element }) => ({
+    id,
+    surfaces: ['result'],
+    elements: [element],
+    action,
+    windowMs: 0,
+    // The modal opens milliseconds after the last note, so the quiet gate is
+    // what separates "a command" from the tail of the run that just ended.
+    // useDrumGestures seeds the clock at the surface change for the same
+    // reason: entering Results must not read as infinite silence.
+    quietBeforeMs: 900,
+    minimumGapMs: 0,
+    maximumGapMs: 0,
+    minimumVelocity: 56,
+  }),
+);
 
 export const DRUM_GESTURES: DrumGestureDefinition[] = [
   {
@@ -21,50 +41,12 @@ export const DRUM_GESTURES: DrumGestureDefinition[] = [
     maximumGapMs: 0,
     minimumVelocity: 56,
   },
-  {
-    id: 'kit-command-home-songs',
-    surfaces: ['home'],
-    elements: ['snare'],
-    action: 'open-songs',
-    windowMs: 0,
-    quietBeforeMs: 650,
-    minimumGapMs: 0,
-    maximumGapMs: 0,
-    minimumVelocity: 56,
-  },
-  {
-    id: 'kit-command-home-journey',
-    surfaces: ['home'],
-    elements: ['tom1'],
-    action: 'open-journey',
-    windowMs: 0,
-    quietBeforeMs: 650,
-    minimumGapMs: 0,
-    maximumGapMs: 0,
-    minimumVelocity: 56,
-  },
-  {
-    id: 'kit-command-home-coach',
-    surfaces: ['home'],
-    elements: ['ride'],
-    action: 'open-coach',
-    windowMs: 0,
-    quietBeforeMs: 650,
-    minimumGapMs: 0,
-    maximumGapMs: 0,
-    minimumVelocity: 56,
-  },
-  {
-    id: 'kit-command-home-profile',
-    surfaces: ['home'],
-    elements: ['crash'],
-    action: 'open-profile',
-    windowMs: 0,
-    quietBeforeMs: 650,
-    minimumGapMs: 0,
-    maximumGapMs: 0,
-    minimumVelocity: 56,
-  },
+  // The home screen's own door map (HOME_KIT_DOORS) is what the player sees
+  // painted on the kit photograph, and HomeCockpit executes it directly from
+  // the input bus. The four `home`-surface definitions that used to live
+  // here were never wired to that screen and disagreed with it lane for lane
+  // (they put Journey on tom1 while the picture says hi-hat), so they are
+  // gone rather than left as a second, wrong answer to the same question.
   {
     id: 'kit-command-start',
     surfaces: ['home', 'ready'],
@@ -99,30 +81,11 @@ export const DRUM_GESTURES: DrumGestureDefinition[] = [
     minimumVelocity: 56,
   },
   {
-    id: 'kit-command-continue',
-    surfaces: ['result'],
-    elements: ['kick', 'crash', 'kick', 'crash'],
-    action: 'continue',
-    windowMs: 1100,
-    quietBeforeMs: 900,
-    minimumGapMs: 60,
-    maximumGapMs: 380,
-    minimumVelocity: 56,
-  },
-  {
-    id: 'kit-command-retry',
-    surfaces: ['result'],
-    elements: ['snare', 'kick', 'snare', 'kick'],
-    action: 'retry',
-    windowMs: 1100,
-    quietBeforeMs: 900,
-    minimumGapMs: 60,
-    maximumGapMs: 380,
-    minimumVelocity: 56,
-  },
-  {
-    id: 'kit-command-end',
-    surfaces: ['paused', 'result'],
+    // Paused sits over a live run, so leaving from there keeps the
+    // deliberate four-strike signature. Results is a finished run and gets
+    // one strike per outcome instead — see RESULT_GESTURES.
+    id: 'kit-command-paused-end',
+    surfaces: ['paused'],
     elements: ['ride', 'kick', 'ride', 'crash'],
     action: 'end',
     windowMs: 1100,
@@ -131,6 +94,7 @@ export const DRUM_GESTURES: DrumGestureDefinition[] = [
     maximumGapMs: 380,
     minimumVelocity: 56,
   },
+  ...RESULT_GESTURES,
 ];
 
 const COOLDOWN_MS = 900;
@@ -138,8 +102,19 @@ const MAX_WINDOW_MS = Math.max(
   ...DRUM_GESTURES.map((gesture) => gesture.windowMs),
 );
 
-export function createDrumGestureState(): DrumGestureState {
-  return { recentHits: [], cooldownUntilMs: 0 };
+/**
+ * `sinceMs` seeds the quiet clock. Callers that enter a new surface pass the
+ * moment of that transition, so `quietBeforeMs` is measured from when the
+ * screen appeared rather than treated as infinite silence — otherwise the
+ * first strike after a run ends satisfies every quiet gate on the result
+ * screen instantly.
+ */
+export function createDrumGestureState(sinceMs?: number): DrumGestureState {
+  return {
+    recentHits: [],
+    cooldownUntilMs: 0,
+    ...(sinceMs === undefined ? {} : { lastHitTimeMs: sinceMs }),
+  };
 }
 
 function matchesPrefix(

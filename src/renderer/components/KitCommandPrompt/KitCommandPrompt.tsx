@@ -19,7 +19,13 @@ export interface KitCommandPromptModel {
   stepHints?: readonly string[];
 }
 
-const STEP_PRESENTATION: Record<
+/**
+ * How each pad is drawn wherever the kit is used as a control surface — the
+ * standard drum colours the player already reads in the score and on the
+ * home kit. Exported so the result screen prints the same pad, in the same
+ * colour, as the prompt does.
+ */
+export const KIT_COMMAND_PRESENTATION: Record<
   KitCommandElement,
   { label: string; image: string; color: string }
 > = {
@@ -46,7 +52,7 @@ export function KitCommandPrompt({
   const relationship = model.relationship ?? 'sequence';
   const spokenSequence = model.steps
     .map((element, index) => {
-      const label = STEP_PRESENTATION[element].label;
+      const label = KIT_COMMAND_PRESENTATION[element].label;
       const hint = model.stepHints?.[index];
 
       return hint ? `${label} for ${hint.toLowerCase()}` : label;
@@ -64,7 +70,7 @@ export function KitCommandPrompt({
       <span className="drumroll-kit-command__label">{model.label}</span>
       <span className="drumroll-kit-command__steps" aria-hidden="true">
         {model.steps.map((element, index) => {
-          const step = STEP_PRESENTATION[element];
+          const step = KIT_COMMAND_PRESENTATION[element];
 
           return (
             <Fragment key={`${element}-${index}`}>

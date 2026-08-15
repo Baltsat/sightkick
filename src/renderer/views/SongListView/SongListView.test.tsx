@@ -184,10 +184,12 @@ describe('SongListView — loading the library', () => {
     );
     view.emit('midi-ready', { port: 2 });
     playKitPreviewMock.mockClear();
+    // Below the deliberate-command velocity, so this stays what the test is
+    // about — feedback — instead of opening the door it landed on.
     view.emit('listen-midi', {
       type: MidiMessageType.NoteOn,
       note: 45,
-      velocity: 100,
+      velocity: 40,
     });
 
     const tom2 = screen.getByTestId('kit-hotspot-tom2');

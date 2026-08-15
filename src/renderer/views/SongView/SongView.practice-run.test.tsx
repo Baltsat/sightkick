@@ -968,22 +968,26 @@ describe('practice mode analytics', () => {
         'Saving this run',
       );
 
-      for (const code of ['KeyK', 'KeyL', 'KeyK', 'KeyL']) {
-        await view.pressKey(code);
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(100);
-        });
-      }
+      // Crash continues and ride leaves, but neither may act while the run
+      // is still being written - the acknowledgement listener has to survive.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_200);
+      });
+      await view.pressKey('KeyL');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
 
       expect(continuePractice).not.toHaveBeenCalled();
       expect(screen.getByTestId('score-modal')).toBeInTheDocument();
 
-      for (const code of ['KeyI', 'KeyK', 'KeyI', 'KeyL']) {
-        await view.pressKey(code);
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(100);
-        });
-      }
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_200);
+      });
+      await view.pressKey('KeyI');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
 
       expect(continuePractice).not.toHaveBeenCalled();
       expect(screen.getByTestId('score-modal')).toBeInTheDocument();
@@ -1002,12 +1006,11 @@ describe('practice mode analytics', () => {
         await vi.advanceTimersByTimeAsync(1_200);
       });
 
-      for (const code of ['KeyK', 'KeyL', 'KeyK', 'KeyL']) {
-        await view.pressKey(code);
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(100);
-        });
-      }
+      // One deliberate crash after the save lands is the whole command.
+      await view.pressKey('KeyL');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
 
       expect(continuePractice).toHaveBeenCalledWith(
         expect.objectContaining({

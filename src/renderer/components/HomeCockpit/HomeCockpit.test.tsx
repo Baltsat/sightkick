@@ -423,7 +423,7 @@ describe('HomeCockpit kit home', () => {
     expect(readiness).not.toHaveClass('sr-only');
   });
 
-  it('keeps a stray strike inert until confirm starts the selected My Wave door', () => {
+  it('opens the door a deliberate strike lands on and only arms the ones that follow it', () => {
     window.localStorage.setItem(
       'settings.selectedDevice',
       JSON.stringify({
@@ -469,46 +469,28 @@ describe('HomeCockpit kit home', () => {
       </InputProvider>,
     );
 
-    fireEvent.keyDown(window, { code: 'KeyA' });
+    // Hi-hat is the Journey door on the painted kit. One deliberate strike
+    // is the whole command - nothing to confirm afterwards.
+    fireEvent.keyDown(window, { code: 'KeyC' });
 
-    expect(onStartRecommended).not.toHaveBeenCalled();
-    expect(screen.getByTestId('kit-hotspot-kick')).toHaveAttribute(
+    expect(onOpenJourney).toHaveBeenCalledOnce();
+    expect(screen.getByTestId('kit-hotspot-hihat')).toHaveAttribute(
       'data-struck',
       'true',
     );
-    expect(screen.getByTestId('kit-hotspot-kick')).toHaveAttribute(
+
+    // Anything struck inside the same warm-up window is not a second
+    // command: it arms its door and waits rather than navigating again.
+    fireEvent.keyDown(window, { code: 'KeyG' });
+
+    expect(onOpenSongs).not.toHaveBeenCalled();
+    expect(onOpenJourney).toHaveBeenCalledOnce();
+    expect(screen.getByTestId('kit-hotspot-ride')).toHaveAttribute(
       'data-armed',
       'true',
     );
-
-    fireEvent.keyDown(window, { code: 'KeyC' });
-
-    expect(onStartSession).not.toHaveBeenCalled();
-    expect(screen.getByTestId('kit-hotspot-hihat')).toHaveAttribute(
-      'data-armed',
-      'true',
-    );
-
-    fireEvent.keyDown(window, { code: 'KeyB' });
-
     expect(onStartRecommended).not.toHaveBeenCalled();
-    expect(onOpenSongs).not.toHaveBeenCalled();
     expect(onStartSession).not.toHaveBeenCalled();
-    expect(onOpenJourney).toHaveBeenCalledOnce();
-
-    fireEvent.keyDown(window, { code: 'KeyB' });
-
-    expect(onStartRecommended).not.toHaveBeenCalled();
-    expect(onOpenSongs).not.toHaveBeenCalled();
-    expect(onOpenJourney).toHaveBeenCalledOnce();
-    expect(onStartSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        intent: 'songs',
-        launch: expect.objectContaining({
-          candidate: expect.objectContaining({ id: song.id }),
-        }),
-      }),
-    );
   });
 
   it('takes every kit surface to the single song chooser when no target is selected', () => {

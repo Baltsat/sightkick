@@ -137,6 +137,16 @@
   transition: border-color 900ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* A practice run owns the whole window. The rail is withdrawn entirely
+   (not narrowed) so the score gets the full viewport width: the practice
+   overlay is transparent, so leaving the rail painted underneath would show
+   navigation through the notation, and every pixel the rail keeps is a bar
+   the player has to scroll to instead of read. `display: none` also takes
+   the rail out of the tab order for the duration of the run. */
+.arena-shell[data-run-open='true'] .arena-shell__rail {
+  display: none;
+}
+
 /* Home is the one route with a photograph to continue under the rail, so
    it is the one route where a hard rail/content border would read as the
    "panel edge" the owner rejects — everywhere else the hairline still

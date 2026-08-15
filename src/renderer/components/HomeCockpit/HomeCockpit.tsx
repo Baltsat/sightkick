@@ -87,6 +87,12 @@ interface ResolvedKitDoor {
   song?: Song;
 }
 
+/* Gates that separate a deliberate home command from warming up on the kit.
+   Same shape and values as the recognizer's single-strike commands, so the
+   kit behaves consistently across every non-scored surface. */
+const HOME_COMMAND_MIN_VELOCITY = 56;
+const HOME_COMMAND_QUIET_MS = 650;
+const HOME_COMMAND_COOLDOWN_MS = 900;
 const KIT_HOTSPOTS: KitHotspot[] = [
   { element: 'hihat', drumLabel: 'Hi-hat', door: HOME_KIT_DOORS.hihat },
   { element: 'crash', drumLabel: 'Crash', door: HOME_KIT_DOORS.crash },
@@ -444,6 +450,8 @@ export function HomeCockpit({
     'armed',
   );
   const [studioSize, setStudioSize] = useState({ width: 0, height: 0 });
+  const lastKitStrikeMsRef = useRef(0);
+  const homeCommandCooldownUntilRef = useRef(0);
   const clearPulseRef = useRef<number | undefined>(undefined);
   const clearPointerStrikeRef = useRef<number | undefined>(undefined);
   const clearPendingDoorRef = useRef<number | undefined>(undefined);
@@ -752,11 +760,8 @@ export function HomeCockpit({
   );
   const armedDoor = pendingDoor ?? (hasContinuationTarget ? 'kick' : undefined);
   const homeStartHint = pendingDoor
-    ? `${kitDoors[pendingDoor].label} is selected. Use your confirm control to start it.`
-    : homeControls.kitActions.includes('confirm') ||
-      homeConfirmControls.length > 0
-    ? 'Strike a labelled door, then use your confirm control to start it.'
-    : 'Set a confirm control in Configure input to use the kit hands-free.';
+    ? `${kitDoors[pendingDoor].label} is armed. Strike it once more to open it.`
+    : 'Strike a labelled door once to open it.';
   const pulseLane = useCallback((element: KitElement) => {
     window.clearTimeout(clearPulseRef.current);
     setStruckLane(element);
@@ -909,18 +914,55 @@ export function HomeCockpit({
         return;
       }
 
+      const now = performance.now();
+      const quietFor = now - lastKitStrikeMsRef.current;
+
+      lastKitStrikeMsRef.current = now;
+
       if (element) {
         pulseLane(element);
       }
 
-      if (homeConfirmControls.includes(event.controlId)) {
-        const door = pendingDoor ?? element ?? 'kick';
+      // One strike opens the door it is painted on. Home is not a scored
+      // surface, so a strike here cannot be music - the same reason `ready`
+      // starts on a single kick. What it still has to survive is warming up
+      // on the kit in front of the home screen, so a strike only counts as a
+      // command when it is deliberate: full velocity, after a real pause,
+      // and never twice inside one cooldown. A strike that fails those gates
+      // still arms the door visibly, so the next deliberate one opens it and
+      // nothing is silently ignored.
+      const deliberate =
+        event.value >= HOME_COMMAND_MIN_VELOCITY &&
+        quietFor >= HOME_COMMAND_QUIET_MS &&
+        now >= homeCommandCooldownUntilRef.current;
+      const isConfirm = homeConfirmControls.includes(event.controlId);
 
-        clearSelectedDoor();
-        executeDoor(door);
-      } else if (element) {
-        selectDoor(element);
+      if (!isConfirm && !element) {
+        return;
       }
+
+      if (!deliberate) {
+        if (element) {
+          selectDoor(element);
+        }
+
+        return;
+      }
+
+      homeCommandCooldownUntilRef.current = now + HOME_COMMAND_COOLDOWN_MS;
+
+      // A confirm control still opens whatever is already armed, so a player
+      // who arms a door with a quiet strike has a way to commit it.
+      const door: KitElement | undefined = isConfirm
+        ? pendingDoor ?? element ?? 'kick'
+        : element;
+
+      if (!door) {
+        return;
+      }
+
+      clearSelectedDoor();
+      executeDoor(door);
     });
 
     return () => {

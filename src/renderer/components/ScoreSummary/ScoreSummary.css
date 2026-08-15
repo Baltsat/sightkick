@@ -62,7 +62,7 @@
 
 .drumroll-score-summary__eyebrow {
   color: var(--dr-wine, var(--color-accent-text));
-  font-size: 13px;
+  font-size: clamp(14px, 1.1vw, 16px);
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -72,11 +72,15 @@
   color: var(--dr-warning, var(--color-amber-text));
 }
 
+/* Everything on this screen is read from the drum stool, several feet back,
+   with sticks in hand — not from a desk. Sizes below are set for that
+   distance: the receipt gets fewer, larger things rather than the same
+   things smaller. */
 .drumroll-score-summary__title {
   overflow: hidden;
   color: var(--dr-ink, var(--color-ink));
   font-family: var(--font-display);
-  font-size: clamp(18px, 1.6vw, 20px);
+  font-size: clamp(22px, 2vw, 28px);
   font-weight: 650;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -85,7 +89,7 @@
 
 .drumroll-score-summary__subtitle {
   color: var(--dr-ink-muted, var(--color-text-muted));
-  font-size: 14px;
+  font-size: clamp(15px, 1.2vw, 18px);
   font-weight: 520;
   line-height: 1.3;
 }
@@ -109,7 +113,7 @@
 .drumroll-score-summary__statement-headline {
   color: var(--dr-ink, var(--color-ink));
   font-family: var(--font-display);
-  font-size: clamp(24px, 2.6vw, 30px);
+  font-size: clamp(32px, 3.4vw, 46px);
   font-weight: 650;
   line-height: 1.15;
   letter-spacing: -0.01em;
@@ -118,7 +122,7 @@
 .drumroll-score-summary__statement-meaning {
   max-width: 52ch;
   color: var(--dr-ink-muted, var(--color-text-muted));
-  font-size: 15px;
+  font-size: clamp(16px, 1.3vw, 20px);
   line-height: 1.5;
 }
 
@@ -150,7 +154,7 @@
 
 .drumroll-score-summary__cell-label {
   color: var(--dr-ink-muted, var(--color-text-muted));
-  font-size: 12px;
+  font-size: clamp(13px, 1vw, 15px);
   font-weight: 600;
   line-height: 1.3;
 }
@@ -159,7 +163,7 @@
   overflow: hidden;
   color: var(--dr-ink, var(--color-ink));
   font-variant-numeric: tabular-nums;
-  font-size: 15px;
+  font-size: clamp(19px, 1.7vw, 24px);
   font-weight: 650;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -170,7 +174,7 @@
   padding: 10px 14px;
   border: 1px solid var(--dr-line, rgb(36 31 25 / 16%));
   color: var(--dr-ink-muted, var(--color-text-muted));
-  font-size: 14px;
+  font-size: clamp(15px, 1.2vw, 18px);
   line-height: 1.45;
 }
 
@@ -234,6 +238,60 @@
   gap: 10px;
   padding: 16px clamp(20px, 3vw, 32px) clamp(16px, 2.4vh, 24px);
   border-top: 1px solid var(--dr-line, rgb(36 31 25 / 16%));
+}
+
+/* One pad, one outcome (see RESULT_KIT_COMMANDS). Each command is a single
+   coloured pad and a verb large enough to read from the stool; the pad's
+   standard drum colour is the instruction, so there is no signature to
+   memorise and nothing small to squint at. They lay out as a row while
+   they fit and wrap to a column when they do not. */
+.drumroll-score-summary__commands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.drumroll-score-summary__command {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 13rem;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid
+    color-mix(in srgb, var(--kit-command-color) 55%, transparent);
+  border-left: 5px solid var(--kit-command-color);
+  background: color-mix(in srgb, var(--kit-command-color) 9%, transparent);
+}
+
+.drumroll-score-summary__command-pad {
+  width: clamp(2.4rem, 3.2vw, 3.1rem);
+  height: auto;
+  flex: 0 0 auto;
+}
+
+.drumroll-score-summary__command-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drumroll-score-summary__command-copy strong {
+  overflow: hidden;
+  color: var(--dr-ink, var(--color-ink));
+  font-size: clamp(17px, 1.5vw, 22px);
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drumroll-score-summary__command-copy small {
+  color: var(--kit-command-color);
+  font-size: clamp(13px, 1.05vw, 16px);
+  font-weight: 650;
+  line-height: 1.2;
 }
 
 .drumroll-score-summary__actions {

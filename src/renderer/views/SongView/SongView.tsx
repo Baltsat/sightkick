@@ -338,10 +338,18 @@ export function SongView() {
   );
   const [lessonProgressionResult, setLessonProgressionResult] =
     useState<LessonProgressionDecision>();
-  const [notationLayout, setNotationLayout] = usePersisted<SheetMusicLayout>(
-    'settings.practiceNotationLayout',
-    'flow',
-  );
+  // Songs and lessons want opposite defaults, so they keep separate
+  // preferences rather than one shared toggle that is wrong half the time.
+  // A song is a long chart nobody can read at once - Flow's moving ribbon is
+  // the honest view. A lesson is a handful of bars authored to be read as a
+  // whole: on a full-window run it fits on one static page, so Classic is
+  // the default there and the score stops travelling sideways under the
+  // player's eyes. The Score view toggle still writes whichever preference
+  // is in play, so an explicit choice sticks per kind of run.
+  const [songNotationLayout, setSongNotationLayout] =
+    usePersisted<SheetMusicLayout>('settings.practiceNotationLayout', 'flow');
+  const [lessonNotationLayout, setLessonNotationLayout] =
+    usePersisted<SheetMusicLayout>('settings.lessonNotationLayout', 'classic');
   const [notationKitKeyVisible, setNotationKitKeyVisible] = usePersisted(
     'settings.notationKitKeyVisible',
     false,
@@ -474,6 +482,13 @@ export function SongView() {
   });
   const navigate = useNavigate();
   const { fileData, format, songData, trackData } = useSongLoader(id);
+  const isLessonRun = Boolean(songData?.lesson);
+  const notationLayout = isLessonRun
+    ? lessonNotationLayout
+    : songNotationLayout;
+  const setNotationLayout = isLessonRun
+    ? setLessonNotationLayout
+    : setSongNotationLayout;
 
   useEffect(() => {
     practiceCardRef.current = practiceCardEvidence;
@@ -1829,6 +1844,18 @@ export function SongView() {
         return;
       }
 
+      if (action === 'open-coach') {
+        onOpenCoach();
+
+        return;
+      }
+
+      // Everything left is 'end'. Named actions return above so a future
+      // gesture can never fall through into leaving the run by accident.
+      if (action !== 'end') {
+        return;
+      }
+
       setIsScoreModalOpen(false);
       cancel();
       pause();
@@ -1839,6 +1866,7 @@ export function SongView() {
       engine,
       navigate,
       onNextSong,
+      onOpenCoach,
       onRetry,
       pause,
       playRun,

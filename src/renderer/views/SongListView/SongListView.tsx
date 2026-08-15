@@ -1259,6 +1259,7 @@ export function SongListView() {
       <AppShell
         view={view}
         onViewChange={setView}
+        runOpen={songOpen}
         statusSlot={
           <GamificationHeaderStrip
             isLoaded={gamification.isLoaded}

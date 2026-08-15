@@ -1,5 +1,5 @@
 import { Button } from 'antd';
-import { useMemo, useState } from 'react';
+import { CSSProperties, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ScoreData, Song } from '../../../types';
 import { Difficulty } from 'scan-chart';
@@ -21,7 +21,8 @@ import {
 } from '../../hooks/useGamification';
 import { AchievementToastQueue } from '../AchievementToastQueue';
 import type { LessonProgressionDecision } from '../../services/lesson-progression';
-import { KitCommandPrompt } from '../KitCommandPrompt';
+import { KIT_COMMAND_PRESENTATION } from '../KitCommandPrompt';
+import { RESULT_KIT_COMMANDS } from '../../services/gestures';
 import { LearningEvidenceReceipt } from '../LearningEvidenceReceipt';
 import { musicalReceipt } from './musicalReceipt';
 import {
@@ -213,6 +214,27 @@ export function ScoreSummary({
           practiceSummary.totalMisses
         } missed`
       : 'No notes played';
+  // The kit controls print the same verbs the on-screen buttons carry, so
+  // the pad and the button are visibly the same command rather than two
+  // vocabularies for one screen. Order matches reading order: what happens
+  // next first, then the ways back.
+  const continueLabel =
+    continuationLabelLocked || receipt?.action !== 'continue'
+      ? nextLabel
+      : receipt.actionLabel;
+  const retryLabel = primaryIsReplay ? 'Replay this loop' : 'Play again';
+  const coachAvailable = Boolean(practiceSummary && onCoach && !noMusicalInput);
+  const kitCommands = RESULT_KIT_COMMANDS.filter(
+    ({ action }) => action !== 'open-coach' || coachAvailable,
+  ).map((command) => ({
+    ...command,
+    label:
+      command.action === 'continue'
+        ? continueLabel
+        : command.action === 'retry'
+        ? retryLabel
+        : command.label,
+  }));
 
   if (!isOpen) {
     return null;
@@ -545,28 +567,31 @@ export function ScoreSummary({
         )}
         {handsFreeControlsEnabled && !continuationBlocked && (
           <section
-            className="drumroll-score-summary__status grid gap-1"
+            className="drumroll-score-summary__commands"
             aria-label="Result controls from the drum kit"
             data-testid="score-kit-controls"
           >
-            <KitCommandPrompt
-              model={{
-                label: nextLabel,
-                steps: ['kick', 'crash', 'kick', 'crash'],
-              }}
-            />
-            <KitCommandPrompt
-              model={{
-                label: 'Play again',
-                steps: ['snare', 'kick', 'snare', 'kick'],
-              }}
-            />
-            <KitCommandPrompt
-              model={{
-                label: 'Leave session',
-                steps: ['ride', 'kick', 'ride', 'crash'],
-              }}
-            />
+            {kitCommands.map(({ id, element, label }) => {
+              const pad = KIT_COMMAND_PRESENTATION[element];
+
+              return (
+                <div
+                  key={id}
+                  className="drumroll-score-summary__command"
+                  style={{ '--kit-command-color': pad.color } as CSSProperties}
+                >
+                  <img
+                    className="drumroll-score-summary__command-pad"
+                    src={pad.image}
+                    alt=""
+                  />
+                  <span className="drumroll-score-summary__command-copy">
+                    <strong>{label}</strong>
+                    <small>Hit {pad.label.toLowerCase()}</small>
+                  </span>
+                </div>
+              );
+            })}
           </section>
         )}
         {canExportPostcard && (

@@ -1,7 +1,9 @@
+/* No rail offset: AppShell withdraws the rail for the whole run
+   (`[data-run-open]`), so the run is a genuine full-window surface rather
+   than a panel indented past navigation that is no longer there. */
 .drumroll-practice-shell {
   height: 100%;
   min-height: 0;
-  margin-left: 13rem;
   overflow: hidden;
   color: var(--dr-ink, var(--color-ink));
   background: transparent;
@@ -177,11 +179,5 @@
 
   .drumroll-practice-streak {
     top: 0.75rem;
-  }
-}
-
-@media (max-width: 1120px) {
-  .drumroll-practice-shell {
-    margin-left: 4rem;
   }
 }

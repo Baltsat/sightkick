@@ -247,17 +247,17 @@ describe('ScoreSummary', () => {
       persistenceState: 'saved',
       nextLabel: 'Next practice',
     });
+    const controls = modal.getByTestId('score-kit-controls');
 
-    expect(modal.getByTestId('score-kit-controls')).toBeInTheDocument();
-    expect(
-      modal.getByLabelText(/Next practice: Kick, then Crash/i),
-    ).toBeInTheDocument();
-    expect(
-      modal.getByLabelText(/Play again: Snare, then Kick/i),
-    ).toBeInTheDocument();
-    expect(
-      modal.getByLabelText(/Leave session: Ride, then Kick/i),
-    ).toBeInTheDocument();
+    // One pad per outcome, printed with the verb its button carries - the
+    // player reads this from the stool, so there is no signature to learn.
+    expect(controls).toHaveTextContent('Next practice');
+    expect(controls).toHaveTextContent('Hit crash');
+    expect(controls).toHaveTextContent('Play again');
+    expect(controls).toHaveTextContent('Hit snare');
+    expect(controls).toHaveTextContent('Leave session');
+    expect(controls).toHaveTextContent('Hit ride');
+    expect(controls.textContent).not.toMatch(/then/i);
   });
 
   it.each(['saved', 'failed', 'no-evidence'] as const)(
