@@ -424,73 +424,84 @@ describe('HomeCockpit kit home', () => {
   });
 
   it('opens the door a deliberate strike lands on and only arms the ones that follow it', () => {
-    window.localStorage.setItem(
-      'settings.selectedDevice',
-      JSON.stringify({
-        id: 'keyboard',
-        name: 'Keyboard',
-        sourceId: 'keyboard',
-      }),
-    );
-    window.localStorage.setItem(
-      'settings.inputMappings',
-      JSON.stringify({
-        keyboard: {
-          kick: ['keyboard:KeyA'],
-          snare: ['keyboard:KeyB'],
-          hihat: ['keyboard:KeyC'],
-          tom1: ['keyboard:KeyD'],
-          tom2: ['keyboard:KeyE'],
-          tom3: ['keyboard:KeyF'],
-          ride: ['keyboard:KeyG'],
-          crash: ['keyboard:KeyH'],
-        },
-      }),
-    );
+    // The kit's deliberateness gate is measured off performance.now(), so
+    // this test owns that clock rather than racing the real one.
+    let clock = 10_000;
+    const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => clock);
 
-    const onStartRecommended = vi.fn();
-    const onOpenSongs = vi.fn();
-    const onOpenJourney = vi.fn();
-    const onStartSession = vi.fn();
+    try {
+      window.localStorage.setItem(
+        'settings.selectedDevice',
+        JSON.stringify({
+          id: 'keyboard',
+          name: 'Keyboard',
+          sourceId: 'keyboard',
+        }),
+      );
+      window.localStorage.setItem(
+        'settings.inputMappings',
+        JSON.stringify({
+          keyboard: {
+            kick: ['keyboard:KeyA'],
+            snare: ['keyboard:KeyB'],
+            hihat: ['keyboard:KeyC'],
+            tom1: ['keyboard:KeyD'],
+            tom2: ['keyboard:KeyE'],
+            tom3: ['keyboard:KeyF'],
+            ride: ['keyboard:KeyG'],
+            crash: ['keyboard:KeyH'],
+          },
+        }),
+      );
 
-    render(
-      <InputProvider>
-        <HomeCockpit
-          songList={[song]}
-          gamification={gamification}
-          recommendation={songRecommendation}
-          practiceRanking={[songRecommendation]}
-          onStartRecommended={onStartRecommended}
-          onStartSession={onStartSession}
-          onOpenSongs={onOpenSongs}
-          onOpenJourney={onOpenJourney}
-          onOpenProfile={vi.fn()}
-        />
-      </InputProvider>,
-    );
+      const onStartRecommended = vi.fn();
+      const onOpenSongs = vi.fn();
+      const onOpenJourney = vi.fn();
+      const onStartSession = vi.fn();
 
-    // Hi-hat is the Journey door on the painted kit. One deliberate strike
-    // is the whole command - nothing to confirm afterwards.
-    fireEvent.keyDown(window, { code: 'KeyC' });
+      render(
+        <InputProvider>
+          <HomeCockpit
+            songList={[song]}
+            gamification={gamification}
+            recommendation={songRecommendation}
+            practiceRanking={[songRecommendation]}
+            onStartRecommended={onStartRecommended}
+            onStartSession={onStartSession}
+            onOpenSongs={onOpenSongs}
+            onOpenJourney={onOpenJourney}
+            onOpenProfile={vi.fn()}
+          />
+        </InputProvider>,
+      );
 
-    expect(onOpenJourney).toHaveBeenCalledOnce();
-    expect(screen.getByTestId('kit-hotspot-hihat')).toHaveAttribute(
-      'data-struck',
-      'true',
-    );
+      // Hi-hat is the Journey door on the painted kit. One deliberate strike
+      // after a real pause is the whole command - nothing to confirm after.
+      clock += 1_000;
+      fireEvent.keyDown(window, { code: 'KeyC' });
 
-    // Anything struck inside the same warm-up window is not a second
-    // command: it arms its door and waits rather than navigating again.
-    fireEvent.keyDown(window, { code: 'KeyG' });
+      expect(onOpenJourney).toHaveBeenCalledOnce();
+      expect(screen.getByTestId('kit-hotspot-hihat')).toHaveAttribute(
+        'data-struck',
+        'true',
+      );
 
-    expect(onOpenSongs).not.toHaveBeenCalled();
-    expect(onOpenJourney).toHaveBeenCalledOnce();
-    expect(screen.getByTestId('kit-hotspot-ride')).toHaveAttribute(
-      'data-armed',
-      'true',
-    );
-    expect(onStartRecommended).not.toHaveBeenCalled();
-    expect(onStartSession).not.toHaveBeenCalled();
+      // Anything struck inside the same warm-up window is not a second
+      // command: it arms its door and waits rather than navigating again.
+      clock += 100;
+      fireEvent.keyDown(window, { code: 'KeyG' });
+
+      expect(onOpenSongs).not.toHaveBeenCalled();
+      expect(onOpenJourney).toHaveBeenCalledOnce();
+      expect(screen.getByTestId('kit-hotspot-ride')).toHaveAttribute(
+        'data-armed',
+        'true',
+      );
+      expect(onStartRecommended).not.toHaveBeenCalled();
+      expect(onStartSession).not.toHaveBeenCalled();
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it('takes every kit surface to the single song chooser when no target is selected', () => {

@@ -906,6 +906,15 @@ export function HomeCockpit({
     [clearSelectedDoor, executeDoor, pulseLane],
   );
 
+  // Arriving on Home counts as the last thing that happened, not as silence
+  // since the beginning of time. Home is remounted the moment a run is left
+  // from the kit, and the run's own cooldown lived in a hook that just
+  // unmounted - without this, the very next stick bounce reads as deliberate
+  // and opens a door the player never chose.
+  useLayoutEffect(() => {
+    lastKitStrikeMsRef.current = performance.now();
+  }, []);
+
   useEffect(() => {
     const unsubscribe = inputBus.subscribe((event) => {
       const element = elementByControlId.get(event.controlId);

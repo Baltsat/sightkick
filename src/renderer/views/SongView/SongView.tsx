@@ -1845,7 +1845,12 @@ export function SongView() {
       }
 
       if (action === 'open-coach') {
-        onOpenCoach();
+        // Only when the result screen is actually offering Coach. Otherwise
+        // the hi-hat would close a result the player is still reading and
+        // open a Coach panel with no run behind it.
+        if (practiceSummary && !noMusicalInput) {
+          onOpenCoach();
+        }
 
         return;
       }
@@ -1865,10 +1870,12 @@ export function SongView() {
       cancel,
       engine,
       navigate,
+      noMusicalInput,
       onNextSong,
       onOpenCoach,
       onRetry,
       pause,
+      practiceSummary,
       playRun,
       playRunFromTick,
       seekSeconds,

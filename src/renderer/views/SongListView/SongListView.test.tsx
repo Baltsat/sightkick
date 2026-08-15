@@ -204,30 +204,40 @@ describe('SongListView — loading the library', () => {
   });
 
   it('starts the armed target from a physical pad instead of navigating the home', async () => {
-    const view = mountSongListView({ freshProfile: true });
+    // Home only accepts a strike as a command after a real pause, so this
+    // test owns the clock the gate reads instead of racing the real one.
+    let clock = 10_000;
+    const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => clock);
 
-    view.loadSongs([makeListSong('song-a', { liked: true })]);
+    try {
+      const view = mountSongListView({ freshProfile: true });
 
-    view.emit('midi-device-list', [{ name: 'Yamaha DTX402', port: 2 }]);
-    await waitFor(() =>
-      expect(view.ipc.sent).toContainEqual({
-        channel: 'listen-midi',
-        args: [2],
-      }),
-    );
-    view.emit('midi-ready', { port: 2 });
+      view.loadSongs([makeListSong('song-a', { liked: true })]);
 
-    view.emit('listen-midi', {
-      type: MidiMessageType.NoteOn,
-      note: 38,
-      velocity: 100,
-    });
+      view.emit('midi-device-list', [{ name: 'Yamaha DTX402', port: 2 }]);
+      await waitFor(() =>
+        expect(view.ipc.sent).toContainEqual({
+          channel: 'listen-midi',
+          args: [2],
+        }),
+      );
+      view.emit('midi-ready', { port: 2 });
 
-    const opened = await screen.findByTestId('song-view-stub');
+      clock += 1_000;
+      view.emit('listen-midi', {
+        type: MidiMessageType.NoteOn,
+        note: 38,
+        velocity: 100,
+      });
 
-    expect(opened).toHaveAttribute('data-song-id', 'song-a');
-    expect(opened.getAttribute('data-search')).toContain('gameMode=practice');
-    expect(opened.getAttribute('data-search')).toContain('autoStart=1');
+      const opened = await screen.findByTestId('song-view-stub');
+
+      expect(opened).toHaveAttribute('data-song-id', 'song-a');
+      expect(opened.getAttribute('data-search')).toContain('gameMode=practice');
+      expect(opened.getAttribute('data-search')).toContain('autoStart=1');
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it('states honest kit availability when no kit is selected', () => {
@@ -685,26 +695,34 @@ describe('SongListView — loading the library', () => {
   });
 
   it('starts the recommendation from one deliberate Home snare and unmounts the background cockpit', async () => {
-    const view = mountSongListView({
-      settings: {
-        inputMappings: {
-          keyboard: {
-            snare: ['keyboard:KeyK'],
+    let clock = 10_000;
+    const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => clock);
+
+    try {
+      const view = mountSongListView({
+        settings: {
+          inputMappings: {
+            keyboard: {
+              snare: ['keyboard:KeyK'],
+            },
           },
         },
-      },
-    });
+      });
 
-    view.loadSongs([makeListSong('song-a', { liked: true })]);
+      view.loadSongs([makeListSong('song-a', { liked: true })]);
 
-    view.typeKey('KeyK');
+      clock += 1_000;
+      view.typeKey('KeyK');
 
-    const opened = await screen.findByTestId('song-view-stub');
+      const opened = await screen.findByTestId('song-view-stub');
 
-    expect(opened).toHaveAttribute('data-song-id', 'song-a');
-    expect(opened.getAttribute('data-search')).toContain('autoStart=1');
-    expect(screen.queryByTestId('home-cockpit')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('kit-hotspot-kick')).not.toBeInTheDocument();
+      expect(opened).toHaveAttribute('data-song-id', 'song-a');
+      expect(opened.getAttribute('data-search')).toContain('autoStart=1');
+      expect(screen.queryByTestId('home-cockpit')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('kit-hotspot-kick')).not.toBeInTheDocument();
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it('requests the song list and stem-tool status on mount', () => {
