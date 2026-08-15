@@ -224,7 +224,13 @@ expectedLessonFiles.forEach((entry) => {
 
 const lessonIds = new Set();
 const lessonDirectories = new Set();
-const requiredLessonFiles = ['drums.ogg', 'notes.mid', 'song.ini', 'song.ogg'];
+const requiredLessonFiles = [
+  'drums.ogg',
+  'notes.mid',
+  'song.ini',
+  'song.ogg',
+  'sticking.json',
+];
 let totalAssetBytes = 0;
 let maxAssetBytes = 0;
 
@@ -255,7 +261,7 @@ for (const lesson of lessonManifest.lessons) {
 
   assert(
     JSON.stringify([...lesson.files].sort()) === JSON.stringify(requiredLessonFiles),
-    `Lesson ${lessonId} does not declare the exact four required assets`,
+    `Lesson ${lessonId} does not declare the exact five required assets`,
   );
   assert(lesson.chart === `${lesson.song.dir}/notes.mid`, `Lesson ${lessonId} chart path is inconsistent`);
   assert(

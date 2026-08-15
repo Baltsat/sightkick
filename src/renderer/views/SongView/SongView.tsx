@@ -100,6 +100,7 @@ import {
   InactivityPauseVeil,
   useInactivityPauseVeil,
 } from '../../components/InactivityPauseVeil';
+import { KitCommandVeil } from '../../components/KitCommandPrompt';
 import { useTutorSession } from '../../hooks/useTutorSession';
 import { usePracticeAttemptCheckpoint } from '../../hooks/usePracticeAttemptCheckpoint';
 import { useMidiInputTelemetry } from '../../hooks/useMidiInputTelemetry';
@@ -137,6 +138,12 @@ import { curriculumItemManifest } from '../../services/pedagogy/item-manifest';
 import { build_my_wave_item_profile } from '../../services/pedagogy/my-wave';
 import { deriveAtomicSkillEvidence } from '../../services/pedagogy/skill-state';
 import { ItemSkillManifest } from '../../services/pedagogy/types';
+import {
+  createVocalizationTrackConfig,
+  mapVocalizationTrack,
+  renderVocalizationTrack,
+  synthesizePlaceholderBank,
+} from '../../services/vocalization';
 import {
   build_pattern_player_profile,
   decompose_chart_patterns,
@@ -211,6 +218,18 @@ function boundedText(
   const trimmed = value?.trim();
 
   return trimmed && trimmed.length <= maximum ? trimmed : undefined;
+}
+
+function boundedInteger(
+  value: string | null,
+  minimum: number,
+  maximum: number,
+): number | undefined {
+  const parsed = value === null ? Number.NaN : Number(value);
+
+  return Number.isInteger(parsed) && parsed >= minimum && parsed <= maximum
+    ? parsed
+    : undefined;
 }
 
 function parsePracticeCardEvidence(
@@ -418,6 +437,31 @@ export function SongView() {
     return gameMode === 'practice' && Number.isFinite(value)
       ? Math.min(2, Math.max(0.3, value))
       : 1;
+  }, [gameMode, searchParams]);
+  const zpdAdaptation = useMemo(() => {
+    if (gameMode !== 'practice') {
+      return undefined;
+    }
+
+    const repeatBudget = boundedInteger(
+      searchParams.get('zpdRepeatBudget'),
+      1,
+      6,
+    );
+    const qualityPasses = boundedInteger(
+      searchParams.get('zpdQualityPasses'),
+      1,
+      4,
+    );
+    const lowQualityPasses = boundedInteger(
+      searchParams.get('zpdLowQualityPasses'),
+      1,
+      6,
+    );
+
+    return repeatBudget && qualityPasses && lowQualityPasses
+      ? { repeatBudget, qualityPasses, lowQualityPasses }
+      : undefined;
   }, [gameMode, searchParams]);
   // Learner-owned tempo, "and the next session": see useLearnerPlaybackSpeed
   // for why this is not usePersisted (SongView does not remount on a
@@ -740,6 +784,24 @@ export function SongView() {
       delaySeconds
     );
   }, [chart, parsedMidi, delaySeconds]);
+  const mixedTrackData = useMemo(() => {
+    if (!chart || !parsedMidi || !stickingData || !isLessonRun) {
+      return trackData;
+    }
+
+    const vocalization = mapVocalizationTrack({
+      chart,
+      measures: parsedMidi.measures,
+      sticking: stickingData,
+      delaySeconds,
+    });
+    const rendered = renderVocalizationTrack(
+      vocalization,
+      synthesizePlaceholderBank(),
+    );
+
+    return [...trackData, createVocalizationTrackConfig(rendered)];
+  }, [chart, delaySeconds, isLessonRun, parsedMidi, stickingData, trackData]);
   const onExplicitSpeedChange = useCallback(
     (speed: number) => {
       setLearnerPlaybackSpeed(speed);
@@ -767,7 +829,7 @@ export function SongView() {
     setStemVolume,
     setMasterVolume: setEngineMasterVolume,
   } = useEngine({
-    trackData,
+    trackData: mixedTrackData,
     isDev,
     chart,
     measures,
@@ -1119,7 +1181,7 @@ export function SongView() {
   // is.
   const streakUi = useStreakEngine(engine);
   const { volumeSliders } = useVolumeControls(
-    trackData,
+    mixedTrackData,
     setStemVolume,
     isReady,
   );
@@ -1134,7 +1196,7 @@ export function SongView() {
     toggleMute: handleMasterMute,
     handleChange: handleMasterChange,
   } = useMuteToggle(masterVolume, setMasterVolume, 100);
-  const audioLoading = trackData.length > 0 && !isReady;
+  const audioLoading = mixedTrackData.length > 0 && !isReady;
   const chartLoading = Boolean(
     songData && (!chart || !parsedMidi || renderData.length === 0),
   );
@@ -1775,6 +1837,19 @@ export function SongView() {
       ...GUIDED_PRACTICE_TUTOR_SETTINGS,
       autoRewind: tutorAutoRewind,
       livesEnabled: tutorLivesEnabled,
+      recursiveChunkGrowthEnabled: Boolean(songData?.lesson),
+      ...(zpdAdaptation
+        ? {
+            requiredCleanRepetitions: zpdAdaptation.qualityPasses,
+            maximumFailedRecoveryAttempts: Math.min(
+              zpdAdaptation.lowQualityPasses,
+              Math.max(
+                0,
+                zpdAdaptation.repeatBudget - zpdAdaptation.qualityPasses,
+              ),
+            ),
+          }
+        : {}),
     },
     hitToleranceSeconds,
   });
@@ -1900,6 +1975,10 @@ export function SongView() {
     };
   }, [loopEscape]);
   const drumGestureSurface = useMemo<DrumGestureSurface>(() => {
+    if (isStatsOpen) {
+      return 'stats';
+    }
+
     if (isScoreModalOpen) {
       return 'result';
     }
@@ -1913,7 +1992,7 @@ export function SongView() {
     }
 
     return 'ready';
-  }, [isCounting, isPlaying, isScoreModalOpen, isStarted]);
+  }, [isCounting, isPlaying, isScoreModalOpen, isStarted, isStatsOpen]);
   const onDrumGesture = useCallback(
     (action: DrumGestureAction) => {
       // Multi-hit gestures are observed before Judge and resolved after the
@@ -1991,6 +2070,12 @@ export function SongView() {
       // Everything left is 'end'. Named actions return above so a future
       // gesture can never fall through into leaving the run by accident.
       if (action !== 'end') {
+        return;
+      }
+
+      if (drumGestureSurface === 'stats') {
+        setIsStatsOpen(false);
+
         return;
       }
 
@@ -2794,6 +2879,11 @@ export function SongView() {
         (practicePresentationPhase === 'recovery-explain' ||
           Boolean(remediationSession.activeTask) ||
           Boolean(loopEscape))));
+  const showTutorCommandVeil =
+    showTutorCaption &&
+    Boolean(kitControlPrompt) &&
+    (practicePresentationPhase === 'paused' ||
+      practicePresentationPhase === 'inactivity-paused');
   const showLoopCaption =
     gameMode === 'practice' &&
     isLooping &&
@@ -2875,6 +2965,10 @@ export function SongView() {
           variant="panel"
           summary={songRuns?.[songRuns.length - 1]}
           trend={songRuns ? computeRunsTrend(songRuns) : []}
+          kitConnected={
+            selectedDevice?.sourceId === 'midi' &&
+            inputReadiness === 'connected'
+          }
         />
       </Drawer>
       <Drawer
@@ -3184,7 +3278,26 @@ export function SongView() {
             }
           />
         )}
-        {showTutorCaption && (
+        {showTutorCommandVeil && kitControlPrompt && (
+          <KitCommandVeil
+            kicker="Paused"
+            title={kitControlPrompt.label}
+            model={kitControlPrompt}
+            detail={
+              practicePresentationPhase === 'inactivity-paused'
+                ? `Bar ${
+                    inactivityRecovery.phase === 'parked'
+                      ? inactivityRecovery.checkpointMeasure + 1
+                      : 1
+                  } is held · the next strike starts a fresh count-in.`
+                : 'The playhead is held · strike the sequence once to count in again.'
+            }
+            tone="warning"
+            testId="practice-kit-command-veil"
+            state={practicePresentationPhase}
+          />
+        )}
+        {showTutorCaption && !showTutorCommandVeil && (
           <TutorHud
             state={tutorSession.state}
             message={tutorHudMessage}
@@ -3248,30 +3361,15 @@ export function SongView() {
           </aside>
         )}
         {showPerformCaption && kitControlPrompt && (
-          <aside
-            className="drumroll-practice-edge-caption drumroll-perform-caption"
-            data-edge-caption="perform-command"
-            data-testid="perform-kit-control-prompt"
-            data-tone="recovery"
-            role="status"
-            aria-live="polite"
-          >
-            <span className="drumroll-practice-edge-caption__kicker">
-              Kit control
-            </span>
-            <strong className="drumroll-practice-edge-caption__title">
-              {kitControlPrompt.label}
-            </strong>
-            <p className="drumroll-practice-edge-caption__detail">
-              {kitControlPrompt.steps
-                .map((step) =>
-                  step === 'any'
-                    ? 'Any pad'
-                    : `${step.charAt(0).toUpperCase()}${step.slice(1)}`,
-                )
-                .join(' → ')}
-            </p>
-          </aside>
+          <KitCommandVeil
+            kicker="Kit control"
+            title={kitControlPrompt.label}
+            model={kitControlPrompt}
+            detail="Strike the shown pad once."
+            tone="ready"
+            testId="perform-kit-control-prompt"
+            state={practicePresentationPhase}
+          />
         )}
         {showCountInCaption && (
           <CountIn

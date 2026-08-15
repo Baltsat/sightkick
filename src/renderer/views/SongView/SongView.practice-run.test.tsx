@@ -253,10 +253,11 @@ describe('practice mode analytics', () => {
           }),
         ]),
       );
+      // During a pause the full-bleed kit-command veil replaces the tutor
+      // HUD, so assert the invariant surface-independently: a deliberate
+      // pause command must never surface as tutor failure copy anywhere.
       expect(
-        within(screen.getByTestId('tutor-hud')).queryByText(
-          'Phrase needs one more pass',
-        ),
+        screen.queryByText('Phrase needs one more pass'),
       ).not.toBeInTheDocument();
 
       clock.advance(1_200);
@@ -723,8 +724,13 @@ describe('practice mode analytics', () => {
 
       expect(evidence).toBeDefined();
       expect(evidence!.map((event) => event.skill_id).sort()).toEqual([
+        'dynamic.even_velocity',
+        'grid.sixteenth',
         'hand.singles',
+        'limb.snare_only',
         'pulse.sixteenth',
+        'sticking.alternating',
+        'tempo.100_119',
       ]);
       expect(evidence!.every((event) => event.item_id === '01.01')).toBe(true);
     } finally {

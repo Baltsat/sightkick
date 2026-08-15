@@ -23,6 +23,7 @@ class TutorEngineProbe {
   readonly playFromTick = vi.fn();
   private judgementListeners = new Set<(value: ResolvedJudgement) => void>();
   private runEndingListeners = new Set<() => boolean>();
+  private loopRestartListeners = new Set<() => void>();
 
   onJudgement(listener: (value: ResolvedJudgement) => void) {
     this.judgementListeners.add(listener);
@@ -36,6 +37,12 @@ class TutorEngineProbe {
     return () => this.runEndingListeners.delete(listener);
   }
 
+  onLoopRestart(listener: () => void) {
+    this.loopRestartListeners.add(listener);
+
+    return () => this.loopRestartListeners.delete(listener);
+  }
+
   getSnapshot() {
     return { isPlaying: false };
   }
@@ -46,6 +53,10 @@ class TutorEngineProbe {
 
   finish(): boolean {
     return [...this.runEndingListeners].every((listener) => listener());
+  }
+
+  restartLoop() {
+    this.loopRestartListeners.forEach((listener) => listener());
   }
 }
 
@@ -279,6 +290,140 @@ describe('useTutorSession run-ending handshake', () => {
     // have been called by any of it.
     expect(probe.setPlaybackSpeed).not.toHaveBeenCalled();
     expect(result.current.state.currentSpeed).toBe(0.5);
+  });
+
+  it('lets natural chunk-loop wraps qualify the hard spot and apply the next engine-selected window', async () => {
+    vi.useFakeTimers();
+
+    const probe = new TutorEngineProbe();
+    const { result } = renderHook(() =>
+      useTutorSession({
+        engine: probe as unknown as Engine,
+        runKey: 'recursive-lesson',
+        chart,
+        measures,
+        delaySeconds: 0,
+        enabled: true,
+        targetSpeed: 0.8,
+        settings: {
+          recursiveChunkGrowthEnabled: true,
+          minimumResolvedEvents: 4,
+          minimumDistinctErrors: 3,
+        },
+      }),
+    );
+
+    act(() => {
+      emitPass(probe, 'miss');
+      probe.finish();
+    });
+
+    expect(result.current.state.recovery).toMatchObject({
+      region: { startTick: 0, endTick: 192, stage: 'seed' },
+      chunkGrowth: { activeWindowIndex: 0 },
+    });
+    expect(result.current.message).toMatchObject({
+      title: 'Start at the hard spot',
+      tone: 'recovery',
+    });
+    expect(result.current.message.detail).toContain('bar 1 · beat 1 → beat 2');
+    expect(probe.setLoopRegion).toHaveBeenLastCalledWith({
+      startTick: 0,
+      endTick: 192,
+    });
+
+    for (let pass = 0; pass < 2; pass += 1) {
+      act(() => probe.emit(outcome('hit', 0, 0)));
+      await act(async () => {
+        probe.restartLoop();
+        await Promise.resolve();
+      });
+    }
+
+    expect(result.current.state.recovery?.chunkGrowth?.activeWindowIndex).toBe(
+      1,
+    );
+    expect(result.current.message.title).toBe('Grow the phrase');
+    expect(probe.setLoopRegion).toHaveBeenLastCalledWith(
+      expect.objectContaining({ startTick: 0 }),
+    );
+    expect(
+      result.current.state.recoveryAttempts.map(
+        ({ chunkTransition }) => chunkTransition,
+      ),
+    ).toEqual(['repeat', 'expand']);
+    expect(probe.setPlaybackSpeed).not.toHaveBeenCalled();
+  });
+
+  it('joins the final full phrase and releases the real run-ending handshake', async () => {
+    const probe = new TutorEngineProbe();
+    const { result } = renderHook(() =>
+      useTutorSession({
+        engine: probe as unknown as Engine,
+        runKey: 'recursive-final-phrase',
+        chart,
+        measures,
+        delaySeconds: 0,
+        enabled: true,
+        targetSpeed: 1,
+        settings: {
+          recursiveChunkGrowthEnabled: true,
+          minimumResolvedEvents: 4,
+          minimumDistinctErrors: 3,
+        },
+      }),
+    );
+
+    act(() => {
+      emitPass(probe, 'miss');
+      probe.finish();
+    });
+
+    let mayCommit = false;
+
+    for (let attempt = 0; attempt < 24; attempt += 1) {
+      const growth = result.current.state.recovery?.chunkGrowth;
+
+      if (!growth) {
+        break;
+      }
+
+      const window = growth.plan.windows[growth.activeWindowIndex];
+
+      act(() => {
+        measures.forEach((measure, measureIndex) => {
+          measure.notes.forEach((note) => {
+            if (note.tick >= window.startTick && note.tick < window.endTick) {
+              probe.emit(outcome('hit', measureIndex, note.tick));
+            }
+          });
+        });
+      });
+
+      if (
+        growth.activeWindowIndex === growth.plan.windows.length - 1 &&
+        window.endTick === measures.at(-1)?.endTick
+      ) {
+        act(() => {
+          mayCommit = probe.finish();
+        });
+      } else {
+        await act(async () => {
+          probe.restartLoop();
+          await Promise.resolve();
+        });
+      }
+    }
+
+    expect(mayCommit).toBe(true);
+    expect(result.current.state.phase).toBe('complete');
+    expect(result.current.state.lastRecoveryOutcome).toMatchObject({
+      status: 'mastered',
+      startMeasure: 0,
+      endMeasure: 1,
+    });
+    expect(probe.setLoopRegion).toHaveBeenLastCalledWith(undefined);
+    expect(probe.setPlaybackSpeed).not.toHaveBeenCalled();
   });
 
   it('replaces a completed run store after commit without updating state during render', async () => {

@@ -94,7 +94,8 @@ describe('opening a song', () => {
 
     const caption = screen.getByTestId('perform-kit-control-prompt');
 
-    expect(caption).toHaveAttribute('data-edge-caption', 'perform-command');
+    expect(caption).toHaveAttribute('data-fullscreen-moment', 'kit-command');
+    expect(caption).toHaveAttribute('data-primary-element', 'kick');
     expect(caption).toHaveTextContent('Kick to start the count-in');
     expect(caption).toHaveTextContent('Kick');
   });

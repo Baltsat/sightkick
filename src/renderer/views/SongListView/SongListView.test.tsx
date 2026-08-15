@@ -280,6 +280,86 @@ describe('SongListView — loading the library', () => {
     );
   });
 
+  it('runs Insights and stats from their printed kit pads', async () => {
+    const deviceId = 'midi:Yamaha DTX402';
+    const view = mountSongListView({
+      settings: {
+        selectedDevice: {
+          id: deviceId,
+          name: 'Yamaha DTX402',
+          sourceId: 'midi',
+          port: 2,
+        },
+        inputMappings: {
+          [deviceId]: {
+            crash: ['midi:49'],
+            hihat: ['midi:42'],
+            ride: ['midi:51'],
+          },
+        },
+      },
+    });
+
+    view.loadSongs([
+      makeLessonSong('lesson-1', {
+        id: '01.01',
+        title: 'Pulse and posture',
+        starsToUnlock: 0,
+      }),
+    ]);
+    view.emit('load-goals', { goals: [] });
+    view.emit('midi-device-list', [{ name: 'Yamaha DTX402', port: 2 }]);
+    await waitFor(() =>
+      expect(view.ipc.sent).toContainEqual({
+        channel: 'listen-midi',
+        args: [2],
+      }),
+    );
+    view.emit('midi-ready', { port: 2 });
+    fireEvent.click(screen.getByTestId('open-profile-button'));
+
+    const continueChips = await screen.findAllByTestId(
+      'kit-action-chip-continue',
+    );
+
+    expect(continueChips.length).toBeGreaterThan(0);
+    continueChips.forEach((chip) =>
+      expect(chip).toHaveAttribute('data-pad', 'crash'),
+    );
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 42,
+      velocity: 100,
+    });
+
+    expect(await screen.findByTestId('stats-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('kit-action-chip-end')).toHaveAttribute(
+      'data-pad',
+      'ride',
+    );
+
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 51,
+      velocity: 100,
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('stats-panel')).not.toBeInTheDocument(),
+    );
+
+    view.emit('listen-midi', {
+      type: MidiMessageType.NoteOn,
+      note: 49,
+      velocity: 100,
+    });
+
+    expect(await screen.findByTestId('song-view-stub')).toHaveAttribute(
+      'data-song-id',
+      'lesson-1',
+    );
+  });
+
   it('keeps the selected target armed while a remembered kit reconnects', async () => {
     const view = mountSongListView({
       settings: {
@@ -554,7 +634,11 @@ describe('SongListView — loading the library', () => {
     );
     expect(screen.queryByTestId('home-recent-songs')).not.toBeInTheDocument();
     expect(screen.queryByTestId('home-lane-evidence')).not.toBeInTheDocument();
-    expect(screen.getByTestId('home-session-manifest')).toHaveTextContent(
+    // The armed target moved from the title band (now the skill-of-the-day
+    // story) into the action band's offer/session summary; the protected
+    // invariant is unchanged — coach evidence must not bypass lesson
+    // prerequisites, so the supported lesson is what the home offers.
+    expect(screen.getByTestId('home-session-summary')).toHaveTextContent(
       'Mid and Floor Tom Signals',
     );
     // The kit is the launcher (docs/kit-launcher-design.md): kick continues
@@ -2518,7 +2602,7 @@ describe('SongListView — Lessons surface', () => {
 
     view.emit('listen-midi', {
       type: MidiMessageType.NoteOn,
-      note: 73,
+      note: 74,
       velocity: 100,
     });
 

@@ -454,11 +454,14 @@ describe('safe hands-free run intent', () => {
       await strikeCommand(view, clock, ['KeyK', 'KeyC', 'KeyK', 'KeyC']);
 
       expect(view.audio.state).toBe('suspended');
-      expect(screen.getByTestId('tutor-hud')).toHaveAttribute(
-        'data-edge-caption',
-        'tutor',
+      expect(screen.getByTestId('practice-kit-command-veil')).toHaveAttribute(
+        'data-state',
+        'paused',
       );
-      expect(document.querySelectorAll('[data-edge-caption]')).toHaveLength(1);
+      expect(screen.getByTestId('practice-kit-command-veil')).toHaveTextContent(
+        'Resume from the kit',
+      );
+      expect(document.querySelectorAll('[data-edge-caption]')).toHaveLength(0);
 
       clock.advance(1200);
       await strikeCommand(view, clock, ['KeyK', 'KeyC', 'KeyK', 'KeyC']);
@@ -475,7 +478,7 @@ describe('safe hands-free run intent', () => {
     expect(document.querySelectorAll('[data-edge-caption]')).toHaveLength(1);
   });
 
-  it('keeps a fallback caption once the inactivity veil steps aside from pointer activity', async () => {
+  it('keeps the full kit action visible once pointer activity releases the initial inactivity veil', async () => {
     vi.useFakeTimers();
 
     try {
@@ -512,11 +515,12 @@ describe('safe hands-free run intent', () => {
         screen.queryByTestId('inactivity-pause-veil'),
       ).not.toBeInTheDocument();
 
-      const hud = screen.getByTestId('tutor-hud');
+      const waitingVeil = screen.getByTestId('practice-kit-command-veil');
 
-      expect(hud).toHaveAttribute('data-display-state', 'inactivity-paused');
-      expect(hud).toHaveTextContent('Paused — input check');
-      expect(document.querySelectorAll('[data-edge-caption]')).toHaveLength(1);
+      expect(waitingVeil).toHaveAttribute('data-state', 'inactivity-paused');
+      expect(waitingVeil).toHaveAttribute('data-primary-element', 'any');
+      expect(waitingVeil).toHaveTextContent('Return with a fresh count-in');
+      expect(document.querySelectorAll('[data-edge-caption]')).toHaveLength(0);
     } finally {
       vi.useRealTimers();
     }

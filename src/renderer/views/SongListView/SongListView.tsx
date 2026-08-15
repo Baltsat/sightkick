@@ -37,6 +37,7 @@ import {
   useInputControls,
 } from '../../hooks/useInputControls';
 import { useGameModeSelector } from '../../hooks/useGameModeSelector';
+import { useDrumGestures } from '../../hooks/useDrumGestures';
 import { usePersisted } from '../../hooks/usePersisted';
 import {
   highestAvailableDifficulty,
@@ -62,6 +63,10 @@ import {
   cluster_pattern_figures,
   decompose_chart_patterns,
 } from '../../services/pattern-model';
+import type {
+  DrumGestureAction,
+  DrumGestureSurface,
+} from '../../services/gestures';
 import {
   buildPracticeWave,
   composeHomeSession,
@@ -214,7 +219,10 @@ export function SongListView() {
     'settings.songHoverPreview',
     true,
   );
-  const { controlMapping, inputMapping } = useInput();
+  const { controlMapping, inputMapping, inputReadiness, selectedDevice } =
+    useInput();
+  const kitConnected =
+    selectedDevice?.sourceId === 'midi' && inputReadiness === 'connected';
   const libraryControls = useMemo(
     () => resolveLibraryControls(controlMapping, inputMapping),
     [controlMapping, inputMapping],
@@ -1100,6 +1108,20 @@ export function SongListView() {
         gameMode: 'practice',
         practiceSpeed: practiceSpeed.toFixed(1),
       });
+      const adaptation =
+        recommendation.adaptation ?? recommendation.decisionReceipt?.adaptation;
+
+      if (adaptation) {
+        params.set('zpdRepeatBudget', String(adaptation.repeat_budget));
+        params.set(
+          'zpdQualityPasses',
+          String(adaptation.quality_passes_to_advance),
+        );
+        params.set(
+          'zpdLowQualityPasses',
+          String(adaptation.low_quality_passes_before_stop),
+        );
+      }
 
       if (!context?.audition) {
         params.set('autoStart', '1');
@@ -1137,6 +1159,42 @@ export function SongListView() {
       );
     }
   }, [launchPractice, nextPractice.recommendation]);
+  const drumFirstSurface: DrumGestureSurface = isStatsOpen
+    ? 'stats'
+    : 'insights';
+  const handleDrumFirstAction = useCallback(
+    (action: DrumGestureAction) => {
+      if (isStatsOpen) {
+        if (action === 'end') {
+          setIsStatsOpen(false);
+        }
+
+        return;
+      }
+
+      if (view !== 'insights') {
+        return;
+      }
+
+      if (action === 'continue') {
+        startTargetedPractice();
+      } else if (action === 'open-coach') {
+        loadAchievements();
+        setIsStatsOpen(true);
+      } else if (action === 'end') {
+        setView('home');
+      }
+    },
+    [isStatsOpen, loadAchievements, startTargetedPractice, view],
+  );
+
+  useDrumGestures({
+    enabled: kitConnected && !songOpen && (view === 'insights' || isStatsOpen),
+    surface: drumFirstSurface,
+    mapping: inputMapping,
+    onAction: handleDrumFirstAction,
+  });
+
   const startPracticeCard = useCallback(
     (option: PracticeCardOption) => {
       const recommendation = nextPractice.ranking.find(
@@ -1286,12 +1344,15 @@ export function SongListView() {
     <StemToolsProvider value={stemTools}>
       {gameModeSelector.element}
 
-      {!songOpen && !gameModeSelector.isOpen && view === 'songs' && (
-        <LibraryInputControls
-          mapping={libraryControls.mapping}
-          handlers={libraryInputHandlers}
-        />
-      )}
+      {!songOpen &&
+        !gameModeSelector.isOpen &&
+        !isStatsOpen &&
+        view === 'songs' && (
+          <LibraryInputControls
+            mapping={libraryControls.mapping}
+            handlers={libraryInputHandlers}
+          />
+        )}
 
       <AppShell
         view={view}
@@ -1308,6 +1369,7 @@ export function SongListView() {
             weekActivity={gamification.weekActivity}
             totalStars={gamification.totalStars}
             practiceRhythm={practiceRhythm}
+            kitConnected={kitConnected && view === 'insights' && !isStatsOpen}
             onOpenStats={() => {
               gamification.loadAchievements();
               setIsStatsOpen(true);
@@ -1372,6 +1434,7 @@ export function SongListView() {
             onSaveGoal={goals.saveGoal}
             onSetPrimaryGoal={goals.setPrimaryGoal}
             gamification={gamification}
+            kitConnected={kitConnected}
             insights={{
               recommendation: nextPractice.recommendation,
               atomicStates,
@@ -1419,6 +1482,7 @@ export function SongListView() {
             scanPercent={scanPercent}
             onRescan={rescanLibrary}
             onBack={() => setView('home')}
+            kitConnected={kitConnected}
           />
         )}
 
@@ -1803,6 +1867,7 @@ export function SongListView() {
           laneAccuracy={gamification.laneAccuracy ?? []}
           achievements={gamification.achievements}
           practiceRhythm={practiceRhythm}
+          kitConnected={kitConnected}
         />
       </Drawer>
 
