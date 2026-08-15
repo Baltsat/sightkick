@@ -626,6 +626,7 @@ export class WebPlatform implements PlatformAdapter {
       if (!response.ok) {
         throw new Error(`Chart failed to load (${response.status}).`);
       }
+
       const stickingData = stickingResponse?.ok
         ? await stickingResponse.json()
         : undefined;
@@ -1019,8 +1020,8 @@ export class WebPlatform implements PlatformAdapter {
           status.stage === 'download'
             ? 'downloading'
             : status.status === 'queued'
-              ? 'queued'
-              : 'processing',
+            ? 'queued'
+            : 'processing',
         percent: status.percent,
         message: status.message || 'Processing chart',
       });
