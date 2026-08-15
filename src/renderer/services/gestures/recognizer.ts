@@ -11,7 +11,7 @@ import {
 const RESULT_GESTURES: DrumGestureDefinition[] = RESULT_KIT_COMMANDS.map(
   ({ id, action, element }) => ({
     id,
-    surfaces: ['result'],
+    surfaces: ['result', 'insights', 'stats'],
     elements: [element],
     action,
     windowMs: 0,

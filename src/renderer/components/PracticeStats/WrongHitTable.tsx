@@ -9,7 +9,7 @@ export function WrongHitTable({ wrongHitCounts }: Props) {
   if (wrongHitCounts.length === 0) {
     return (
       <div
-        className="text-sm text-text-faint"
+        className="text-base text-text-muted"
         data-testid="wrong-hit-table-empty"
       >
         No wrong hits this run.
@@ -20,11 +20,11 @@ export function WrongHitTable({ wrongHitCounts }: Props) {
   const rows = [...wrongHitCounts].sort((a, b) => b.count - a.count);
 
   return (
-    <table className="w-full text-sm" data-testid="wrong-hit-table">
+    <table className="w-full text-base" data-testid="wrong-hit-table">
       <thead>
-        <tr className="text-left text-text-faint">
-          <th className="pb-1 font-normal">Pad</th>
-          <th className="pb-1 text-right font-normal">Wrong hits</th>
+        <tr className="text-left text-text-muted">
+          <th className="pb-2 font-normal">Pad</th>
+          <th className="pb-2 text-right font-normal">Wrong hits</th>
         </tr>
       </thead>
       <tbody>

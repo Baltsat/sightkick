@@ -81,7 +81,7 @@ function explicitLegend(mapping: ControlMapping): string {
  * Resolve controls for the Journey surface only. Authored control mappings
  * remain authoritative. When none of the Journey actions has an explicit
  * binding, familiar kit lanes become a local fallback: Tom 1/Tom 2 move,
- * Hi-hat/Ride change season, Snare starts, and Crash backs out. Nothing is
+ * Snare/Tom 3 change season, Crash starts, and Ride backs out. Nothing is
  * written to InputContext, so
  * the pads retain their musical meaning everywhere else in the app.
  */
@@ -110,15 +110,15 @@ export function resolveJourneyControls(
     down:
       (controlMapping.down?.length ?? 0) > 0 ? [] : claim(inputMapping.tom2),
     left:
-      (controlMapping.left?.length ?? 0) > 0 ? [] : claim(inputMapping.hihat),
+      (controlMapping.left?.length ?? 0) > 0 ? [] : claim(inputMapping.snare),
     right:
-      (controlMapping.right?.length ?? 0) > 0 ? [] : claim(inputMapping.ride),
+      (controlMapping.right?.length ?? 0) > 0 ? [] : claim(inputMapping.tom3),
     confirm:
       (controlMapping.confirm?.length ?? 0) > 0
         ? []
-        : claim(inputMapping.snare),
+        : claim(inputMapping.crash),
     back:
-      (controlMapping.back?.length ?? 0) > 0 ? [] : claim(inputMapping.crash),
+      (controlMapping.back?.length ?? 0) > 0 ? [] : claim(inputMapping.ride),
   };
   const mapping: ControlMapping = {
     ...controlMapping,
@@ -162,7 +162,7 @@ export function resolveJourneyControls(
   }
 
   if ((fallbackMapping.confirm?.length ?? 0) > 0) {
-    parts.push('Snare starts');
+    parts.push('Crash starts');
     kitActions.push('confirm');
   }
 
@@ -170,11 +170,11 @@ export function resolveJourneyControls(
     (fallbackMapping.left?.length ?? 0) > 0 &&
     (fallbackMapping.right?.length ?? 0) > 0
   ) {
-    parts.push('Hi-hat / Ride change season');
+    parts.push('Snare / Tom 3 change season');
   } else if ((fallbackMapping.left?.length ?? 0) > 0) {
-    parts.push('Hi-hat selects previous season');
+    parts.push('Snare selects previous season');
   } else if ((fallbackMapping.right?.length ?? 0) > 0) {
-    parts.push('Ride selects next season');
+    parts.push('Tom 3 selects next season');
   }
 
   if ((fallbackMapping.left?.length ?? 0) > 0) {
@@ -186,7 +186,7 @@ export function resolveJourneyControls(
   }
 
   if ((fallbackMapping.back?.length ?? 0) > 0) {
-    parts.push('Crash backs');
+    parts.push('Ride backs');
     kitActions.push('back');
   }
 

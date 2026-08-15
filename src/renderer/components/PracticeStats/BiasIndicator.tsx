@@ -34,7 +34,7 @@ export function BiasIndicator({ timingBias, laneBias }: Props) {
   if (timingBias.sampleCount === 0) {
     return (
       <div
-        className="text-sm text-text-faint"
+        className="text-base text-text-muted"
         data-testid="bias-indicator-empty"
       >
         Not enough timing data yet.
@@ -46,7 +46,7 @@ export function BiasIndicator({ timingBias, laneBias }: Props) {
 
   if (direction === 'on time') {
     return (
-      <div className="text-sm text-text-body" data-testid="bias-indicator">
+      <div className="text-base text-text-body" data-testid="bias-indicator">
         Your timing is dead on average.
       </div>
     );
@@ -60,7 +60,7 @@ export function BiasIndicator({ timingBias, laneBias }: Props) {
       : undefined;
 
   return (
-    <div className="text-sm text-text-body" data-testid="bias-indicator">
+    <div className="text-base text-text-body" data-testid="bias-indicator">
       {`You hit ${magnitude} ms ${direction} on average${
         worstName ? ` — especially ${worstName}` : ''
       }.`}

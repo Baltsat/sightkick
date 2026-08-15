@@ -34,6 +34,18 @@ describe('PracticeStats', () => {
     expect(screen.getByTestId('bias-indicator')).toBeInTheDocument();
     expect(screen.getByTestId('wrong-hit-table')).toBeInTheDocument();
     expect(screen.getByTestId('accuracy-sparkline')).toBeInTheDocument();
+    expect(screen.getByTestId('practice-overall-accuracy')).toHaveTextContent(
+      '88%',
+    );
+  });
+
+  it('shows the ride binding for closing the panel when a kit is connected', () => {
+    render(<PracticeStats summary={multiLaneRunFixture()} kitConnected />);
+
+    const chip = screen.getByTestId('kit-action-chip-end');
+
+    expect(chip).toHaveAttribute('data-pad', 'ride');
+    expect(chip).toHaveTextContent('Ride');
   });
 
   it('tags the mounted variant for styling hooks without changing content', () => {

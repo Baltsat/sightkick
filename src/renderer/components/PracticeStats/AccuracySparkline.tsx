@@ -6,8 +6,8 @@ interface Props {
   height?: number;
 }
 
-const DEFAULT_WIDTH = 160;
-const DEFAULT_HEIGHT = 32;
+const DEFAULT_WIDTH = 280;
+const DEFAULT_HEIGHT = 64;
 const PADDING = 3;
 
 export interface SparklineCoord {
@@ -41,7 +41,7 @@ export function AccuracySparkline({
   if (trend.length === 0) {
     return (
       <div
-        className="text-sm text-text-faint"
+        className="text-base text-text-muted"
         data-testid="accuracy-sparkline-empty"
       >
         Play a few runs to see your trend.

@@ -110,6 +110,8 @@ const meta: Meta<typeof LessonsView> = {
     progress,
     onPlay: () => {},
     onRescan: () => {},
+    onBack: () => {},
+    kitConnected: true,
   },
   render: (args) => (
     <div className="h-screen overflow-hidden bg-canvas">

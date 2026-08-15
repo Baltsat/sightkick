@@ -85,6 +85,21 @@ describe('drum gesture recognizer', () => {
     ).toMatchObject({ action: 'open-coach', gestureId: 'kit-command-coach' });
   });
 
+  it('keeps the same one-pad language on insights and stats', () => {
+    expect(
+      hit(createDrumGestureState(), 'insights', 'crash', 1_000),
+    ).toMatchObject({ action: 'continue', gestureId: 'kit-command-continue' });
+    expect(
+      hit(createDrumGestureState(), 'insights', 'hihat', 2_000),
+    ).toMatchObject({ action: 'open-coach', gestureId: 'kit-command-coach' });
+    expect(
+      hit(createDrumGestureState(), 'insights', 'ride', 3_000),
+    ).toMatchObject({ action: 'end', gestureId: 'kit-command-end' });
+    expect(hit(createDrumGestureState(), 'stats', 'ride', 4_000)).toMatchObject(
+      { action: 'end', gestureId: 'kit-command-end' },
+    );
+  });
+
   it('holds a result command until the run has actually gone quiet', () => {
     // Entering Results seeds the quiet clock (see useDrumGestures), so the
     // tail of the run that just ended cannot open the next one.

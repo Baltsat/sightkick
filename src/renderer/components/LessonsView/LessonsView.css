@@ -1,0 +1,120 @@
+.journey-route__manifest-wrap {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.journey-route__kit-actions {
+  display: flex;
+  min-height: 3.75rem;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink-muted);
+  font-size: 1rem;
+}
+
+.journey-route .journey-manifest__eyebrow,
+.journey-route .journey-manifest__next p,
+.journey-route .journey-manifest__progress {
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+}
+
+.journey-route .journey-manifest__position,
+.journey-route .journey-manifest__next span,
+.journey-route .journey-manifest__next--complete p {
+  font-size: 1rem;
+}
+
+.journey-route .journey-manifest h2 {
+  font-size: clamp(1.8rem, 2.6vw, 2.5rem);
+}
+
+.journey-route .journey-manifest h3 {
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+}
+
+.journey-route .journey-manifest__next .ant-btn {
+  min-height: 3rem;
+  padding-inline: 1rem;
+  font-size: 1rem;
+}
+
+.journey-route .daybreak-season-tab {
+  min-height: 3.5rem;
+  align-items: center;
+  font-size: 1rem;
+}
+
+.journey-route .daybreak-season-tab__number,
+.journey-route .journey-venue-plaque span,
+.journey-route .journey-venue-plaque small {
+  font-size: 0.875rem;
+}
+
+.journey-route .journey-venue-plaque strong {
+  font-size: clamp(1.45rem, 2vw, 1.9rem);
+}
+
+.journey-route .journey-venue-plaque {
+  padding: 0.65rem 0.8rem;
+  background: color-mix(in srgb, var(--surface-raised) 90%, transparent);
+}
+
+.journey-route .daybreak-lesson-path__controls-toggle {
+  min-height: 2.75rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.journey-route .daybreak-lesson-path__kit-hint > span,
+.journey-route .daybreak-lesson-path__kit-hint small,
+.journey-route .daybreak-lesson-path__kit-hint strong,
+.journey-route .drumroll-kit-command__label,
+.journey-route .drumroll-kit-command__step strong,
+.journey-route
+  .drumroll-kit-command[data-compact='true']
+  .drumroll-kit-command__label,
+.journey-route
+  .drumroll-kit-command[data-compact='true']
+  .drumroll-kit-command__step
+  strong {
+  font-size: 0.875rem;
+}
+
+.journey-route .daybreak-lesson-node__plaque {
+  width: 13rem;
+}
+
+.journey-route .daybreak-node-status,
+.journey-route .daybreak-node-lane {
+  font-size: 0.875rem;
+}
+
+.journey-route .daybreak-lesson-node__title {
+  min-height: 3.6rem;
+  -webkit-line-clamp: 3;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.journey-route
+  .daybreak-lesson-node:hover:not(:focus-visible):not([data-kit-focused='true'])
+  .daybreak-lesson-node__plaque {
+  opacity: 0;
+  transform: translateY(0.3rem);
+  pointer-events: none;
+}
+
+.journey-route .daybreak-node-status::after {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .journey-route__kit-actions {
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+}

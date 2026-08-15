@@ -118,4 +118,23 @@ describe('StatsPanel', () => {
     expect(screen.getByTestId('lane-accuracy-bars')).toBeInTheDocument();
     expect(screen.queryByTestId('lane-accuracy-empty')).not.toBeInTheDocument();
   });
+
+  it('shows the ride binding for leaving stats when a kit is connected', () => {
+    render(
+      <StatsPanel
+        streak={{ current: 3, longest: 5 }}
+        weeklyXp={weeklyXp}
+        goalXp={50}
+        totalStars={12}
+        laneAccuracy={[]}
+        achievements={undefined}
+        kitConnected
+      />,
+    );
+
+    expect(screen.getByTestId('kit-action-chip-end')).toHaveAttribute(
+      'data-pad',
+      'ride',
+    );
+  });
 });

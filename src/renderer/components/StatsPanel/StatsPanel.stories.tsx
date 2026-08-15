@@ -17,13 +17,19 @@ const meta: Meta<typeof StatsPanel> = {
     })),
     goalXp: 50,
     totalStars: 137,
-    laneAccuracy: [],
+    laneAccuracy: [
+      { element: 'kick', hits: 34, misses: 6, accuracy: 0.85 },
+      { element: 'snare', hits: 28, misses: 12, accuracy: 0.7 },
+      { element: 'hihat', hits: 37, misses: 3, accuracy: 0.925 },
+    ],
     achievements,
+    practiceRhythm: 'daily',
+    kitConnected: true,
   },
   decorators: [
     (Story) => (
-      <div className="h-screen overflow-y-auto bg-background p-8">
-        <div className="mx-auto max-w-2xl rounded-2xl border border-border-soft bg-surface p-6 shadow-sm">
+      <div className="h-screen overflow-y-auto bg-canvas p-8">
+        <div className="mx-auto max-w-2xl">
           <Story />
         </div>
       </div>

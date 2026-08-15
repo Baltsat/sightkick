@@ -61,4 +61,17 @@ describe('EvidencePracticeCards', () => {
     );
     expect(screen.getByRole('button', { name: 'Restore' })).toBeInTheDocument();
   });
+
+  it('shows the crash binding on the primary action when a kit is connected', () => {
+    render(
+      <EvidencePracticeCards cards={cards} onStart={vi.fn()} kitConnected />,
+    );
+
+    const start = screen.getByTestId('practice-card-review-start');
+    const chip = screen.getByTestId('kit-action-chip-continue');
+
+    expect(start).toContainElement(chip);
+    expect(chip).toHaveAttribute('data-pad', 'crash');
+    expect(chip).toHaveTextContent('Crash');
+  });
 });
