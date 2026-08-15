@@ -3,6 +3,7 @@ export type SampleBlock = Float32Array<ArrayBuffer>;
 export interface TrackConfig {
   name: string;
   urls: string[];
+  buffers?: ArrayBuffer[];
 }
 
 export interface AudioTrackHandle {

@@ -34,11 +34,15 @@ export abstract class BaseAudioPlayer<TTrack extends BaseAudioTrack> {
   protected abstract createTrack(buffers: AudioBuffer[], name: string): TTrack;
 
   private async createTracks(trackConfigs: TrackConfig[]): Promise<TTrack[]> {
-    return Promise.all(
-      trackConfigs.map(async ({ name, urls }) => {
-        const dataBuffers = await Promise.all(
+    const tracks = await Promise.all(
+      trackConfigs.map(async ({ name, urls, buffers = [] }) => {
+        const fetchedBuffers = await Promise.all(
           urls.map((url) => fetch(url).then((res) => res.arrayBuffer())),
         );
+        const dataBuffers = [
+          ...fetchedBuffers,
+          ...buffers.map((buffer) => buffer.slice(0)),
+        ];
         const decodedBuffers = await Promise.all(
           dataBuffers.map((buf) => this.context.decodeAudioData(buf)),
         );
@@ -53,11 +57,13 @@ export abstract class BaseAudioPlayer<TTrack extends BaseAudioTrack> {
         );
         const track = this.createTrack(audioBuffers, name);
 
-        this.audioTracks.push(track);
-
         return track;
       }),
     );
+
+    this.audioTracks = tracks;
+
+    return tracks;
   }
 
   pause(): void {
