@@ -2,6 +2,7 @@ import { ResolvedJudgement } from '../engine';
 import {
   TutorBarFailureHistory,
   TutorChartPlan,
+  TutorChunkWindow,
   TutorSettings,
   TutorTrigger,
   TutorWindowStats,
@@ -152,6 +153,27 @@ export function summarizeTutorWindow(
     { length: Math.max(0, endMeasure - startMeasure + 1) },
     (_, offset) => judgementsByMeasure[startMeasure + offset] ?? [],
   ).flat();
+  const expected = chart.measures
+    .slice(startMeasure, endMeasure + 1)
+    .reduce((sum, measure) => sum + measure.expectedKeys, 0);
+
+  return summarizeOutcomes(
+    chart,
+    judgements,
+    startMeasure,
+    endMeasure,
+    expected,
+  );
+}
+
+function summarizeOutcomes(
+  chart: TutorChartPlan,
+  judgements: ResolvedJudgement[],
+  startMeasure: number,
+  endMeasure: number,
+  expected: number,
+  tickRange?: { startTick: number; endTick: number },
+): TutorWindowStats {
   const expectedOutcomes = uniqueExpectedOutcomes(judgements);
   const hits = expectedOutcomes.filter(
     (judgement) => judgement.verdict === 'hit',
@@ -172,14 +194,12 @@ export function summarizeTutorWindow(
     // satisfy the sustained-timing branch.
     (deltaMs) => Math.abs(deltaMs) >= timingSpreadMs,
   ).length;
-  const expected = chart.measures
-    .slice(startMeasure, endMeasure + 1)
-    .reduce((sum, measure) => sum + measure.expectedKeys, 0);
   const resolved = hits + misses.length;
 
   return {
     startMeasure,
     endMeasure,
+    ...tickRange,
     expected,
     resolved,
     hits,
@@ -193,6 +213,65 @@ export function summarizeTutorWindow(
     accuracy: resolved === 0 ? 0 : hits / resolved,
     distinctMissIds: misses.map((judgement) => judgement.id),
   };
+}
+
+function judgementTick(judgement: ResolvedJudgement): number | undefined {
+  return judgement.verdict === 'wrong'
+    ? judgement.actualTick ?? judgement.expectedTick
+    : judgement.expectedTick ?? judgement.actualTick;
+}
+
+function expectedKeysForTickWindow(
+  chart: TutorChartPlan,
+  startTick: number,
+  endTick: number,
+): number {
+  return chart.measures.reduce((sum, measure) => {
+    if (measure.endTick <= startTick || measure.startTick >= endTick) {
+      return sum;
+    }
+
+    if (measure.noteOnsets) {
+      return (
+        sum +
+        measure.noteOnsets
+          .filter(({ tick }) => tick >= startTick && tick < endTick)
+          .reduce((subtotal, onset) => subtotal + onset.expectedKeys, 0)
+      );
+    }
+
+    return startTick <= measure.startTick && endTick >= measure.endTick
+      ? sum + measure.expectedKeys
+      : sum;
+  }, 0);
+}
+
+export function summarizeTutorTickWindow(
+  chart: TutorChartPlan,
+  judgementsByMeasure: Record<number, ResolvedJudgement[]>,
+  window: TutorChunkWindow,
+): TutorWindowStats {
+  const judgements = Array.from(
+    { length: Math.max(0, window.endMeasure - window.startMeasure + 1) },
+    (_, offset) => judgementsByMeasure[window.startMeasure + offset] ?? [],
+  )
+    .flat()
+    .filter((judgement) => {
+      const tick = judgementTick(judgement);
+
+      return (
+        tick !== undefined && tick >= window.startTick && tick < window.endTick
+      );
+    });
+
+  return summarizeOutcomes(
+    chart,
+    judgements,
+    window.startMeasure,
+    window.endMeasure,
+    expectedKeysForTickWindow(chart, window.startTick, window.endTick),
+    { startTick: window.startTick, endTick: window.endTick },
+  );
 }
 
 function hasSufficientResolvedEvidence(
@@ -295,8 +374,13 @@ export function isCleanRecovery(
   stats: TutorWindowStats,
   settings: TutorSettings,
 ) {
+  const minimumResolvedEvents = Math.min(
+    settings.cleanMinimumResolvedEvents,
+    Math.max(1, stats.expected),
+  );
+
   return (
-    stats.resolved >= settings.cleanMinimumResolvedEvents &&
+    stats.resolved >= minimumResolvedEvents &&
     stats.accuracy >= settings.cleanMinimumAccuracy &&
     stats.misses <= settings.cleanMaximumMisses &&
     stats.wrong <= settings.cleanMaximumWrongHits
@@ -313,10 +397,11 @@ export function recoveryQualityScore(
   stats: TutorWindowStats,
   settings: TutorSettings,
 ): number {
-  const coverage = Math.min(
-    1,
-    stats.resolved / Math.max(1, settings.cleanMinimumResolvedEvents),
+  const minimumResolvedEvents = Math.min(
+    settings.cleanMinimumResolvedEvents,
+    Math.max(1, stats.expected),
   );
+  const coverage = Math.min(1, stats.resolved / minimumResolvedEvents);
   const timing =
     stats.timingSampleCount < Math.max(2, settings.minimumTimingSamples / 2)
       ? 1

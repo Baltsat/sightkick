@@ -2,10 +2,16 @@ import { clamp } from 'es-toolkit';
 import { ResolvedJudgement } from '../engine';
 import { planRecoveryRegion, planRecoveryReturnContext } from './checkpoints';
 import {
+  createTutorChunkGrowthState,
+  planTutorChunkGrowth,
+  recordTutorChunkAttempt,
+} from './chunk-growth';
+import {
   detectTutorTrigger,
   isCleanRecovery,
   isRepeatableBarFailure,
   recoveryQualityScore,
+  summarizeTutorTickWindow,
   summarizeTutorWindow,
 } from './detector';
 import {
@@ -14,6 +20,7 @@ import {
   TutorCommand,
   TutorEvent,
   TutorRecovery,
+  TutorRecoveryApproach,
   TutorRecoveryAttempt,
   TutorSettings,
   TutorState,
@@ -70,6 +77,32 @@ function snapshotJudgements(
   }
 
   return Object.freeze(snapshot);
+}
+
+function judgementTick(judgement: ResolvedJudgement): number | undefined {
+  return judgement.verdict === 'wrong'
+    ? judgement.actualTick ?? judgement.expectedTick
+    : judgement.expectedTick ?? judgement.actualTick;
+}
+
+function snapshotTickJudgements(
+  source: TutorState['judgementsByMeasure'],
+  startMeasure: number,
+  endMeasure: number,
+  startTick: number,
+  endTick: number,
+): readonly Readonly<ResolvedJudgement>[] {
+  return Object.freeze(
+    snapshotJudgements(source, startMeasure, endMeasure).filter((judgement) => {
+      const tick = judgementTick(judgement);
+
+      return tick !== undefined && tick >= startTick && tick < endTick;
+    }),
+  );
+}
+
+function chunkApproach(stage: string): TutorRecoveryApproach {
+  return `chunk-${stage}` as TutorRecoveryApproach;
 }
 
 export function createTutorState(
@@ -240,17 +273,39 @@ function beginRecovery(
     };
   }
 
-  const region = planRecoveryRegion(
+  const fullRegion = planRecoveryRegion(
     chart,
     trigger.stats.startMeasure,
     trigger.stats.endMeasure,
     observedState.settings,
   );
 
-  if (!region) {
+  if (!fullRegion) {
     return { state: observedState, commands: [materialFailure] };
   }
 
+  const hardTicks = triggerJudgements
+    .filter(({ verdict }) => verdict === 'miss' || verdict === 'wrong')
+    .flatMap((judgement) => {
+      const tick = judgementTick(judgement);
+
+      return tick === undefined ? [] : [tick];
+    });
+  const chunkPlan = observedState.settings.recursiveChunkGrowthEnabled
+    ? planTutorChunkGrowth(chart, fullRegion, hardTicks)
+    : undefined;
+  const chunkGrowth =
+    chunkPlan && chunkPlan.windows.length > 0
+      ? createTutorChunkGrowthState(chunkPlan, {
+          requiredQualifyingPasses:
+            observedState.settings.requiredCleanRepetitions,
+          maximumAttemptsPerWindow:
+            observedState.settings.maximumChunkAttemptsPerWindow,
+          regressionFailureThreshold:
+            observedState.settings.chunkRegressionFailureThreshold,
+        })
+      : undefined;
+  const region = chunkGrowth?.plan.windows[0] ?? fullRegion;
   const recovery: TutorRecovery = {
     id: nextId(
       {
@@ -261,11 +316,14 @@ function beginRecovery(
     ),
     trigger,
     region,
-    approach: 'anchor',
+    approach: chunkGrowth
+      ? chunkApproach(chunkGrowth.plan.windows[0].stage)
+      : 'anchor',
     repetition: 1,
     cleanRepetitions: 0,
     qualityProgress: 0,
     bestQuality: 0,
+    ...(chunkGrowth ? { fullRegion, chunkGrowth } : {}),
   };
   const intervention = {
     id: nextId(
@@ -303,6 +361,158 @@ function beginRecovery(
         type: 'begin-recovery',
         recovery,
         speed: observedState.currentSpeed,
+      },
+    ],
+  };
+}
+
+function finishChunkGrowthAttempt(
+  state: TutorState,
+  chart: TutorChartPlan,
+): TutorTransition {
+  const recovery = state.recovery;
+  const growth = recovery?.chunkGrowth;
+  const window = growth?.plan.windows[growth.activeWindowIndex];
+
+  if (!recovery || !growth || !window) {
+    return { state, commands: [] };
+  }
+
+  const stats = summarizeTutorTickWindow(
+    chart,
+    state.judgementsByMeasure,
+    window,
+  );
+  const clean = isCleanRecovery(stats, state.settings);
+  const qualityScore = recoveryQualityScore(stats, state.settings);
+  const minimumResolved = Math.min(
+    state.settings.cleanMinimumResolvedEvents,
+    Math.max(1, stats.expected),
+  );
+  const nearMiss =
+    !clean &&
+    stats.resolved >= minimumResolved &&
+    stats.accuracy >=
+      Math.max(0.68, state.settings.cleanMinimumAccuracy - 0.15);
+  const quality = clean ? 'qualifying' : nearMiss ? 'near-miss' : 'failed';
+  const growthResult = recordTutorChunkAttempt(growth, quality);
+  const transition = growthResult.transition;
+  const deferred = transition === 'defer';
+  const mastered = transition === 'master';
+  const judgements = snapshotTickJudgements(
+    state.judgementsByMeasure,
+    window.startMeasure,
+    window.endMeasure,
+    window.startTick,
+    window.endTick,
+  );
+  const attempt: TutorRecoveryAttempt = {
+    id: nextId(state, 'attempt'),
+    recoveryId: recovery.id,
+    repetition: recovery.repetition,
+    approach: recovery.approach,
+    speed: state.currentSpeed,
+    result: clean ? 'clean' : deferred ? 'deferred' : 'retry',
+    qualityScore,
+    ...(deferred ? { deferralReason: 'maximum-failed-attempts' as const } : {}),
+    stats,
+    judgements,
+    chunkTransition: transition,
+    chunkWindowIndex: growth.activeWindowIndex,
+    chunkWindowCount: growth.plan.windows.length,
+    chunkLabel: window.label,
+  };
+  const attempts = [...state.recoveryAttempts, attempt];
+  const bestQuality = Math.max(recovery.bestQuality, qualityScore);
+  const fullRegion = recovery.fullRegion ?? growth.plan.phrase;
+
+  if (mastered || deferred) {
+    const qualityProgress = mastered
+      ? growthResult.state.requiredQualifyingPasses
+      : growthResult.state.qualifyingPasses;
+    const nextState: TutorState = {
+      ...state,
+      phase: 'observing',
+      livesRemaining: deferred
+        ? state.settings.startingLives
+        : state.livesRemaining,
+      recovery: undefined,
+      lastRecoveryOutcome: {
+        recoveryId: recovery.id,
+        status: deferred ? 'deferred' : 'mastered',
+        startMeasure: fullRegion.startMeasure,
+        endMeasure: fullRegion.endMeasure,
+        cleanRepetitions: Math.floor(qualityProgress),
+        qualityProgress,
+        bestQuality,
+        resumeSpeed: state.currentSpeed,
+      },
+      recoveryAttempts: attempts,
+      nextSequence: state.nextSequence + 1,
+      ignoreTriggersThroughMeasure: fullRegion.endMeasure,
+      judgementsByMeasure: clearJudgements(
+        state.judgementsByMeasure,
+        fullRegion.startMeasure,
+        fullRegion.endMeasure,
+      ),
+    };
+
+    return {
+      state: nextState,
+      commands: [
+        {
+          type: 'resume-main',
+          recoveryId: recovery.id,
+          speed: state.currentSpeed,
+          reason: deferred ? 'chunk-plan-deferred' : 'chunk-plan-mastered',
+          ...(deferred
+            ? {
+                failedAttempts: growthResult.state.totalAttempts,
+                maximumFailedAttempts: growthResult.state.maximumTotalAttempts,
+              }
+            : {}),
+          resumeMeasure: fullRegion.resumeMeasure,
+          resumeTick: fullRegion.resumeTick,
+          attempt,
+        },
+      ],
+    };
+  }
+
+  const nextWindow =
+    growthResult.state.plan.windows[growthResult.state.activeWindowIndex];
+  const nextRecovery: TutorRecovery = {
+    ...recovery,
+    region: nextWindow,
+    approach: chunkApproach(nextWindow.stage),
+    repetition: recovery.repetition + 1,
+    cleanRepetitions: growthResult.state.qualifyingPasses,
+    qualityProgress: growthResult.state.qualifyingPasses,
+    bestQuality,
+    chunkGrowth: growthResult.state,
+  };
+  const clearStart = Math.min(window.startMeasure, nextWindow.startMeasure);
+  const clearEnd = Math.max(window.endMeasure, nextWindow.endMeasure);
+  const nextState: TutorState = {
+    ...state,
+    recovery: nextRecovery,
+    recoveryAttempts: attempts,
+    nextSequence: state.nextSequence + 1,
+    judgementsByMeasure: clearJudgements(
+      state.judgementsByMeasure,
+      clearStart,
+      clearEnd,
+    ),
+  };
+
+  return {
+    state: nextState,
+    commands: [
+      {
+        type: 'repeat-recovery',
+        recovery: nextRecovery,
+        speed: state.currentSpeed,
+        attempt,
       },
     ],
   };
@@ -551,6 +761,12 @@ export function transitionTutor(
     return { state: recordJudgement(state, event), commands: [] };
   }
 
+  if (event.type === 'recovery-pass-complete') {
+    return state.phase === 'recovering' && state.recovery?.chunkGrowth
+      ? finishChunkGrowthAttempt(state, chart)
+      : { state, commands: [] };
+  }
+
   const completedState = {
     ...state,
     lastCompletedMeasure: Math.max(
@@ -562,6 +778,7 @@ export function transitionTutor(
   if (
     completedState.phase === 'recovering' &&
     completedState.recovery &&
+    !completedState.recovery.chunkGrowth &&
     event.measureIndex >= completedState.recovery.region.endMeasure
   ) {
     return finishRecoveryAttempt(completedState, chart);

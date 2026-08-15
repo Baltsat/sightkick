@@ -157,6 +157,17 @@ export function messageForTutorCommand(
   }
 
   if (command.type === 'begin-recovery') {
+    const growth = command.recovery.chunkGrowth;
+    const window = growth?.plan.windows[growth.activeWindowIndex];
+
+    if (growth && window) {
+      return {
+        title: 'Start at the hard spot',
+        detail: `Now: ${window.label}. Two good-enough passes grow this sounding chunk; the tutor chooses the next boundary. Your tempo stays yours.`,
+        tone: 'recovery',
+      };
+    }
+
     const failedStart = command.recovery.trigger.stats.startMeasure + 1;
     const failedEnd = command.recovery.trigger.stats.endMeasure + 1;
     const checkpoint = command.recovery.region.startMeasure + 1;
@@ -182,6 +193,35 @@ export function messageForTutorCommand(
   }
 
   if (command.type === 'repeat-recovery') {
+    const growth = command.recovery.chunkGrowth;
+    const window = growth?.plan.windows[growth.activeWindowIndex];
+
+    if (growth && window) {
+      const transition = command.attempt.chunkTransition;
+      const title =
+        transition === 'expand'
+          ? 'Grow the phrase'
+          : transition === 'regress'
+          ? 'Return to the smaller chunk'
+          : command.attempt.result === 'clean'
+          ? 'Quality pass saved'
+          : 'Hold this chunk';
+      const reason =
+        transition === 'expand'
+          ? `The last window qualified. Now: ${window.label}.`
+          : transition === 'regress'
+          ? `Repeated failure triggered one safe step back. Now: ${window.label}.`
+          : `Now: ${window.label}. ${growth.qualifyingPasses}/${growth.requiredQualifyingPasses} qualifying passes.`;
+
+      return {
+        title,
+        detail: `${reason} Window ${growth.activeWindowIndex + 1} of ${
+          growth.plan.windows.length
+        }; the plan always ends in mastery or a deferred return to the song.`,
+        tone: command.attempt.result === 'clean' ? 'success' : 'recovery',
+      };
+    }
+
     const qualityPass = command.attempt.result === 'clean';
     const heldSpeed = percent(command.attempt.speed);
     // command.speed is the tutor's own recommendation, never applied - the
@@ -227,6 +267,25 @@ export function messageForTutorCommand(
   }
 
   if (command.type === 'resume-main') {
+    if (command.reason === 'chunk-plan-deferred') {
+      return {
+        title: 'Hard spot saved for later',
+        detail: `${
+          command.failedAttempts ?? 0
+        } bounded chunk attempts reached the plan limit. Returning to the full run at your own speed.`,
+        tone: 'warning',
+      };
+    }
+
+    if (command.reason === 'chunk-plan-mastered') {
+      return {
+        title: 'Full phrase joined',
+        detail:
+          'The hard spot grew through its musical half and the full phrase qualified. Returning to the run at your own speed.',
+        tone: 'success',
+      };
+    }
+
     if (command.reason === 'maximum-failed-attempts') {
       const failedAttempts = command.failedAttempts ?? 0;
       const maximumFailedAttempts = command.maximumFailedAttempts ?? 0;
@@ -453,7 +512,23 @@ export function useTutorSession({
         // available to messageForTutorCommand as a recommendation only.
         onTutorTakeover?.();
         engine.pause();
-        engine.setLoopRegion(undefined);
+
+        const growth = command.recovery.chunkGrowth;
+        const finalWindow = Boolean(
+          growth && growth.activeWindowIndex === growth.plan.windows.length - 1,
+        );
+        const chartEndTick = measures.at(-1)?.endTick;
+        const endsAtChartEnd =
+          finalWindow && command.recovery.region.endTick === chartEndTick;
+
+        engine.setLoopRegion(
+          growth && !endsAtChartEnd
+            ? {
+                startTick: command.recovery.region.startTick,
+                endTick: command.recovery.region.endTick,
+              }
+            : undefined,
+        );
         window.clearTimeout(recoveryTimerRef.current);
         recoveryTimerRef.current = window.setTimeout(() => {
           recoveryTimerRef.current = undefined;
@@ -478,7 +553,7 @@ export function useTutorSession({
         }
       }
     },
-    [engine, onTutorTakeover],
+    [engine, measures, onTutorTakeover],
   );
   const send = useCallback(
     (event: TutorEvent) => {
@@ -506,10 +581,50 @@ export function useTutorSession({
     }
 
     let lastCompletedMeasure = -1;
+    let disposed = false;
     const offJudgement = engine.onJudgement((judgement) =>
       send({ type: 'judgement', judgement }),
     );
     const offRunEnding = engine.onRunEnding(() => {
+      const currentState = activeHolder.store.getSnapshot().state;
+      const growth = currentState.recovery?.chunkGrowth;
+      const activeWindow = growth?.plan.windows[growth.activeWindowIndex];
+      const finalChunkAtChartEnd = Boolean(
+        growth &&
+          activeWindow &&
+          growth.activeWindowIndex === growth.plan.windows.length - 1 &&
+          activeWindow.endTick === measures.at(-1)?.endTick,
+      );
+
+      if (finalChunkAtChartEnd) {
+        const commands = send({ type: 'recovery-pass-complete' });
+        const retry = commands.find(
+          (command) => command.type === 'repeat-recovery',
+        );
+
+        if (retry?.type === 'repeat-recovery') {
+          lastCompletedMeasure = retry.recovery.region.startMeasure - 1;
+
+          return false;
+        }
+
+        const resumed = commands.find(
+          (command) => command.type === 'resume-main',
+        );
+
+        if (resumed?.type === 'resume-main') {
+          if (resumed.resumeTick !== undefined) {
+            lastCompletedMeasure = (resumed.resumeMeasure ?? 0) - 1;
+
+            return false;
+          }
+
+          send({ type: 'song-complete' });
+
+          return true;
+        }
+      }
+
       const finalMeasure = measures.length - 1;
       const finalCommands: TutorCommand[] = [];
 
@@ -553,6 +668,19 @@ export function useTutorSession({
       send({ type: 'song-complete' });
 
       return true;
+    });
+    const offLoopRestart = engine.onLoopRestart(() => {
+      const state = activeHolder.store.getSnapshot().state;
+
+      if (state.phase !== 'recovering' || !state.recovery?.chunkGrowth) {
+        return;
+      }
+
+      queueMicrotask(() => {
+        if (!disposed) {
+          send({ type: 'recovery-pass-complete' });
+        }
+      });
     });
     const offTime = engine.timeStore.subscribe(() => {
       if (!engine.getSnapshot().isPlaying) {
@@ -629,11 +757,14 @@ export function useTutorSession({
     });
 
     return () => {
+      disposed = true;
       offJudgement();
       offRunEnding();
+      offLoopRestart();
       offTime();
     };
   }, [
+    activeHolder.store,
     chart,
     delaySeconds,
     enabled,

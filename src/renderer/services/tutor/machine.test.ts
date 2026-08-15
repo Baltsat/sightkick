@@ -15,6 +15,12 @@ const CHART: TutorChartPlan = {
     endTick: (index + 1) * 100,
     expectedKeys: 4,
     sectionStart: index === 0,
+    beatCount: 4,
+    strongOnsets: [0, 25, 50, 75].map((offset) => index * 100 + offset),
+    noteOnsets: [0, 25, 50, 75].map((offset) => ({
+      tick: index * 100 + offset,
+      expectedKeys: 1,
+    })),
   })),
 };
 
@@ -176,6 +182,65 @@ describe('tutor machine', () => {
       'material-failure',
       'begin-recovery',
     ]);
+  });
+
+  it('starts on the hard subdivision, expands after quality passes, and regresses after repeated failure', () => {
+    let { state } = beginFailedSession({
+      recursiveChunkGrowthEnabled: true,
+      maximumChunkAttemptsPerWindow: 4,
+      chunkRegressionFailureThreshold: 2,
+    });
+
+    expect(state.recovery).toMatchObject({
+      region: {
+        startTick: 100,
+        endTick: 125,
+        stage: 'seed',
+      },
+      chunkGrowth: {
+        activeWindowIndex: 0,
+        status: 'active',
+      },
+    });
+
+    for (let pass = 0; pass < 2; pass += 1) {
+      state = addMeasure(state, 1, ['hit', 'hit', 'hit', 'hit']);
+
+      const result = dispatch(state, { type: 'recovery-pass-complete' });
+
+      if (pass === 0) {
+        expect(result.commands[0]).toMatchObject({
+          type: 'repeat-recovery',
+          attempt: { chunkTransition: 'repeat' },
+        });
+      } else {
+        expect(result.commands[0]).toMatchObject({
+          type: 'repeat-recovery',
+          attempt: { chunkTransition: 'expand' },
+        });
+      }
+
+      state = result.state;
+    }
+
+    expect(state.recovery?.chunkGrowth?.activeWindowIndex).toBe(1);
+    expect(state.recovery?.region.startTick).toBeLessThanOrEqual(100);
+    expect(state.recovery?.region.endTick).toBeGreaterThanOrEqual(125);
+
+    for (let failure = 0; failure < 2; failure += 1) {
+      const region = state.recovery!.region;
+
+      state = addFailedRegion(state, region.startMeasure, region.endMeasure);
+      state = dispatch(state, { type: 'recovery-pass-complete' }).state;
+    }
+
+    expect(state.recovery?.chunkGrowth).toMatchObject({
+      activeWindowIndex: 0,
+      status: 'active',
+    });
+    expect(state.recoveryAttempts.at(-1)).toMatchObject({
+      chunkTransition: 'regress',
+    });
   });
 
   it('preserves an immutable raw snapshot of the failed trigger window', () => {
