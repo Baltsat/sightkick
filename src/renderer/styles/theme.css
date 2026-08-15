@@ -46,15 +46,6 @@
   --dr-field-ember: #e38a5d;
   --dr-field-wine: #a86f78;
 
-  /* Kit-continuity contract (AppShell.css "arena-shell__field-bleed"):
-     unset by default, so the rail stays the plain field until a crop is
-     published. Whoever wires the home route may set
-     `--dr-home-field-crop: url(<right-edge crop of the exact home kit
-     photo>)` on `:root` while the kit is showing (and clear it again on
-     unmount) — AppShell bleeds it under the rail and fades it into the
-     field colour on its own; it never needs to know the crop exists. */
-  --dr-home-field-crop: none;
-
   --color-bg: #f8f5ef;
   --color-surface: #ffffff;
   --color-surface-sunken: #e4ddd0;
@@ -183,8 +174,6 @@
   --dr-field-low: #e1cfbe;
   --dr-field-ember: #e38a5d;
   --dr-field-wine: #a86f78;
-  --dr-home-field-crop: none;
-
   --gradient-header: linear-gradient(180deg, #ffffff, #eee8dc);
   --gradient-header-reverse: linear-gradient(180deg, #eee8dc, #ffffff);
   --gradient-accent: linear-gradient(

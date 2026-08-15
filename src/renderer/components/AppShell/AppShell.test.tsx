@@ -1,53 +1,84 @@
 import { useState } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { AppShell, ArenaView } from './AppShell';
 
-function ShellHarness() {
-  const [view, setView] = useState<ArenaView>('home');
+function ShellHarness({
+  initialView = 'home',
+  runOpen = false,
+}: {
+  initialView?: ArenaView;
+  runOpen?: boolean;
+}) {
+  const [view, setView] = useState<ArenaView>(initialView);
 
   return (
     <AppShell
       view={view}
       onViewChange={setView}
-      settingsSlot={<span>Settings</span>}
+      settingsSlot={<button type="button">Settings</button>}
       onOpenProfile={() => setView('insights')}
+      runOpen={runOpen}
     >
       <div>Route content</div>
     </AppShell>
   );
 }
 
-afterEach(() => {
-  vi.useRealTimers();
-});
-
 describe('AppShell', () => {
-  it('keeps only places in the rail', () => {
+  it('keeps every place and settings in one centered navigation group', () => {
     render(<ShellHarness />);
 
-    expect(screen.getByTestId('view-home')).toBeInTheDocument();
-    expect(screen.getByTestId('view-songs')).toBeInTheDocument();
-    expect(screen.getByTestId('view-lessons')).toBeInTheDocument();
-    expect(screen.getByTestId('open-profile-button')).toBeInTheDocument();
+    const navigation = screen.getByRole('navigation', { name: 'Primary' });
+
+    expect(within(navigation).getByTestId('view-home')).toBeInTheDocument();
+    expect(within(navigation).getByTestId('view-songs')).toBeInTheDocument();
+    expect(within(navigation).getByTestId('view-lessons')).toBeInTheDocument();
+    expect(
+      within(navigation).getByTestId('open-profile-button'),
+    ).toBeInTheDocument();
+    expect(
+      within(navigation).getByRole('button', { name: 'Settings' }),
+    ).toBeInTheDocument();
     expect(screen.queryByTestId('view-wave')).not.toBeInTheDocument();
+    expect(screen.queryByText('Drumroll')).not.toBeInTheDocument();
   });
 
-  it('publishes a home-only field-bleed hook under the rail', () => {
-    render(<ShellHarness />);
+  it.each([
+    ['home', 'Home', 'view-home'],
+    ['songs', 'Songs', 'view-songs'],
+    ['journey', 'Journey', 'view-lessons'],
+    ['insights', 'Profile', 'open-profile-button'],
+  ] as const)(
+    'renders the %s route on the persistent shell field',
+    (view, label, activeTestId) => {
+      render(<ShellHarness initialView={view} />);
 
-    const bleed = screen.getByTestId('arena-shell-field-bleed');
+      expect(document.querySelector('.arena-shell')).toHaveAttribute(
+        'data-view',
+        view,
+      );
+      expect(screen.getByLabelText(`${label} content`)).toBeInTheDocument();
+      expect(screen.getByTestId(activeTestId)).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+    },
+  );
 
-    // Present on every route (opacity is gated in CSS by
-    // `.arena-shell[data-view='home']`, not by mount/unmount), decorative
-    // only, and never in the way of rail keyboard/pointer interaction.
-    expect(bleed).toBeInTheDocument();
-    expect(bleed).toHaveAttribute('aria-hidden', 'true');
-    expect(bleed.parentElement).toHaveClass('arena-shell__rail');
+  it('withdraws the rail while a practice run owns the window', () => {
+    render(<ShellHarness runOpen />);
+
+    expect(document.querySelector('.arena-shell')).toHaveAttribute(
+      'data-run-open',
+      'true',
+    );
+    expect(screen.getByLabelText('Drumroll navigation')).toHaveAttribute(
+      'hidden',
+    );
   });
 
-  it('keeps the field mounted and marks a route change once', () => {
-    vi.useFakeTimers();
+  it('keeps the same field mounted through a route change', () => {
     render(<ShellHarness />);
 
     const field = document.querySelector('.arena-shell');
@@ -55,12 +86,6 @@ describe('AppShell', () => {
     expect(field).toHaveAttribute('data-view', 'home');
     fireEvent.click(screen.getByTestId('view-songs'));
     expect(field).toHaveAttribute('data-view', 'songs');
-    expect(field).toHaveClass('arena-shell--transitioning');
-
-    act(() => {
-      vi.advanceTimersByTime(900);
-    });
-
-    expect(field).not.toHaveClass('arena-shell--transitioning');
+    expect(document.querySelector('.arena-shell')).toBe(field);
   });
 });
