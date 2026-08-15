@@ -13,11 +13,11 @@ import type {
 import { HomeCockpit } from './HomeCockpit';
 
 const song: Song = {
-  id: 'song:favourite',
-  dir: '/library/song-favourite',
-  name: 'Night Ride',
-  artist: 'The Practice Set',
-  album: 'Warm Studio',
+  id: 'yandex:kygo-raging',
+  dir: '/library/kygo-raging',
+  name: 'Raging',
+  artist: 'Kygo feat. Kodaline',
+  album: 'Cloud Nine',
   charter: 'Drumroll',
   genre: 'Rock',
   year: '2026',
@@ -27,6 +27,15 @@ const song: Song = {
   drumDifficulty: 5,
   format: 'chart',
   audio: [],
+  liked: true,
+  sourceProvenance: {
+    provider: 'yandex-music',
+    collectionId: 'liked',
+    collectionName: 'Мне нравится',
+    trackId: 'kygo-raging',
+    title: 'Raging',
+    artists: ['Kygo', 'Kodaline'],
+  },
 };
 
 function ranked(
@@ -72,6 +81,12 @@ function ranked(
       uncertainty: 0.2,
       hard_prerequisites: [],
       scaffold: { speed: 0.7, steps: ['short_loop'] },
+      adaptation: {
+        starting_speed: 0.7,
+        repeat_budget: 3,
+        quality_passes_to_advance: 2,
+        low_quality_passes_before_stop: 2,
+      },
       factors: [],
       explanation: 'Saved evidence supports this route.',
     },
@@ -162,10 +177,47 @@ const gamification = {
 const launcherLesson = {
   ...song,
   id: 'lesson:pulse',
-  name: 'Eighth-note pulse',
+  name: 'Whole and Half Note Reading',
   artist: 'Drumroll Method',
-  lesson: { id: '01.02', title: 'Eighth-note pulse' },
+  lesson: {
+    id: '02.01',
+    starsToUnlock: 3,
+    unit: 'Foundations',
+    title: 'Whole and Half Note Reading',
+    skills: ['reading'],
+  },
 } as Song;
+const foundationEpisodes = [
+  {
+    id: '01.01',
+    title: 'Hand Blocks Warm-Up',
+    skills: ['sixteenth-notes', 'timing'],
+  },
+  {
+    id: '01.02',
+    title: 'Paired Doubles Warm-Up',
+    skills: ['sixteenth-notes', 'timing'],
+  },
+  {
+    id: '01.03',
+    title: 'Kick Drum Pulse',
+    skills: ['sixteenth-notes', 'timing'],
+  },
+].map(
+  ({ id, title, skills }, index) =>
+    ({
+      ...launcherLesson,
+      id: `lesson:${id}`,
+      name: title,
+      lesson: {
+        id,
+        starsToUnlock: index,
+        unit: 'Foundations',
+        title,
+        skills,
+      },
+    }) as Song,
+);
 const launcherSongTwo = {
   ...song,
   id: 'song:night-drive',
@@ -258,12 +310,36 @@ type Story = StoryObj<typeof HomeCockpit>;
 
 export const P1EvidenceCards: Story = {};
 
+export const TodaysStory: Story = {
+  args: {
+    songList: [...foundationEpisodes, launcherLesson, song],
+  },
+};
+
+export const HonestMissingData: Story = {
+  args: {
+    songList: [],
+    recommendation: undefined,
+    practiceRanking: [],
+    pedagogyRanking: [],
+    activeGoal: undefined,
+    goalPayoffCandidate: undefined,
+    atomicStates: [],
+  },
+};
+
 export const KitLauncherArmed: Story = {
   render: (args) => (
     <div className="h-screen overflow-hidden bg-bg">
       <HomeCockpit
         {...args}
-        songList={[launcherLesson, song, launcherSongTwo, launcherSongThree]}
+        songList={[
+          ...foundationEpisodes,
+          launcherLesson,
+          song,
+          launcherSongTwo,
+          launcherSongThree,
+        ]}
         gamification={launcherGamification}
         onOpenJourney={() => {}}
         onFindNewMusic={() => {}}

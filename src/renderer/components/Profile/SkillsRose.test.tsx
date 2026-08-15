@@ -11,6 +11,8 @@ const profile: PatternPlayerProfile = {
         label: 'Eighth-note backbeat',
         subdivision: 'eighth',
         groove: 'rock-backbeat',
+        dynamics: 'even',
+        independence: 'three-way',
         contains_rests: false,
         rest_ratio: 0,
         limb_combinations: ['kick+hihat', 'hihat', 'snare+hihat'],
@@ -46,6 +48,8 @@ const profile: PatternPlayerProfile = {
         label: 'Quarter-note pulse with rests',
         subdivision: 'quarter',
         groove: 'quarter-pulse',
+        dynamics: 'even',
+        independence: 'two-way',
         contains_rests: true,
         rest_ratio: 0.25,
         limb_combinations: ['kick', 'snare'],
@@ -104,5 +108,37 @@ describe('SkillsRose', () => {
     );
 
     expect(onOpenLesson).toHaveBeenCalledWith('01.01');
+  });
+
+  it('pages a large taxonomy without dropping families and groups it deterministically', () => {
+    const expanded: PatternPlayerProfile = {
+      ...profile,
+      families: Array.from({ length: 14 }, (_, index) => ({
+        ...profile.families[index % profile.families.length],
+        family: {
+          ...profile.families[index % profile.families.length].family,
+          family_id: `pattern:${String(index).padStart(2, '0')}`,
+          label: `Pattern family ${index + 1}`,
+        },
+      })),
+      played_family_count: 7,
+      total_family_count: 14,
+    };
+
+    render(<SkillsRose profile={expanded} />);
+
+    expect(screen.getByText('Showing 1–6 of 14')).toBeInTheDocument();
+    expect(screen.getByText('Pattern family 1')).toBeInTheDocument();
+    expect(screen.queryByText('Pattern family 14')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+    expect(screen.getByText('Showing 13–14 of 14')).toBeInTheDocument();
+    expect(screen.getByText('Pattern family 14')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Quarter notes · 7/ }));
+
+    expect(screen.getByText('Showing 1–6 of 7')).toBeInTheDocument();
   });
 });

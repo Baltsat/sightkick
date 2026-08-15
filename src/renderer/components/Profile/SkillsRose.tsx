@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import {
   COACH_LESSONS,
   PATTERN_SKILL_LESSONS,
@@ -15,6 +16,13 @@ const ROSE_RADIUS = 118;
 const LABEL_RADIUS = 195;
 const LABEL_WIDTH = 128;
 const LABEL_HEIGHT = 68;
+const FAMILY_PAGE_SIZE = 6;
+
+export interface PatternFamilyGroup {
+  key: string;
+  label: string;
+  families: readonly PatternFamilyProfile[];
+}
 
 function point(index: number, total: number, radius: number) {
   const angle = -Math.PI / 2 + (index * Math.PI * 2) / total;
@@ -50,18 +58,46 @@ function lessonTitle(id: string): string {
   );
 }
 
-function selectedFamilies(
-  profile: PatternPlayerProfile,
+function sortedFamilies(
+  families: readonly PatternFamilyProfile[],
 ): readonly PatternFamilyProfile[] {
-  return [...profile.families]
-    .sort(
-      (left, right) =>
-        Number(right.coverage === 'played') -
-          Number(left.coverage === 'played') ||
-        right.strength - left.strength ||
-        left.family.family_id.localeCompare(right.family.family_id),
-    )
-    .slice(0, 6);
+  return [...families].sort(
+    (left, right) =>
+      Number(right.coverage === 'played') -
+        Number(left.coverage === 'played') ||
+      right.strength - left.strength ||
+      left.family.family_id.localeCompare(right.family.family_id),
+  );
+}
+
+export function groupPatternFamilies(
+  profile: PatternPlayerProfile,
+): readonly PatternFamilyGroup[] {
+  const order = ['quarter', 'eighth', 'sixteenth', 'triplet', 'mixed'];
+  const labels: Record<string, string> = {
+    quarter: 'Quarter notes',
+    eighth: 'Eighth notes',
+    sixteenth: 'Sixteenth notes',
+    triplet: 'Triplets',
+    mixed: 'Mixed grid',
+  };
+  const sorted = sortedFamilies(profile.families);
+  const groups = order.flatMap((key) => {
+    const families = sorted.filter(({ family }) => family.subdivision === key);
+
+    return families.length > 0 ? [{ key, label: labels[key], families }] : [];
+  });
+
+  return [{ key: 'all', label: 'All patterns', families: sorted }, ...groups];
+}
+
+export function patternFamilyPage(
+  families: readonly PatternFamilyProfile[],
+  page: number,
+): readonly PatternFamilyProfile[] {
+  const start = Math.max(0, page) * FAMILY_PAGE_SIZE;
+
+  return families.slice(start, start + FAMILY_PAGE_SIZE);
 }
 
 export function SkillsRose({
@@ -71,7 +107,16 @@ export function SkillsRose({
   profile: PatternPlayerProfile;
   onOpenLesson?: (lessonId: string) => void;
 }) {
-  const families = selectedFamilies(profile);
+  const groups = useMemo(() => groupPatternFamilies(profile), [profile]);
+  const [groupKey, setGroupKey] = useState('all');
+  const [page, setPage] = useState(0);
+  const group = groups.find(({ key }) => key === groupKey) ?? groups[0];
+  const pageCount = Math.max(
+    1,
+    Math.ceil((group?.families.length ?? 0) / FAMILY_PAGE_SIZE),
+  );
+  const resolvedPage = Math.min(page, pageCount - 1);
+  const families = patternFamilyPage(group?.families ?? [], resolvedPage);
 
   if (families.length === 0) {
     return (
@@ -121,7 +166,63 @@ export function SkillsRose({
         </p>
       </div>
 
-      <div className="mt-7 grid gap-8 xl:grid-cols-[minmax(34rem,1.15fr)_minmax(25rem,0.85fr)]">
+      <div
+        className="mt-5 flex flex-wrap items-center gap-2"
+        role="group"
+        aria-label="Pattern family groups"
+        data-testid="skills-rose-groups"
+      >
+        {groups.map((candidate) => (
+          <button
+            key={candidate.key}
+            type="button"
+            className="min-h-11 rounded-full border border-border-soft px-4 text-sm font-semibold text-text data-[active=true]:border-[var(--signal-wine)] data-[active=true]:bg-[color-mix(in_srgb,var(--signal-wine)_12%,var(--surface))]"
+            data-active={candidate.key === group?.key}
+            onClick={() => {
+              setGroupKey(candidate.key);
+              setPage(0);
+            }}
+          >
+            {candidate.label} · {candidate.families.length}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 flex min-h-11 items-center justify-between gap-4">
+        <p className="text-sm font-semibold text-text-muted" aria-live="polite">
+          Showing {resolvedPage * FAMILY_PAGE_SIZE + 1}–
+          {Math.min(
+            (resolvedPage + 1) * FAMILY_PAGE_SIZE,
+            group.families.length,
+          )}{' '}
+          of {group.families.length}
+        </p>
+        {pageCount > 1 && (
+          <div className="flex gap-2" aria-label="Pattern family pages">
+            <button
+              type="button"
+              className="min-h-11 rounded-full border border-border-soft px-4 text-sm font-semibold text-text disabled:opacity-40"
+              disabled={resolvedPage === 0}
+              onClick={() => setPage(Math.max(0, resolvedPage - 1))}
+            >
+              Previous
+            </button>
+            <span className="self-center text-sm font-semibold tabular-nums text-text-muted">
+              {resolvedPage + 1} / {pageCount}
+            </span>
+            <button
+              type="button"
+              className="min-h-11 rounded-full border border-border-soft px-4 text-sm font-semibold text-text disabled:opacity-40"
+              disabled={resolvedPage + 1 >= pageCount}
+              onClick={() => setPage(Math.min(pageCount - 1, resolvedPage + 1))}
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 grid gap-8 xl:grid-cols-[minmax(34rem,1.15fr)_minmax(25rem,0.85fr)]">
         <figure
           className="mx-auto w-full max-w-160"
           data-testid="skills-rose-chart"

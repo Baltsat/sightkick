@@ -36,6 +36,12 @@ function entry({
       label,
       subdivision,
       groove,
+      dynamics: label.includes('ghost')
+        ? 'ghosted'
+        : label.includes('accent')
+        ? 'accented'
+        : 'even',
+      independence: groove === 'linear' ? 'linear' : 'three-way',
       contains_rests: label.includes('rests'),
       rest_ratio: label.includes('rests') ? 0.25 : 0,
       limb_combinations: ['kick+hihat', 'hihat', 'snare+hihat'],
@@ -219,3 +225,25 @@ export default meta;
 type Story = StoryObj<typeof SkillsRose>;
 
 export const SavedPracticeProfile: Story = {};
+
+export const ExpandedTaxonomy: Story = {
+  args: {
+    profile: {
+      ...profile,
+      families: Array.from({ length: 18 }, (_, index) => {
+        const source = profile.families[index % profile.families.length];
+
+        return {
+          ...source,
+          family: {
+            ...source.family,
+            family_id: `${source.family.family_id}:${index}`,
+            label: `${source.family.label} · ${index + 1}`,
+          },
+        };
+      }),
+      played_family_count: 15,
+      total_family_count: 18,
+    },
+  },
+};

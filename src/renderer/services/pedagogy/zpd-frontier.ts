@@ -16,6 +16,7 @@ import {
   SongGoal,
   ZpdCandidate,
   ZpdCandidateState,
+  ZpdAdaptation,
   ZpdRankedCandidate,
 } from './types';
 
@@ -235,6 +236,42 @@ function scaffoldFor(
   };
 }
 
+function adaptationFor(
+  state: ZpdCandidateState,
+  scaffold: PracticeDecision['scaffold'],
+  uncertainty: number,
+  recent_attempts: number,
+): ZpdAdaptation {
+  const base_budget: Record<ZpdCandidateState, number> = {
+    assessment: 1,
+    too_easy: 1,
+    productive_consolidation: 2,
+    productive_acquisition: uncertainty >= 0.5 ? 3 : 2,
+    scaffold_first: 4,
+    goal_preview_only: 1,
+  };
+  const fatigue_discount = recent_attempts >= 3 ? 1 : 0;
+  const repeat_budget = Math.max(1, base_budget[state] - fatigue_discount);
+  const quality_passes_to_advance = Math.min(
+    repeat_budget,
+    state === 'productive_acquisition' ||
+      state === 'productive_consolidation' ||
+      state === 'scaffold_first'
+      ? 2
+      : 1,
+  );
+
+  return {
+    starting_speed: scaffold.speed,
+    repeat_budget,
+    quality_passes_to_advance,
+    low_quality_passes_before_stop: Math.max(
+      1,
+      repeat_budget - quality_passes_to_advance + 1,
+    ),
+  };
+}
+
 function zpdFit(state: ZpdCandidateState, predicted_success: number): number {
   const target =
     state === 'productive_consolidation'
@@ -434,6 +471,12 @@ export function scoreZpdCandidate(
     states,
     prerequisite.independent_eligible,
   );
+  const adaptation = adaptationFor(
+    state,
+    scaffold,
+    uncertainty,
+    candidate.recent_attempts ?? 0,
+  );
   const fit = zpdFit(state, predicted_success);
   const bottleneck = bottleneckReduction(
     candidate.manifest,
@@ -515,6 +558,7 @@ export function scoreZpdCandidate(
     uncertainty,
     hard_prerequisites: prerequisite.ids,
     scaffold,
+    adaptation,
     factors,
     explanation: explanationFor({
       candidate,

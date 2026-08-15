@@ -19,6 +19,14 @@ export type PatternGroove =
   | 'fill'
   | 'mixed';
 
+export type PatternDynamics = 'even' | 'accented' | 'ghosted' | 'mixed';
+
+export type PatternIndependence =
+  | 'single-limb'
+  | 'two-way'
+  | 'three-way'
+  | 'linear';
+
 export type PatternLimb =
   | 'kick'
   | 'snare'
@@ -32,6 +40,8 @@ export type PatternLimb =
 export interface PatternOnset {
   position: number;
   limbs: readonly PatternLimb[];
+  accented: boolean;
+  ghosted: boolean;
 }
 
 export interface PatternSkillWeight {
@@ -51,6 +61,8 @@ export interface AtomicPatternFigure {
   meter: string;
   subdivision: PatternSubdivision;
   groove: PatternGroove;
+  dynamics: PatternDynamics;
+  independence: PatternIndependence;
   contains_rests: boolean;
   rest_ratio: number;
   limb_combinations: readonly string[];
@@ -65,6 +77,8 @@ export interface PatternFamily {
   label: string;
   subdivision: PatternSubdivision;
   groove: PatternGroove;
+  dynamics?: PatternDynamics;
+  independence?: PatternIndependence;
   contains_rests: boolean;
   rest_ratio: number;
   limb_combinations: readonly string[];

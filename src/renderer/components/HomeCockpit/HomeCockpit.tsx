@@ -29,10 +29,16 @@ import type {
   SongGoal,
   ZpdRankedCandidate,
 } from '../../services/pedagogy/types';
-import { composePracticeCards } from '../../services/pedagogy';
+import {
+  composePracticeCards,
+  skillNodeById,
+  skillProbability,
+} from '../../services/pedagogy';
+import type { PatternExemplar } from '../../services/pattern-model';
 import { KitElement } from '../../services/practice-stats';
 import { useKitColorMaturity } from '../../services/kit-color-maturity';
 import { EvidencePracticeCards } from '../PracticeCards';
+import { PatternNotationSnippet } from '../Profile/PatternNotationSnippet';
 import { playKitPreview } from '../../services/kit-preview-audio';
 import homeKitStudio from '../../assets/daybreak/home-kit-studio.png';
 import drumstickCursor from '../../assets/daybreak/drumstick-cursor-reversed.png';
@@ -223,6 +229,19 @@ export interface SelectHomeOffersInput {
   playableSongIds: readonly string[];
 }
 
+export interface HomeSkillStory {
+  skillId: string;
+  label: string;
+  exemplar: PatternExemplar;
+  adaptation: string;
+}
+
+export interface HomeEpisodeStory {
+  label: string;
+  detail: string;
+  ariaLabel: string;
+}
+
 const EMPTY_SHELF_COPY: ShelfCopy = {
   title: 'Choose a song to begin',
   detail: 'Pick a song, then strike a highlighted drum to start.',
@@ -232,6 +251,240 @@ const ARMED_SHELF_FALLBACK_COPY: ShelfCopy = {
   detail:
     'My Wave needs a playable saved favourite before it can name a song section.',
 };
+
+function signatureValues(signature: string): ReadonlyMap<string, string> {
+  return new Map(
+    signature.split(';').flatMap((part) => {
+      const separator = part.indexOf('=');
+
+      return separator > 0
+        ? [[part.slice(0, separator), part.slice(separator + 1)] as const]
+        : [];
+    }),
+  );
+}
+
+function notationForSkill(
+  skillId: string,
+  contextSignature: string,
+): PatternExemplar {
+  const context = signatureValues(contextSignature);
+  const subdivision = context.get('subdivision') ?? 'eighth';
+  const step =
+    subdivision === 'quarter'
+      ? 480
+      : subdivision === 'sixteenth'
+      ? 120
+      : subdivision === 'triplet'
+      ? 160
+      : 240;
+  const laneToken: Record<string, string> = {
+    K: 'kick',
+    S: 'snare',
+    H: 'yellow',
+    Y: 'yellow',
+    R: 'blue',
+    B: 'blue',
+    C: 'green',
+    G: 'green',
+    T1: 'yellow:tom',
+    T2: 'blue:tom',
+    T3: 'green:tom',
+  };
+  const tokens = (context.get('lanes') ?? 'S')
+    .split(',')
+    .map((lane) => laneToken[lane])
+    .filter((token): token is string => token !== undefined);
+  const usable = tokens.length > 0 ? tokens : ['snare'];
+  const count = Math.min(8, Math.floor(1920 / step));
+  const joint = context.get('limbs') === 'joint';
+  const fill = context.get('phrase') === 'fill';
+  const lines = Array.from({ length: count }, (_, index) => {
+    const notes = joint
+      ? usable.join(' ')
+      : fill
+      ? usable[index % usable.length]
+      : usable[index % Math.min(usable.length, 2)];
+
+    return `${index * step} ${notes}`;
+  });
+
+  return {
+    dsl: ['res=480 ts=4/4', ...lines].join('\n'),
+    rhythmic_signature: `${skillId};${contextSignature}`,
+  };
+}
+
+export function resolveHomeSkillStory({
+  ranking,
+  states,
+  preferredItemId,
+}: {
+  ranking: readonly ZpdRankedCandidate[];
+  states: readonly AtomicSkillState[];
+  preferredItemId?: string;
+}): HomeSkillStory | undefined {
+  const ranked =
+    ranking.find(
+      ({ candidate, decision }) =>
+        candidate.item_id === preferredItemId &&
+        candidate.available &&
+        decision.state !== 'goal_preview_only',
+    ) ??
+    ranking.find(
+      ({ candidate, decision }) =>
+        candidate.available && decision.state !== 'goal_preview_only',
+    );
+
+  if (!ranked) {
+    return undefined;
+  }
+
+  const stateById = new Map(states.map((state) => [state.skill_id, state]));
+  const demand = [...ranked.candidate.manifest.demands].sort(
+    (left, right) =>
+      right.weight * (1 - skillProbability(stateById.get(right.skill_id))) -
+        left.weight * (1 - skillProbability(stateById.get(left.skill_id))) ||
+      right.weight - left.weight ||
+      left.skill_id.localeCompare(right.skill_id),
+  )[0];
+  const skill = demand ? skillNodeById().get(demand.skill_id) : undefined;
+
+  if (!demand || !skill) {
+    return undefined;
+  }
+
+  const adaptation = ranked.decision.adaptation ?? {
+    starting_speed: ranked.decision.scaffold.speed,
+    repeat_budget: 1,
+  };
+
+  return {
+    skillId: demand.skill_id,
+    label: skill.label,
+    exemplar: notationForSkill(demand.skill_id, demand.context),
+    adaptation: `${adaptation.starting_speed.toFixed(2).replace(/0$/, '')}× · ${
+      adaptation.repeat_budget
+    } pass${adaptation.repeat_budget === 1 ? '' : 'es'}`,
+  };
+}
+
+function readableSkill(value: string): string {
+  return value
+    .split(/[._-]/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+export function resolveHomeEpisode({
+  nextLesson,
+  songList,
+}: {
+  nextLesson?: RankedPracticeCandidate;
+  songList: readonly Song[];
+}): HomeEpisodeStory | undefined {
+  if (!nextLesson) {
+    return undefined;
+  }
+
+  const song = songList.find(({ id }) => id === nextLesson.candidate.id);
+  const lesson = song?.lesson;
+
+  if (!song || !lesson?.unit || !lesson.id) {
+    return undefined;
+  }
+
+  const episodes = songList
+    .filter((candidate) => candidate.lesson?.unit === lesson.unit)
+    .sort(
+      (left, right) =>
+        (left.lesson?.starsToUnlock ?? Number.MAX_SAFE_INTEGER) -
+          (right.lesson?.starsToUnlock ?? Number.MAX_SAFE_INTEGER) ||
+        (left.lesson?.id ?? '').localeCompare(right.lesson?.id ?? ''),
+    );
+  const episode = episodes.findIndex(({ id }) => id === song.id) + 1;
+  const skillId = [...(nextLesson.candidate.itemManifest?.demands ?? [])].sort(
+    (left, right) =>
+      right.weight - left.weight || left.skill_id.localeCompare(right.skill_id),
+  )[0]?.skill_id;
+  const authoredSkill = lesson.skills?.[0];
+  const skill =
+    (skillId ? skillNodeById().get(skillId)?.label : undefined) ??
+    (authoredSkill ? readableSkill(authoredSkill) : lesson.title);
+  const detail = `Episode ${Math.max(1, episode)} of ${lesson.unit} · ${skill}`;
+
+  return {
+    label: `Lesson ${lesson.id}`,
+    detail,
+    ariaLabel: `Hi-hat. Open ${lesson.title}, ${detail}.`,
+  };
+}
+
+export function selectCuratedFindNew({
+  songList,
+  ranking,
+  pedagogyRanking,
+  runsBySong,
+}: {
+  songList: readonly Song[];
+  ranking: readonly RankedPracticeCandidate[];
+  pedagogyRanking: readonly ZpdRankedCandidate[];
+  runsBySong?: UseGamificationResult['runsBySong'];
+}): Song | undefined {
+  const songById = new Map(songList.map((song) => [song.id, song]));
+  const pedagogyById = new Map(
+    pedagogyRanking.map(({ candidate, decision }) => [
+      candidate.item_id,
+      decision,
+    ]),
+  );
+  const productive = new Set([
+    'productive_acquisition',
+    'productive_consolidation',
+  ]);
+
+  return ranking
+    .flatMap((recommendation, index) => {
+      const song = songById.get(recommendation.candidate.id);
+      const decision =
+        recommendation.decisionReceipt ??
+        pedagogyById.get(recommendation.candidate.id);
+      const known =
+        song?.sourceProvenance?.provider === 'yandex-music' ||
+        song?.liked === true ||
+        recommendation.candidate.liked === true;
+
+      return song &&
+        !song.lesson &&
+        recommendation.candidate.kind === 'song' &&
+        recommendation.candidate.available &&
+        recommendation.candidate.unlocked !== false &&
+        (runsBySong?.[song.id]?.length ?? 0) === 0 &&
+        known &&
+        decision &&
+        productive.has(decision.state)
+        ? [{ song, recommendation, index }]
+        : [];
+    })
+    .sort(
+      (left, right) =>
+        Number(right.song.sourceProvenance?.provider === 'yandex-music') -
+          Number(left.song.sourceProvenance?.provider === 'yandex-music') ||
+        Number(
+          right.song.liked === true ||
+            right.recommendation.candidate.liked === true,
+        ) -
+          Number(
+            left.song.liked === true ||
+              left.recommendation.candidate.liked === true,
+          ) ||
+        Math.abs(left.recommendation.predictedSuccess - 0.76) -
+          Math.abs(right.recommendation.predictedSuccess - 0.76) ||
+        left.index - right.index ||
+        left.song.id.localeCompare(right.song.id),
+    )[0]?.song;
+}
 
 export function resolveShelfCopy(
   sessionSummary: HomeSessionReceipt | undefined,
@@ -585,18 +838,36 @@ export function HomeCockpit({
       candidate.available &&
       candidate.unlocked !== false,
   );
-  // The lesson library keeps the lesson number and the lesson name as two
-  // separate fields (`song.lesson.id`/`.title` - see
-  // `library/manifest.json`'s `sk_lesson_id`/`sk_lesson_title`); `song.name`
-  // only concatenates them ("Lesson 01.01 — Alternating Singles Warm-Up")
-  // for places that want one string. Reading the two fields back apart
-  // here is what turns that concatenation into a small eyebrow plus one
-  // confident title line (2026-08-13 critique, home item 17) instead of
-  // wrapping the whole combined string across four lines.
-  const heroEyebrow = continuationSong?.lesson
+  const homeSkillStory = useMemo(
+    () =>
+      resolveHomeSkillStory({
+        ranking: pedagogyRanking ?? [],
+        states: atomicStates ?? [],
+        preferredItemId: targetRecommendation?.candidate.id,
+      }),
+    [atomicStates, pedagogyRanking, targetRecommendation?.candidate.id],
+  );
+  const nextLessonStory = useMemo(
+    () => resolveHomeEpisode({ nextLesson, songList }),
+    [nextLesson, songList],
+  );
+  const curatedSong = useMemo(
+    () =>
+      selectCuratedFindNew({
+        songList,
+        ranking: homeRanking,
+        pedagogyRanking: pedagogyRanking ?? [],
+        runsBySong: gamification.runsBySong,
+      }),
+    [gamification.runsBySong, homeRanking, pedagogyRanking, songList],
+  );
+  const heroEyebrow = homeSkillStory
+    ? 'Today’s skill'
+    : continuationSong?.lesson
     ? `Lesson ${continuationSong.lesson.id}`
     : continuationSong?.artist;
   const heroTitle =
+    homeSkillStory?.label ??
     continuationSong?.lesson?.title ??
     continuationSong?.name ??
     'Choose a song';
@@ -708,13 +979,11 @@ export function HomeCockpit({
       },
       hihat: {
         action: 'next-lesson',
-        label: 'Next lesson',
-        detail: nextLesson
-          ? 'Follow your learning path'
-          : 'Open Journey to choose one',
-        ariaLabel: nextLesson
-          ? 'Hi-hat. Open your next lesson.'
-          : 'Hi-hat. Open Journey to choose your next lesson.',
+        label: nextLessonStory?.label ?? 'Next lesson',
+        detail: nextLessonStory?.detail ?? 'Open Journey to choose one',
+        ariaLabel:
+          nextLessonStory?.ariaLabel ??
+          'Hi-hat. Open Journey to choose your next lesson.',
       },
       ride: {
         action: 'songs',
@@ -725,8 +994,13 @@ export function HomeCockpit({
       crash: {
         action: 'discover',
         label: 'Find new',
-        detail: 'Browse new practice music',
-        ariaLabel: 'Crash. Find new practice music.',
+        detail: curatedSong
+          ? `${curatedSong.name} · ${curatedSong.artist}`
+          : 'Browse new practice music',
+        ariaLabel: curatedSong
+          ? `Crash. Start curated song ${curatedSong.name} by ${curatedSong.artist}.`
+          : 'Crash. Find new practice music.',
+        song: curatedSong,
       },
       tom1: {
         action: 'top-song-1',
@@ -756,7 +1030,7 @@ export function HomeCockpit({
         song: topSongs[2],
       },
     }),
-    [continuationSong, myWaveSession, nextLesson, topSongs],
+    [continuationSong, curatedSong, myWaveSession, nextLessonStory, topSongs],
   );
   const armedDoor = pendingDoor ?? (hasContinuationTarget ? 'kick' : undefined);
   const homeStartHint = pendingDoor
@@ -866,7 +1140,11 @@ export function HomeCockpit({
       }
 
       if (door.action === 'discover') {
-        (onFindNewMusic ?? onOpenSongs)();
+        if (door.song) {
+          startSong(door.song);
+        } else {
+          (onFindNewMusic ?? onOpenSongs)();
+        }
 
         return;
       }
@@ -1105,13 +1383,33 @@ export function HomeCockpit({
           } as CSSProperties
         }
       >
-        <h1 id="home-cockpit-title" className="kit-home__hero">
-          {heroEyebrow ? (
-            <span className="kit-home__eyebrow">{heroEyebrow}</span>
+        <div
+          className="kit-home__theme"
+          data-skill={homeSkillStory ? true : undefined}
+          data-testid="home-skill-story"
+        >
+          <div className="kit-home__theme-copy">
+            <h1 id="home-cockpit-title" className="kit-home__hero">
+              {heroEyebrow ? (
+                <span className="kit-home__eyebrow">{heroEyebrow}</span>
+              ) : null}
+              {heroEyebrow ? ' ' : null}
+              <span className="kit-home__hero-name">{heroTitle}</span>
+            </h1>
+            {homeSkillStory ? (
+              <span className="kit-home__adaptation">
+                {homeSkillStory.adaptation}
+              </span>
+            ) : null}
+          </div>
+          {homeSkillStory ? (
+            <PatternNotationSnippet
+              exemplar={homeSkillStory.exemplar}
+              label={homeSkillStory.label}
+              size="home"
+            />
           ) : null}
-          {heroEyebrow ? ' ' : null}
-          <span className="kit-home__hero-name">{heroTitle}</span>
-        </h1>
+        </div>
         <p
           className="kit-home__input-readiness"
           data-testid="home-input-readiness"

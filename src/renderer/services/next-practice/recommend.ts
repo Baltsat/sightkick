@@ -1184,6 +1184,7 @@ function atomicRecommendation(
     ),
     predictedSuccess: round(decision.predicted_success, 3),
     suggestedSpeed: decision.scaffold.speed,
+    adaptation: decision.adaptation,
     reason:
       baseline.directRemediation || baseline.deadlinePacing
         ? baseline.reason

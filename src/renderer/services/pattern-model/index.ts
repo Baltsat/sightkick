@@ -12,9 +12,11 @@ import type {
   AtomicPatternFigure,
   DecomposePatternChartOptions,
   PatternChartModel,
+  PatternDynamics,
   PatternFamily,
   PatternFamilyProfile,
   PatternGroove,
+  PatternIndependence,
   PatternLimb,
   PatternOnset,
   PatternPlayerProfile,
@@ -159,6 +161,33 @@ function grooveFor(
   return subdivision === 'eighth' ? 'eighth-groove' : 'quarter-pulse';
 }
 
+function dynamicsFor(onsets: readonly PatternOnset[]): PatternDynamics {
+  const accented = onsets.some((onset) => onset.accented);
+  const ghosted = onsets.some((onset) => onset.ghosted);
+
+  return accented && ghosted
+    ? 'mixed'
+    : accented
+    ? 'accented'
+    : ghosted
+    ? 'ghosted'
+    : 'even';
+}
+
+function independenceFor(onsets: readonly PatternOnset[]): PatternIndependence {
+  const limbs = new Set(onsets.flatMap((onset) => onset.limbs));
+
+  if (onsets.every((onset) => onset.limbs.length === 1) && limbs.size > 1) {
+    return 'linear';
+  }
+
+  if (limbs.size >= 3) {
+    return 'three-way';
+  }
+
+  return limbs.size === 1 ? 'single-limb' : 'two-way';
+}
+
 function restRatioFor(
   subdivision: PatternSubdivision,
   onsets: readonly PatternOnset[],
@@ -243,7 +272,12 @@ function normalizedSkillWeights(
 
 function rhythmicSignature(onsets: readonly PatternOnset[]): string {
   return onsets
-    .map(({ position, limbs }) => `${position}:${limbs.join('+')}`)
+    .map(
+      ({ position, limbs, accented, ghosted }) =>
+        `${position}:${limbs.join('+')}${accented ? '!' : ''}${
+          ghosted ? 'g' : ''
+        }`,
+    )
     .join('|');
 }
 
@@ -306,8 +340,15 @@ function figureSimilarity(
       return sum + shared.length / Math.max(1, all.size);
     }, 0) / Math.max(1, intersection.length);
   const groove = left.groove === right.groove ? 1 : 0;
+  const expression =
+    left.dynamics === right.dynamics && left.independence === right.independence
+      ? 1
+      : 0;
 
-  return round(0.68 * rhythm + 0.24 * limb + 0.08 * groove, 6);
+  return round(
+    0.62 * rhythm + 0.22 * limb + 0.08 * groove + 0.08 * expression,
+    6,
+  );
 }
 
 function dominant<T extends string>(values: readonly T[]): T {
@@ -325,6 +366,7 @@ function familyLabel(
   subdivision: PatternSubdivision,
   groove: PatternGroove,
   containsRests: boolean,
+  dynamics: PatternDynamics,
 ): string {
   const subdivisionLabel: Record<PatternSubdivision, string> = {
     quarter: 'Quarter-note',
@@ -344,10 +386,18 @@ function familyLabel(
     fill: 'fill',
     mixed: 'pattern',
   };
+  const expression =
+    dynamics === 'accented'
+      ? ' with accents'
+      : dynamics === 'ghosted'
+      ? ' with ghost notes'
+      : dynamics === 'mixed'
+      ? ' with accents and ghosts'
+      : '';
 
   return `${subdivisionLabel[subdivision]} ${grooveLabel[groove]}${
     containsRests ? ' with rests' : ''
-  }`;
+  }${expression}`;
 }
 
 function familyForFigures(
@@ -370,6 +420,8 @@ function familyForFigures(
   })[0];
   const subdivision = dominant(figures.map((figure) => figure.subdivision));
   const groove = dominant(figures.map((figure) => figure.groove));
+  const dynamics = dominant(figures.map((figure) => figure.dynamics));
+  const independence = dominant(figures.map((figure) => figure.independence));
   const containsRests = figures.some((figure) => figure.contains_rests);
   const skillWeights = normalizedSkillWeights(
     figures.flatMap((figure) => figure.skill_weights),
@@ -381,15 +433,19 @@ function familyForFigures(
     representative.meter,
     subdivision,
     groove,
+    dynamics,
+    independence,
     Number(containsRests),
     representative.rhythmic_signature,
   ].join('|');
 
   return {
     family_id: `pattern:${hash(identity)}`,
-    label: familyLabel(subdivision, groove, containsRests),
+    label: familyLabel(subdivision, groove, containsRests, dynamics),
     subdivision,
     groove,
+    dynamics,
+    independence,
     contains_rests: containsRests,
     rest_ratio: round(
       figures.reduce((sum, figure) => sum + figure.rest_ratio, 0) /
@@ -504,6 +560,8 @@ export function decompose_chart_patterns(
             }),
           ),
         ].sort() as PatternLimb[],
+        accented: group.some(({ flags }) => (flags & noteFlags.accent) !== 0),
+        ghosted: group.some(({ flags }) => (flags & noteFlags.ghost) !== 0),
       }))
       .filter(({ limbs }) => limbs.length > 0)
       .sort(
@@ -539,6 +597,8 @@ export function decompose_chart_patterns(
       onsets,
       skillWeights.map(({ skill_id }) => skill_id),
     );
+    const dynamics = dynamicsFor(onsets);
+    const independence = independenceFor(onsets);
     const signature = rhythmicSignature(onsets);
     const meter = `${measure.timeSig[0]}/${measure.timeSig[1]}`;
 
@@ -550,6 +610,8 @@ export function decompose_chart_patterns(
         meter,
         subdivision,
         groove,
+        dynamics,
+        independence,
         contains_rests: containsRests,
         rest_ratio: restRatio,
         limb_combinations: [

@@ -277,6 +277,12 @@ describe('ProfileView', () => {
           uncertainty: 0.3,
           hard_prerequisites: ['pulse.eighth'],
           scaffold: { speed: 0.7, steps: ['short_loop', 'Tutor'] },
+          adaptation: {
+            starting_speed: 0.7,
+            repeat_budget: 3,
+            quality_passes_to_advance: 2,
+            low_quality_passes_before_stop: 2,
+          },
           factors: [],
           explanation: 'Targets the tom handoff at a reachable tempo.',
         },
@@ -302,6 +308,7 @@ describe('ProfileView', () => {
         onSaveGoal={() => {}}
         onSetPrimaryGoal={() => {}}
         gamification={gamification()}
+        kitConnected
         insights={insights}
         onStartTargetedPractice={onStartTargetedPractice}
       />,
@@ -318,6 +325,16 @@ describe('ProfileView', () => {
     );
     expect(screen.getByTestId('insights-skill-spine')).toHaveTextContent(
       'Mid-to-floor tom movement',
+    );
+    expect(screen.getByTestId('insights-skill-spine')).toHaveTextContent(
+      'Building',
+    );
+    expect(screen.getByTestId('insights-skill-spine')).not.toHaveTextContent(
+      'measured',
+    );
+    expect(screen.getByTestId('kit-action-chip-continue')).toHaveAttribute(
+      'data-pad',
+      'crash',
     );
 
     openScale('history');

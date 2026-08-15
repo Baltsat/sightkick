@@ -119,8 +119,8 @@ export function LessonPath({
     ...(kitActions.includes('down') ? ['Next'] : []),
   ];
   const seasonSteps = [
-    ...(kitActions.includes('left') ? (['hihat'] as const) : []),
-    ...(kitActions.includes('right') ? (['ride'] as const) : []),
+    ...(kitActions.includes('left') ? (['snare'] as const) : []),
+    ...(kitActions.includes('right') ? (['tom3'] as const) : []),
   ];
   const seasonStepHints = [
     ...(kitActions.includes('left') ? ['Previous'] : []),
@@ -220,13 +220,13 @@ export function LessonPath({
             {kitActions.includes('confirm') && (
               <KitCommandPrompt
                 compact
-                model={{ label: 'Start', steps: ['snare'] }}
+                model={{ label: 'Start', steps: ['crash'] }}
               />
             )}
             {kitActions.includes('back') && (
               <KitCommandPrompt
                 compact
-                model={{ label: 'Back', steps: ['crash'] }}
+                model={{ label: 'Back', steps: ['ride'] }}
               />
             )}
           </div>

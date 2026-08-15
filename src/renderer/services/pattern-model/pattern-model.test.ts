@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { noteFlags } from 'scan-chart';
 import { buildParsedChartFromDsl } from '../../components/SheetMusic/helpers';
 import type { SkillEvidenceEvent } from '../pedagogy';
 import {
@@ -133,6 +134,25 @@ describe('pattern chart decomposition', () => {
 
     expect(lessons).toContain('18.03');
     expect(lessons).toContain('07.02');
+  });
+
+  it('keeps authored accents and ghost notes as separate deterministic family evidence', () => {
+    const chart = buildParsedChartFromDsl(eighthGroove());
+
+    chart.trackData[0].noteEventGroups[0][0].flags |= noteFlags.accent;
+    chart.trackData[0].noteEventGroups[2][0].flags |= noteFlags.ghost;
+
+    const first = decompose_chart_patterns(chart, { item_id: 'dynamics' });
+    const second = decompose_chart_patterns(chart, { item_id: 'dynamics' });
+
+    expect(first).toEqual(second);
+    expect(first.figures[0]).toMatchObject({
+      dynamics: 'mixed',
+      independence: 'three-way',
+    });
+    expect(first.figures[0].rhythmic_signature).toContain('!');
+    expect(first.figures[0].rhythmic_signature).toContain('g');
+    expect(first.families[0].label).toContain('accents and ghosts');
   });
 });
 

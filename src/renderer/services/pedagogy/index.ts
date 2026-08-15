@@ -1,5 +1,7 @@
 export * from './item-manifest';
 
+export * from './curriculum-taxonomy';
+
 export * from './my-wave';
 
 export * from './mistake-evidence';

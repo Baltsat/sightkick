@@ -12,10 +12,10 @@ export function PatternNotationSnippet({
 }: {
   exemplar: PatternExemplar;
   label: string;
-  size?: 'rose' | 'card';
+  size?: 'rose' | 'card' | 'home';
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const scale = size === 'rose' ? 0.23 : 0.38;
+  const scale = size === 'rose' ? 0.23 : size === 'home' ? 0.31 : 0.38;
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -46,7 +46,11 @@ export function PatternNotationSnippet({
     <div
       className={cn(
         'relative overflow-hidden rounded-lg bg-[color-mix(in_srgb,var(--surface-raised)_88%,transparent)]',
-        size === 'rose' ? 'h-12 w-32' : 'h-20 w-56',
+        size === 'rose'
+          ? 'h-12 w-32'
+          : size === 'home'
+          ? 'h-16 w-48'
+          : 'h-20 w-56',
       )}
       role="img"
       aria-label={`${label} notation`}
