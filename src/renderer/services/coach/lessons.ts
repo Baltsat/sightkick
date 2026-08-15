@@ -15,9 +15,15 @@ export const COACH_LESSONS: Record<CoachSkillTag, CoachLessonLink> = {
     id: '06.03',
     title: 'Right Hand Steady, Kick Answers',
   },
-  timing: { id: '01.01', title: 'Alternating Singles Warm-Up' },
+  timing: { id: '01.01', title: 'Hand Blocks Warm-Up' },
   'pad-accuracy': { id: '07.02', title: 'High and Mid Tom Signals' },
 };
+
+export const PATTERN_SKILL_LESSONS: Readonly<Record<string, CoachLessonLink>> =
+  {
+    'reading.rests': { id: '02.03', title: 'Rests in the Groove' },
+    'coord.linear': { id: '15.03', title: 'Hand-to-Foot Linear Groove' },
+  };
 
 const PAD_TRANSITION_LESSONS: Record<string, CoachLessonLink> = {
   'tom1:tom2': COACH_LESSONS['pad-accuracy'],
@@ -27,6 +33,75 @@ const PAD_TRANSITION_LESSONS: Record<string, CoachLessonLink> = {
 
 export function lessonForSkill(skill: CoachSkillTag): CoachLessonLink {
   return COACH_LESSONS[skill];
+}
+
+function lessonTagsForAtomicSkill(skillId: string): readonly CoachSkillTag[] {
+  if (PATTERN_SKILL_LESSONS[skillId]) {
+    return [];
+  }
+
+  if (skillId === 'pulse.sixteenth' || skillId === 'music.groove_16th') {
+    return ['sixteenth-hihat'];
+  }
+
+  if (skillId === 'pulse.triplet' || skillId === 'feel.jazz_ride') {
+    return ['triplets'];
+  }
+
+  if (skillId === 'pulse.shuffle' || skillId === 'feel.shuffle') {
+    return ['shuffle'];
+  }
+
+  if (skillId.startsWith('kit.fill') || skillId.startsWith('music.fill')) {
+    return ['fills'];
+  }
+
+  if (skillId.startsWith('kit.tom')) {
+    return ['pad-accuracy', 'fills'];
+  }
+
+  if (
+    skillId.startsWith('dynamics.') ||
+    skillId === 'hand.accent_control' ||
+    skillId === 'hand.ghost_note'
+  ) {
+    return ['dynamics'];
+  }
+
+  if (skillId.startsWith('foot.') || skillId === 'coord.syncopated_kick') {
+    return ['kick-independence'];
+  }
+
+  if (
+    skillId === 'coord.two_way' ||
+    skillId === 'coord.rock_three_way' ||
+    skillId === 'music.groove_8th'
+  ) {
+    return ['kick-independence'];
+  }
+
+  return ['timing'];
+}
+
+export function lessonsForAtomicSkills(
+  skillIds: readonly string[],
+): readonly CoachLessonLink[] {
+  const ids = new Set<string>();
+
+  return [
+    ...skillIds.flatMap((skillId) => PATTERN_SKILL_LESSONS[skillId] ?? []),
+    ...skillIds.flatMap(lessonTagsForAtomicSkill).map(lessonForSkill),
+  ]
+    .filter((lesson) => {
+      if (ids.has(lesson.id)) {
+        return false;
+      }
+
+      ids.add(lesson.id);
+
+      return true;
+    })
+    .sort((left, right) => left.id.localeCompare(right.id));
 }
 
 function transitionKey(first: string, second: string): string {

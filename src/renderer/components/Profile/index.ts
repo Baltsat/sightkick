@@ -11,3 +11,7 @@ export * from './GoalCard';
 export * from './SkillBars';
 
 export * from './XpSkillLine';
+
+export * from './SkillsRose';
+
+export * from './PatternNotationSnippet';

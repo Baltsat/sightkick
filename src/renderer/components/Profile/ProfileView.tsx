@@ -35,6 +35,7 @@ import type {
   RankedPracticeCandidate,
 } from '../../services/next-practice';
 import type { RunSummary } from '../../services/practice-stats';
+import type { PatternPlayerProfile } from '../../services/pattern-model';
 import { LearningEvidenceReceipt } from '../LearningEvidenceReceipt';
 import { cn } from '../../cn';
 import { Goal, SaveGoalInput, SetGoalModal } from '../Goals';
@@ -45,6 +46,7 @@ import { SkillBars } from './SkillBars';
 import { useMastery } from './useMastery';
 import { useRetiredLessons } from './useRetiredLessons';
 import { AtomicSkillRadar } from './AtomicSkillRadar';
+import { SkillsRose } from './SkillsRose';
 import { EvidencePracticeCards } from '../PracticeCards';
 
 export interface ProfileInsights {
@@ -60,6 +62,7 @@ export interface ProfileInsights {
   weeklyRecap?: WeeklyMusicalRecap;
   bestAudition?: SavedSongSectionAudition;
   auditionAvailable?: boolean;
+  patternProfile?: PatternPlayerProfile;
 }
 
 export interface ProfileViewProps {
@@ -75,6 +78,7 @@ export interface ProfileViewProps {
   onPracticeRhythmChange?: (rhythm: PracticeRhythm) => void;
   onRefreshPracticeSet?: () => void;
   onStartAudition?: () => void;
+  onOpenLesson?: (lessonId: string) => void;
 }
 
 const STAGE_INDEX: Record<AtomicSkillState['stage'], number> = {
@@ -622,6 +626,7 @@ export function ProfileView({
   onPracticeRhythmChange,
   onRefreshPracticeSet,
   onStartAudition,
+  onOpenLesson,
 }: ProfileViewProps) {
   const [selectedGoalId, setSelectedGoalId] = useState<string | undefined>(
     undefined,
@@ -971,19 +976,28 @@ export function ProfileView({
                       stay hidden because this chart has changed.
                     </p>
                   ) : null}
-                  <details data-testid="atomic-radar-disclosure">
-                    <summary className="cursor-pointer text-sm font-semibold text-text">
-                      Open skill map
-                    </summary>
-                    <div className="mt-5">
-                      <AtomicSkillRadar
-                        states={states}
-                        focusSkillIds={focusSkillIds}
-                      />
-                    </div>
-                  </details>
+                  {!insights?.patternProfile && (
+                    <details data-testid="atomic-radar-disclosure">
+                      <summary className="cursor-pointer text-sm font-semibold text-text">
+                        Open skill map
+                      </summary>
+                      <div className="mt-5">
+                        <AtomicSkillRadar
+                          states={states}
+                          focusSkillIds={focusSkillIds}
+                        />
+                      </div>
+                    </details>
+                  )}
                 </div>
               </div>
+
+              {insights?.patternProfile && (
+                <SkillsRose
+                  profile={insights.patternProfile}
+                  onOpenLesson={onOpenLesson}
+                />
+              )}
 
               <div className="border-t border-border-soft pt-7">
                 <PracticeHistory

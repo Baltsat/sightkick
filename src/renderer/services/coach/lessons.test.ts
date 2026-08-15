@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CoachFinding } from './types';
-import { COACH_LESSONS, remediationForFinding } from './lessons';
+import {
+  COACH_LESSONS,
+  lessonsForAtomicSkills,
+  PATTERN_SKILL_LESSONS,
+  remediationForFinding,
+} from './lessons';
 
 const curriculum = readFileSync('resources/lessons/curriculum.yaml', 'utf8');
 
@@ -11,7 +16,10 @@ function escapeRegExp(value: string): string {
 
 describe('COACH_LESSONS', () => {
   it('links every coaching skill to the current curriculum id and title', () => {
-    for (const { id, title } of Object.values(COACH_LESSONS)) {
+    for (const { id, title } of [
+      ...Object.values(COACH_LESSONS),
+      ...Object.values(PATTERN_SKILL_LESSONS),
+    ]) {
       expect(curriculum).toMatch(
         new RegExp(
           `- id: '${escapeRegExp(id)}'\\r?\\n` +
@@ -20,6 +28,23 @@ describe('COACH_LESSONS', () => {
         ),
       );
     }
+  });
+
+  it('maps atomic pattern skills to stable authored lesson links', () => {
+    expect(
+      lessonsForAtomicSkills([
+        'pulse.sixteenth',
+        'kit.tom_sweep',
+        'pulse.sixteenth',
+      ]),
+    ).toEqual([
+      COACH_LESSONS['pad-accuracy'],
+      COACH_LESSONS['sixteenth-hihat'],
+      COACH_LESSONS.fills,
+    ]);
+    expect(lessonsForAtomicSkills(['reading.rests'])).toEqual([
+      PATTERN_SKILL_LESSONS['reading.rests'],
+    ]);
   });
 
   it('uses a distinct curriculum exercise for every coaching skill', () => {
