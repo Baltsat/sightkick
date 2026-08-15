@@ -1,10 +1,14 @@
-import { act, render, screen } from '@testing-library/react';
-import { createElement } from 'react';
+import { act, cleanup, render, screen } from '@testing-library/react';
+import { createElement, createRef } from 'react';
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Stave, StaveNote } from 'vexflow';
 import { Measure, ParsedChart, RenderData } from '../../../chart-parser/types';
+import type { Song } from '../../../types';
+import { deriveAdaptiveTimingWindow } from '../../services/adaptive-practice';
 import type { ResolvedJudgement } from '../../services/engine';
+import { GameRenderer } from '../../services/engine/game-renderer';
+import { Judge } from '../../services/engine/judge';
 import { describeMistake } from '../../services/pedagogy';
 import { TimeStore } from '../../services/time-store';
 import { secondsToTicks } from '../../../chart-parser/timing';
@@ -15,6 +19,7 @@ import {
 } from '../../services/pedagogy';
 import { HOME_KIT_ZONE_LANES } from '../HomeCockpit/kit-zone-map';
 import { notationElementForTarget } from '../NotationGlossary';
+import { SheetMusic } from '../SheetMusic';
 import {
   flowBeatCount,
   flowFixedPlayheadGeometry,
@@ -32,6 +37,7 @@ import {
   repeatCueSegments,
   repeatedNotationPatterns,
 } from './ContinuousNotation';
+import '../../styles/sheet-music.css';
 
 function measureData(
   startTick: number,
@@ -66,7 +72,131 @@ function measureData(
   };
 }
 
+const FEEDBACK_CHART = {
+  resolution: 480,
+  tempos: [{ tick: 0, beatsPerMinute: 120, msTime: 0 }],
+} as ParsedChart;
+const FEEDBACK_SONG = {
+  id: 'notation-feedback',
+  dir: '/notation-feedback',
+  name: 'Notation Feedback',
+  artist: 'Drumroll',
+  album: '',
+  charter: '',
+  genre: '',
+  year: '2026',
+  fiveLaneDrums: false,
+  proDrums: false,
+  delaySeconds: 0,
+  drumDifficulty: 1,
+  format: 'chart',
+  audio: [],
+} satisfies Song;
+
+function feedbackNote(x: number): StaveNote {
+  const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  const noteHead = document.createElementNS(
+    'http://www.w3.org/2000/svg',
+    'path',
+  );
+
+  noteHead.classList.add('vf-note-snare');
+  group.append(noteHead);
+
+  return {
+    isRest: () => false,
+    getKeys: () => ['c/5'],
+    getAbsoluteX: () => x,
+    getSVGElement: () => group,
+    noteHeads: [{ getSVGElement: () => noteHead }],
+  } as unknown as StaveNote;
+}
+
+function feedbackRun(layout: 'classic' | 'flow', timingWindowMs: number) {
+  const ticks = [0, 480, 960];
+  const notes = ticks.map((_, index) => feedbackNote(index * 300 + 100));
+  const measure = {
+    startTick: 0,
+    endTick: 1920,
+    timeSig: [4, 4],
+    isCompound: false,
+    notes: ticks.map((tick) => ({
+      tick,
+      notes: ['c/5'],
+      duration: '4',
+      dots: 0,
+      isRest: false,
+    })),
+  } as Measure;
+  const stave = {
+    getX: () => 0,
+    getY: () => 0,
+    getWidth: () => 1200,
+    getHeight: () => 80,
+  } as unknown as Stave;
+  const renderData = [
+    {
+      measure,
+      stave,
+      renderedNotes: ticks.map((tick, index) => ({
+        tick,
+        note: notes[index],
+      })),
+      yOffset: 0,
+    },
+  ] satisfies RenderData[];
+  const vexflowContainerRef = createRef<HTMLDivElement>();
+
+  render(
+    createElement(SheetMusic, {
+      engine: undefined,
+      songData: FEEDBACK_SONG,
+      renderData,
+      vexflowContainerRef,
+      isDev: false,
+      gameMode: 'practice',
+      onSelectMeasure: () => {},
+      zoom: 1,
+      layout,
+    }),
+  );
+
+  const judge = new Judge();
+  const renderer = new GameRenderer(
+    (tick, key) => judge.isHit(tick, key),
+    (tick, key) => judge.isMissed(tick, key),
+  );
+
+  judge.setContext({
+    chart: FEEDBACK_CHART,
+    measures: [measure],
+    mapping: { snare: ['midi:38'] },
+    hitToleranceSeconds: timingWindowMs / 1000,
+    preferUnhitNotes: true,
+  });
+  judge.onHit((pos, prefixes) => renderer.paintHit(pos, prefixes));
+  renderer.setContext({ chart: FEEDBACK_CHART, renderData });
+  renderer.setSettings('Cursor');
+  judge.setEnabled(true);
+
+  const moveTo = (milliseconds: number) => {
+    const seconds = milliseconds / 1000;
+    const tick = secondsToTicks(
+      seconds,
+      FEEDBACK_CHART.resolution,
+      FEEDBACK_CHART.tempos,
+    );
+
+    judge.setTick(tick);
+    judge.resolveThrough(tick);
+    renderer.render(seconds, tick);
+  };
+
+  return { judge, layout, moveTo, notes };
+}
+
 afterEach(() => {
+  cleanup();
   document.body.replaceChildren();
 });
 
@@ -452,6 +582,84 @@ describe('Flow meter and current location', () => {
       '1:0',
     );
   });
+});
+
+describe('in-score judgement feedback', () => {
+  it.each(['flow', 'classic'] as const)(
+    'fades a correct hit and marks a miss in %s notation',
+    (layout) => {
+      const timing = deriveAdaptiveTimingWindow({ kind: 'song', runs: [] });
+      const run = feedbackRun(layout, timing.timingWindowMs);
+      const hitHead = run.notes[0].noteHeads[0].getSVGElement() as SVGElement;
+      const hitGlyph = run.notes[0].getSVGElement() as SVGElement;
+      const missedHead =
+        run.notes[1].noteHeads[0].getSVGElement() as SVGElement;
+
+      expect(screen.getByTestId(`${layout}-notation`)).toBeInTheDocument();
+
+      run.moveTo(timing.timingWindowMs - 1);
+      run.judge.handleInput({ controlId: 'midi:38', value: 100 });
+
+      expect(hitHead).toHaveClass('vf-note-hit');
+      expect(hitGlyph).not.toHaveClass('vf-note-hidden');
+
+      hitHead.dispatchEvent(new Event('animationend'));
+
+      expect(hitGlyph).toHaveClass('vf-note-hidden');
+      expect(
+        readFileSync('src/renderer/styles/sheet-music.css', 'utf8'),
+      ).toMatch(/\.vf-note-hidden\s*\{\s*display:\s*none;/);
+
+      run.moveTo(500 + timing.timingWindowMs - 1);
+      expect(run.judge.isMissed(480, 'c/5')).toBe(false);
+
+      run.moveTo(500 + timing.timingWindowMs + 1);
+      expect(run.judge.isMissed(480, 'c/5')).toBe(true);
+
+      run.moveTo(1000);
+      expect(missedHead).toHaveClass('vf-note-missed');
+      expect(missedHead).not.toHaveClass('vf-note-hidden');
+    },
+  );
+
+  it.each([
+    {
+      expectedMs: 140,
+      runs: Array.from({ length: 6 }, () => ({
+        overallAccuracy: 0.97,
+        totalHits: 97,
+        mode: 'practice',
+        playbackSpeed: 1,
+        timingBias: { spreadMs: 28, sampleCount: 97 },
+      })),
+    },
+    {
+      expectedMs: 230,
+      runs: [
+        {
+          overallAccuracy: 0.48,
+          totalHits: 48,
+          mode: 'practice',
+          playbackSpeed: 1,
+          timingBias: { spreadMs: 180, sampleCount: 48 },
+        },
+      ],
+    },
+  ])(
+    'closes miss feedback at the derived $expectedMs ms player window',
+    ({ expectedMs, runs }) => {
+      const timing = deriveAdaptiveTimingWindow({ kind: 'song', runs });
+      const run = feedbackRun('classic', timing.timingWindowMs);
+
+      expect(timing.timingWindowMs).toBe(expectedMs);
+
+      run.moveTo(expectedMs - 1);
+      expect(run.judge.isMissed(0, 'c/5')).toBe(false);
+
+      run.moveTo(expectedMs + 1);
+      expect(run.judge.isMissed(0, 'c/5')).toBe(true);
+    },
+  );
 });
 
 describe('Loop Escape runway', () => {

@@ -88,21 +88,6 @@ function uncolored(note: StaveNote, head = 0): boolean {
   );
 }
 
-function expectVisible(note: StaveNote): void {
-  const elements = [
-    note.getSVGElement?.(),
-    ...note.noteHeads.map((head) => head.getSVGElement()),
-  ].filter((element): element is SVGElement => Boolean(element));
-
-  elements.forEach((el) => {
-    expect(el.classList).not.toContain('vf-note-hidden');
-    expect(el.hasAttribute('hidden')).toBe(false);
-    expect(el.style.display).toBe('');
-    expect(el.style.visibility).toBe('');
-    expect(el.style.opacity).toBe('');
-  });
-}
-
 interface SetupOptions {
   playheadStyle?: 'Cursor' | 'Measure';
   isHit?: (tick: number, prefix: string) => boolean;
@@ -359,90 +344,7 @@ describe('GameRenderer', () => {
   });
 });
 
-describe('GameRenderer completed-note visibility', () => {
-  it('has no visual state that makes a completed or legacy-hidden notehead transparent', () => {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    const noteHead = svgEl();
-
-    noteHead.classList.add('vf-note-hit', 'vf-note-hidden');
-    svg.append(noteHead);
-    document.body.append(svg);
-
-    const style = getComputedStyle(noteHead);
-
-    expect(style.display).not.toBe('none');
-    expect(style.visibility).toBe('visible');
-    expect(style.opacity).toBe('1');
-    svg.remove();
-  });
-
-  it('keeps every notehead visible through hits, misses, a row crossing, seek recovery, and reset', () => {
-    const notes = Array.from({ length: 6 }, (_, index) =>
-      staveNote([index % 2 === 0 ? 'c/5' : 'g/5']),
-    );
-
-    // Reproduce stale state left by the pre-fix renderer. Initial context
-    // setup must recover it before playback moves at all.
-    notes.forEach((note) => {
-      [
-        note.getSVGElement?.(),
-        ...note.noteHeads.map((head) => head.getSVGElement()),
-      ].forEach((el) => {
-        if (!el) {
-          return;
-        }
-
-        el.classList.add('vf-note-hidden');
-        el.setAttribute('hidden', '');
-        el.style.display = 'none';
-        el.style.visibility = 'hidden';
-        el.style.opacity = '0';
-      });
-    });
-
-    const hitTicks = new Set([0, 2160]);
-    const renderData = [
-      measureData(0, 1920, [rendered(0, notes[0]), rendered(480, notes[1])]),
-      {
-        ...measureData(1920, 3840, [
-          rendered(1920, notes[2]),
-          rendered(2160, notes[3]),
-        ]),
-        // A different system/row in Classic notation.
-        yOffset: 180,
-      },
-      {
-        ...measureData(3840, 5760, [
-          rendered(3840, notes[4]),
-          rendered(4320, notes[5]),
-        ]),
-        yOffset: 360,
-      },
-    ];
-    const view = setup(renderData, {
-      isHit: (tick) => hitTicks.has(tick),
-      isMissed: (tick) => !hitTicks.has(tick),
-    });
-
-    notes.forEach(expectVisible);
-
-    view.paintHit({ measureIdx: 0, noteIdx: 0 }, ['c/5']);
-    view.render(1, 2400);
-    notes.forEach(expectVisible);
-    expect(hasClass(notes[0], 'vf-note-hit')).toBe(true);
-    expect(hasClass(notes[1], 'vf-note-missed')).toBe(true);
-
-    // Focused recovery rewinds into the first row and replays renderer state.
-    view.render(0.25, 240, true);
-    notes.forEach(expectVisible);
-
-    // Resolve the chart end, then reset for the next recovery attempt.
-    view.render(6, 5760, true);
-    notes.forEach(expectVisible);
-    view.reset();
-    notes.forEach(expectVisible);
-  });
-
+describe('GameRenderer completed-note feedback', () => {
   it('keeps the notehead visible while the pop-flash animation is still playing', () => {
     const note = staveNote(['c/5']);
     const isHit = (tick: number, prefix: string) =>
@@ -457,7 +359,7 @@ describe('GameRenderer completed-note visibility', () => {
     expect(hasClass(note, 'vf-note-hidden', 0)).toBe(false);
   });
 
-  it('keeps the whole note visible after the pop-flash animation finishes', () => {
+  it('vanishes the whole note after the pop-flash animation finishes', () => {
     const note = staveNote(['c/5']);
     const isHit = (tick: number, prefix: string) =>
       tick === 0 && prefix === 'c/5';
@@ -468,7 +370,7 @@ describe('GameRenderer completed-note visibility', () => {
     view.paintHit({ measureIdx: 0, noteIdx: 0 }, ['c/5']);
     note.noteHeads[0].getSVGElement()!.dispatchEvent(new Event('animationend'));
 
-    expect(hasClass(note, 'vf-note-hidden', 0)).toBe(false);
+    expect(note.getSVGElement()?.classList).toContain('vf-note-hidden');
   });
 
   it('keeps a partially completed chord visible', () => {
@@ -485,7 +387,7 @@ describe('GameRenderer completed-note visibility', () => {
     expect(hasClass(note, 'vf-note-hidden', 0)).toBe(false);
   });
 
-  it('keeps a completed note readable across a small backward seek', () => {
+  it('keeps a completed note vanished across a small backward seek', () => {
     const n0 = staveNote(['c/5']);
     const n1 = staveNote(['d/5']);
     const n2 = staveNote(['e/5']);
@@ -503,10 +405,10 @@ describe('GameRenderer completed-note visibility', () => {
     );
 
     view.render(0, 480);
-    expect(hasClass(n0, 'vf-note-hidden')).toBe(false);
+    expect(n0.getSVGElement()?.classList).toContain('vf-note-hidden');
 
     view.render(0, 240);
-    expect(hasClass(n0, 'vf-note-hidden')).toBe(false);
+    expect(n0.getSVGElement()?.classList).toContain('vf-note-hidden');
   });
 
   it('clears hit treatment on rewind once Judge no longer reports it', () => {
@@ -529,7 +431,7 @@ describe('GameRenderer completed-note visibility', () => {
 
     view.render(0, 480);
     expect(hasClass(n0, 'vf-note-hit')).toBe(true);
-    expect(hasClass(n0, 'vf-note-hidden')).toBe(false);
+    expect(n0.getSVGElement()?.classList).toContain('vf-note-hidden');
 
     hit = false;
     view.render(0, 240);
@@ -564,7 +466,7 @@ describe('GameRenderer completed-note visibility', () => {
 
     view.render(0, 700);
     expect(hasClass(n1, 'vf-note-hit')).toBe(true);
-    expect(hasClass(n1, 'vf-note-hidden')).toBe(false);
+    expect(n1.getSVGElement()?.classList).toContain('vf-note-hidden');
 
     n1Hit = false;
     view.render(0, 500, true);
@@ -573,7 +475,7 @@ describe('GameRenderer completed-note visibility', () => {
     expect(hasClass(n1, 'vf-note-hidden')).toBe(false);
   });
 
-  it('never creates hidden-note state during reset', () => {
+  it('clears hidden-note state during reset', () => {
     const note = staveNote(['c/5']);
     const isHit = () => true;
     const view = setup([measureData(0, 1920, [rendered(0, note)])], {
@@ -585,6 +487,7 @@ describe('GameRenderer completed-note visibility', () => {
     view.reset();
 
     expect(hasClass(note, 'vf-note-hidden', 0)).toBe(false);
+    expect(note.getSVGElement()?.classList).not.toContain('vf-note-hidden');
   });
 });
 
