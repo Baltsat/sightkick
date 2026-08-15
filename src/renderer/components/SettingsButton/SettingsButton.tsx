@@ -71,7 +71,12 @@ export const SettingsButton = memo(function Settings({
         open={isOpen}
         onOpenChange={popoverOpenChange(setIsOpen)}
         trigger="click"
-        placement="bottomRight"
+        // The library trigger sits at the bottom of the shell rail; a
+        // bottom-anchored popover there lands past the window edge on a
+        // small screen, where a portal cannot be scrolled into view. Open
+        // rightward into the window instead; the run view keeps its
+        // toolbar anchor.
+        placement={page === 'song-list' ? 'rightBottom' : 'bottomRight'}
         rootClassName={label ? 'drumroll-performance-inspector' : undefined}
         destroyOnHidden={Boolean(label)}
         styles={popoverStyles}
