@@ -18,8 +18,10 @@ async function waitForAppReady(currentPage: Page) {
   await expect(libraryHeading).toBeVisible({ timeout: 60_000 });
 }
 
-// Throwaway repro for the reported freeze: open the library settings
-// popover, then try to close it and keep using the app.
+// Regression guard for the reported freeze: a stale modal wrapper in the
+// DOM must not block the settings popover from closing on an outside
+// click, and the app must keep responding. Outside-click is the guarded
+// gesture — Escape handling differs per platform and is not asserted.
 test('settings popover closes and the app keeps responding', async () => {
   let harness: Harness | undefined;
 
@@ -42,8 +44,7 @@ test('settings popover closes and the app keeps responding', async () => {
       document.body.append(staleModal);
     });
 
-    await page.keyboard.press('Escape');
-
+    await page.mouse.click(700, 400);
     await expect(page.getByTestId('rescan-folder')).not.toBeVisible({
       timeout: 5_000,
     });
