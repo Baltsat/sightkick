@@ -146,6 +146,21 @@ export function ScoreSummary({
   const accuracy = scoreData ? calculateAccuracy(scoreData) : 0;
   const hitNotes = scoreData?.hitNotes ?? 0;
   const missedNotes = Math.max(0, (scoreData?.totalNotes ?? 0) - hitNotes);
+  const performanceAccuracy = scoreData
+    ? accuracy
+    : practiceSummary?.overallAccuracy;
+  const performance =
+    noMusicalInput ||
+    performanceAccuracy === undefined ||
+    !Number.isFinite(performanceAccuracy)
+      ? 'none'
+      : performanceAccuracy >= 0.9
+      ? 'peak'
+      : performanceAccuracy >= 0.6
+      ? 'earned'
+      : 'recovery';
+  const albumCover =
+    songData?.albumCover && !songData.lesson ? songData.albumCover : undefined;
   // gamification.todayXp is live (reactive off the shared hook instance),
   // so by the time runResult lands it already reflects this run's XP -
   // no need to add xpEarned on top of it here.
@@ -298,7 +313,24 @@ export function ScoreSummary({
           : `Run complete — ${songData?.name ?? 'practice run'}`
       }
       data-testid="score-modal"
+      data-has-cover={albumCover ? 'true' : undefined}
+      data-performance={performance}
     >
+      {albumCover ? (
+        <img
+          className="drumroll-score-summary__cover"
+          src={albumCover}
+          alt=""
+          aria-hidden="true"
+          data-testid="score-album-cover"
+        />
+      ) : null}
+      {performance === 'peak' ? (
+        <div
+          className="drumroll-score-summary__victory-flare"
+          aria-hidden="true"
+        />
+      ) : null}
       <header className="drumroll-score-summary__header">
         <div
           className="drumroll-score-summary__eyebrow"
@@ -338,29 +370,48 @@ export function ScoreSummary({
               // may set it so the curriculum can award its honest stars.
               // The accuracy line IS this mode's one musical statement -
               // it already agrees with the grid below it by construction.
-              <div className="drumroll-score-summary__statement drumroll-score-summary__stars">
-                <Stars
-                  rating={starRating}
-                  perfect={isPerfect}
-                  glow
-                  size="3x"
-                  className="gap-3"
-                />
-                {isPerfect ? (
-                  <h3 className="drumroll-score-summary__statement-headline">
-                    Perfect
-                  </h3>
-                ) : (
-                  <h3 className="drumroll-score-summary__statement-headline tabular-nums">
-                    {Math.round(accuracy * 100)}% accuracy
-                  </h3>
-                )}
-                <p className="drumroll-score-summary__statement-meaning">
-                  {isPerfect
-                    ? 'Every note landed.'
-                    : `${starRating} of 5 stars on this run`}
-                </p>
-              </div>
+              <section className="drumroll-score-summary__score-result">
+                <div className="drumroll-score-summary__statement drumroll-score-summary__stars">
+                  <Stars
+                    rating={starRating}
+                    perfect={isPerfect}
+                    glow
+                    size="3x"
+                    className="gap-3"
+                  />
+                  {isPerfect ? (
+                    <h3 className="drumroll-score-summary__statement-headline">
+                      Perfect
+                    </h3>
+                  ) : (
+                    <h3 className="drumroll-score-summary__statement-headline tabular-nums">
+                      {Math.round(accuracy * 100)}% accuracy
+                    </h3>
+                  )}
+                  <p className="drumroll-score-summary__statement-meaning">
+                    {isPerfect
+                      ? 'Every note landed.'
+                      : `${starRating} of 5 stars on this run`}
+                  </p>
+                </div>
+                <div className="drumroll-score-summary__cells">
+                  <div className="drumroll-score-summary__cell">
+                    <div className="drumroll-score-summary__cell-value">
+                      {noteCountLabel(hitNotes, 'hit')}
+                    </div>
+                  </div>
+                  <div className="drumroll-score-summary__cell">
+                    <div className="drumroll-score-summary__cell-value">
+                      {noteCountLabel(missedNotes, 'missed')}
+                    </div>
+                  </div>
+                  <div className="drumroll-score-summary__cell">
+                    <div className="drumroll-score-summary__cell-value">
+                      {`${scoreData.falseHits ?? 0} false hits`}
+                    </div>
+                  </div>
+                </div>
+              </section>
             ) : (
               receipt && (
                 // The one honest musical statement for a Practice run
@@ -387,35 +438,14 @@ export function ScoreSummary({
               )
             )}
 
-            {scoreData ? (
-              <div className="drumroll-score-summary__cells">
-                <div className="drumroll-score-summary__cell">
-                  <div className="drumroll-score-summary__cell-value">
-                    {noteCountLabel(hitNotes, 'hit')}
-                  </div>
-                </div>
-                <div className="drumroll-score-summary__cell">
-                  <div className="drumroll-score-summary__cell-value">
-                    {noteCountLabel(missedNotes, 'missed')}
-                  </div>
-                </div>
-                <div className="drumroll-score-summary__cell">
-                  <div className="drumroll-score-summary__cell-value">
-                    {`${scoreData?.falseHits ?? 0} false hits`}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              receipt &&
-              runInsights && (
-                <RunInsightPanel
-                  insight={runInsights}
-                  actionLabel={primaryIsReplay ? retryLabel : continueLabel}
-                  focusSection={resolvedFocusSection}
-                  lessonRecommendations={resolvedLessonRecommendations}
-                />
-              )
-            )}
+            {!scoreData && receipt && runInsights ? (
+              <RunInsightPanel
+                insight={runInsights}
+                actionLabel={primaryIsReplay ? retryLabel : continueLabel}
+                focusSection={resolvedFocusSection}
+                lessonRecommendations={resolvedLessonRecommendations}
+              />
+            ) : null}
 
             {lessonProgression && (
               <div
@@ -483,6 +513,72 @@ export function ScoreSummary({
               </p>
             ) : null}
 
+            {runResult && (
+              <section
+                className={cn(
+                  'drumroll-score-summary__earned-moment',
+                  runResult.goalCrossed &&
+                    receipt?.changed &&
+                    'sk-goal-celebrate',
+                )}
+                data-testid="gamification-summary"
+                data-goal-crossed={runResult.goalCrossed ? 'true' : undefined}
+                data-new-unlocks={runResult.newlyUnlocked.length}
+              >
+                <div
+                  className="drumroll-score-summary__earned-label"
+                  data-testid="run-earned-moment"
+                >
+                  Earned this run
+                </div>
+                <div className="drumroll-score-summary__earned-grid">
+                  <div
+                    className="drumroll-score-summary__earned-fact"
+                    data-testid="run-streak-status"
+                  >
+                    <FontAwesomeIcon
+                      icon={faFire}
+                      style={{
+                        color:
+                          streakCurrent > 0
+                            ? 'var(--dr-ember)'
+                            : 'var(--dr-ink-muted)',
+                      }}
+                    />
+                    {streakCurrent > 0
+                      ? `${streakCurrent}-day practice streak`
+                      : 'New set, same progress'}
+                  </div>
+                  <div
+                    className="drumroll-score-summary__earned-xp tabular-nums"
+                    data-testid="run-xp-earned"
+                  >
+                    +{runResult.xpEarned} XP
+                  </div>
+                  <div
+                    className="drumroll-score-summary__earned-fact drumroll-score-summary__earned-goal"
+                    data-testid="run-goal-status"
+                  >
+                    {xpToGoal === 0
+                      ? "Today's set reached"
+                      : `${xpToGoal} XP left in today's set`}
+                  </div>
+                </div>
+                {runResult.nudge && (
+                  <div
+                    className="drumroll-score-summary__earned-nudge"
+                    data-testid="run-nudge"
+                  >
+                    {runResult.nudge.message}
+                  </div>
+                )}
+                <AchievementToastQueue
+                  queue={runResult.newlyUnlocked}
+                  className="drumroll-score-summary__achievement"
+                />
+              </section>
+            )}
+
             <details className="drumroll-score-summary__evidence">
               <summary
                 className="drumroll-score-summary__evidence-summary"
@@ -502,62 +598,6 @@ export function ScoreSummary({
                 />
               </div>
             </details>
-
-            {runResult && (
-              <div
-                className={cn(
-                  'drumroll-score-summary__status flex flex-col gap-2',
-                  runResult.goalCrossed &&
-                    receipt?.changed &&
-                    'sk-goal-celebrate',
-                )}
-                data-testid="gamification-summary"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div
-                    className="flex items-center gap-2 text-base font-semibold text-[var(--dr-ink)]"
-                    data-testid="run-streak-status"
-                  >
-                    <FontAwesomeIcon
-                      icon={faFire}
-                      style={{
-                        color:
-                          streakCurrent > 0
-                            ? 'var(--dr-ember)'
-                            : 'var(--dr-ink-muted)',
-                      }}
-                    />
-                    {streakCurrent > 0
-                      ? `${streakCurrent}-day practice streak`
-                      : 'New set, same progress'}
-                  </div>
-                  <div
-                    className="font-display text-lg font-semibold text-[var(--dr-wine)] tabular-nums"
-                    data-testid="run-xp-earned"
-                  >
-                    +{runResult.xpEarned} XP
-                  </div>
-                </div>
-                <div data-testid="run-goal-status">
-                  {xpToGoal === 0
-                    ? "Today's set reached"
-                    : `${xpToGoal} XP left in today's set`}
-                </div>
-                {runResult.nudge && (
-                  <div
-                    className="text-[var(--dr-wine)]"
-                    data-testid="run-nudge"
-                  >
-                    {runResult.nudge.message}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <AchievementToastQueue
-              queue={runResult?.newlyUnlocked ?? []}
-              className="w-full"
-            />
           </>
         )}
       </div>

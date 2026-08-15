@@ -2,11 +2,16 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { Song } from '../../../types';
 import { UseGamificationResult } from '../../hooks/useGamification';
 import { RunSummary, summarizeRun } from '../../services/practice-stats';
+import homeKitStudio from '../../assets/daybreak/home-kit-studio.png';
 import { ScoreSummary } from './ScoreSummary';
 
 const songData = {
   name: 'Master of Puppets',
   artist: 'Metallica',
+} as Song;
+const songWithCover = {
+  ...songData,
+  albumCover: homeKitStudio,
 } as Song;
 
 function kickRun(hits: number, misses: number, completedAt: string) {
@@ -121,6 +126,13 @@ export const MusicalReceipt: Story = {
   },
 };
 
+export const SeventyEightPercentWithCover: Story = {
+  args: {
+    songData: songWithCover,
+    scoreData: { hitNotes: 78, totalNotes: 100, falseHits: 0 },
+  },
+};
+
 export const ContinueMyWave: Story = {
   args: {
     scoreData: { hitNotes: 8, totalNotes: 10, falseHits: 0 },
@@ -178,6 +190,7 @@ const catastrophicRun = songRun(24, 1054, '2026-08-15T10:00:00.000Z', 0.7);
 
 export const CatastrophicMiss: Story = {
   args: {
+    songData: songWithCover,
     scoreData: undefined,
     practiceSummary: catastrophicRun,
     practiceHistory: [
@@ -239,7 +252,8 @@ const strongRun: RunSummary = {
 
 export const StrongPass: Story = {
   args: {
-    scoreData: undefined,
+    songData: songWithCover,
+    scoreData: { hitNotes: 1002, totalNotes: 1078, falseHits: 0 },
     practiceSummary: strongRun,
     practiceHistory: [
       songRun(701, 377, '2026-08-10T11:00:00.000Z', 0.7),
@@ -248,6 +262,54 @@ export const StrongPass: Story = {
       strongRun,
     ],
     persistenceState: 'saved',
+    gamification: {
+      ...gamification,
+      streak: { current: 7, longest: 9 },
+      todayXp: 62,
+    },
+    runResult: {
+      xpEarned: 24,
+      goalCrossed: true,
+      streakCurrent: 7,
+      newlyUnlocked: [
+        {
+          id: 'speed-demon',
+          title: 'Song personal best',
+          description: 'A later comparable song pass exceeded your saved best.',
+          hint: 'Beat a saved result on the same song, pace, and difficulty.',
+          evidenceEvent: 'comparable saved song personal best',
+          proofRank: 5,
+        },
+      ],
+    },
+  },
+};
+
+export const LessonPass: Story = {
+  args: {
+    songData: {
+      ...songData,
+      albumCover: undefined,
+      name: 'Alternating Singles Warm-Up',
+      artist: 'Drumroll Method',
+      lesson: {
+        id: '01.01',
+        starsToUnlock: 0,
+        unit: 'Foundations',
+        title: 'Alternating Singles Warm-Up',
+      },
+    } as Song,
+    scoreData: { hitNotes: 92, totalNotes: 100, falseHits: 0 },
+    lessonProgression: {
+      qualifies: true,
+      fullCoverage: true,
+      meetsLearningTempo: true,
+      atTargetSpeed: true,
+      meetsAccuracyTarget: true,
+      accuracy: 0.92,
+      starsEarned: 5,
+    },
+    persistenceState: 'saved',
   },
 };
 
@@ -255,6 +317,7 @@ const firstSongRun = songRun(840, 238, '2026-08-15T12:00:00.000Z', 0.8);
 
 export const FirstTimeSong: Story = {
   args: {
+    songData: songWithCover,
     scoreData: undefined,
     practiceSummary: firstSongRun,
     practiceHistory: [],

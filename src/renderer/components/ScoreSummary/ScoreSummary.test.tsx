@@ -56,6 +56,24 @@ describe('ScoreSummary', () => {
     expect(modal.getByText('5 false hits')).toBeInTheDocument();
   });
 
+  it('uses real score bands for a large 78% song result over its album cover', () => {
+    const { modal, modalEl } = renderSummary({
+      songData: {
+        ...songData,
+        albumCover: 'asset://master-of-puppets.jpg',
+      } as Song,
+      scoreData: { hitNotes: 78, totalNotes: 100, falseHits: 0 },
+    });
+
+    expect(modal.getByText('78% accuracy')).toBeInTheDocument();
+    expect(modalEl.querySelectorAll('[data-filled]')).toHaveLength(3);
+    expect(modal.getByTestId('score-album-cover')).toHaveAttribute(
+      'src',
+      'asset://master-of-puppets.jpg',
+    );
+    expect(modalEl).toHaveAttribute('data-performance', 'earned');
+  });
+
   it('labels a MIDI-silent miss-only run as missing musical input', () => {
     const { modal } = renderSummary({
       noMusicalInput: true,
@@ -692,6 +710,7 @@ describe('ScoreSummary', () => {
     const { modal } = renderSummary({
       songData: {
         ...songData,
+        albumCover: 'asset://lesson-placeholder.jpg',
         artist: 'Drumroll Method',
         lesson: {
           id: '01.01',
@@ -707,6 +726,26 @@ describe('ScoreSummary', () => {
     expect(
       modal.getByText('Drumroll Method · Foundations'),
     ).toBeInTheDocument();
+    expect(modal.queryByTestId('score-album-cover')).not.toBeInTheDocument();
+  });
+
+  it('keeps catastrophic evidence in recovery treatment without a victory flare', () => {
+    const catastrophic = {
+      ...multiLaneRunFixture(),
+      totalHits: 2,
+      totalMisses: 98,
+      totalWrong: 0,
+      overallAccuracy: 0.02,
+    };
+    const { modalEl } = renderSummary({
+      scoreData: undefined,
+      practiceSummary: catastrophic,
+    });
+
+    expect(modalEl).toHaveAttribute('data-performance', 'recovery');
+    expect(
+      modalEl.querySelector('.drumroll-score-summary__victory-flare'),
+    ).not.toBeInTheDocument();
   });
 
   it('capitalises the chart difficulty for a real (non-lesson) song', () => {
@@ -782,6 +821,9 @@ describe('ScoreSummary', () => {
       );
       expect(modal.getByTestId('run-goal-status')).toHaveTextContent(
         "10 XP left in today's set",
+      );
+      expect(modal.getByTestId('run-earned-moment')).toHaveTextContent(
+        'Earned this run',
       );
     });
 
