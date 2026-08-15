@@ -188,8 +188,8 @@ export function InputConfig({
           </div>
           {inputReadiness === 'reconnecting' && (
             <div className="text-text-muted text-xs">
-              Reconnecting to your remembered MIDI device. Keep it connected;
-              its mappings will be restored when it returns.
+              Keep your MIDI device connected. Drumroll restores its mappings
+              after reconnection.
             </div>
           )}
           {inputReadiness === 'waiting' && (

@@ -111,7 +111,7 @@ function decodeRecording(
   if (result.status !== 0) {
     const detail = result.stderr.toString().trim();
 
-    throw new Error(`ffmpeg could not decode ${filePath}: ${detail}`);
+    throw new Error(`ffmpeg failed to decode ${filePath}: ${detail}`);
   }
 
   return Promise.resolve(
@@ -208,7 +208,7 @@ export function sliceRecordingTakes(
 
   if (ranges.length < takeCount) {
     throw new Error(
-      `recording has ${ranges.length} clean takes; expected ${takeCount}`,
+      `recording has ${ranges.length} clean takes. expected ${takeCount}`,
     );
   }
 

@@ -24,6 +24,7 @@ import {
   cancelAutoChartJob,
   useAutoChartJobs,
 } from '../../hooks/useAutoChartJobs';
+import themedark from '../../theme';
 import { SongImportReview } from '../SongImport/SongImport';
 
 interface Props {
@@ -309,8 +310,8 @@ export function AutoChart({ disabled, onImported }: Props) {
               Paste a song. Get a playable drum chart.
             </h2>
             <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-text-muted">
-              Drumroll downloads the audio, separates the drums, transcribes the
-              notes, and lets you review the chart before it joins your library.
+              Drumroll turns the audio into a draft chart. Review the chart.
+              Then add it to your library.
             </p>
           </div>
 
@@ -451,7 +452,13 @@ export function AutoChart({ disabled, onImported }: Props) {
                 <div className="font-semibold text-text-body">Create chart</div>
                 <div className="flex gap-2">
                   <Tag color="blue">{backendName(job.backend)}</Tag>
-                  <Tag color={job.stage === 'failed' ? 'red' : 'purple'}>
+                  <Tag
+                    color={
+                      job.stage === 'failed'
+                        ? themedark.color.red
+                        : themedark.color.accent
+                    }
+                  >
                     {stageLabel(job)}
                   </Tag>
                 </div>

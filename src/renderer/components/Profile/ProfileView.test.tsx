@@ -213,7 +213,7 @@ describe('ProfileView', () => {
       'Target date: 2026-09-10',
     );
     expect(screen.getByTestId('profile-deadline-targets')).toHaveTextContent(
-      'Play a few more runs before Drumroll sets a weekly pace.',
+      'Complete 3 scored runs before Drumroll sets a weekly pace.',
     );
   });
 
@@ -390,7 +390,7 @@ describe('ProfileView', () => {
     openScale('history');
 
     expect(screen.getByTestId('retired-goal-notice')).toHaveTextContent(
-      'does not unlock the new Journey',
+      'does not open the new Journey',
     );
     expect(screen.getByTestId('retired-lessons-history')).toHaveTextContent(
       'Lesson 05.06 — Roadhouse Cat',

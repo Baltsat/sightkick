@@ -33,7 +33,7 @@ describe('StatsPanel', () => {
     expect(screen.getByTestId('stat-longest-streak')).toHaveTextContent('5');
     expect(screen.getByTestId('stat-total-stars')).toHaveTextContent('12');
     expect(screen.getByTestId('today-set-definition')).toHaveTextContent(
-      'qualifying saved practice days',
+      'saved practice days that meet the target',
     );
     expect(screen.getByTestId('weekly-xp-chart')).toBeInTheDocument();
     expect(screen.getByTestId('achievement-grid-loading')).toBeInTheDocument();

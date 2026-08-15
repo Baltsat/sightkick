@@ -500,7 +500,7 @@ export function buildWeeklyMusicalRecap({
     ? {
         state: 'uncertain' as const,
         label: nodes.get(uncertain.skill_id)?.label ?? uncertain.skill_id,
-        detail: 'Saved evidence is still building; it is not retained yet.',
+        detail: 'Saved evidence is building. Retained evidence: 0.',
       }
     : {
         state: 'not_enough_saved_evidence' as const,

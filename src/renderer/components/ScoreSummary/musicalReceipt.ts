@@ -155,7 +155,7 @@ function sectionAttemptReceipt(focus: FocusSectionInsight): MusicalReceipt {
 
   return {
     headline: 'This was a section attempt, not a full-song pass',
-    meaning: `${focus.label} carries the real input; the full-song total includes notes outside that attempt. Drumroll will replay this section at ${tempo}%.`,
+    meaning: `${focus.label} contains the scored input. The full-song total includes notes outside this attempt. Replay this section at ${tempo}%.`,
     action: 'replay',
     actionLabel: `Replay ${focus.label.toLowerCase()} at ${tempo}%`,
     replaySpeed: focus.tempoMultiplier,
@@ -294,8 +294,7 @@ export function musicalReceipt(
       headline: `${target[0].toUpperCase()}${target.slice(
         1,
       )} ${verb} ready for a loop`,
-      meaning:
-        'This run saved a specific target; no musical change is claimed yet.',
+      meaning: 'This run saved a specific target. No musical change yet.',
       action: 'replay',
       actionLabel: 'Replay this loop',
       changed: false,
@@ -319,9 +318,7 @@ export function musicalReceipt(
       headline: 'This tempo is playable',
       meaning: `${summary.totalHits} of ${attemptedCount(
         summary,
-      ).toLocaleString(
-        'en-US',
-      )} notes landed; this is a real baseline for the song.`,
+      ).toLocaleString('en-US')} notes landed. This is the song baseline.`,
       action: 'continue',
       actionLabel: 'Continue current plan',
       changed: false,

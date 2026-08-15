@@ -147,10 +147,10 @@ function tutorNextReason(
         : 'this phrase needs a smaller, musical return';
     const nextAction =
       recovery.approach === 'return-context'
-        ? 'carry it through one more bar so it survives the return to the song.'
-        : 'settle the anchor phrase, then carry it into the next bar.';
+        ? 'Carry it through 1 more bar so it survives the return to the song.'
+        : 'Settle the anchor phrase. Then carry it into the next bar.';
 
-    return `Build ${skill}: ${observation}; ${nextAction}`;
+    return `Build ${skill}. Notice ${observation}. ${nextAction}`;
   }
 
   if (displayState === 'remediation') {
@@ -163,7 +163,7 @@ function tutorNextReason(
     }
 
     if (recoveryCaption?.title === 'Loop released') {
-      return 'Take this phrase back into the song now; the next context is the useful proof.';
+      return 'Play this phrase in the song. Save 1 context pass.';
     }
 
     return 'Settle this observed phrase first. One clean anchor earns a nearby-tempo return.';

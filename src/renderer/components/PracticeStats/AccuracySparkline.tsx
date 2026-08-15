@@ -44,7 +44,7 @@ export function AccuracySparkline({
         className="text-base text-text-muted"
         data-testid="accuracy-sparkline-empty"
       >
-        Play a few runs to see your trend.
+        Play 1 scored run to see your trend.
       </div>
     );
   }

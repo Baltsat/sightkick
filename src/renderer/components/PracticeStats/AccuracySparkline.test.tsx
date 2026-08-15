@@ -35,7 +35,7 @@ describe('AccuracySparkline', () => {
     render(<AccuracySparkline trend={[]} />);
 
     expect(screen.getByTestId('accuracy-sparkline-empty')).toHaveTextContent(
-      'Play a few runs to see your trend.',
+      'Play 1 scored run to see your trend.',
     );
   });
 

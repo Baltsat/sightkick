@@ -714,7 +714,7 @@ describe('Loop Escape runway', () => {
     expect(screen.getByText('Quality retained')).toBeInTheDocument();
     expect(screen.getByText('0.7× → 0.9×')).toBeInTheDocument();
     expect(screen.getByTestId('loop-escape-runway')).toHaveAccessibleName(
-      'Loop escape, bars 1 through 2: lock; 1.0 of 2 clean passes, 0.7× → 0.9×; near-clean quality retained',
+      'Loop escape · bars 1–2 · lock · 1.0 of 2 clean passes · 0.7× → 0.9× · near-clean quality retained',
     );
   });
 });

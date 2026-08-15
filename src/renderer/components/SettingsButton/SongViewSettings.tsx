@@ -189,7 +189,7 @@ export function SongViewSettings({
                 <div className="flex items-center justify-between gap-3">
                   <SettingLabel
                     label="Count-in"
-                    tooltip="A few clicks before the song starts so you're not caught off guard."
+                    tooltip="Hear the count-in before the song starts."
                   />
                   <Switch
                     size="small"

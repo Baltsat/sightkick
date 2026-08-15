@@ -108,7 +108,7 @@ describe('deriveAdaptiveTimingWindow', () => {
     expect(recommendation.timingWindowMs).toBe(SONG_STARTING_WINDOW_MS);
     expect(recommendation.phase).toBe('calibrating');
     expect(recommendation.evidence.highQualityRuns).toBe(2);
-    expect(recommendation.reason).toContain('three consistent runs');
+    expect(recommendation.reason).toContain('3 consistent runs');
   });
 
   it('tightens gradually only after repeated high-accuracy, low-spread evidence', () => {

@@ -527,7 +527,7 @@ function directRemediationDetail(
   return findingCount > 0
     ? `${findingCount} saved Coach finding${
         findingCount === 1 ? '' : 's'
-      } route directly to this lesson.`
+      } match this lesson.`
     : undefined;
 }
 

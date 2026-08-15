@@ -478,10 +478,10 @@ export function ScoreSummary({
                 </span>
                 {' — '}
                 {lessonProgression.qualifies
-                  ? `You finished every note at 82%+. The next lesson can open${
+                  ? `You finished every note at 82%+. Open the next lesson${
                       lessonProgression.atTargetSpeed
-                        ? '; you also earned the full-tempo mark.'
-                        : ', and full tempo is still there when you want it.'
+                        ? '. Full-tempo mark earned.'
+                        : '. Earn the full-tempo mark at 1.0×.'
                     }`
                   : !lessonProgression.fullCoverage
                   ? 'Start from bar 1 and reach the end. Tutor rewinds are okay.'

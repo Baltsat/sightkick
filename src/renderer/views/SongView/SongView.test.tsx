@@ -117,7 +117,7 @@ describe('opening a song', () => {
       view.ipc.emit('load-song', { error: 'missing' });
     });
 
-    expect(screen.getByText("Couldn't open this song")).toBeInTheDocument();
+    expect(screen.getByText('Song open failed')).toBeInTheDocument();
     expect(screen.getByTestId('song-list-stub')).toBeInTheDocument();
   });
 

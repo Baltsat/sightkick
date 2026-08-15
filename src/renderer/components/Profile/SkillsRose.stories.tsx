@@ -211,8 +211,8 @@ const meta: Meta<typeof SkillsRose> = {
   },
   decorators: [
     (Story) => (
-      <div className="min-h-screen bg-bg p-8">
-        <div className="mx-auto max-w-7xl rounded-3xl bg-surface px-8 pb-10">
+      <div className="h-screen overflow-y-auto bg-bg px-8 pb-10">
+        <div className="mx-auto max-w-7xl">
           <Story />
         </div>
       </div>

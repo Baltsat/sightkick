@@ -556,13 +556,13 @@ describe('Tutor HUD evidence messages', () => {
     ).toContain('Checkpoint bar 3 gives 1 lead-in bar before failed bars 4–5');
     expect(
       messageForTutorCommand(rewind, DEFAULT_TUTOR_SETTINGS)?.detail,
-    ).toContain('played at your own speed');
+    ).toContain('at your current speed');
     expect(
       messageForTutorCommand(rewind, DEFAULT_TUTOR_SETTINGS)?.detail,
     ).not.toMatch(/80%/);
     expect(
       messageForTutorCommand(rewind, DEFAULT_TUTOR_SETTINGS)?.detail,
-    ).toContain('listen for the count-in before playing');
+    ).toContain('Listen for the count-in. Then play.');
   });
 
   it('explains the configured clean predicate and configurable deferral limit', () => {
@@ -607,7 +607,7 @@ describe('Tutor HUD evidence messages', () => {
     };
 
     expect(messageForTutorCommand(retry, settings)?.detail).toContain(
-      '95% or better across 6 resolved notes, no more than 1 miss, and no more than 1 wrong hit',
+      '95%+ accuracy · 6+ resolved notes · ≤1 misses · ≤1 wrong hits',
     );
     expect(messageForTutorCommand(deferred, settings)?.detail).toContain(
       '3 failed recovery attempts reached the configured 3-attempt safety limit',

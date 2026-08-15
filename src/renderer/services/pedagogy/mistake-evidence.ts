@@ -152,7 +152,7 @@ export function describeMistake(
       actualElement: actual,
       title: `${expectedLabel} didn't score${bar ? ` — ${bar}` : ''}`,
       detail: 'The right drum was struck, but this hit was not counted.',
-      check: `If that note head is marked accent or ghost, that dynamic is worth checking — hit harder for an accent, softer for a ghost.`,
+      check: 'Check the note head. Play accents harder. Play ghosts softer.',
     };
   }
 
@@ -165,7 +165,7 @@ export function describeMistake(
     title: `${actualLabel} instead of ${expectedLabel}`,
     detail: `${
       bar ?? 'The score'
-    } called for ${expectedLabel}; the strike landed on ${actualLabel}.`,
+    } expected ${expectedLabel}. You played ${actualLabel}.`,
     check: `Move to the ${expectedLabel} zone next time.`,
   };
 }

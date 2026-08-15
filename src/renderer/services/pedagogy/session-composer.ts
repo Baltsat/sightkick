@@ -333,7 +333,7 @@ export function composePracticeSession(
     launch: blocks[0],
     blocks,
     reason: input.request.explicit_song_id
-      ? 'The explicitly chosen song wins the launch; its receipt controls the scaffold.'
+      ? 'The chosen song starts first. Its receipt controls the scaffold.'
       : 'The launch is precomputed from intent, dose, and the current evidence receipt.',
   };
 }

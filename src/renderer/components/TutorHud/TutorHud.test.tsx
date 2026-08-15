@@ -161,7 +161,7 @@ describe('TutorHud', () => {
     );
 
     expect(screen.getByTestId('tutor-next-reason')).toHaveTextContent(
-      'Build snare placement: the tom 1 → snare switch repeated; carry it through one more bar so it survives the return to the song.',
+      'Build snare placement. Notice the tom 1 → snare switch repeated. Carry it through 1 more bar so it survives the return to the song.',
     );
   });
 
@@ -253,7 +253,7 @@ describe('TutorHud', () => {
 
       expect(disclosure).toHaveAttribute('open');
       expect(
-        screen.getByText('Bar 4 called for Snare; the strike landed on Ride.'),
+        screen.getByText('Bar 4 expected Snare. You played Ride.'),
       ).toBeInTheDocument();
       expect(
         screen.getByText('Move to the Snare zone next time.'),

@@ -149,7 +149,7 @@ export function remediationTaskWhy(task: RemediationTask): string {
     ? `The anchor is in. Keep ${skill} through this phrase at ${task.playbackSpeed.toFixed(
         1,
       )}× before the next planned tempo probe.`
-    : `Build ${skill} in this phrase first; two good-enough passes unlock the next planned tempo probe.`;
+    : `Build ${skill} in this phrase. Save 2 good-enough passes. Then test the next tempo.`;
 }
 
 /**

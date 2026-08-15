@@ -108,7 +108,7 @@ export function StatsPanel({
           data-testid="today-set-definition"
         >
           This is today&apos;s effort target. A practice streak counts
-          consecutive qualifying saved practice days.
+          consecutive saved practice days that meet the target.
         </p>
         <WeeklyXpChart
           points={weeklyXp}
@@ -128,7 +128,7 @@ export function StatsPanel({
             className="border-l-2 border-border-soft p-4 text-center text-base text-text-muted"
             data-testid="lane-accuracy-empty"
           >
-            Play a few runs to see your per-drum accuracy.
+            Play 1 scored run to see your per-drum accuracy.
           </div>
         )}
       </section>

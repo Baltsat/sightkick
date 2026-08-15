@@ -2,10 +2,10 @@
 # Rudiment Gym units (Fundamentals wing) added by a later authoring-time pass (build_fundamentals.py / splice_and_renumber.py, also not part of the shipped generator) -- see README.md's "Rudiment Gym" section for the design writeup and PAS-40 coverage table.
 meta:
   title: Drumroll Method - Drumset Fundamentals
-  assessment_boundary: MIDI assesses timing and pad choice; sticking/form cue is not assessed.
+  assessment_boundary: MIDI assesses timing and pad choice. It does not assess sticking or form.
   lesson_policy:
-    dose_rule: Use focused repeats from the authored BPM floor; advance only while the pattern remains controlled.
-    mastery_rule: Clear gate - one complete uninterrupted pass at the authored target BPM with at least 90 percent scored accuracy; keep repeating until it feels consistent.
+    dose_rule: Start at the authored BPM floor. Use focused repeats. Advance only while the pattern stays controlled.
+    mastery_rule: Play 1 uninterrupted pass at the target BPM. Score at least 90 percent accuracy. Repeat until the pattern stays consistent.
   inspiration:
     Pedagogical progression inspired by a well-known beginner drumset method book's lesson
     order (sticking basics, reading, coordination, 8th notes, toms, ties/rests, strokes, fills, musical
@@ -198,7 +198,7 @@ units:
           - id: '01.01'
             lesson: 1
             title: Hand Blocks Warm-Up
-            cue: Play four right-hand notes, then four left-hand notes; keep the volume even when the lead changes.
+            cue: Play four right-hand notes. Play four left-hand notes. Keep both hands at one volume.
             skills:
               - sixteenth-notes
               - timing
@@ -221,7 +221,7 @@ units:
           - id: '01.02'
             lesson: 1
             title: Paired Doubles Warm-Up
-            cue: Two even taps per hand -- listen for the second tap matching the first.
+            cue: Play 2 even taps per hand. Match the second tap to the first.
             skills:
               - sixteenth-notes
               - timing
@@ -244,7 +244,7 @@ units:
           - id: '01.03'
             lesson: 1
             title: Kick Drum Pulse
-            cue: Rest your heel down and let the beater bounce back off the head.
+            cue: Rest your heel down. Let the beater bounce off the head.
             skills:
               - sixteenth-notes
               - timing
@@ -290,9 +290,7 @@ units:
           - id: '02.02'
             lesson: 2
             title: Snare and Kick Trade-Off
-            cue:
-              Alternate cleanly between hand and foot, then bring them together -- kick holds the pulse while
-              the snare marks beats 2 and 4.
+            cue: Alternate hand and foot. Then join them. Keep the kick steady under snare beats 2 and 4.
             skills:
               - kick-independence
               - reading
@@ -316,7 +314,7 @@ units:
           - id: '02.03'
             lesson: 2
             title: Rests in the Groove
-            cue: Let the rests breathe -- don't sneak in an extra note to fill the gap.
+            cue: Let the rests breathe. Do not add a note in each gap.
             skills:
               - fills
               - kick-independence
@@ -347,9 +345,7 @@ units:
           - id: '03.01'
             lesson: 3
             title: Single Stroke Roll (60 BPM)
-            cue:
-              'RLRL RLRL RLRL RLRL -- both hands the same height, let the stick rebound on its own, no accents.
-              First rung of the ladder: nail the evenness before the tempo climbs.'
+            cue: Play RLRL RLRL RLRL RLRL. Keep both hands at one height. Let each stick rebound. Use no accents.
             skills:
               - single-stroke-roll
               - singles
@@ -372,9 +368,7 @@ units:
           - id: '03.02'
             lesson: 3
             title: Single Stroke Roll (80 BPM)
-            cue:
-              Same RLRL stream, faster. If the hands start to tense up, drop back to the 60 BPM rung and
-              build from there.
+            cue: Play the RLRL stream faster. Drop to 60 BPM if your hands tense. Rebuild from there.
             skills:
               - single-stroke-roll
               - singles
@@ -420,9 +414,7 @@ units:
           - id: '03.04'
             lesson: 3
             title: Single Stroke Roll (120 BPM)
-            cue:
-              Top rung of the ladder. This is roughly where 'Wipe Out'-style tom rolls live -- keep the stick
-              heights identical even as the tempo pushes.
+            cue: Play the top tempo. Keep both stick heights even.
             skills:
               - single-stroke-roll
               - singles
@@ -445,9 +437,7 @@ units:
           - id: '03.05'
             lesson: 3
             title: Single Stroke Roll - Tom Cascade
-            cue:
-              Three bars of groove, then the single strokes cascade top to bottom across the toms -- the
-              classic 'Wipe Out' move, minus the flourish.
+            cue: Play 3 groove bars. Cascade single strokes down the toms for bar 4.
             skills:
               - single-stroke-roll
               - singles
@@ -481,9 +471,8 @@ units:
             lesson: 3
             title: Double Stroke Roll (60 BPM)
             cue:
-              RRLL RRLL RRLL RRLL -- one full stroke, then let the second stroke of each pair rebound on
-              its own instead of restriking it. The grid can't show which hand plays which note -- that difference
-              lives entirely in the cue and in your hands, not in the notation or the audio.
+              Play RRLL RRLL RRLL RRLL. Use 1 full stroke, then rebound the second stroke. Follow the sticking
+              cue because notation and audio do not identify hands.
             skills:
               - double-stroke-roll
               - doubles
@@ -506,9 +495,7 @@ units:
           - id: '03.07'
             lesson: 3
             title: Double Stroke Roll (80 BPM)
-            cue:
-              Same doubles, faster -- if the second stroke of each pair starts sounding weak or uneven, that's
-              the rebound breaking down. Slow back down.
+            cue: Play the doubles faster. Slow down when the second stroke weakens.
             skills:
               - double-stroke-roll
               - doubles
@@ -531,9 +518,7 @@ units:
           - id: '03.08'
             lesson: 3
             title: Double Stroke Roll (100 BPM)
-            cue:
-              Same doubles again. At this speed you're relying on the stick's natural bounce, not muscling
-              the second stroke.
+            cue: Play the doubles again. Use stick rebound for the second stroke.
             skills:
               - double-stroke-roll
               - doubles
@@ -556,9 +541,7 @@ units:
           - id: '03.09'
             lesson: 3
             title: Double Stroke Roll (120 BPM)
-            cue:
-              Top rung. This is buzz-roll territory for a lot of players -- keep every pair distinct, don't
-              let it blur into an uncontrolled bounce.
+            cue: Keep every pair distinct at the top tempo. Stop if the pairs blur into a buzz.
             skills:
               - double-stroke-roll
               - doubles
@@ -581,9 +564,7 @@ units:
           - id: '03.10'
             lesson: 3
             title: Double Stroke Roll - Backbeat Fill
-            cue:
-              Three bars of groove, then a full bar of doubles on the snare, building to an accent on the
-              very last stroke to launch the next phrase.
+            cue: Play 3 groove bars. Play 1 doubles bar on the snare. Accent the last stroke before the next phrase.
             skills:
               - double-stroke-roll
               - doubles
@@ -617,9 +598,8 @@ units:
             lesson: 4
             title: Triple Stroke Roll (60 BPM)
             cue:
-              RRR LLL RRR LLL -- three even strokes per hand at the same height before switching. Groupings
-              of 3 don't line up with this bar's 16 steps, and that's fine -- the stream itself is unaccented,
-              so nothing in the notation depends on where a group starts.
+              Play RRR LLL with 3 even strokes per hand. Ignore where each unaccented group starts in this
+              16-step bar.
             skills:
               - triple-stroke-roll
               - triples
@@ -642,9 +622,7 @@ units:
           - id: '04.02'
             lesson: 4
             title: Triple Stroke Roll (80 BPM)
-            cue:
-              Same triples, faster -- listen for all three strokes in a group staying the same volume, no
-              accent creeping in on the first of each three.
+            cue: Play the triples faster. Keep all 3 strokes at one volume.
             skills:
               - triple-stroke-roll
               - triples
@@ -667,9 +645,7 @@ units:
           - id: '04.03'
             lesson: 4
             title: Triple Stroke Roll (100 BPM)
-            cue:
-              Top rung -- three even strokes per hand at speed, no ghosted first stroke, no accented last
-              one.
+            cue: Play 3 even strokes per hand at the top tempo. Keep all strokes level.
             skills:
               - triple-stroke-roll
               - triples
@@ -692,9 +668,7 @@ units:
           - id: '04.04'
             lesson: 4
             title: Triple Stroke Roll - Triplet Fill
-            cue:
-              Three bars of groove, then the triple strokes spill from snare to high tom to floor tom --
-              a fill you'll hear in blues-rock turnarounds.
+            cue: Play 3 groove bars. Move triple strokes from snare to high tom to floor tom.
             skills:
               - triple-stroke-roll
               - triples
@@ -726,10 +700,7 @@ units:
           - id: '04.05'
             lesson: 4
             title: Accent Study - Every Fourth Note
-            cue:
-              All single strokes -- accent beat 1 of every group of four, everything else stays quiet and
-              even. This is the same accent skeleton you'll feel inside the single paradiddle a few seasons
-              from now.
+            cue: Play single strokes. Accent every fourth note. Keep every other note quiet and even.
             skills:
               - accents
               - singles
@@ -751,10 +722,7 @@ units:
           - id: '04.06'
             lesson: 4
             title: Accent Study - Every Third Note
-            cue:
-              Single strokes, accented every third note -- the accent walks across the bar and creates a
-              3-against-4 feel against the steady 16th-note pulse. Count '1-2-3, 1-2-3' over the top of the
-              4/4 beat.
+            cue: Accent every third single stroke. Count '1-2-3, 1-2-3' over the 4/4 pulse.
             skills:
               - accents
               - singles
@@ -778,9 +746,8 @@ units:
             lesson: 4
             title: Accent-Shift Linear Fill
             cue:
-              Same accent-every-4 shape as the study above, but now the accented notes jump to the high tom
-              while the unaccented notes stay on the snare -- a linear fill, hands never land on two drums at
-              once. This is the big single-stroke tom-fill vocabulary you hear leading into 'In the Air Tonight'.
+              Play the accent-every-4 shape. Move accents to the high tom and keep quiet notes on the snare.
+              Keep the fill linear.
             skills:
               - accents
               - linear-drumming
@@ -817,9 +784,7 @@ units:
           - id: '05.01'
             lesson: 5
             title: Hi-Hat and Snare Handshake
-            cue:
-              Keep the hi-hat steady with your hand while the snare answers on beat 2 -- your foot's only
-              job is holding the pedal shut.
+            cue: Keep steady hi-hat notes. Play snare on beat 2. Hold the hi-hat pedal shut.
             skills:
               - sixteenth-notes
             time_signature:
@@ -1049,7 +1014,7 @@ units:
           - id: '06.05'
             lesson: 6
             title: Syncopated Kick Groove
-            cue: Kick lands on 1, the and of 2, 3, and the and of 4 -- count every upbeat out loud.
+            cue: Count every upbeat aloud. Play kick on 1, the and of 2, 3, and the and of 4.
             skills:
               - accents
               - hihat-timekeeping
@@ -1075,7 +1040,7 @@ units:
           - id: '06.06'
             lesson: 6
             title: Hat and Kick Unison Drill
-            cue: Foot and hand land together -- lock them so it sounds like one voice.
+            cue: Play foot and hand together. Make them sound like 1 voice.
             skills:
               - eighth-notes
               - kick-independence
@@ -1156,7 +1121,7 @@ units:
           - id: '07.02'
             lesson: 7
             title: High and Mid Tom Signals
-            cue: Hear the bright high tom (T1) and the mid tom (T2) as separate voices. Play each answer clearly, then alternate them without losing the pulse.
+            cue: Hear T1 and T2 as separate voices. Play each answer clearly. Then alternate them over the pulse.
             skills:
               - eighth-notes
               - toms
@@ -1179,7 +1144,7 @@ units:
           - id: '07.03'
             lesson: 7
             title: Mid and Floor Tom Signals
-            cue: Keep the mid tom (T2) and floor tom (T3) distinct. First name each voice with the hands, then move between them in both directions.
+            cue: Keep T2 and T3 distinct. Name each voice first. Then move between them in both directions.
             skills:
               - eighth-notes
               - toms
@@ -1202,7 +1167,7 @@ units:
           - id: '07.04'
             lesson: 7
             title: 'Three-Tom Paths: Down and Back'
-            cue: Travel high to mid to floor tom, then reverse the route. Keep every landing even; the order is the lesson.
+            cue: Move from high to mid to floor tom. Reverse the route. Keep every hit even.
             skills:
               - accents
               - eighth-notes
@@ -1232,7 +1197,7 @@ units:
           - id: '07.05'
             lesson: 7
             title: Random-Order Three-Tom Callouts
-            cue: Identify high, mid, and floor tom from the sound and position. The final mixed callout bar uses a random order; start with the labels, then answer from memory.
+            cue: Name the high, mid, and floor toms. Read the labels first. Then play the random final bar from memory.
             skills:
               - eighth-notes
               - toms
@@ -1292,7 +1257,7 @@ units:
           - id: '07.07'
             lesson: 7
             title: Three-Tom Groove and Fill
-            cue: Keep the groove relaxed for three bars, then answer with one descending fill across high, mid, and floor tom. Land the crash exactly on the next phrase.
+            cue: Play 3 relaxed groove bars. Answer with 1 descending fill across all 3 toms. Land the next crash.
             skills:
               - accents
               - hihat-timekeeping
@@ -1327,7 +1292,7 @@ units:
           - id: '07.08'
             lesson: 7
             title: 'Three-Tom Transfer: Faded Cues'
-            cue: Move the same three-tom vocabulary through a real groove. Start by reading the lane labels; fade the labels on later repeats and navigate from sound, color, and kit position.
+            cue: Play this 3-tom pattern in the groove. Read the labels first. Hide them on later repeats. Navigate by sound, color, and position.
             skills:
               - accents
               - hihat-timekeeping
@@ -1368,7 +1333,7 @@ units:
           - id: '08.01'
             lesson: 8
             title: Tied Upbeat Feel
-            cue: Don't restrike the tied note -- let the sound carry through the silence.
+            cue: Do not restrike the tied note. Let the sound carry through the rest.
             skills:
               - sixteenth-notes
             time_signature:
@@ -1526,7 +1491,7 @@ units:
           - id: '09.01'
             lesson: 9
             title: Accent and Rebound Control
-            cue: Accent every downbeat and let the stick rebound naturally into a quiet upbeat between hits.
+            cue: Accent every downbeat. Let the stick rebound into each quiet upbeat.
             skills:
               - accents
               - sixteenth-notes
@@ -1548,7 +1513,7 @@ units:
           - id: '09.02'
             lesson: 9
             title: Dotted-Quarter Kick Feel
-            cue: The kick lands a beat and a half apart -- count '1-e-and-uh' to feel it.
+            cue: Count '1-e-and-uh' aloud. Place each kick 1.5 beats apart.
             skills:
               - accents
               - hihat-timekeeping
@@ -1600,9 +1565,7 @@ units:
           - id: '09.04'
             lesson: 9
             title: Groove with a Turnaround Tag
-            cue:
-              A crash-and-broken-snare tag caps the phrase every time through -- this loop format has no
-              true first/second ending (see README.md), so the same turnaround plays each pass.
+            cue: Play the same crash and broken-snare turnaround on every loop. This chart has no first or second ending.
             skills:
               - accents
               - crash
@@ -1693,7 +1656,7 @@ units:
           - id: '10.01'
             lesson: 10
             title: Hand-to-Hand Accents
-            cue: Alternate hands through steady 8th notes, popping an accent every third note.
+            cue: Alternate hands through steady eighth notes. Accent every third note.
             skills:
               - accents
               - sixteenth-notes
@@ -1855,7 +1818,7 @@ units:
           - id: '10.07'
             lesson: 10
             title: Time-Keeping Discipline
-            cue: Three bars of solid time followed by a short, simple fill -- resist the urge to rush it.
+            cue: Play 3 steady groove bars. Add 1 short fill. Keep the fill in time.
             skills:
               - accents
               - fills
@@ -1936,9 +1899,7 @@ units:
           - id: '10.10'
             lesson: 10
             title: Open Hi-Hat Backbeat Splash
-            cue:
-              Let the hi-hat ring open on the 'and' right before each backbeat, then clamp it shut exactly
-              on beats 2 and 4.
+            cue: Open the hi-hat before each backbeat. Close it on beats 2 and 4.
             skills:
               - accents
               - hihat-timekeeping
@@ -1971,7 +1932,7 @@ units:
           - id: '11.01'
             lesson: 11
             title: Accent Alternation Warm-Up
-            cue: Alternate strong and soft strokes, then reverse which hand owns the accent on the next bar.
+            cue: Alternate strong and soft strokes. Switch the accent hand in the next bar.
             skills:
               - accents
               - sixteenth-notes
@@ -2051,9 +2012,7 @@ units:
           - id: '11.04'
             lesson: 11
             title: Two-Bar Fill Idea
-            cue:
-              Two bars of time, then a snare-to-tom fill -- it swells pianissimo to fortissimo hit by hit,
-              landing on the ff crash that opens the next phrase.
+            cue: Play 2 time bars. Crescendo the snare-to-tom fill from pianissimo to fortissimo. Land on the ff crash.
             skills:
               - accents
               - crash
@@ -2088,9 +2047,7 @@ units:
           - id: '11.05'
             lesson: 11
             title: Backbeat Shifted to Beat 3 Only
-            cue:
-              The snare moves off the usual 2-and-4 spot -- lock onto the new backbeat feel against the steady
-              hi-hat.
+            cue: Lock onto the new backbeat against the steady hi-hat. Play snare away from beats 2 and 4.
             skills:
               - accents
               - hihat-timekeeping
@@ -2247,9 +2204,8 @@ units:
             lesson: 12
             title: Full-Form Etude
             cue:
-              A complete intro/verse/chorus/fill/outro piece with a graded dynamic arc from a hushed pickup
-              through a mezzo-piano verse to a fortissimo chorus, tom-fill crescendo, and outro -- the capstone
-              of everything so far.
+              Play the full form with intro, verse, chorus, fill, and outro. Grow from pianissimo to fortissimo
+              through the song.
             skills:
               - capstone
               - crash
@@ -2382,9 +2338,8 @@ units:
             lesson: 13
             title: Single Paradiddle Groove
             cue:
-              "The paradiddle voiced as a groove: accented notes land on the snare, unaccented notes stay
-              on the hi-hat, kick anchors 1 and 3. This is the paradiddle-based groove vocabulary Steve Gadd
-              made famous in '50 Ways to Leave Your Lover'."
+              Voice the paradiddle as a groove. Put accents on snare, quiet notes on hi-hat, and kick on
+              beats 1 and 3.
             skills:
               - paradiddle
               - single-paradiddle
@@ -2418,9 +2373,8 @@ units:
             lesson: 13
             title: Double Paradiddle (65 BPM)
             cue:
-              RLRLRR LRLRLL -- accent only the 1st note of each six-note group; everything else stays even.
-              Two groups per bar, then one beat of rest to catch your breath -- 16th-note resolution throughout,
-              no triplet feel needed.
+              Play RLRLRR LRLRLL. Accent the first note of each 6-note group. Keep every other note even.
+              Rest for 1 beat.
             skills:
               - paradiddle
               - double-paradiddle
@@ -2444,9 +2398,7 @@ units:
           - id: '13.06'
             lesson: 13
             title: Double Paradiddle (85 BPM)
-            cue:
-              Same six-note groups, faster. The extra pair of singles (RLRL before the RR) is what makes
-              this harder than the single paradiddle -- don't let it rush.
+            cue: Play the 6-note groups faster. Keep the extra RLRL singles even before each double.
             skills:
               - paradiddle
               - double-paradiddle
@@ -2494,9 +2446,7 @@ units:
           - id: '13.08'
             lesson: 13
             title: Double Paradiddle - Extended Fill
-            cue:
-              Three bars of groove, then the two six-note groups spill from snare onto the high tom -- an
-              extended paradiddle-family fill you'll hear in fusion and rudimental-influenced kit playing.
+            cue: Play 3 groove bars. Move 2 six-note groups from snare to high tom for the fill.
             skills:
               - double-paradiddle
               - fills
@@ -2529,9 +2479,7 @@ units:
           - id: '14.01'
             lesson: 14
             title: Triple Paradiddle (60 BPM)
-            cue:
-              RLRLRLRR LRLRLRLL -- accent only the 1st note of each eight-note group; everything else stays
-              even. Exactly one full cycle per bar, no rest needed.
+            cue: Play RLRLRLRR LRLRLRLL. Accent the first note of each 8-note group. Keep every other note even.
             skills:
               - paradiddle
               - triple-paradiddle
@@ -2605,9 +2553,7 @@ units:
           - id: '14.04'
             lesson: 14
             title: Triple Paradiddle - Extended Fill
-            cue:
-              Three bars of groove, then the two eight-note groups spill from snare to high tom -- paradiddle-family
-              fill vocabulary stretched out over a full bar.
+            cue: Play 3 groove bars. Move 2 eight-note groups from snare to high tom for the fill.
             skills:
               - triple-paradiddle
               - fills
@@ -2666,9 +2612,8 @@ units:
             lesson: 14
             title: Paradiddle-Diddle (85 BPM)
             cue:
-              Same six-note groups, faster -- here the double comes right after the accent (RLRR-LL) instead
-              of before it, which changes how the sticking feels in the hand even though the grid can't show
-              that.
+              Play the 6-note groups faster. Place the double directly after each accent. Keep the hands even
+              when the grid hides sticking.
             skills:
               - paradiddle
               - paradiddle-diddle
@@ -2717,8 +2662,8 @@ units:
             lesson: 14
             title: Paradiddle-Diddle - Extended Fill
             cue:
-              Three bars of groove, then the paradiddle-diddle's six-note groups spill from snare to high
-              tom -- the same fill shape as the double paradiddle's, played with different hands.
+              Play 3 groove bars. Move the paradiddle-diddle groups from snare to high tom. Follow the written
+              sticking.
             skills:
               - paradiddle-diddle
               - fills
@@ -2807,9 +2752,8 @@ units:
             lesson: 15
             title: Hand-to-Foot Linear Groove
             cue:
-              "A groove built entirely from hand-to-foot substitution: hi-hat keeps steady 8th-note time
-              on top while hands and kick trade the 16th-note stream underneath, never landing together. This
-              is the ostinato vocabulary behind most modern 'chops'-style kit drumming."
+              Keep steady hi-hat eighth notes. Trade the sixteenth-note stream between hands and kick without
+              unison hits.
             skills:
               - hand-to-foot
               - kick-independence
@@ -2841,7 +2785,7 @@ units:
           - id: '16.01'
             lesson: 16
             title: 16th-Note Singles
-            cue: Build the sixteenth-note stream one beat at a time, then play the complete bar.
+            cue: Build the sixteenth-note stream 1 beat at a time. Then play the full bar.
             skills:
               - sixteenth-notes
             time_signature:
@@ -2888,7 +2832,7 @@ units:
           - id: '16.03'
             lesson: 16
             title: 16th Hi-Hat, Right Hand Only
-            cue: The right hand alone rides straight 16th notes on the hat -- keep it dead even.
+            cue: Play straight hi-hat sixteenths with your right hand. Keep every note even.
             skills:
               - accents
               - hihat-timekeeping
@@ -3178,7 +3122,7 @@ units:
           - id: '17.04'
             lesson: 17
             title: New Rhythm Groove B
-            cue: Now the 'TA-ka-da' shape sits under the same backbeat -- compare the feel.
+            cue: Play the 'TA-ka-da' shape under the same backbeat. Compare the feel.
             skills:
               - accents
               - hihat-timekeeping
@@ -3262,7 +3206,7 @@ units:
           - id: '18.02'
             lesson: 18
             title: 16ths Around the Kit B
-            cue: A clear three-drum transfer -- snare, then mid tom, then floor tom. Hold each voice for one quarter-bar and listen for even spacing.
+            cue: Play snare, then mid tom, then floor tom. Hold each voice for 1 quarter-bar. Listen for even spacing.
             skills:
               - sixteenth-notes
               - toms
@@ -3347,9 +3291,7 @@ units:
           - id: '18.05'
             lesson: 18
             title: One-Beat 16th Fill Insert
-            cue:
-              An even shorter fill -- just the last beat breaks into 16th notes on the snare, with the kick
-              joining on the very last hit.
+            cue: Play the groove. Break the last beat into snare sixteenths. Add kick on the final hit.
             skills:
               - accents
               - fills
@@ -3476,7 +3418,7 @@ units:
           - id: '19.02'
             lesson: 19
             title: Triplet Singles
-            cue: Straight alternating triplets across the whole bar -- stay loose in the wrists.
+            cue: Alternate triplets through the full bar. Keep your wrists loose.
             skills:
               - triplet-feel
             time_signature:
@@ -3644,9 +3586,7 @@ units:
           - id: '19.09'
             lesson: 19
             title: Vibraphone Solo Etude
-            cue:
-              A swing tune that lays out space for a solo, then returns to full comping -- feather a soft
-              kick on all four beats underneath.
+            cue: Play swing time around the solo space. Then return to full comping. Feather kick on all 4 beats.
             skills:
               - accents
               - capstone
@@ -3813,7 +3753,7 @@ units:
           - id: '20.06'
             lesson: 20
             title: Jazz Fill C
-            cue: A widely-spaced, heavily accented fill -- land each hit hard for a big finish.
+            cue: Space each fill hit widely. Accent every hit.
             skills:
               - accents
               - fills
@@ -4255,9 +4195,7 @@ units:
           - id: '22.02'
             lesson: 22
             title: Five-Stroke Roll (90 BPM)
-            cue:
-              Same shape, faster -- the accent on note 5 should ring out over the four unaccented notes before
-              it, not blend into them.
+            cue: Play the shape faster. Let note 5 ring above the first 4 notes.
             skills:
               - measured-roll
               - five-stroke-roll
@@ -4303,9 +4241,7 @@ units:
           - id: '22.04'
             lesson: 22
             title: Five-Stroke Roll - Fill Application
-            cue:
-              Three bars of groove, then two five-stroke rolls fill the bar -- drumline cadence vocabulary,
-              the exact kind of measured roll marching snares build cadences from.
+            cue: Play 3 groove bars. Fill bar 4 with 2 five-stroke rolls.
             skills:
               - five-stroke-roll
               - fills
@@ -4334,8 +4270,8 @@ units:
             lesson: 22
             title: Six-Stroke Roll (70 BPM)
             cue:
-              RLLRRL -- accent the 1st and 6th strokes (both singles), keep the two doubles in the middle
-              even and unaccented. Alternate lead hand each repeat (RLLRRL, then LRRLLR).
+              Play RLLRRL. Accent strokes 1 and 6. Keep both middle doubles even. Alternate the lead hand
+              each repeat.
             skills:
               - measured-roll
               - six-stroke-roll
@@ -4358,7 +4294,7 @@ units:
           - id: '22.06'
             lesson: 22
             title: Six-Stroke Roll (90 BPM)
-            cue: Same shape, faster -- both accents (first and last stroke) should match in volume.
+            cue: Play the shape faster. Match the first and last accent volume.
             skills:
               - measured-roll
               - six-stroke-roll
@@ -4404,9 +4340,7 @@ units:
           - id: '22.08'
             lesson: 22
             title: Six-Stroke Roll - Fill Application
-            cue:
-              Three bars of groove, then two six-stroke rolls fill the bar -- the kind of roll that punctuates
-              a turnaround in gospel and funk drumming.
+            cue: Play 3 groove bars. Fill bar 4 with 2 six-stroke rolls.
             skills:
               - six-stroke-roll
               - fills
@@ -4510,9 +4444,7 @@ units:
           - id: '23.04'
             lesson: 23
             title: Seven-Stroke Roll - Fill Application
-            cue:
-              Three bars of groove, then two seven-stroke rolls fill the bar -- more drumline cadence vocabulary,
-              one step longer than the five-stroke roll.
+            cue: Play 3 groove bars. Fill bar 4 with 2 seven-stroke rolls.
             skills:
               - seven-stroke-roll
               - fills
@@ -4702,7 +4634,7 @@ units:
           - id: '24.03'
             lesson: 24
             title: Slow 12/8 Blues
-            cue: A slow-burning blues feel in 6/8 -- let the triplet subdivision breathe.
+            cue: Play a slow 6/8 blues feel. Leave space in the triplet subdivision.
             skills:
               - accents
               - compound-meter
@@ -4876,8 +4808,8 @@ units:
             lesson: 25
             title: Encore Etude One
             cue:
-              A capstone rock tune with a full intro, verse, chorus, and outro, now with a graded dynamic
-              arc from a hushed pickup up through a fortissimo finish -- everything you've learned, together.
+              Play the full rock form with intro, verse, chorus, and outro. Grow from a quiet pickup to a
+              fortissimo finish.
             skills:
               - capstone
               - crash

@@ -38,8 +38,20 @@ export const AI_TUTOR_DECISION_SCHEMA = {
       required: ['playback_speed', 'target_bpm'],
       additionalProperties: false,
     },
-    encouragement_line: { type: 'string', minLength: 1, maxLength: 160 },
-    rationale: { type: 'string', minLength: 1, maxLength: 500 },
+    encouragement_line: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 160,
+      description:
+        'SimpleEnglish procedure. Start with one action. Use 20 words or fewer. No semicolons, hedging, or filler.',
+    },
+    rationale: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 500,
+      description:
+        'SimpleEnglish description. Use active voice, simple tenses, one topic, and 25 words or fewer per sentence.',
+    },
   },
   required: [
     'next_action',
@@ -52,6 +64,18 @@ export const AI_TUTOR_DECISION_SCHEMA = {
 } as const;
 
 export class AiTutorDecisionValidationError extends Error {}
+
+const BANNED_AI_TUTOR_COPY =
+  /\b(?:can|could|may|might|should|simply|seamlessly|robust|powerful|comprehensive|leverage|effortlessly|unlock(?:s|ed|ing)?)\b/i;
+const BANNED_AI_TUTOR_METAPHOR = /\bjourney\b/;
+
+function sentence_word_counts(value: string): number[] {
+  return value
+    .split(/[.!?]+|\n+/)
+    .map((sentence) => sentence.match(/[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)?/g))
+    .filter((words): words is RegExpMatchArray => words !== null)
+    .map((words) => words.length);
+}
 
 function record_value(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -101,6 +125,32 @@ function string_value(value: unknown, label: string, maximum: number): string {
   if (!result || result.length > maximum) {
     throw new AiTutorDecisionValidationError(
       `${label} must contain 1 to ${maximum} characters`,
+    );
+  }
+
+  return result;
+}
+
+function styled_string_value(
+  value: unknown,
+  label: string,
+  maximum: number,
+  sentence_word_limit: number,
+  one_sentence: boolean,
+): string {
+  const result = string_value(value, label, maximum);
+  const word_counts = sentence_word_counts(result);
+
+  if (
+    result.includes(';') ||
+    BANNED_AI_TUTOR_COPY.test(result) ||
+    BANNED_AI_TUTOR_METAPHOR.test(result) ||
+    /\b(?:has|have)\s+(?:been|[a-z]+ed)\b/i.test(result) ||
+    word_counts.some((count) => count > sentence_word_limit) ||
+    (one_sentence && word_counts.length !== 1)
+  ) {
+    throw new AiTutorDecisionValidationError(
+      `${label} breaks the SimpleEnglish copy rule`,
     );
   }
 
@@ -157,11 +207,19 @@ export function parse_ai_tutor_decision(value: unknown): AiTutorDecision {
       ),
       target_bpm,
     },
-    encouragement_line: string_value(
+    encouragement_line: styled_string_value(
       decision.encouragement_line,
       'encouragement_line',
       160,
+      20,
+      true,
     ),
-    rationale: string_value(decision.rationale, 'rationale', 500),
+    rationale: styled_string_value(
+      decision.rationale,
+      'rationale',
+      500,
+      25,
+      false,
+    ),
   };
 }

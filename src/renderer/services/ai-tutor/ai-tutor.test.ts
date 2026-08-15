@@ -173,6 +173,27 @@ describe('AI tutor decision validation', () => {
       }),
     ).toThrow('window.start_measure must not exceed window.end_measure');
   });
+
+  it.each([
+    'You could simply repeat this window.',
+    'Repeat this window; then change the tempo.',
+    'Repeat this window once. Then change the tempo.',
+    'Repeat this exact four-bar practice window at the current tempo while keeping every stroke even and listening closely to the transition.',
+  ])('rejects coaching copy outside the SimpleEnglish contract', (line) => {
+    expect(() =>
+      parse_ai_tutor_decision({ ...decision, encouragement_line: line }),
+    ).toThrow('encouragement_line breaks the SimpleEnglish copy rule');
+  });
+
+  it('rejects an overlong rationale sentence', () => {
+    expect(() =>
+      parse_ai_tutor_decision({
+        ...decision,
+        rationale:
+          'The first attempt contains enough scored notes to identify a repeated transition error while the second attempt still shows the same timing spread across this exact window.',
+      }),
+    ).toThrow('rationale breaks the SimpleEnglish copy rule');
+  });
 });
 
 describe('AI tutor application safety', () => {

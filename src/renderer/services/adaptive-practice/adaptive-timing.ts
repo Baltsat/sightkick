@@ -181,7 +181,7 @@ function roundAndClampWindow(value: number): number {
 }
 
 function startingReason(kind: AdaptivePracticeKind): string {
-  return `No usable completed-run evidence yet; using the learner-friendly ${kind} starting window.`;
+  return `0 usable completed runs. Use the ${kind} starting window.`;
 }
 
 /**
@@ -313,7 +313,7 @@ export function deriveAdaptiveTimingWindow({
       highQualityRuns > 0
         ? `${highQualityRuns} strong run${
             highQualityRuns === 1 ? '' : 's'
-          } recorded; three consistent runs are required before timing tightens.`
+          } recorded. Keep 3 consistent runs before tightening the timing window.`
         : `Current evidence supports the standard learner-friendly ${kind} window while calibration continues.`,
     evidence,
   };

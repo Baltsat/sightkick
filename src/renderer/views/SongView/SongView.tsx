@@ -2165,8 +2165,8 @@ export function SongView() {
         lastAttempt && !lastAttempt.hasSufficientCoverage
           ? 'Finish every authored note in the loop.'
           : lastAttempt && !lastAttempt.qualifiesAsCleanPass
-          ? 'That attempt was saved. Settle the pattern and try once more.'
-          : 'A good-enough pass can include one developing hit; useful progress is retained.';
+          ? 'That attempt was saved. Settle the pattern. Try 1 more pass.'
+          : 'A good-enough pass allows 1 developing hit. Useful progress stays saved.';
       const tempoDetail =
         remediationTask.approach === 'target-probe'
           ? 'This is the target-tempo probe.'
@@ -2199,8 +2199,8 @@ export function SongView() {
         ? playbackSpeed < 0.999
           ? `Kick once to start. Finish at ${playbackSpeed.toFixed(
               1,
-            )}× with 82%+ to open the next lesson; the full-tempo mark is 90%+ at 1.0×.`
-          : 'Kick once to start. Finish from the beginning at 82%+; Tutor rewinds are okay, and the full-tempo mark is still there.'
+            )}× with 82%+ to open the next lesson. Earn the full-tempo mark at 90%+ at 1.0×.`
+          : 'Kick once to start. Finish from bar 1 at 82%+. Tutor rewinds stay valid. Earn the full-tempo mark at 90%+.'
         : countIn
         ? 'Kick once to start the count-in.'
         : 'Kick once to start.';
@@ -2756,10 +2756,9 @@ export function SongView() {
         />
       </div>
       <p className="m-0 text-xs leading-5 text-text-faint">
-        At Ready, kick once to count in. If the kit goes quiet, Drumroll pauses,
-        rewinds one lead-in bar, and any pad resumes. During play, kick, crash,
-        kick, crash pauses; snare, kick, snare, kick retries; ride, kick, ride,
-        crash ends.
+        Kick once at Ready to count in. Any pad resumes after an inactivity
+        pause. During play, kick–crash–kick–crash pauses. Snare–kick–snare–kick
+        retries. Ride–kick–ride–crash ends.
       </p>
     </section>
   );
@@ -3138,7 +3137,7 @@ export function SongView() {
             gameMode === 'practice' ? 'Practice' : 'Perform'
           } ${notationLayout} ${difficulty}${
             policy.speedControl ? ` at ${playbackSpeed.toFixed(1)} times` : ''
-          }${isLooping ? ', loop active' : ''}; ${
+          }${isLooping ? ', loop active' : ''}. ${
             practiceInputStatus.accessibleLabel
           }`}
         >

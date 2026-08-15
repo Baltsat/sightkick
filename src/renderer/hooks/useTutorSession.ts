@@ -103,13 +103,13 @@ function triggerEvidence(
   if (trigger.reason === 'repeated-wrong-pad-pair') {
     const pair = trigger.wrongPadPair;
 
-    return `${counts}; ${plural(pair?.count ?? 0, 'matched wrong-pad pair')} (${
+    return `${counts}. ${plural(pair?.count ?? 0, 'matched wrong-pad pair')} (${
       pair?.actualElement ?? 'unknown'
     } → ${pair?.expectedElement ?? 'unknown'}).`;
   }
 
   if (trigger.reason === 'repeated-same-bar-failure') {
-    return `${counts}; bar ${
+    return `${counts}. Bar ${
       stats.endMeasure + 1
     } showed the same weak evidence on ${plural(
       trigger.repeatedBarCount ?? 0,
@@ -118,24 +118,23 @@ function triggerEvidence(
   }
 
   if (trigger.reason === 'timing-spread') {
-    return `${counts}; ${stats.timingSampleCount} timed hits span ${Math.round(
+    return `${counts}. ${stats.timingSampleCount} timed hits span ${Math.round(
       stats.timingSpreadMs,
     )} ms.`;
   }
 
-  return `${counts}; ${plural(
+  return `${counts}. ${plural(
     stats.distinctErrorIds.length,
     'distinct scoreable error',
   )}.`;
 }
 
 function qualityPredicate(settings: TutorSettings): string {
-  return `${percent(settings.cleanMinimumAccuracy)} or better across ${
+  return `${percent(settings.cleanMinimumAccuracy)}+ accuracy · ${
     settings.cleanMinimumResolvedEvents
-  } resolved notes, no more than ${plural(
-    settings.cleanMaximumMisses,
-    'miss',
-  )}, and no more than ${plural(settings.cleanMaximumWrongHits, 'wrong hit')}`;
+  }+ resolved notes · ≤${settings.cleanMaximumMisses} misses · ≤${
+    settings.cleanMaximumWrongHits
+  } wrong hits`;
 }
 
 export function messageForTutorCommand(
@@ -163,7 +162,7 @@ export function messageForTutorCommand(
     if (growth && window) {
       return {
         title: 'Start at the hard spot',
-        detail: `Now: ${window.label}. Two good-enough passes grow this sounding chunk; the tutor chooses the next boundary. Your tempo stays yours.`,
+        detail: `Play ${window.label}. Save 2 good-enough passes. The tutor chooses the next boundary. Keep your tempo.`,
         tone: 'recovery',
       };
     }
@@ -187,7 +186,7 @@ export function messageForTutorCommand(
         type: 'material-failure',
         trigger: command.recovery.trigger,
         livesRemaining: 0,
-      })} ${checkpointReason} Replay ends at bar ${recoveryEnd}, played at your own speed - nothing changes your tempo automatically. Take a breath, then listen for the count-in before playing.`,
+      })} ${checkpointReason} Replay through bar ${recoveryEnd} at your current speed. Listen for the count-in. Then play.`,
       tone: 'recovery',
     };
   }
@@ -217,7 +216,7 @@ export function messageForTutorCommand(
         title,
         detail: `${reason} Window ${growth.activeWindowIndex + 1} of ${
           growth.plan.windows.length
-        }; the plan always ends in mastery or a deferred return to the song.`,
+        }. The plan ends with mastery or returns this phrase to the song.`,
         tone: command.attempt.result === 'clean' ? 'success' : 'recovery',
       };
     }
@@ -248,19 +247,19 @@ export function messageForTutorCommand(
       detail: qualityPass
         ? `${retainedProgress.toFixed(1)} of ${
             settings.requiredCleanRepetitions
-          } pattern progress; this pass met ${qualityPredicate(settings)}. ${
+          } pattern progress. This pass met ${qualityPredicate(settings)}. ${
             suggestionDiffers
-              ? `${suggestedSpeed} could suit the next repetition - your speed control, your call.`
-              : `Holding ${heldSpeed}; one useful repetition remains.`
+              ? `Try ${suggestedSpeed} for the next repetition.`
+              : `Keep ${heldSpeed} for 1 useful repetition.`
           }`
-        : `This pass was close, not erased: ${retainedProgress.toFixed(1)} of ${
+        : `Progress kept: ${retainedProgress.toFixed(1)} of ${
             settings.requiredCleanRepetitions
-          } progress remains (${attemptEvidence}; a quality pass is ${qualityPredicate(
+          }. Attempt: ${attemptEvidence}. Target: ${qualityPredicate(
             settings,
-          )}). ${
+          )}. ${
             suggestionDiffers
-              ? `Try ${suggestedSpeed} on the next pass if ${heldSpeed} feels rushed - your call.`
-              : `Holding ${heldSpeed} for one focused pass, then continue.`
+              ? `Try ${suggestedSpeed} for the next pass.`
+              : `Keep ${heldSpeed} for 1 focused pass.`
           }`,
       tone: 'recovery',
     };

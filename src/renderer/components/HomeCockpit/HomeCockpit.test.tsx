@@ -103,7 +103,7 @@ const lessonRecommendation = {
   predictedSuccess: 0.76,
   suggestedSpeed: 0.8,
   mastery: 20,
-  reason: '2 saved Coach findings route directly to this lesson.',
+  reason: '2 saved Coach findings match this lesson.',
   factors: [],
   confidence: {
     value: 0.7,
@@ -140,7 +140,7 @@ const practiceWave: PracticeWaveResult = {
     {
       role: 'focus',
       recommendation: lessonRecommendation,
-      reason: '2 saved Coach findings route directly to this lesson.',
+      reason: '2 saved Coach findings match this lesson.',
       linkedSkills: ['kick-independence'],
     },
     {
@@ -1294,7 +1294,7 @@ describe('resolveShelfCopy', () => {
 
     const payoff: HomeSessionReceipt = {
       title: 'Boulevard of Broken Dreams',
-      detail: 'Apply the session in your goal song.',
+      detail: 'Play the goal song.',
       candidateId: 'song-1',
     };
 
@@ -1314,7 +1314,7 @@ describe('resolveShelfCopy', () => {
       unavailable: true,
       title: 'No favourite-song payoff is ready',
       detail:
-        'Today’s work is Alternating Singles. My Wave has no playable saved favourite linked to this session.',
+        'Today’s work: Alternating Singles. My Wave has 0 playable saved favourites for this session.',
     };
 
     // Armed (the hero reads a specific lesson/song), but nothing was ranked
@@ -1342,7 +1342,7 @@ describe('resolveShelfCopy', () => {
     const payoff: HomeSessionReceipt = {
       title: 'Boulevard of Broken Dreams',
       detail:
-        'Apply the session in your goal song. A safe section probe will appear when chart evidence supports one.',
+        'Play the goal song. Drumroll adds 1 section probe when chart evidence supports it.',
       candidateId: 'song-1',
     };
 

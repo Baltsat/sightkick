@@ -7,6 +7,7 @@ import { renderMusic } from '../../../chart-parser/renderer';
 import { RenderData } from '../../../chart-parser/types';
 import { Song } from '../../../types';
 import { SHEET_MUSIC_COLORS } from '../../constants';
+import '../../views/SongView/SongView.css';
 
 const STORY_SONG = {
   name: 'Parser',
@@ -261,9 +262,11 @@ res=192 ts=4/4
 function SheetHarness({
   dsl,
   practice = false,
+  layout = 'classic',
 }: {
   dsl: string;
   practice?: boolean;
+  layout?: 'classic' | 'flow';
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [renderData, setRenderData] = useState<RenderData[]>([]);
@@ -292,9 +295,10 @@ function SheetHarness({
         false,
         true,
         true,
+        layout,
       ),
     );
-  }, [parser]);
+  }, [layout, parser]);
 
   if (!parser) {
     return null;
@@ -316,15 +320,31 @@ function SheetHarness({
         setIsLooping(true);
       }}
       zoom={1}
+      layout={layout}
       onSelectMeasure={() => {}}
     />
   );
 }
 
-function Sheet({ dsl, practice = false }: { dsl: string; practice?: boolean }) {
+function Sheet({
+  dsl,
+  practice = false,
+  layout = 'classic',
+}: {
+  dsl: string;
+  practice?: boolean;
+  layout?: 'classic' | 'flow';
+}) {
   return (
-    <div style={{ padding: 24, background: '#fff', overflow: 'auto' }}>
-      <SheetHarness dsl={dsl} practice={practice} />
+    <div
+      className={
+        layout === 'flow'
+          ? 'drumroll-flow-viewport'
+          : 'drumroll-classic-viewport'
+      }
+      style={{ height: '100vh', padding: 24, background: 'var(--dr-canvas)' }}
+    >
+      <SheetHarness dsl={dsl} practice={practice} layout={layout} />
     </div>
   );
 }
@@ -344,4 +364,12 @@ export const Parser: Story = {
 
 export const PracticeLoop: Story = {
   render: () => <Sheet dsl={DSL} practice />,
+};
+
+export const FlowRun: Story = {
+  render: () => <Sheet dsl={DSL} practice layout="flow" />,
+};
+
+export const ClassicRun: Story = {
+  render: () => <Sheet dsl={DSL} practice layout="classic" />,
 };

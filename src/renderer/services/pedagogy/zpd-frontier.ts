@@ -402,7 +402,7 @@ function explanationFor({
   }
 
   if (state === 'goal_preview_only') {
-    return `"${candidate.title}" is still ahead of your current evidence, so it stays visible as a target without blocking free play.${liked}`;
+    return `Keep "${candidate.title}" as a future target. Current evidence is below its practice range.${liked}`;
   }
 
   if (!independent_eligible) {

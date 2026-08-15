@@ -201,8 +201,7 @@ function SkillSpine({
           </h2>
         </div>
         <p className="max-w-90 text-base leading-relaxed text-text-muted">
-          Bars use saved kit evidence; blank means there is not enough evidence
-          yet.
+          Bars use saved kit evidence. Blank means no saved kit evidence.
         </p>
       </div>
 
@@ -340,7 +339,7 @@ function DeadlineTargets({
         </div>
       ) : (
         <p className="mt-2 text-sm leading-relaxed text-text-muted">
-          Play a few more runs before Drumroll sets a weekly pace.
+          Complete 3 scored runs before Drumroll sets a weekly pace.
         </p>
       )}
     </section>
@@ -448,7 +447,7 @@ function WeeklyRhythmPanel({
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-150 text-xs leading-relaxed text-text-muted">
           Next available session: {calendar.next_available}. Planned rests stay
-          unscored; they are part of the rhythm, not a failure.
+          unscored. They are part of the rhythm.
         </p>
         {onRefresh && (
           <button
@@ -518,7 +517,7 @@ function WeeklyMusicalRecapPanel({
       </div>
       {recap.evidence_state === 'not_enough_saved_evidence' && (
         <p className="mt-3 text-xs text-text-faint">
-          Play a few more runs to see a weekly trend.
+          Play 2 more runs to see a weekly trend.
         </p>
       )}
     </section>
@@ -819,7 +818,7 @@ export function ProfileView({
                       Today’s practice
                     </p>
                     <p className="mt-1 text-base leading-relaxed text-text-muted">
-                      Each option starts a real practice run.
+                      Choose 1 practice run.
                     </p>
                   </div>
                   <EvidencePracticeCards
@@ -939,8 +938,8 @@ export function ProfileView({
                       data-testid="retired-goal-notice"
                     >
                       This goal belongs to a retired curriculum exercise. Its
-                      score and practice history remain readable, but it does
-                      not unlock the new Journey.
+                      score and practice history remain visible. It does not
+                      open the new Journey.
                     </p>
                   )}
                   <div className="flex flex-wrap gap-2">
@@ -978,7 +977,7 @@ export function ProfileView({
                       {insights.rejectedAtomicEvidenceCount === 1
                         ? ''
                         : 's'}{' '}
-                      stay hidden because this chart has changed.
+                      stay hidden because this chart changed.
                     </p>
                   ) : null}
                   {!insights?.patternProfile && (

@@ -71,7 +71,7 @@ export function useSheetMusic({
       notification.error({
         title: 'Chart parse failed',
         description:
-          "This song's chart could not be parsed and cannot be displayed.",
+          'Drumroll failed to parse this chart. The chart is hidden.',
         placement: 'bottomRight',
       });
     }

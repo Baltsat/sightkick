@@ -178,7 +178,7 @@ describe('composeHomeSession', () => {
         {
           role: 'focus',
           recommendation: lesson,
-          reason: '2 saved Coach findings route directly to this lesson.',
+          reason: '2 saved Coach findings match this lesson.',
           linkedSkills: ['timing'],
         },
         {
@@ -198,7 +198,7 @@ describe('composeHomeSession', () => {
 
     expect(session).toMatchObject({
       source: 'practice-wave',
-      reason: '2 saved Coach findings route directly to this lesson.',
+      reason: '2 saved Coach findings match this lesson.',
       focus: {
         title: lesson.candidate.title,
       },
@@ -251,7 +251,7 @@ describe('composeHomeSession', () => {
       unavailable: true,
       title: 'No favourite-song payoff is ready',
       detail:
-        'Today’s work is lesson:focus. My Wave has no playable saved favourite linked to this session.',
+        'Today’s work: lesson:focus. My Wave has 0 playable saved favourites for this session.',
     });
   });
 
@@ -329,8 +329,6 @@ describe('composeHomeSession', () => {
       candidateId: 'song:goal',
       title: 'song:goal',
     });
-    expect(session?.payoff.detail).toContain(
-      'Apply the session in your goal song.',
-    );
+    expect(session?.payoff.detail).toContain('Play the goal song.');
   });
 });

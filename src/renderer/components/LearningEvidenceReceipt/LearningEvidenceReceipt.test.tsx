@@ -75,7 +75,7 @@ describe('LearningEvidenceReceipt', () => {
       'bars 4–5',
     );
     expect(screen.getByTestId('learning-evidence-receipt')).toHaveTextContent(
-      'does not change your level yet',
+      'Your level stays unchanged',
     );
   });
 
