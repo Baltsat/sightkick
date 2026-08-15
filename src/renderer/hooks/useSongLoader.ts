@@ -9,11 +9,13 @@ import {
   Song,
 } from '../../types';
 import { TrackConfig } from '../services/audio-player/types';
+import { parseStickingData, StickingData } from '../services/sticking';
 
 interface SongLoaderResult {
   fileData: Buffer | undefined;
   format: 'mid' | 'chart';
   songData: Song | undefined;
+  stickingData: StickingData | undefined;
   trackData: TrackConfig[];
 }
 
@@ -21,6 +23,7 @@ export function useSongLoader(id: string | undefined): SongLoaderResult {
   const [fileData, setFileData] = useState<Buffer>();
   const [format, setFormat] = useState<'mid' | 'chart'>('mid');
   const [songData, setSongData] = useState<Song>();
+  const [stickingData, setStickingData] = useState<StickingData>();
   const [trackData, setTrackData] = useState<TrackConfig[]>([]);
   const { notification } = App.useApp();
   const navigate = useNavigate();
@@ -41,11 +44,12 @@ export function useSongLoader(id: string | undefined): SongLoaderResult {
         return;
       }
 
-      const { data, fileData: fd } = payload;
+      const { data, fileData: fd, stickingData: rawSticking } = payload;
 
       setFileData(fd);
       setFormat(data.format);
       setSongData(data);
+      setStickingData(parseStickingData(rawSticking));
 
       const drums = data.audio
         .filter((file: AudioData) => file.name.includes('drums'))
@@ -65,5 +69,5 @@ export function useSongLoader(id: string | undefined): SongLoaderResult {
     return off;
   }, [id, notification, navigate]);
 
-  return { fileData, format, songData, trackData };
+  return { fileData, format, songData, stickingData, trackData };
 }

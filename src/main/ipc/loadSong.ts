@@ -22,8 +22,18 @@ export function loadSong(event: Electron.IpcMainEvent, id: string) {
       songData.format === 'mid' ? 'notes.mid' : 'notes.chart',
     );
     const fileData = fs.readFileSync(notesFile);
+    const stickingFile = path.join(songData.dir, 'sticking.json');
+    const stickingData = fs
+      .statSync(stickingFile, { throwIfNoEntry: false })
+      ?.isFile()
+      ? JSON.parse(fs.readFileSync(stickingFile, 'utf8'))
+      : undefined;
 
-    event.reply('load-song', { data: toSong(songData), fileData });
+    event.reply('load-song', {
+      data: toSong(songData),
+      fileData,
+      ...(stickingData ? { stickingData } : {}),
+    });
   } catch (error) {
     event.reply('load-song', {
       error: error instanceof Error ? error.message : String(error),

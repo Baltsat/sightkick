@@ -26,6 +26,10 @@ export interface StickingData {
   bars: StickingBar[];
 }
 
+export interface PositionedStickingNote extends StickingNote {
+  tick: number;
+}
+
 const lanes = new Set(['K', 'S', 'H', 'O', 'R', 'C', 'T1', 'T2', 'T3']);
 const limbs = new Set(['right-hand', 'left-hand', 'right-foot', 'left-foot']);
 const symbols = new Set(['x', 'X', 'o', 'g', '1', '2', '3', '4', '5', '6']);
@@ -114,4 +118,31 @@ export function parseStickingData(value: unknown): StickingData | undefined {
   }
 
   return value as unknown as StickingData;
+}
+
+export function stickingNotesForMeasure(
+  data: StickingData,
+  measureIndex: number,
+  startTick: number,
+  endTick: number,
+  timeSignature: [number, number],
+): PositionedStickingNote[] {
+  const authoredIndex = measureIndex - data.countInBars;
+
+  if (
+    authoredIndex < 0 ||
+    authoredIndex >= data.bars.length * data.repeatCount ||
+    data.timeSignature[0] !== timeSignature[0] ||
+    data.timeSignature[1] !== timeSignature[1]
+  ) {
+    return [];
+  }
+
+  const bar = data.bars[authoredIndex % data.bars.length];
+  const measureTicks = endTick - startTick;
+
+  return bar.notes.map((note) => ({
+    ...note,
+    tick: Math.round(startTick + (measureTicks * note.step) / bar.stepCount),
+  }));
 }

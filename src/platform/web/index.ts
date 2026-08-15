@@ -618,15 +618,22 @@ export class WebPlatform implements PlatformAdapter {
     const lesson = manifest.lessons.find(({ song }) => song.id === id);
 
     if (lesson) {
-      const response = await fetch(lesson.chart);
+      const [response, stickingResponse] = await Promise.all([
+        fetch(lesson.chart),
+        lesson.sticking ? fetch(lesson.sticking) : Promise.resolve(undefined),
+      ]);
 
       if (!response.ok) {
         throw new Error(`Chart failed to load (${response.status}).`);
       }
+      const stickingData = stickingResponse?.ok
+        ? await stickingResponse.json()
+        : undefined;
 
       this.emit('load-song', {
         data: this.applyOverrides(lesson.song),
         fileData: new Uint8Array(await response.arrayBuffer()),
+        ...(stickingData ? { stickingData } : {}),
       });
 
       return;
@@ -1012,8 +1019,8 @@ export class WebPlatform implements PlatformAdapter {
           status.stage === 'download'
             ? 'downloading'
             : status.status === 'queued'
-            ? 'queued'
-            : 'processing',
+              ? 'queued'
+              : 'processing',
         percent: status.percent,
         message: status.message || 'Processing chart',
       });

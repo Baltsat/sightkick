@@ -10,6 +10,11 @@ import {
 } from './renderer';
 import { ChartParser } from './parser';
 import { Measure, Note, ParsedChart, TempoMark } from './types';
+import { GameRenderer } from '../renderer/services/engine/game-renderer';
+import {
+  parseStickingData,
+  type StickingData,
+} from '../renderer/services/sticking';
 
 beforeAll(() => {
   (
@@ -65,6 +70,7 @@ function render(
   enableColors?: boolean,
   showTempo?: boolean,
   layout?: 'classic' | 'flow',
+  sticking?: StickingData,
 ) {
   return renderMusic(
     target.current ?? undefined,
@@ -74,6 +80,7 @@ function render(
     enableColors,
     showTempo,
     layout,
+    sticking,
   );
 }
 
@@ -83,6 +90,16 @@ function container() {
   document.body.appendChild(div);
 
   return div;
+}
+
+function markupWithoutIds(div: HTMLDivElement): string {
+  const clone = div.cloneNode(true) as HTMLDivElement;
+
+  clone
+    .querySelectorAll('[id]')
+    .forEach((element) => element.removeAttribute('id'));
+
+  return clone.innerHTML;
 }
 
 const quarters: Note[] = [0, 192, 384, 576].map((tick) =>
@@ -113,6 +130,107 @@ describe('renderMusic', () => {
 
     expect(div.querySelector('svg')).not.toBeNull();
   });
+
+  it.each(['flow', 'classic'] as const)(
+    'renders readable hand and foot sticking below %s notation and hides it with the note',
+    (layout) => {
+      const div = container();
+      const countIn = measure([
+        note({ notes: ['g/5/x2'], tick: 0, duration: 'q' }),
+      ]);
+      const exercise = measure(
+        [note({ notes: ['e/4', 'c/5'], tick: 768, duration: 'q' })],
+        { startTick: 768, endTick: 1536 },
+      );
+      const sticking = parseStickingData({
+        version: 1,
+        lessonId: '03.01',
+        timeSignature: [4, 4],
+        countInBars: 1,
+        repeatCount: 1,
+        bars: [
+          {
+            stepCount: 4,
+            notes: [
+              { step: 0, lane: 'K', symbol: 'x', limb: 'right-foot' },
+              { step: 0, lane: 'S', symbol: 'x', limb: 'left-hand' },
+            ],
+          },
+        ],
+      });
+
+      expect(sticking).toBeDefined();
+
+      const data = render(
+        ref(div),
+        song([countIn, exercise]),
+        true,
+        true,
+        true,
+        layout,
+        sticking,
+      );
+      const glyphs = Array.from(
+        div.querySelectorAll<SVGTextElement>('.vf-sticking-glyph'),
+      );
+      const noteGroup = data[1].renderedNotes[0].note.getSVGElement();
+
+      expect(div.querySelectorAll('.vf-sticking')).toHaveLength(1);
+      expect(glyphs.map((glyph) => glyph.textContent)).toEqual(['L', 'RF']);
+      expect(
+        glyphs.every(
+          (glyph) => glyph.closest('.vf-sticking')?.parentElement === noteGroup,
+        ),
+      ).toBe(true);
+      expect(
+        glyphs.every(
+          (glyph) =>
+            Number(glyph.getAttribute('y')) >
+            data[1].stave.getY() + data[1].stave.getHeight(),
+        ),
+      ).toBe(true);
+      expect(
+        glyphs.every((glyph) => Number(glyph.getAttribute('font-size')) >= 18),
+      ).toBe(true);
+
+      const gameRenderer = new GameRenderer(() => true);
+
+      gameRenderer.setContext({ chart: {} as ParsedChart, renderData: data });
+      gameRenderer.paintHit({ measureIdx: 1, noteIdx: 0 }, ['e', 'c']);
+      data[1].renderedNotes[0].note.noteHeads[1]
+        .getSVGElement()
+        ?.dispatchEvent(new Event('animationend'));
+
+      expect(noteGroup).toHaveClass('vf-note-hidden');
+      expect(glyphs.every((glyph) => glyph.closest('.vf-note-hidden'))).toBe(
+        true,
+      );
+    },
+  );
+
+  it.each(['flow', 'classic'] as const)(
+    'leaves %s songs without validated sticking data unchanged',
+    (layout) => {
+      const baseline = container();
+      const rejected = container();
+      const chart = song([measure(quarters)]);
+      const invalid = parseStickingData({
+        version: 1,
+        lessonId: '03.01',
+        timeSignature: [4, 4],
+        countInBars: 1,
+        repeatCount: 1,
+        bars: [],
+      });
+
+      render(ref(baseline), chart, true, true, true, layout);
+      render(ref(rejected), chart, true, true, true, layout, invalid);
+
+      expect(invalid).toBeUndefined();
+      expect(markupWithoutIds(rejected)).toBe(markupWithoutIds(baseline));
+      expect(rejected.querySelector('.vf-sticking')).toBeNull();
+    },
+  );
 
   it('returns one render entry per measure', () => {
     const div = container();

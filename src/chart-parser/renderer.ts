@@ -21,6 +21,12 @@ import {
 import { ChartParser } from './parser';
 import { Measure, Note, RenderData, TempoMark } from './types';
 import { KEY_TO_ELEMENT } from './constants';
+import {
+  stickingNotesForMeasure,
+  type StickingData,
+  type StickingLimb,
+  type StickingNote,
+} from '../renderer/services/sticking';
 
 export interface SheetMusicColors {
   note: string;
@@ -61,6 +67,20 @@ const STEM_DIRECTION = -1;
 const REST_KEY = 'b/4';
 const ACCENT_SCALE = Flow.NOTATION_FONT_SCALE;
 const ACCENT_SCALE_RIGHT = Flow.NOTATION_FONT_SCALE * 0.8;
+const STICKING_FONT_SIZE = 18;
+const STICKING_FOOT_OFFSET = 20;
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+const STICKING_LANE_TO_ELEMENT: Record<StickingNote['lane'], string> = {
+  K: 'kick',
+  S: 'snare',
+  H: 'hihat',
+  O: 'hihat',
+  R: 'ride',
+  C: 'crash',
+  T1: 'tom1',
+  T2: 'tom2',
+  T3: 'tom3',
+};
 
 export function renderMusic(
   container: HTMLDivElement | undefined,
@@ -70,6 +90,7 @@ export function renderMusic(
   enableColors: boolean = false,
   showTempo: boolean = true,
   layout: SheetMusicLayout = 'classic',
+  sticking?: StickingData,
 ): RenderData[] {
   if (!container) {
     return [];
@@ -140,6 +161,7 @@ export function renderMusic(
         enableColors,
         tempoLabels[index],
         colors,
+        sticking,
       );
 
       renderData[index] = { measure, stave, renderedNotes, yOffset };
@@ -536,6 +558,124 @@ function drawAccents(
   context.restore();
 }
 
+function stickingGlyph(limb: StickingLimb): string {
+  switch (limb) {
+    case 'right-hand':
+      return 'R';
+
+    case 'left-hand':
+      return 'L';
+
+    case 'right-foot':
+      return 'RF';
+
+    case 'left-foot':
+      return 'LF';
+  }
+}
+
+function drawSticking(
+  stave: Stave,
+  measure: Measure,
+  measureIndex: number,
+  staveNotes: StaveNote[],
+  sticking: StickingData | undefined,
+  noteColor: string,
+) {
+  if (!sticking) {
+    return;
+  }
+
+  const positioned = stickingNotesForMeasure(
+    sticking,
+    measureIndex,
+    measure.startTick,
+    measure.endTick,
+    measure.timeSig,
+  );
+  const byTick = new Map<number, typeof positioned>();
+
+  positioned.forEach((note) => {
+    const notes = byTick.get(note.tick) ?? [];
+
+    notes.push(note);
+    byTick.set(note.tick, notes);
+  });
+
+  staveNotes.forEach((staveNote, noteIndex) => {
+    if (staveNote.isRest()) {
+      return;
+    }
+
+    const note = measure.notes[noteIndex];
+    const elements = new Set(
+      staveNote
+        .getKeys()
+        .map((key) => KEY_TO_ELEMENT[key])
+        .filter((element): element is string => Boolean(element)),
+    );
+    const stickingNotes = (byTick.get(note.tick) ?? []).filter((entry) =>
+      elements.has(STICKING_LANE_TO_ELEMENT[entry.lane]),
+    );
+    const glyphParent =
+      staveNote.getSVGElement() ??
+      staveNote.getStem()?.getSVGElement() ??
+      staveNote.noteHeads[0]?.getSVGElement();
+
+    if (!glyphParent || stickingNotes.length === 0) {
+      return;
+    }
+
+    const group = document.createElementNS(SVG_NAMESPACE, 'g');
+    const x = staveNote.getAbsoluteX();
+    const handGlyph = stickingNotes
+      .filter((entry) => entry.limb.endsWith('-hand'))
+      .sort((left) => (left.limb === 'right-hand' ? -1 : 1))
+      .map((entry) => stickingGlyph(entry.limb))
+      .join('');
+    const footGlyph = stickingNotes
+      .filter((entry) => entry.limb.endsWith('-foot'))
+      .map((entry) => stickingGlyph(entry.limb))
+      .join('');
+    const handY = stave.getYForBottomText(2);
+
+    group.classList.add('vf-sticking');
+    group.setAttribute('data-notation-kind', 'sticking');
+    group.setAttribute(
+      'data-sticking-limbs',
+      stickingNotes.map((entry) => entry.limb).join(' '),
+    );
+    group.setAttribute('aria-hidden', 'true');
+
+    [
+      { glyph: handGlyph, y: handY },
+      { glyph: footGlyph, y: handY + STICKING_FOOT_OFFSET },
+    ].forEach(({ glyph, y }) => {
+      if (!glyph) {
+        return;
+      }
+
+      const text = document.createElementNS(SVG_NAMESPACE, 'text');
+
+      text.classList.add('vf-sticking-glyph');
+      text.setAttribute('x', `${x}`);
+      text.setAttribute('y', `${y}`);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('font-family', 'Arial, sans-serif');
+      text.setAttribute('font-size', `${STICKING_FONT_SIZE}`);
+      text.setAttribute('font-weight', '800');
+      text.setAttribute('letter-spacing', '0.5');
+      text.setAttribute('fill', noteColor);
+      text.setAttribute('stroke', 'none');
+      text.setAttribute('pointer-events', 'none');
+      text.textContent = glyph;
+      group.appendChild(text);
+    });
+
+    glyphParent.appendChild(group);
+  });
+}
+
 function renderMeasure(
   context: RenderContext,
   measure: Measure,
@@ -548,6 +688,7 @@ function renderMeasure(
   enableColors: boolean,
   tempoToShow: TempoMark | undefined,
   colors: SheetMusicColors,
+  sticking?: StickingData,
 ) {
   const stave = new Stave(xOffset, yOffset, width);
 
@@ -598,6 +739,7 @@ function renderMeasure(
   applyNoteClasses(staveNotes, enableColors);
   annotateNotation(staveNotes, measure);
   drawAccents(context, stave, measure, staveNotes, enableColors, colors.note);
+  drawSticking(stave, measure, index, staveNotes, sticking, colors.note);
 
   const renderedNotes = staveNotes.map((staveNote, i) => ({
     tick: measure.notes[i].tick,
