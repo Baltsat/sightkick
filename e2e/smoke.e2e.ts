@@ -60,11 +60,17 @@ async function expectSongOpenWithNotation(currentPage: Page) {
     timeout: 60_000,
   });
 
-  const sheet = currentPage.locator('svg').first();
+  // Scoped to the notation itself, whichever layout the run opened in. The
+  // page's first `svg` is not the score — it is whatever icon happens to be
+  // in the DOM first, so this used to pass by accident on a rail icon and
+  // then fail the moment the run stopped rendering that rail at all.
+  const notation = currentPage
+    .locator('[data-testid="flow-notation"], [data-testid="classic-notation"]')
+    .first();
 
-  await expect(sheet).toBeVisible({ timeout: 30_000 });
+  await expect(notation).toBeVisible({ timeout: 30_000 });
   await expect
-    .poll(async () => currentPage.locator('svg path').count(), {
+    .poll(async () => notation.locator('svg path').count(), {
       timeout: 30_000,
     })
     .toBeGreaterThan(0);
