@@ -1,0 +1,24 @@
+.actionable-song-shelves__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+@media (min-width: 80rem) {
+  .actionable-song-shelves__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 1.5rem;
+    row-gap: 1.25rem;
+  }
+
+  .actionable-song-shelves__secondary,
+  .actionable-song-shelves__browse {
+    grid-column: 1 / -1;
+  }
+
+  .actionable-song-shelves__primary [class~='max-w-32'][class~='xl:flex'],
+  .actionable-song-shelves__primary [aria-label^='Auto-charted with'] {
+    display: none;
+  }
+}

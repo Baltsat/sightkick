@@ -27,6 +27,11 @@ export function SongListSettings({
 }: Props) {
   const { currentPath } = useApp();
   const isScanning = scanPercent !== undefined;
+  const currentFolderName = currentPath?.split(/[\\/]/).pop();
+  const currentFolderLabel =
+    currentFolderName?.toLocaleLowerCase() === 'sightkick'
+      ? 'Drumroll'
+      : currentFolderName;
   const selectFolder = () =>
     window.electron.ipcRenderer.sendMessage('rescan-songs');
   const rescan = () =>
@@ -37,7 +42,9 @@ export function SongListSettings({
       <div className="flex gap-2 grow">
         <Tooltip
           title={
-            currentPath ?? 'Point this at the folder where your songs will live'
+            currentPath
+              ? 'Drumroll library folder'
+              : 'Point this at the folder where your songs will live'
           }
           placement="bottom"
         >
@@ -47,7 +54,7 @@ export function SongListSettings({
             disabled={isScanning}
             className="grow"
           >
-            {currentPath ? currentPath.split(/[\\/]/).pop() : 'Select folder'}
+            {currentFolderLabel ?? 'Select folder'}
           </Button>
         </Tooltip>
         {currentPath ? (

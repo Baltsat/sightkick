@@ -6,6 +6,7 @@ import type {
   ActionableLibraryShelf,
   LocalLibraryEntry,
 } from './actionable-shelves';
+import './ActionableSongShelves.css';
 
 interface ActionableSongShelvesProps {
   shelves: readonly ActionableLibraryShelf[];
@@ -68,17 +69,22 @@ export function ActionableSongShelves({
 }: ActionableSongShelvesProps) {
   return (
     <div
-      className="mx-auto flex h-full w-full max-w-360 flex-col overflow-y-auto px-5 py-5"
+      className="mx-auto flex h-full w-full max-w-360 flex-col overflow-y-auto px-5 py-4"
       data-testid="actionable-song-shelves"
     >
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
+      <div className="actionable-song-shelves__grid w-full">
         {shelves.map((shelf) => (
           <section
             key={shelf.id}
+            className={
+              shelf.id === 'ready-now' || shelf.id === 'favourites'
+                ? 'actionable-song-shelves__primary min-w-0'
+                : 'actionable-song-shelves__secondary min-w-0'
+            }
             data-testid={`library-shelf-${shelf.id}`}
             aria-labelledby={`library-shelf-${shelf.id}-title`}
           >
-            <div className="mb-3 flex items-end justify-between gap-4">
+            <div className="mb-2 flex items-end justify-between gap-4">
               <div>
                 <h2
                   id={`library-shelf-${shelf.id}-title`}
@@ -86,7 +92,7 @@ export function ActionableSongShelves({
                 >
                   {shelf.title}
                 </h2>
-                <p className="mt-1 text-sm text-text-muted">{shelf.detail}</p>
+                <p className="mt-0.5 text-sm text-text-muted">{shelf.detail}</p>
               </div>
               {shelf.entries.length > 0 && (
                 <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.12em] text-text-faint">
@@ -122,7 +128,7 @@ export function ActionableSongShelves({
         ))}
 
         {restCount > 0 && (
-          <div className="border-t border-border-soft pt-5">
+          <div className="actionable-song-shelves__browse border-t border-border-soft pt-4">
             <Button
               size="large"
               data-testid="browse-all-library"
