@@ -242,8 +242,7 @@
 .drumroll-pattern-band {
   position: absolute;
   box-sizing: border-box;
-  border-top: 1px solid
-    color-mix(in srgb, var(--dr-violet, #7c3aed) 42%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--dr-wine) 42%, transparent);
   background: transparent;
 }
 
@@ -252,8 +251,7 @@
   position: absolute;
   top: 0;
   height: 0.45rem;
-  border-left: 1px solid
-    color-mix(in srgb, var(--dr-violet, #7c3aed) 42%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--dr-wine) 42%, transparent);
   content: '';
 }
 
@@ -271,11 +269,11 @@
   left: 0.38rem;
   color: color-mix(
     in srgb,
-    var(--dr-violet, #7c3aed) 68%,
+    var(--dr-wine) 68%,
     var(--dr-ink-muted, var(--color-text-muted))
   );
   font-family: var(--font-ui);
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 760;
   letter-spacing: 0.08em;
   text-transform: uppercase;

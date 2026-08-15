@@ -29,7 +29,7 @@ export const KIT_COMMAND_PRESENTATION: Record<
   KitCommandElement,
   { label: string; image: string; color: string }
 > = {
-  any: { label: 'Any pad', image: meshPad, color: 'var(--color-cyan)' },
+  any: { label: 'Any pad', image: meshPad, color: 'var(--dr-ember)' },
   kick: { label: 'Kick', image: kickPad, color: 'var(--color-orange)' },
   snare: { label: 'Snare', image: pearlSnare, color: 'var(--color-red)' },
   hihat: { label: 'Hi-hat', image: bronzeCymbal, color: 'var(--color-yellow)' },

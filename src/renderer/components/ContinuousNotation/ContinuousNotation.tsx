@@ -472,12 +472,12 @@ export function LoopEscapeRunway({
   const speed = `${model.currentSpeed.toFixed(
     1,
   )}× → ${model.targetSpeed.toFixed(1)}×`;
-  const label = `Loop escape, bars ${model.barStart} through ${
+  const label = `Loop escape · bars ${model.barStart}–${
     model.barEnd
-  }: ${phase}; ${model.qualityProgress.toFixed(1)} of ${
+  } · ${phase} · ${model.qualityProgress.toFixed(1)} of ${
     model.requiredCleanPasses
-  } clean passes, ${speed}${
-    model.retainedQuality ? '; near-clean quality retained' : ''
+  } clean passes · ${speed}${
+    model.retainedQuality ? ' · near-clean quality retained' : ''
   }`;
 
   return (
@@ -497,9 +497,9 @@ export function LoopEscapeRunway({
       >
         <defs>
           <linearGradient id="loop-escape-energy" x1="0" x2="1">
-            <stop offset="0" stopColor="#63d5ff" />
-            <stop offset="0.54" stopColor="#8a74ff" />
-            <stop offset="1" stopColor="#d48cff" />
+            <stop offset="0" stopColor="var(--dr-warning)" />
+            <stop offset="0.54" stopColor="var(--dr-ember)" />
+            <stop offset="1" stopColor="var(--dr-wine)" />
           </linearGradient>
         </defs>
         <path

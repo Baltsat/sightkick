@@ -46,29 +46,29 @@
   --dr-field-ember: #e38a5d;
   --dr-field-wine: #a86f78;
 
-  --color-bg: #f8f5ef;
-  --color-surface: #ffffff;
-  --color-surface-sunken: #e4ddd0;
+  --color-bg: #f4efe5;
+  --color-surface: #fcf9f2;
+  --color-surface-sunken: #eae1d3;
 
-  --color-border: rgba(17, 23, 34, 0.14);
-  --color-border-soft: rgba(17, 23, 34, 0.08);
-  --color-divider: rgba(17, 23, 34, 0.1);
-  --color-fill: rgba(17, 23, 34, 0.055);
-  --color-fill-strong: rgba(17, 23, 34, 0.11);
+  --color-border: rgb(36 31 25 / 14%);
+  --color-border-soft: rgb(36 31 25 / 8%);
+  --color-divider: rgb(36 31 25 / 10%);
+  --color-fill: rgb(36 31 25 / 5.5%);
+  --color-fill-strong: rgb(36 31 25 / 11%);
 
-  --color-text: #111722;
-  --color-text-body: #1b2430;
-  --color-text-muted: #526172;
-  --color-text-faint: #566476;
-  --color-text-dim: #59687a;
-  --color-text-dimmer: #59687a;
+  --color-text: #241f19;
+  --color-text-body: #241f19;
+  --color-text-muted: #71685e;
+  --color-text-faint: #71685e;
+  --color-text-dim: #71685e;
+  --color-text-dimmer: #71685e;
 
-  --color-accent: #f73586;
-  --color-accent-bright: #ff684f;
+  --color-accent: #e85a36;
+  --color-accent-bright: #e85a36;
   --color-accent-hover: color-mix(in srgb, var(--color-accent), white 12%);
   --color-accent-deep: color-mix(in srgb, var(--color-accent), black 22%);
   --color-accent-text: color-mix(in srgb, var(--color-accent), black 25%);
-  --color-accent-ink: #111722;
+  --color-accent-ink: #241f19;
   --color-accent-soft-bg: color-mix(
     in srgb,
     var(--color-accent) 8%,
@@ -103,27 +103,23 @@
   --color-blue-dark: #185e83;
 
   --color-paper: #eee8dc;
-  --color-paper-light: #f8f5ef;
-  --color-ink: #111722;
-  --color-ink-soft: #536274;
-  --color-pearl: #f8f5ef;
+  --color-paper-light: #f4efe5;
+  --color-ink: #241f19;
+  --color-ink-soft: #71685e;
+  --color-pearl: #fcf9f2;
   --color-warm-paper: #eee8dc;
-  --color-amber: #ffad2f;
+  --color-amber: #f4bd3d;
   --color-amber-text: #8b5708;
-  --color-coral: #ff684f;
-  --color-magenta: #f73586;
-  --color-cyan: #56d8f2;
+  --color-coral: #e85a36;
 
   --font-display: 'Newsreader', Georgia, serif;
   --font-ui:
     'Instrument Sans Variable', 'Instrument Sans', system-ui, sans-serif;
 
   --shadow-frame:
-    0 40px 90px -30px rgba(17, 23, 34, 0.18),
-    0 0 0 1px rgba(255, 255, 255, 0.72);
+    0 40px 90px -30px rgb(36 31 25 / 18%), 0 0 0 1px rgba(255, 255, 255, 0.72);
   --shadow-panel:
-    0 40px 90px -30px rgba(17, 23, 34, 0.18),
-    0 0 0 1px rgba(255, 255, 255, 0.72);
+    0 40px 90px -30px rgb(36 31 25 / 18%), 0 0 0 1px rgba(255, 255, 255, 0.72);
   --shadow-accent-button:
     0 12px 32px -6px color-mix(in srgb, var(--color-accent) 60%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
@@ -133,11 +129,10 @@
     color-mix(in srgb, var(--color-accent) 50%, transparent);
   --shadow-paper:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 18px 40px -20px rgba(17, 23, 34, 0.22);
-  --shadow-float-label: 0 8px 20px rgba(17, 23, 34, 0.16);
+    0 18px 40px -20px rgb(36 31 25 / 22%);
+  --shadow-float-label: 0 8px 20px rgb(36 31 25 / 16%);
   --shadow-paper-strong:
-    0 14px 34px -8px rgba(17, 23, 34, 0.24),
-    0 4px 12px -4px rgba(17, 23, 34, 0.14);
+    0 14px 34px -8px rgb(36 31 25 / 24%), 0 4px 12px -4px rgb(36 31 25 / 14%);
 }
 
 :root {
@@ -174,8 +169,8 @@
   --dr-field-low: #e1cfbe;
   --dr-field-ember: #e38a5d;
   --dr-field-wine: #a86f78;
-  --gradient-header: linear-gradient(180deg, #ffffff, #eee8dc);
-  --gradient-header-reverse: linear-gradient(180deg, #eee8dc, #ffffff);
+  --gradient-header: linear-gradient(180deg, #fcf9f2, #eae1d3);
+  --gradient-header-reverse: linear-gradient(180deg, #eae1d3, #fcf9f2);
   --gradient-accent: linear-gradient(
     145deg,
     var(--color-accent-hover),
@@ -184,21 +179,21 @@
   --gradient-accent-fade: linear-gradient(
     90deg,
     color-mix(in srgb, var(--color-accent) 35%, transparent),
-    rgba(17, 23, 34, 0.04)
+    rgb(36 31 25 / 4%)
   );
   --gradient-accent-fade-reverse: linear-gradient(
     90deg,
-    rgba(17, 23, 34, 0.04),
+    rgb(36 31 25 / 4%),
     color-mix(in srgb, var(--color-accent) 35%, transparent)
   );
   --gradient-faint-fade: linear-gradient(
     90deg,
     color-mix(in srgb, var(--color-text-faint) 35%, transparent),
-    rgba(17, 23, 34, 0.04)
+    rgb(36 31 25 / 4%)
   );
   --gradient-faint-fade-reverse: linear-gradient(
     90deg,
-    rgba(17, 23, 34, 0.04),
+    rgb(36 31 25 / 4%),
     color-mix(in srgb, var(--color-text-faint) 35%, transparent)
   );
   --gradient-slider-fill: linear-gradient(

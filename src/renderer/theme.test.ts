@@ -105,7 +105,7 @@ describe('themedark accent derivation', () => {
   const accent = themedark.color.accent;
 
   it('keeps the accent base as the configured value', () => {
-    expect(accent).toBe('#f73586');
+    expect(accent).toBe('#e85a36');
   });
 
   it('derives the hover, deep and text shades from the accent base', () => {
