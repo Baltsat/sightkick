@@ -44,14 +44,22 @@ test('settings popover closes and the app keeps responding', async () => {
       document.body.append(staleModal);
     });
 
-    await page.mouse.click(700, 400);
+    // Click a real element that is always outside the popover — blind
+    // coordinates land inside it on some window geometries.
+    await page
+      .getByRole('heading', { name: 'Your drum library' })
+      .click({ force: true });
     await expect(page.getByTestId('rescan-folder')).not.toBeVisible({
       timeout: 5_000,
     });
 
     await page.getByTestId('settings-trigger').click();
     await expect(page.getByTestId('rescan-folder')).toBeVisible();
-    await page.mouse.click(700, 400);
+    // Click a real element that is always outside the popover — blind
+    // coordinates land inside it on some window geometries.
+    await page
+      .getByRole('heading', { name: 'Your drum library' })
+      .click({ force: true });
     await expect(page.getByTestId('rescan-folder')).not.toBeVisible({
       timeout: 5_000,
     });
