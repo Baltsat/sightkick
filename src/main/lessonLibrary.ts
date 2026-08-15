@@ -14,6 +14,7 @@ interface LessonManifestSong {
 
 interface LessonManifestEntry {
   song: LessonManifestSong;
+  sticking: string;
 }
 
 interface LessonManifest {
@@ -87,7 +88,12 @@ function readLessonManifest(root: string): LessonManifest | undefined {
 
     if (
       ids.some((id) => !/^lesson:\d{2}\.\d{2}$/.test(id)) ||
-      new Set(ids).size !== ids.length
+      new Set(ids).size !== ids.length ||
+      manifest.lessons.some(
+        (entry) =>
+          typeof entry.sticking !== 'string' ||
+          !entry.sticking.endsWith('/sticking.json'),
+      )
     ) {
       return undefined;
     }
@@ -154,6 +160,9 @@ function scanBundledLessons(
 
   const validSongs = songs as SongData[];
   const scannedIds = validSongs.map((song) => song.id);
+  const manifestById = new Map(
+    manifest.lessons.map((entry) => [entry.song.id, entry]),
+  );
 
   if (
     new Set(scannedIds).size !== manifest.lessonCount ||
@@ -162,6 +171,20 @@ function scanBundledLessons(
     throw new Error(
       'Bundled lesson library does not match its stable lesson-ID manifest.',
     );
+  }
+
+  for (const song of validSongs) {
+    const entry = manifestById.get(song.id);
+    const stickingPath = path.join(song.dir, 'sticking.json');
+
+    if (
+      !entry ||
+      !fs.statSync(stickingPath, { throwIfNoEntry: false })?.isFile()
+    ) {
+      throw new Error(
+        `Bundled lesson ${song.id} has no structured sticking data.`,
+      );
+    }
   }
 
   return Object.fromEntries(validSongs.map((song) => [song.id, song]));

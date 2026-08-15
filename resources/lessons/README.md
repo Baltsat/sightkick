@@ -155,18 +155,23 @@ authoring notes) — no triplet subdivision appears anywhere in this wing.
 | Multiple bounce roll (buzz roll)                                                                                                                                                          | a sustained, uncontrolled-bounce roll has no discrete-hit representation in a grid where every step is one fixed-duration attack — the same category of gap as the README's existing fermata caveat               |
 | Ten/eleven/thirteen/fifteen/seventeen-stroke rolls                                                                                                                                        | same measured-roll technique as the five/six/seven/nine-stroke rolls that _are_ included; left out only to keep this wing's exercise count inside the requested +40–60 budget, not for any notation-format reason |
 
-**Notation caveat specific to this wing**: the grid has no lane concept of
-"which hand" — a single `S`-lane hit sounds and reads identically no matter
-which hand plays it. Two honest consequences follow: (1) the single/
-double/triple stroke rolls render as the same continuous, unaccented
-16th-note stream — the only place the distinction lives is the cue text's
-sticking notation (`RLRL...` vs. `RRLL...` vs. `RRRLLL...`), not the chart
-or the audio; (2) double paradiddle and paradiddle-diddle share an accent
-skeleton (accent, then five unaccented notes, twice a bar) and are
-genuinely indistinguishable in the generated chart/audio — again, only the
-cue's sticking spells out the difference. Both exercises say this
-explicitly in their own cue text rather than leaving it for the player to
-notice.
+**Structured sticking**: every generated folder now carries `sticking.json`.
+Its bar records align exact `right-hand`, `left-hand`, and `right-foot`
+assignments to each authored step and lane. Explicit R/L strings cover the
+book-facing sticking drills; standard rudiment tags resolve the known PAS
+patterns; ordinary kit notes receive deterministic orchestration defaults.
+`countInBars` and `repeatCount` make the authored bars align with the complete
+generated MIDI timeline without inference.
+The duplicate audit fingerprints notes and limbs together, so single, double,
+and triple strokes and the paradiddle variants are distinct lesson data even
+when the snare MIDI and audio timbre match. Staff R/L glyphs remain an additive
+renderer consumer of this file; phase 1 does not alter chart parsing or staff
+layout.
+
+Generated MIDI also carries `ENABLE_CHART_DYNAMICS`: `X` uses velocity 127
+and `g` uses velocity 1, while demo-audio gain remains tied to the authored
+dynamic level. The current parser therefore exposes accents and ghost notes as
+chart flags instead of reducing them to ordinary hits.
 
 **Bridges to real music.** Where a bridge is defensibly true it names a
 specific, well-known reference (single-stroke tom rolls → "Wipe Out";
@@ -314,17 +319,25 @@ version). Summary:
 
 ```sh
 cd resources/lessons
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt   # pins pyyaml==6.0.3
-.venv/bin/python3 generate.py               # writes to ~/Music/SightKick
+uv run --python 3.12 --with pyyaml python generate.py
 ```
 
 Useful flags:
 
-- `--out-dir PATH` — write elsewhere (defaults to `~/Music/SightKick`,
-  SightKick's live library folder).
+- `--out-dir PATH` — write elsewhere (defaults to
+  `tmp/lanes/f-staging/library`; no user library is read or changed).
 - `--only 03.03,04.04` — regenerate just a few exercises by id.
 - `--dry-run` — print what would be written without touching disk.
+
+To stage the complete packaged library and manifest from the repository root:
+
+```sh
+node web/scripts/package-lessons.mjs --out-dir tmp/lanes/f-staging/library
+```
+
+Custom package outputs are rejected unless they stay under that staging
+library subtree. The release pipeline's no-flag invocation remains the only
+path that replaces `web/public/library`.
 
 `ffmpeg` must be on `PATH` (used to transcode both the generated click WAV
 and the generated drums WAV into compact stereo OGG files). The macOS release

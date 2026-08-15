@@ -61,6 +61,11 @@ meta:
       Each lane's value is a string, one character per step. A bar's step count is the
       string length and may differ bar to bar (e.g. 8 steps for 8th notes, 16 for 16ths, 12 for 8th-note
       triplets in 4/4). All lanes within one bar must share the same step count.
+    sticking:
+      An optional R/L string assigns one hand to every authored hand note in notation order; one
+      string applies to every equal-density bar, while a list assigns exact strings or null defaults per bar.
+      The generator resolves this plus standard rudiment vocabulary into sticking.json, where every hand
+      and kick note has an exact right-hand, left-hand, or right-foot assignment.
     tom_vs_cymbal:
       H/O share MIDI note 98 with T1, R shares note 99 with T2, and C shares note 100 with
       T3. generate.py emits a short tom-marker note (110/111/112) tightly scoped to each individual T1/T2/T3
@@ -192,8 +197,8 @@ units:
         exercises:
           - id: '01.01'
             lesson: 1
-            title: Alternating Singles Warm-Up
-            cue: Keep both hands the same height and let the stick rebound on its own.
+            title: Hand Blocks Warm-Up
+            cue: Play four right-hand notes, then four left-hand notes; keep the volume even when the lead changes.
             skills:
               - sixteenth-notes
               - timing
@@ -204,6 +209,7 @@ units:
             bpm_target: 100
             diff_drums: 0
             mode: loop
+            sticking: RRRRLLLL
             bars:
               - &id001
                 S: x.x.x.x.x.x.x.x.
@@ -226,6 +232,7 @@ units:
             bpm_target: 100
             diff_drums: 0
             mode: loop
+            sticking: RRLLRRLL
             bars:
               - &id002
                 S: xx..xx..xx..xx..
@@ -1015,7 +1022,7 @@ units:
           - id: '06.04'
             lesson: 6
             title: House Beat
-            cue: The full 8th-note groove -- hat rides through, backbeat cracks, kick drives on the beat.
+            cue: The full 8th-note groove -- hat rides through, backbeat cracks, kick drives all four beats.
             skills:
               - accents
               - hihat-timekeeping
@@ -1033,7 +1040,7 @@ units:
               - &id015
                 H: x.x.x.x.x.x.x.x.
                 S: '....X.......X...'
-                K: X.......X.......
+                K: X...X...X...X...
               - *id015
               - *id015
               - *id015
@@ -1042,7 +1049,7 @@ units:
           - id: '06.05'
             lesson: 6
             title: Syncopated Kick Groove
-            cue: The kick sneaks in on the upbeat before beat 3 -- count the 'and' out loud.
+            cue: Kick lands on 1, the and of 2, 3, and the and of 4 -- count every upbeat out loud.
             skills:
               - accents
               - hihat-timekeeping
@@ -1059,7 +1066,7 @@ units:
               - &id016
                 H: x.x.x.x.x.x.x.x.
                 S: '....X.......X...'
-                K: X.....x.x.......
+                K: X.....x.X.....x.
               - *id016
               - *id016
               - *id016
@@ -1277,9 +1284,9 @@ units:
               - H: x.x.x.x.x.x.x.x.
                 S: '....X.......X...'
                 K: X.......X.......
-                T1: '.........x......'
+                T3: '.........x......'
                 T2: '...........x....'
-                T3: '.............x..'
+                T1: '.............x..'
             stars_to_unlock: 40
             next: '07.07'
           - id: '07.07'
@@ -1964,7 +1971,7 @@ units:
           - id: '11.01'
             lesson: 11
             title: Accent Alternation Warm-Up
-            cue: Alternate a strong stroke with a softer tap so the pulse breathes -- loud, soft, loud, soft.
+            cue: Alternate strong and soft strokes, then reverse which hand owns the accent on the next bar.
             skills:
               - accents
               - sixteenth-notes
@@ -1976,11 +1983,10 @@ units:
             diff_drums: 2
             mode: loop
             bars:
-              - &id046
-                S: X.x.X.x.X.x.X.x.
-              - *id046
-              - *id046
-              - *id046
+              - S: X.x.X.x.X.x.X.x.
+              - S: x.X.x.X.x.X.x.X.
+              - S: X.x.X.x.X.x.X.x.
+              - S: x.X.x.X.x.X.x.X.
             stars_to_unlock: 65
             next: '11.02'
           - id: '11.02'
@@ -2835,7 +2841,7 @@ units:
           - id: '16.01'
             lesson: 16
             title: 16th-Note Singles
-            cue: Four evenly spaced strokes per beat -- count '1 e and ah' out loud.
+            cue: Build the sixteenth-note stream one beat at a time, then play the complete bar.
             skills:
               - sixteenth-notes
             time_signature:
@@ -2845,18 +2851,22 @@ units:
             bpm_target: 110
             diff_drums: 3
             mode: loop
+            sticking:
+              - RLRL
+              - RLRLRLRL
+              - RLRLRLRLRLRL
+              - RLRLRLRLRLRLRLRL
             bars:
-              - &id056
-                S: xxxxxxxxxxxxxxxx
-              - *id056
-              - *id056
-              - *id056
+              - S: xxxx............
+              - S: xxxxxxxx........
+              - S: xxxxxxxxxxxx....
+              - S: xxxxxxxxxxxxxxxx
             stars_to_unlock: 94
             next: '16.02'
           - id: '16.02'
             lesson: 16
             title: 16th-Note Alternating Accents
-            cue: Same alternating stream, now with an accent every four notes.
+            cue: Keep alternating while the accent moves through each sixteenth-note position across four bars.
             skills:
               - accents
               - sixteenth-notes
@@ -2867,12 +2877,12 @@ units:
             bpm_target: 110
             diff_drums: 3
             mode: loop
+            sticking: RLRLRLRLRLRLRLRL
             bars:
-              - &id057
-                S: XxxxXxxxXxxxXxxx
-              - *id057
-              - *id057
-              - *id057
+              - S: XxxxXxxxXxxxXxxx
+              - S: xXxxxXxxxXxxxXxx
+              - S: xxXxxxXxxxXxxxXx
+              - S: xxxXxxxXxxxXxxxX
             stars_to_unlock: 95
             next: '16.03'
           - id: '16.03'
@@ -2918,6 +2928,7 @@ units:
             bpm_target: 100
             diff_drums: 3
             mode: loop
+            sticking: RLRLRLLRLRLRLRLLRL
             bars:
               - &id059
                 H: xxxxxxxxxxxxxxxx
@@ -3440,7 +3451,7 @@ units:
           - id: '19.01'
             lesson: 19
             title: Triplet Feel Introduction
-            cue: Three even notes per beat -- count 'trip-uh-let' to internalize the subdivision.
+            cue: Add one triplet partial at a time until all three notes in every beat are even.
             skills:
               - triplet-feel
             time_signature:
@@ -3450,12 +3461,16 @@ units:
             bpm_target: 100
             diff_drums: 3
             mode: loop
+            sticking:
+              - RLRL
+              - RLRLRLRL
+              - RLRLRLRLRLRL
+              - RLRLRLRLRLRL
             bars:
-              - &id077
-                S: xxxxxxxxxxxx
-              - *id077
-              - *id077
-              - *id077
+              - S: x..x..x..x..
+              - S: xx.xx.xx.xx.
+              - S: xxxxxxxxxxxx
+              - S: xxxxxxxxxxxx
             stars_to_unlock: 116
             next: '19.02'
           - id: '19.02'
@@ -3471,6 +3486,7 @@ units:
             bpm_target: 100
             diff_drums: 3
             mode: loop
+            sticking: RLRLRLRLRLRL
             bars:
               - &id078
                 S: xxxxxxxxxxxx
@@ -3537,6 +3553,7 @@ units:
             bpm_target: 100
             diff_drums: 3
             mode: loop
+            sticking: RLLRLLRLLRLL
             bars:
               - &id081
                 S: xxxxxxxxxxxx
@@ -3666,7 +3683,7 @@ units:
           - id: '20.01'
             lesson: 20
             title: Triplet Accent Shift -- First Note
-            cue: Accent lands on the first note of the triplet -- the default swing pulse.
+            cue: Move the first-note triplet accent to the ride so the hand motion becomes a swing pulse.
             skills:
               - accents
               - jazz-ride
@@ -3680,7 +3697,7 @@ units:
             mode: loop
             bars:
               - &id085
-                S: XxxXxxXxxXxx
+                R: XxxXxxXxxXxx
               - *id085
               - *id085
               - *id085
@@ -3972,7 +3989,7 @@ units:
           - id: '21.05'
             lesson: 21
             title: Straight Shuffle
-            cue: A simpler, laid-back shuffle with the kick locked to the downbeat only.
+            cue: A laid-back shuffle with the kick anchoring beats 1 and 3 under the swung hat.
             skills:
               - accents
               - hihat-timekeeping
@@ -3990,7 +4007,7 @@ units:
               - &id095
                 H: x.xx.xx.xx.x
                 S: '...X.....X..'
-                K: X...........
+                K: X.....X.....
               - *id095
               - *id095
               - *id095
@@ -3999,7 +4016,7 @@ units:
           - id: '21.06'
             lesson: 21
             title: 12-Bar Blues Groove
-            cue: The shuffle groove that carries a classic blues progression -- lock in and don't waver.
+            cue: Repeat this changing four-bar kick phrase three times for a 12-bar blues form.
             skills:
               - accents
               - hihat-timekeeping
@@ -4014,13 +4031,18 @@ units:
             diff_drums: 5
             mode: loop
             bars:
-              - &id096
-                H: x.xx.xx.xx.x
+              - H: x.xx.xx.xx.x
                 S: '...X.....X..'
-                K: X...........
-              - *id096
-              - *id096
-              - *id096
+                K: X.....X.....
+              - H: x.xx.xx.xx.x
+                S: '...X.....X..'
+                K: X..x..X.....
+              - H: x.xx.xx.xx.x
+                S: '...X.....X..'
+                K: X.....X..x..
+              - H: x.xx.xx.xx.x
+                S: '...X.....X..'
+                K: X..x..X..x..
             stars_to_unlock: 137
             next: '21.07'
           - id: '21.07'

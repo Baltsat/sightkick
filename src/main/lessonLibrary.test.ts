@@ -51,8 +51,15 @@ function makeLessonBundle(
     );
     fs.writeFileSync(path.join(dir, 'notes.chart'), CHART);
     fs.writeFileSync(path.join(dir, 'drums.ogg'), audio);
+    fs.writeFileSync(
+      path.join(dir, 'sticking.json'),
+      JSON.stringify({ version: 1, lessonId, bars: [] }),
+    );
 
-    return { song: { id: `lesson:${lessonId}`, drumDifficulties: ['expert'] } };
+    return {
+      song: { id: `lesson:${lessonId}`, drumDifficulties: ['expert'] },
+      sticking: `${lessonId}/sticking.json`,
+    };
   });
 
   fs.writeFileSync(
@@ -150,6 +157,22 @@ describe('bootstrapLessonLibrary', () => {
     expect(
       Object.keys(result.songs ?? {}).filter((id) => id.startsWith('lesson:')),
     ).toHaveLength(170);
+  });
+
+  it('rejects a bundle with missing structured sticking before creating a profile library', () => {
+    const bundle = makeLessonBundle();
+    const userDataRoot = path.join(root, 'missing-sticking-profile');
+
+    fs.rmSync(
+      path.join(bundle, 'SightKick Method - Lesson 01.01', 'sticking.json'),
+    );
+
+    expect(() =>
+      bootstrapLessonLibrary({ bundledRoot: bundle, userDataRoot }),
+    ).toThrow('Bundled lesson lesson:01.01 has no structured sticking data.');
+    expect(
+      fs.existsSync(path.join(userDataRoot, DESKTOP_LESSON_LIBRARY_FOLDER)),
+    ).toBe(false);
   });
 
   it('keeps an imported song in the default lesson-backed library across relaunch', () => {

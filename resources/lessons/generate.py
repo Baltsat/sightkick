@@ -8,10 +8,9 @@ the exercise's own pattern using real drum one-shot samples, sample-
 accurately aligned with song.ogg), and song.ini.
 
 Usage:
-    python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-    .venv/bin/python3 generate.py
-    .venv/bin/python3 generate.py --out-dir /some/other/dir --only 03.03,04.04
-    .venv/bin/python3 generate.py --dry-run
+    uv run --python 3.12 --with pyyaml python generate.py
+    uv run --python 3.12 --with pyyaml python generate.py --out-dir /some/other/dir --only 03.03,04.04
+    uv run --python 3.12 --with pyyaml python generate.py --dry-run
 
 Requires: Python 3.12, PyYAML (see requirements.txt), ffmpeg on PATH (used
 to transcode both the click WAV and the drums WAV into small mono OGG
@@ -27,7 +26,9 @@ the source method book).
 from __future__ import annotations
 
 import argparse
+import json
 import math
+import re
 import shutil
 import struct
 import subprocess
@@ -51,10 +52,8 @@ try:
     from pedagogy_manifest import write_json_manifest
 except ImportError:  # pragma: no cover
     sys.exit(
-        "PyYAML is required. Set up the pinned local venv first:\n"
-        "  python3 -m venv resources/lessons/.venv\n"
-        "  resources/lessons/.venv/bin/pip install -r resources/lessons/requirements.txt\n"
-        "then re-run with resources/lessons/.venv/bin/python3 generate.py"
+        "PyYAML is required. Run with:\n"
+        "  uv run --python 3.12 --with pyyaml python resources/lessons/generate.py"
     )
 
 HERE = Path(__file__).resolve().parent
@@ -100,6 +99,7 @@ VELOCITY = {
     "5": 100,  # f
     "6": 115,  # ff (same loudness as the accent symbol X)
 }
+CHART_VELOCITY = {**VELOCITY, "X": 127, "g": 1}
 VALID_SYMBOLS = ".xXog123456"
 HIT_LENGTH_TICKS = 10  # short, percussive note-on/off length for actual hits
 
@@ -154,9 +154,7 @@ LANE_SAMPLE = {
 # that drives notes.mid (0-127 MIDI velocity -> 0.0-1.0 amplitude scale)
 GAIN = {sym: vel / 127.0 for sym, vel in VELOCITY.items()}
 
-# Preserve the established on-disk folder and prefix so an upgrade never
-# duplicates or abandons an existing lesson library during the product rename.
-DEFAULT_OUT_DIR = Path.home() / "Music" / "SightKick"
+DEFAULT_OUT_DIR = HERE.parents[1] / "tmp" / "lanes" / "f-staging" / "library"
 FOLDER_PREFIX = "SightKick Method - Lesson"
 
 # The lesson chart can assess a scored MIDI event's timing and mapped pad.
@@ -179,6 +177,27 @@ LANE_TARGET_ELEMENT = {
     "T3": "tom3",
 }
 
+NOTE_LANE_ORDER = ("K", "H", "O", "R", "C", "S", "T1", "T2", "T3")
+HAND_LANES = frozenset(NOTE_LANE_ORDER) - {"K"}
+TIMEKEEPING_LANES = frozenset({"H", "O", "R", "C"})
+DRUM_HAND_LANES = HAND_LANES - TIMEKEEPING_LANES
+HAND_LIMB = {"R": "right-hand", "L": "left-hand"}
+STANDARD_STICKING = {
+    "single-stroke-roll": "RL",
+    "double-stroke-roll": "RRLL",
+    "triple-stroke-roll": "RRRLLL",
+    "single-paradiddle": "RLRRLRLL",
+    "double-paradiddle": "RLRLRRLRLRLL",
+    "triple-paradiddle": "RLRLRLRRLRLRLRLL",
+    "paradiddle-diddle": "RLRRLLLRLLRR",
+    "five-stroke-roll": "RRLLRLLRRL",
+    "six-stroke-roll": "RLLRRLLRRLLR",
+    "seven-stroke-roll": "RRLLRRLLLRRLLR",
+    "nine-stroke-roll": "RRLLRRLLRLLRRLLRRL",
+    "paradiddle": "RLRRLRLL",
+}
+TEMPO_FAMILY_TITLE = re.compile(r"^(?P<name>.+) \(\d+ BPM\)$")
+
 
 # ---------------------------------------------------------------------------
 # curriculum loading
@@ -196,6 +215,219 @@ def iter_exercises(curriculum: dict):
         for lesson in unit["lessons"]:
             for exercise in lesson["exercises"]:
                 yield unit, lesson, exercise
+
+
+def _sticking_patterns(exercise: dict) -> list[str | None]:
+    authored = exercise.get("sticking")
+    bar_count = len(exercise["bars"])
+    if authored is None:
+        skills = set(exercise.get("skills", []))
+        pattern = next(
+            (value for skill, value in STANDARD_STICKING.items() if skill in skills),
+            None,
+        )
+        if pattern is None:
+            return [None] * bar_count
+        offset = 0
+        resolved: list[str | None] = []
+        for bar in exercise["bars"]:
+            hand_lanes = {
+                lane
+                for lane, notes in bar.items()
+                if lane in HAND_LANES and any(symbol != "." for symbol in notes)
+            }
+            if not hand_lanes or not hand_lanes <= DRUM_HAND_LANES:
+                resolved.append(None)
+                continue
+            hand_count = sum(
+                symbol != "."
+                for lane, notes in bar.items()
+                if lane in HAND_LANES
+                for symbol in notes
+            )
+            expanded = "".join(
+                pattern[(offset + index) % len(pattern)] for index in range(hand_count)
+            )
+            resolved.append(expanded)
+            offset += hand_count
+        return resolved
+    if isinstance(authored, str):
+        return [authored] * bar_count
+    if (
+        not isinstance(authored, list)
+        or len(authored) != bar_count
+        or any(
+            pattern is not None and not isinstance(pattern, str) for pattern in authored
+        )
+    ):
+        raise ValueError(
+            f"{exercise['id']}: sticking must be one R/L string or one string/null per bar"
+        )
+    return authored
+
+
+def pattern_family_for(exercise: dict) -> str | None:
+    explicit = exercise.get("pattern_family")
+    if explicit:
+        return str(explicit)
+    if "tempo-building" not in set(exercise.get("skills", [])):
+        return None
+    match = TEMPO_FAMILY_TITLE.match(exercise["title"])
+    return match.group("name").lower().replace(" ", "-") if match else None
+
+
+def _bar_notes(bar: dict) -> list[dict[str, object]]:
+    step_count = len(next(iter(bar.values())))
+    return [
+        {"step": step, "lane": lane, "symbol": bar[lane][step]}
+        for step in range(step_count)
+        for lane in NOTE_LANE_ORDER
+        if lane in bar and bar[lane][step] != "."
+    ]
+
+
+def _default_hand_assignments(notes: list[dict[str, object]]) -> dict[int, str]:
+    assignments: dict[int, str] = {}
+    alternating = 0
+    steps = sorted({int(note["step"]) for note in notes})
+    for step in steps:
+        indexes = [
+            index
+            for index, note in enumerate(notes)
+            if note["step"] == step and note["lane"] in HAND_LANES
+        ]
+        if len(indexes) > 2:
+            raise ValueError(f"step {step} requires more than two hands")
+        if len(indexes) == 2:
+            timekeeping = [
+                index for index in indexes if notes[index]["lane"] in TIMEKEEPING_LANES
+            ]
+            first = timekeeping[0] if timekeeping else indexes[0]
+            second = indexes[0] if indexes[1] == first else indexes[1]
+            assignments[first] = "R"
+            assignments[second] = "L"
+            alternating += 2
+        elif indexes:
+            index = indexes[0]
+            if notes[index]["lane"] in TIMEKEEPING_LANES:
+                assignments[index] = "R"
+            else:
+                assignments[index] = "R" if alternating % 2 == 0 else "L"
+                alternating += 1
+    return assignments
+
+
+def build_sticking_data(
+    exercise: dict, *, count_in_bars: int | None = None, repeat_count: int | None = None
+) -> dict:
+    patterns = _sticking_patterns(exercise)
+    bars: list[dict] = []
+    for bar_index, (bar, authored) in enumerate(zip(exercise["bars"], patterns)):
+        notes = _bar_notes(bar)
+        hand_indexes = [
+            index for index, note in enumerate(notes) if note["lane"] in HAND_LANES
+        ]
+        if authored is not None:
+            if any(limb not in HAND_LIMB for limb in authored):
+                raise ValueError(
+                    f"{exercise['id']}: sticking bar {bar_index + 1} contains a symbol other than R/L"
+                )
+            if len(authored) != len(hand_indexes):
+                raise ValueError(
+                    f"{exercise['id']}: sticking must contain {len(hand_indexes)} hand assignments "
+                    f"for bar {bar_index + 1}, found {len(authored)}"
+                )
+            assignments = dict(zip(hand_indexes, authored))
+        else:
+            assignments = _default_hand_assignments(notes)
+
+        rendered: list[dict[str, object]] = []
+        for index, note in enumerate(notes):
+            lane = str(note["lane"])
+            limb = "right-foot" if lane == "K" else HAND_LIMB[assignments[index]]
+            rendered.append({**note, "limb": limb})
+        for step in {int(note["step"]) for note in rendered}:
+            hand_limbs = [
+                note["limb"]
+                for note in rendered
+                if note["step"] == step and str(note["limb"]).endswith("-hand")
+            ]
+            if len(hand_limbs) != len(set(hand_limbs)):
+                raise ValueError(
+                    f"{exercise['id']}: sticking assigns one hand to two notes at step {step}"
+                )
+        bars.append(
+            {
+                "stepCount": len(next(iter(bar.values()))),
+                "notes": rendered,
+            }
+        )
+
+    data = {
+        "version": 1,
+        "lessonId": exercise["id"],
+        "timeSignature": exercise["time_signature"],
+        "bars": bars,
+    }
+    family = pattern_family_for(exercise)
+    if family:
+        data["patternFamily"] = family
+    if count_in_bars is not None:
+        data["countInBars"] = count_in_bars
+    if repeat_count is not None:
+        data["repeatCount"] = repeat_count
+    return data
+
+
+def duplicate_pattern_report(exercises: list[dict]) -> dict:
+    groups: dict[str, list[dict]] = {}
+    family_fingerprints: dict[str, set[str]] = {}
+    for exercise in exercises:
+        data = build_sticking_data(exercise)
+        fingerprint = json.dumps(
+            {
+                "timeSignature": data["timeSignature"],
+                "bars": data["bars"],
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        groups.setdefault(fingerprint, []).append(exercise)
+        family = pattern_family_for(exercise)
+        if family:
+            family_fingerprints.setdefault(family, set()).add(fingerprint)
+
+    inconsistent = sorted(
+        family
+        for family, fingerprints in family_fingerprints.items()
+        if len(fingerprints) != 1
+    )
+    if inconsistent:
+        raise ValueError(
+            f"pattern families must describe one complete note+sticking pattern: {', '.join(inconsistent)}"
+        )
+
+    duplicate_groups = []
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        families = {pattern_family_for(member) for member in members}
+        if len(families) != 1 or None in families:
+            ids = ", ".join(member["id"] for member in members)
+            raise ValueError(f"unintentional duplicate pattern: {ids}")
+        duplicate_groups.append(
+            {
+                "family": pattern_family_for(members[0]),
+                "lesson_ids": [member["id"] for member in members],
+            }
+        )
+
+    duplicate_groups.sort(key=lambda group: group["lesson_ids"][0])
+    return {
+        "exercise_count": len(exercises),
+        "distinct_pattern_count": len(groups),
+        "duplicate_groups": duplicate_groups,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -385,7 +617,7 @@ def build_drums_track(timeline: Timeline) -> bytes:
 
     for tick, lane, sym in timeline.hits:
         note = LANE_NOTE[lane]
-        vel = VELOCITY[sym]
+        vel = CHART_VELOCITY[sym]
         note_on(tick, note, vel)
         note_off(tick + HIT_LENGTH_TICKS, note)
 
@@ -396,11 +628,12 @@ def build_drums_track(timeline: Timeline) -> bytes:
             note_on(tick, marker_note, 100)
             note_off(tick + _marker_span_ticks(timeline, tick), marker_note)
 
-    name_event = (0, -1, -1, _meta(0x03, b"PART DRUMS"))
+    name_event = (0, -2, -1, _meta(0x03, b"PART DRUMS"))
+    dynamics_event = (0, -1, -1, _meta(0x01, b"[ENABLE_CHART_DYNAMICS]"))
     end_event = (timeline.total_ticks, 2, 999, _meta(0x2F, b""))
 
     ordered = sorted(events, key=lambda e: (e[0], e[1], e[2]))
-    all_events = [name_event] + ordered + [end_event]
+    all_events = [name_event, dynamics_event] + ordered + [end_event]
     return _track_chunk([(e[0], e[3]) for e in all_events])
 
 
@@ -733,6 +966,16 @@ def generate_one(
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "notes.mid").write_bytes(mid_bytes)
     (folder / "song.ini").write_text(ini_text, encoding="utf-8")
+    (folder / "sticking.json").write_text(
+        json.dumps(
+            build_sticking_data(
+                exercise, count_in_bars=1, repeat_count=timeline.repeats
+            ),
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     wav_path = folder / "_click_tmp.wav"
     ogg_path = folder / "song.ogg"
