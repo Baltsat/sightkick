@@ -44,18 +44,23 @@ test('settings popover closes and the app keeps responding', async () => {
       document.body.append(staleModal);
     });
 
-    // Toggle the trigger to close — the one gesture antd treats the same
-    // on every platform. Outside-click semantics are covered by the
-    // overlayStyles unit test; this spec guards that a stale modal cannot
-    // wedge the popover open and the app keeps responding.
-    await page.getByTestId('settings-trigger').click();
+    // The popover anchors to the rail's bottom-left, so the top-right
+    // corner of the window is outside it on every platform geometry.
+    // Outside-click is the gesture that froze; the stale modal above
+    // must not block it.
+    const topRight = await page.evaluate(() => ({
+      x: window.innerWidth - 24,
+      y: 80,
+    }));
+
+    await page.mouse.click(topRight.x, topRight.y);
     await expect(page.getByTestId('rescan-folder')).not.toBeVisible({
       timeout: 5_000,
     });
 
     await page.getByTestId('settings-trigger').click();
     await expect(page.getByTestId('rescan-folder')).toBeVisible();
-    await page.getByTestId('settings-trigger').click();
+    await page.mouse.click(topRight.x, topRight.y);
     await expect(page.getByTestId('rescan-folder')).not.toBeVisible({
       timeout: 5_000,
     });
