@@ -12,7 +12,14 @@ const meta: Meta<typeof CountIn> = {
   },
   decorators: [
     (Story) => (
-      <div style={{ position: 'relative', height: 480, background: '#f1eadc' }}>
+      <div
+        style={{
+          position: 'relative',
+          minHeight: '100vh',
+          background:
+            'repeating-linear-gradient(#f4efe5 0 84px, #d9cebd 85px 86px)',
+        }}
+      >
         <Story />
       </div>
     ),
@@ -23,6 +30,10 @@ export default meta;
 
 type Story = StoryObj<typeof CountIn>;
 
-export const Three: Story = { args: { count: 3 } };
+export const FourthBeat: Story = { args: { count: 4 } };
 
 export const Animated: Story = { args: { count: 3, animated: true } };
+
+export const SevenBeatMeasure: Story = {
+  args: { count: 7, total: 7, beatMs: 640 },
+};

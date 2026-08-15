@@ -1,21 +1,53 @@
 .drumroll-count-in {
-  justify-content: center;
+  position: fixed;
+  z-index: 1100;
+  inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  place-items: center;
+  gap: clamp(2rem, 5vh, 4rem);
+  padding: clamp(2rem, 6vw, 5rem);
+  overflow: hidden;
+  color: var(--dr-studio-ink);
+  background: radial-gradient(
+      circle at 50% 48%,
+      color-mix(in srgb, var(--dr-count) 16%, transparent) 0%,
+      transparent 42%
+    ),
+    var(--surface-studio);
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  isolation: isolate;
+  pointer-events: none;
 }
 
-.drumroll-count-in__label {
-  margin: 0;
-  color: var(--dr-ink-muted, var(--color-text-muted));
-  font-size: 0.75rem;
+.drumroll-count-in__current {
+  align-self: end;
+  color: var(--dr-studio-ink);
+  font-family: var(--font-display);
+  font-size: clamp(14rem, 46vw, 36rem);
   font-weight: 700;
-  line-height: 1;
-  white-space: nowrap;
+  letter-spacing: -0.08em;
+  line-height: 0.72;
+  text-shadow: 0 0 0.28em color-mix(in srgb, var(--dr-count) 24%, transparent);
+  transform-origin: 50% 72%;
+}
+
+.drumroll-count-in__current::before {
+  content: attr(data-count);
+}
+
+.drumroll-count-in[data-animated='true'] .drumroll-count-in__current {
+  animation: drumroll-count-in-impact 180ms ease-out both;
 }
 
 .drumroll-count-in__beats {
   display: grid;
-  grid-template-columns: repeat(var(--count-in-columns, 4), 1.8rem);
+  grid-template-columns: repeat(var(--count-in-columns, 4), minmax(0, 1fr));
   align-items: center;
-  gap: 0.28rem;
+  align-self: start;
+  width: min(72rem, 82vw);
+  gap: clamp(0.5rem, 1.4vw, 1.5rem);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -24,38 +56,78 @@
 .drumroll-count-in__beat {
   display: grid;
   place-items: center;
+  border-top: clamp(0.2rem, 0.45vw, 0.38rem) solid
+    color-mix(in srgb, var(--dr-studio-ink) 20%, transparent);
 }
 
 .drumroll-count-in__beat > span {
   display: grid;
-  width: 1.8rem;
-  height: 1.8rem;
+  min-width: 2ch;
+  min-height: clamp(3rem, 7vw, 5.5rem);
   place-items: center;
-  border: 1px solid var(--dr-line, rgb(36 31 25 / 20%));
-  color: var(--dr-ink-muted, var(--color-text-muted));
-  background: var(--dr-paper-low, var(--color-paper));
-  font-size: 0.78rem;
-  font-weight: 720;
+  color: color-mix(in srgb, var(--dr-studio-ink) 34%, transparent);
+  font-size: clamp(1.5rem, 3.4vw, 3rem);
+  font-weight: 760;
   line-height: 1;
   transition:
-    color 100ms ease-out,
-    background-color 100ms ease-out,
-    border-color 100ms ease-out;
+    color 120ms ease-out,
+    transform 120ms ease-out;
+}
+
+.drumroll-count-in__beat[data-state='passed'] {
+  border-top-color: color-mix(in srgb, var(--dr-count) 58%, transparent);
 }
 
 .drumroll-count-in__beat[data-state='passed'] > span {
-  color: var(--dr-ink, var(--color-ink));
-  background: var(--dr-paper, var(--color-paper-light));
+  color: color-mix(in srgb, var(--dr-studio-ink) 66%, transparent);
+}
+
+.drumroll-count-in__beat[data-state='active'] {
+  border-top-color: var(--dr-count);
 }
 
 .drumroll-count-in__beat[data-state='active'] > span {
-  border-color: var(--dr-count, var(--color-yellow));
-  color: var(--dr-ink, var(--color-ink));
-  background: var(--dr-count, var(--color-yellow));
+  color: var(--dr-count);
+  transform: translateY(-0.16em) scale(1.16);
+}
+
+@keyframes drumroll-count-in-impact {
+  0% {
+    opacity: 0.36;
+    transform: scale(0.82) translateY(0.04em);
+  }
+
+  65% {
+    opacity: 1;
+    transform: scale(1.035) translateY(-0.01em);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .drumroll-count-in[data-animated='true'] .drumroll-count-in__current {
+    animation: none;
+  }
+
   .drumroll-count-in__beat > span {
     transition: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .drumroll-count-in {
+    padding: 2rem 1.5rem 3rem;
+  }
+
+  .drumroll-count-in__current {
+    font-size: clamp(12rem, 68vw, 24rem);
+  }
+
+  .drumroll-count-in__beats {
+    width: min(100%, 38rem);
   }
 }

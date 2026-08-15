@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { KitCommandPrompt } from './KitCommandPrompt';
+import { KitCommandPrompt, KitCommandVeil } from './KitCommandPrompt';
 
 describe('KitCommandPrompt', () => {
   it('shows and names a full hands-free sequence', () => {
@@ -38,5 +38,31 @@ describe('KitCommandPrompt', () => {
     expect(screen.getByText('or')).toBeVisible();
     expect(screen.getByText('Previous')).toBeVisible();
     expect(screen.getByText('Next')).toBeVisible();
+  });
+
+  it('renders the same command language as a full-bleed waiting veil', () => {
+    render(
+      <KitCommandVeil
+        kicker="Paused"
+        title="Resume from the kit"
+        model={{
+          label: 'Resume from the kit',
+          steps: ['kick', 'crash', 'kick', 'crash'],
+        }}
+        detail="The score stays held at bar 8."
+        animated={false}
+      />,
+    );
+
+    const veil = screen.getByTestId('kit-command-veil');
+
+    expect(veil).toHaveAttribute('data-fullscreen-moment', 'kit-command');
+    expect(veil).toHaveAttribute('data-primary-element', 'kick');
+    expect(veil).toHaveAccessibleName(
+      'Paused. Resume from the kit: Kick, then Crash, then Kick, then Crash. The score stays held at bar 8.',
+    );
+    expect(veil.querySelectorAll('.drumroll-kit-command__step')).toHaveLength(
+      4,
+    );
   });
 });
