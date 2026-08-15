@@ -44,22 +44,18 @@ test('settings popover closes and the app keeps responding', async () => {
       document.body.append(staleModal);
     });
 
-    // Click a real element that is always outside the popover — blind
-    // coordinates land inside it on some window geometries.
-    await page
-      .getByRole('heading', { name: 'Your drum library' })
-      .click({ force: true });
+    // Toggle the trigger to close — the one gesture antd treats the same
+    // on every platform. Outside-click semantics are covered by the
+    // overlayStyles unit test; this spec guards that a stale modal cannot
+    // wedge the popover open and the app keeps responding.
+    await page.getByTestId('settings-trigger').click();
     await expect(page.getByTestId('rescan-folder')).not.toBeVisible({
       timeout: 5_000,
     });
 
     await page.getByTestId('settings-trigger').click();
     await expect(page.getByTestId('rescan-folder')).toBeVisible();
-    // Click a real element that is always outside the popover — blind
-    // coordinates land inside it on some window geometries.
-    await page
-      .getByRole('heading', { name: 'Your drum library' })
-      .click({ force: true });
+    await page.getByTestId('settings-trigger').click();
     await expect(page.getByTestId('rescan-folder')).not.toBeVisible({
       timeout: 5_000,
     });
