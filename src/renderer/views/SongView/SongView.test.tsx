@@ -551,7 +551,7 @@ describe('drumming and scoring', () => {
     view.clickPlay();
     await view.finishSong();
 
-    view.clickTestId('score-retry');
+    view.clickTestId('score-command-retry');
 
     expect(view.startedSources().length).toBeGreaterThan(0);
   });
@@ -564,7 +564,7 @@ describe('drumming and scoring', () => {
     view.clickPlay();
     await view.finishSong();
 
-    view.clickTestId('score-next');
+    view.clickTestId('score-command-continue');
 
     expect(screen.getByTestId('song-list-stub')).toBeInTheDocument();
   });

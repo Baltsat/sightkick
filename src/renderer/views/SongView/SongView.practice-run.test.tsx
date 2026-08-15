@@ -1002,7 +1002,9 @@ describe('practice mode analytics', () => {
         view.ipc.emit('save-practice-run', { songId: 'song-1' });
       });
 
-      expect(screen.getByTestId('score-next')).toBeEnabled();
+      // After the save lands the pad command chips are the single set of
+      // actions - the standalone fallback button leaves with them active.
+      expect(screen.queryByTestId('score-next')).not.toBeInTheDocument();
       expect(
         screen.queryByTestId('score-auto-continue'),
       ).not.toBeInTheDocument();

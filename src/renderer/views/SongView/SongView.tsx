@@ -1297,6 +1297,16 @@ export function SongView() {
     practicePersistenceState,
     practiceSummary,
   ]);
+  const onEndSession = useCallback(() => {
+    if (practicePersistenceState === 'saving') {
+      return;
+    }
+
+    setIsScoreModalOpen(false);
+    cancel();
+    pause();
+    navigate('/');
+  }, [cancel, navigate, pause, practicePersistenceState]);
   const onRetry = useCallback(() => {
     if (practicePersistenceState === 'saving') {
       return;
@@ -2935,6 +2945,7 @@ export function SongView() {
       <ScoreSummary
         isOpen={isScoreModalOpen}
         onNextSong={onNextSong}
+        onEndSession={onEndSession}
         nextLabel={gameMode === 'practice' ? 'Continue My Wave' : undefined}
         continuationLabelLocked={gameMode === 'practice'}
         persistenceState={practicePersistenceState}

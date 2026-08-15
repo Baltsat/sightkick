@@ -263,10 +263,20 @@ describe('ScoreSummary', () => {
   });
 
   it('draws all result commands when kit control is enabled', () => {
+    const onRetry = vi.fn();
+    const onNextSong = vi.fn();
+    const onEndSession = vi.fn();
+    const onCoach = vi.fn();
     const { modal } = renderSummary({
+      onRetry,
+      onNextSong,
+      onEndSession,
+      onCoach,
+      practiceSummary: multiLaneRunFixture(),
       handsFreeControlsEnabled: true,
       persistenceState: 'saved',
       nextLabel: 'Next practice',
+      continuationLabelLocked: true,
     });
     const controls = modal.getByTestId('score-kit-controls');
 
@@ -278,7 +288,23 @@ describe('ScoreSummary', () => {
     expect(controls).toHaveTextContent('Hit snare');
     expect(controls).toHaveTextContent('Leave session');
     expect(controls).toHaveTextContent('Hit ride');
+    expect(controls).toHaveTextContent('Coach');
+    expect(controls).toHaveTextContent('Hit hi-hat');
     expect(controls.textContent).not.toMatch(/then/i);
+    expect(controls.querySelectorAll('button')).toHaveLength(4);
+    expect(controls.querySelectorAll('[data-primary="true"]')).toHaveLength(1);
+    expect(modal.queryByTestId('score-next')).not.toBeInTheDocument();
+    expect(modal.queryByTestId('score-retry')).not.toBeInTheDocument();
+
+    fireEvent.click(modal.getByTestId('score-command-continue'));
+    fireEvent.click(modal.getByTestId('score-command-retry'));
+    fireEvent.click(modal.getByTestId('score-command-end'));
+    fireEvent.click(modal.getByTestId('score-command-open-coach'));
+
+    expect(onNextSong).toHaveBeenCalledOnce();
+    expect(onRetry).toHaveBeenCalledOnce();
+    expect(onEndSession).toHaveBeenCalledOnce();
+    expect(onCoach).toHaveBeenCalledOnce();
   });
 
   it.each(['saved', 'failed', 'no-evidence'] as const)(
@@ -421,14 +447,17 @@ describe('ScoreSummary', () => {
     expect(modal.getByTestId('musical-receipt')).toHaveTextContent(
       'This chart is far above your current tempo ceiling',
     );
-    expect(modal.getByTestId('score-retry')).toHaveTextContent(
+    expect(modal.getByTestId('score-command-retry')).toHaveTextContent(
       'Replay at 60% tempo',
     );
-    expect(modal.getByTestId('score-kit-controls')).toHaveTextContent(
-      'Replay at 60% tempo',
+    expect(modal.getByTestId('score-command-retry')).toHaveAttribute(
+      'data-primary',
+      'true',
     );
+    expect(modal.getAllByText('Replay at 60% tempo')).toHaveLength(1);
+    expect(modal.queryByTestId('score-retry')).not.toBeInTheDocument();
 
-    fireEvent.click(modal.getByTestId('score-retry'));
+    fireEvent.click(modal.getByTestId('score-command-retry'));
 
     expect(onAdaptiveRetry).toHaveBeenCalledWith(0.6);
   });

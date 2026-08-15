@@ -9,12 +9,17 @@
   padding: clamp(2rem, 6vw, 5rem);
   overflow: hidden;
   color: var(--dr-studio-ink);
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 50% 48%,
-      color-mix(in srgb, var(--dr-count) 16%, transparent) 0%,
+      color-mix(in srgb, var(--dr-count) 18%, transparent) 0%,
       transparent 42%
     ),
-    var(--surface-studio);
+    linear-gradient(
+      color-mix(in srgb, var(--surface-studio) 24%, transparent),
+      color-mix(in srgb, var(--surface-studio) 18%, transparent)
+    );
+  backdrop-filter: brightness(0.84) saturate(0.72);
   font-family: var(--font-ui);
   font-variant-numeric: tabular-nums;
   isolation: isolate;
@@ -23,13 +28,15 @@
 
 .drumroll-count-in__current {
   align-self: end;
-  color: var(--dr-studio-ink);
+  color: color-mix(in srgb, var(--dr-studio-ink) 18%, transparent);
   font-family: var(--font-display);
   font-size: clamp(14rem, 46vw, 36rem);
   font-weight: 700;
   letter-spacing: -0.08em;
   line-height: 0.72;
-  text-shadow: 0 0 0.28em color-mix(in srgb, var(--dr-count) 24%, transparent);
+  -webkit-text-stroke: clamp(0.16rem, 0.45vw, 0.36rem)
+    color-mix(in srgb, var(--dr-studio-ink) 92%, transparent);
+  text-shadow: 0 0 0.2em color-mix(in srgb, var(--dr-count) 30%, transparent);
   transform-origin: 50% 72%;
 }
 

@@ -79,6 +79,7 @@ const meta: Meta<typeof ScoreSummary> = {
     scoreData: { hitNotes: 70, totalNotes: 100, falseHits: 5 },
     onRetry: () => {},
     onNextSong: () => {},
+    onEndSession: () => {},
   },
 };
 

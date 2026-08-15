@@ -22,7 +22,10 @@ import {
 import { AchievementToastQueue } from '../AchievementToastQueue';
 import type { LessonProgressionDecision } from '../../services/lesson-progression';
 import { KIT_COMMAND_PRESENTATION } from '../KitCommandPrompt';
-import { RESULT_KIT_COMMANDS } from '../../services/gestures';
+import {
+  RESULT_KIT_COMMANDS,
+  type DrumGestureAction,
+} from '../../services/gestures';
 import { LearningEvidenceReceipt } from '../LearningEvidenceReceipt';
 import { musicalReceipt } from './musicalReceipt';
 import {
@@ -47,6 +50,7 @@ interface Props {
   onRetry: () => void;
   onAdaptiveRetry?: (playbackSpeed: number) => void;
   onNextSong: () => void;
+  onEndSession?: () => void;
   nextLabel?: string;
   continuationLabelLocked?: boolean;
   autoContinueEnabled?: boolean;
@@ -98,6 +102,7 @@ export function ScoreSummary({
   onRetry,
   onAdaptiveRetry,
   onNextSong,
+  onEndSession,
   nextLabel = 'Back to library',
   continuationLabelLocked = false,
   persistenceState,
@@ -286,7 +291,9 @@ export function ScoreSummary({
   };
   const coachAvailable = Boolean(practiceSummary && onCoach && !noMusicalInput);
   const kitCommands = RESULT_KIT_COMMANDS.filter(
-    ({ action }) => action !== 'open-coach' || coachAvailable,
+    ({ action }) =>
+      (action !== 'open-coach' || coachAvailable) &&
+      (action !== 'end' || onEndSession),
   ).map((command) => ({
     ...command,
     label:
@@ -296,6 +303,17 @@ export function ScoreSummary({
         ? retryLabel
         : command.label,
   }));
+  const runKitCommand = (action: DrumGestureAction) => {
+    if (action === 'continue') {
+      onNextSong();
+    } else if (action === 'retry') {
+      retry();
+    } else if (action === 'end') {
+      onEndSession?.();
+    } else if (action === 'open-coach') {
+      onCoach?.();
+    }
+  };
 
   if (!isOpen) {
     return null;
@@ -639,14 +657,22 @@ export function ScoreSummary({
             aria-label="Result controls from the drum kit"
             data-testid="score-kit-controls"
           >
-            {kitCommands.map(({ id, element, label }) => {
+            {kitCommands.map(({ id, action, element, label }) => {
               const pad = KIT_COMMAND_PRESENTATION[element];
+              const primary = primaryIsReplay
+                ? action === 'retry'
+                : action === 'continue';
 
               return (
-                <div
+                <button
                   key={id}
+                  type="button"
                   className="drumroll-score-summary__command"
+                  data-testid={`score-command-${action}`}
+                  data-primary={primary ? 'true' : undefined}
                   style={{ '--kit-command-color': pad.color } as CSSProperties}
+                  onClick={() => runKitCommand(action)}
+                  autoFocus={primary}
                 >
                   <img
                     className="drumroll-score-summary__command-pad"
@@ -657,7 +683,7 @@ export function ScoreSummary({
                     <strong>{label}</strong>
                     <small>Hit {pad.label.toLowerCase()}</small>
                   </span>
-                </div>
+                </button>
               );
             })}
           </section>
@@ -671,70 +697,72 @@ export function ScoreSummary({
             Export private performance postcard
           </Button>
         )}
-        <div className="drumroll-score-summary__actions">
-          {primaryIsReplay ? (
-            <Button
-              data-testid="score-retry"
-              type="primary"
-              disabled={continuationBlocked}
-              onClick={retry}
-              icon={<FontAwesomeIcon icon={faRepeat} />}
-              size="large"
-              block
-              autoFocus
-            >
-              {retryLabel}
-            </Button>
-          ) : (
-            <Button
-              data-testid="score-next"
-              type="primary"
-              disabled={continuationBlocked}
-              onClick={() => onNextSong()}
-              size="large"
-              block
-              autoFocus
-            >
-              {continuationLabelLocked || receipt?.action !== 'continue'
-                ? nextLabel
-                : receipt.actionLabel}
-            </Button>
-          )}
-          <div className="drumroll-score-summary__actions-secondary">
+        {!handsFreeControlsEnabled || continuationBlocked ? (
+          <div className="drumroll-score-summary__actions">
             {primaryIsReplay ? (
               <Button
+                data-testid="score-retry"
+                type="primary"
+                disabled={continuationBlocked}
+                onClick={retry}
+                icon={<FontAwesomeIcon icon={faRepeat} />}
+                size="large"
+                block
+                autoFocus
+              >
+                {retryLabel}
+              </Button>
+            ) : (
+              <Button
                 data-testid="score-next"
-                type="text"
+                type="primary"
                 disabled={continuationBlocked}
                 onClick={() => onNextSong()}
+                size="large"
+                block
+                autoFocus
               >
                 {continuationLabelLocked || receipt?.action !== 'continue'
                   ? nextLabel
                   : receipt.actionLabel}
               </Button>
-            ) : (
-              <Button
-                data-testid="score-retry"
-                type="text"
-                disabled={continuationBlocked}
-                onClick={retry}
-                icon={<FontAwesomeIcon icon={faRepeat} />}
-              >
-                Play again
-              </Button>
             )}
-            {practiceSummary && onCoach && !noMusicalInput && (
-              <Button
-                data-testid="score-coach"
-                type="text"
-                onClick={onCoach}
-                icon={<FontAwesomeIcon icon={faWandMagicSparkles} />}
-              >
-                Coach
-              </Button>
-            )}
+            <div className="drumroll-score-summary__actions-secondary">
+              {primaryIsReplay ? (
+                <Button
+                  data-testid="score-next"
+                  type="text"
+                  disabled={continuationBlocked}
+                  onClick={() => onNextSong()}
+                >
+                  {continuationLabelLocked || receipt?.action !== 'continue'
+                    ? nextLabel
+                    : receipt.actionLabel}
+                </Button>
+              ) : (
+                <Button
+                  data-testid="score-retry"
+                  type="text"
+                  disabled={continuationBlocked}
+                  onClick={retry}
+                  icon={<FontAwesomeIcon icon={faRepeat} />}
+                >
+                  Play again
+                </Button>
+              )}
+              {practiceSummary && onCoach && !noMusicalInput && (
+                <Button
+                  data-testid="score-coach"
+                  type="text"
+                  onClick={onCoach}
+                  icon={<FontAwesomeIcon icon={faWandMagicSparkles} />}
+                >
+                  Coach
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
+        ) : null}
       </footer>
 
       {postcardOpen && songData && practiceSummary ? (
