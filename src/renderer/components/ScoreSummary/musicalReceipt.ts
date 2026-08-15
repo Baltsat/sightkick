@@ -1,4 +1,9 @@
 import type { KitElement, RunSummary } from '../../services/practice-stats';
+import {
+  hasSectionCoverageMismatch,
+  recommendedReplaySpeed,
+  type FocusSectionInsight,
+} from '../../services/run-insights';
 
 export type MusicalReceiptAction = 'replay' | 'continue';
 
@@ -7,6 +12,7 @@ export interface MusicalReceipt {
   meaning: string;
   action: MusicalReceiptAction;
   actionLabel: string;
+  replaySpeed?: number;
   changed: boolean;
 }
 
@@ -91,6 +97,7 @@ const FELL_APART_MIN_ATTEMPTS = 4;
  * - it did not connect. Below the threshold the headline must say so
  * plainly instead of reaching for a neutral/positive frame. */
 const FELL_APART_MAX_ACCURACY = 0.15;
+const FAR_ABOVE_TEMPO_CEILING_MIN_ATTEMPTS = 256;
 
 function attemptedCount(summary: RunSummary): number {
   return summary.totalHits + summary.totalMisses;
@@ -103,6 +110,57 @@ function fellApart(summary: RunSummary): boolean {
     attemptedCount(summary) >= FELL_APART_MIN_ATTEMPTS &&
     summary.overallAccuracy <= FELL_APART_MAX_ACCURACY
   );
+}
+
+function farAboveTempoCeiling(summary: RunSummary): boolean {
+  return (
+    attemptedCount(summary) >= FAR_ABOVE_TEMPO_CEILING_MIN_ATTEMPTS &&
+    summary.overallAccuracy <= FELL_APART_MAX_ACCURACY
+  );
+}
+
+function percentTempo(speed: number): number {
+  return Math.round(speed * 100);
+}
+
+function replayReceipt(summary: RunSummary, headline: string): MusicalReceipt {
+  const attempted = attemptedCount(summary);
+  const replaySpeed = recommendedReplaySpeed(summary);
+  const currentTempo =
+    summary.playbackSpeed === undefined
+      ? ''
+      : ` at ${percentTempo(summary.playbackSpeed)}% tempo`;
+  const next = replaySpeed
+    ? ` Drumroll will replay at ${percentTempo(
+        replaySpeed,
+      )}% to find a playable floor.`
+    : ' Drumroll will replay the loop to find a playable floor.';
+
+  return {
+    headline,
+    meaning: `${summary.totalHits} of ${attempted.toLocaleString(
+      'en-US',
+    )} notes landed${currentTempo}.${next}`,
+    action: 'replay',
+    actionLabel: replaySpeed
+      ? `Replay at ${percentTempo(replaySpeed)}% tempo`
+      : 'Replay this loop',
+    ...(replaySpeed ? { replaySpeed } : {}),
+    changed: false,
+  };
+}
+
+function sectionAttemptReceipt(focus: FocusSectionInsight): MusicalReceipt {
+  const tempo = percentTempo(focus.tempoMultiplier);
+
+  return {
+    headline: 'This was a section attempt, not a full-song pass',
+    meaning: `${focus.label} carries the real input; the full-song total includes notes outside that attempt. Drumroll will replay this section at ${tempo}%.`,
+    action: 'replay',
+    actionLabel: `Replay ${focus.label.toLowerCase()} at ${tempo}%`,
+    replaySpeed: focus.tempoMultiplier,
+    changed: false,
+  };
 }
 
 /** True when nothing was scored at all - the player started and stopped, or
@@ -142,6 +200,7 @@ function loopTarget(summary: RunSummary): string | undefined {
 export function musicalReceipt(
   summary: RunSummary | undefined,
   previous: RunSummary | undefined,
+  focus?: FocusSectionInsight,
 ): MusicalReceipt | undefined {
   if (!summary) {
     return undefined;
@@ -156,6 +215,17 @@ export function musicalReceipt(
       actionLabel: 'Replay this loop',
       changed: false,
     };
+  }
+
+  if (focus && hasSectionCoverageMismatch(summary, focus)) {
+    return sectionAttemptReceipt(focus);
+  }
+
+  if (farAboveTempoCeiling(summary)) {
+    return replayReceipt(
+      summary,
+      'This chart is far above your current tempo ceiling',
+    );
   }
 
   if (previous && speedIsComparable(summary, previous)) {
@@ -192,15 +262,12 @@ export function musicalReceipt(
   // as praise the numbers directly contradict. The run's overall honesty
   // outranks a narrower, more flattering fact about it.
   if (fellApart(summary)) {
-    const attempted = attemptedCount(summary);
-
-    return {
-      headline: 'This pass did not connect',
-      meaning: `${summary.totalHits} of ${attempted} notes landed. Slow the tempo or check the kit mapping, then try the loop again.`,
-      action: 'replay',
-      actionLabel: 'Replay this loop',
-      changed: false,
-    };
+    return replayReceipt(
+      summary,
+      summary.totalHits === 0
+        ? 'No chart notes landed at this tempo'
+        : 'This tempo is above your current ceiling',
+    );
   }
 
   const recoveredBar = cleanRecovery(summary);
@@ -235,12 +302,39 @@ export function musicalReceipt(
     };
   }
 
+  if (summary.overallAccuracy >= 0.9) {
+    return {
+      headline: 'This tempo is under control',
+      meaning: `${summary.totalHits} of ${attemptedCount(
+        summary,
+      ).toLocaleString('en-US')} notes landed on this pass.`,
+      action: 'continue',
+      actionLabel: 'Continue current plan',
+      changed: false,
+    };
+  }
+
+  if (summary.overallAccuracy >= 0.7) {
+    return {
+      headline: 'This tempo is playable',
+      meaning: `${summary.totalHits} of ${attemptedCount(
+        summary,
+      ).toLocaleString(
+        'en-US',
+      )} notes landed; this is a real baseline for the song.`,
+      action: 'continue',
+      actionLabel: 'Continue current plan',
+      changed: false,
+    };
+  }
+
   return {
-    headline: 'This run is saved for comparison',
-    meaning:
-      'No musical change is claimed until another comparable pass exists.',
-    action: 'continue',
-    actionLabel: 'Continue current plan',
+    headline: 'This tempo needs another pass',
+    meaning: `${summary.totalHits} of ${attemptedCount(summary).toLocaleString(
+      'en-US',
+    )} notes landed. Drumroll will keep the next pass on this loop.`,
+    action: 'replay',
+    actionLabel: 'Replay this loop',
     changed: false,
   };
 }

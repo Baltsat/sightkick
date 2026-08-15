@@ -12,6 +12,10 @@ import {
 } from '../../hooks/useGamification';
 import { installIpcMock } from '../../hooks/test-support';
 import { ScoreSummary } from './ScoreSummary';
+import type {
+  FocusSectionInsight,
+  LessonRecommendationInsight,
+} from '../../services/run-insights';
 
 const songData = {
   name: 'Master of Puppets',
@@ -21,7 +25,7 @@ const songData = {
 function renderSummary(
   props: Partial<Parameters<typeof ScoreSummary>[0]> = {},
 ) {
-  render(
+  const result = render(
     <AntdApp>
       <ScoreSummary
         isOpen
@@ -33,10 +37,9 @@ function renderSummary(
       />
     </AntdApp>,
   );
-
   const modalEl = screen.getByTestId('score-modal');
 
-  return { modalEl, modal: within(modalEl) };
+  return { modalEl, modal: within(modalEl), unmount: result.unmount };
 }
 
 describe('ScoreSummary', () => {
@@ -320,7 +323,7 @@ describe('ScoreSummary', () => {
     // never a canned "Nice reps".
     expect(screen.queryByText('Nice reps')).not.toBeInTheDocument();
     expect(modal.getByTestId('musical-receipt')).toHaveTextContent(
-      'This run is saved for comparison',
+      'This tempo is playable',
     );
     expect(modal.getByTestId('practice-stats')).toBeInTheDocument();
     expect(modal.getByTestId('practice-run-mode')).toHaveTextContent(
@@ -330,7 +333,10 @@ describe('ScoreSummary', () => {
     // (bug-hunt-20260812.md) - the at-a-glance cell carries it too, not
     // just the collapsed evidence.
     expect(modal.getByTestId('score-cell-accuracy')).toHaveTextContent(
-      '88% at 0.7×',
+      '88% hit rate',
+    );
+    expect(modal.getByTestId('run-current-metrics')).toHaveTextContent(
+      '70% tempo',
     );
   });
 
@@ -369,12 +375,176 @@ describe('ScoreSummary', () => {
     expect(screen.queryByText('Nice reps')).not.toBeInTheDocument();
     expect(modal.queryByText(/ready for a loop/)).not.toBeInTheDocument();
     expect(modal.getByTestId('musical-receipt')).toHaveTextContent(
-      'This pass did not connect',
+      'No chart notes landed at this tempo',
     );
     expect(modal.getByTestId('musical-receipt')).toHaveAttribute(
       'data-changed',
       'false',
     );
+  });
+
+  it('makes the catastrophic-miss adaptation visible and applies it with one action', () => {
+    const onAdaptiveRetry = vi.fn();
+    const summary = {
+      ...multiLaneRunFixture(),
+      totalHits: 24,
+      totalMisses: 1054,
+      totalWrong: 0,
+      overallAccuracy: 24 / 1078,
+      playbackSpeed: 0.7,
+    };
+    const { modal } = renderSummary({
+      scoreData: undefined,
+      practiceSummary: summary,
+      handsFreeControlsEnabled: true,
+      onAdaptiveRetry,
+    });
+
+    expect(modal.getByTestId('musical-receipt')).toHaveTextContent(
+      'This chart is far above your current tempo ceiling',
+    );
+    expect(modal.getByTestId('score-retry')).toHaveTextContent(
+      'Replay at 60% tempo',
+    );
+    expect(modal.getByTestId('score-kit-controls')).toHaveTextContent(
+      'Replay at 60% tempo',
+    );
+
+    fireEvent.click(modal.getByTestId('score-retry'));
+
+    expect(onAdaptiveRetry).toHaveBeenCalledWith(0.6);
+  });
+
+  it('shows current song metrics and a chronological stored-run trend', () => {
+    const first = {
+      ...multiLaneRunFixture(),
+      completedAt: '2026-08-13T12:00:00.000Z',
+      totalHits: 600,
+      totalMisses: 478,
+      totalWrong: 0,
+      overallAccuracy: 600 / 1078,
+      playbackSpeed: 0.6,
+    };
+    const current = {
+      ...first,
+      completedAt: '2026-08-15T12:00:00.000Z',
+      totalHits: 840,
+      totalMisses: 238,
+      totalWrong: 0,
+      overallAccuracy: 840 / 1078,
+      playbackSpeed: 0.8,
+    };
+    const { modal } = renderSummary({
+      scoreData: undefined,
+      practiceSummary: current,
+      practiceHistory: [current, first],
+    });
+
+    expect(modal.getByTestId('run-current-metrics')).toHaveTextContent(
+      '78% hit rate',
+    );
+    expect(modal.getByTestId('run-current-metrics')).toHaveTextContent(
+      '840 hit · 238 missed · 80% tempo',
+    );
+    expect(modal.getByTestId('run-trend-chart')).toHaveAccessibleName(
+      'Hit rate across 2 runs: 56%, 78%.',
+    );
+    expect(modal.getByTestId('run-trend-summary')).toHaveTextContent(
+      'Up 22 points from the previous saved run.',
+    );
+  });
+
+  it('surfaces each atomic skill contribution from this pass', () => {
+    const summary = {
+      ...multiLaneRunFixture(),
+      atomicSkillEvidence: [
+        {
+          run_id: 'run:1',
+          chart_revision: 'chart:1',
+          manifest_revision: 'manifest:1',
+          skill_id: 'pulse.eighth',
+          item_id: '01.03',
+          context_signature: 'rock',
+          evidence_kind: 'acquisition' as const,
+          quality: 0.84,
+          weight: 0.5,
+          playback_speed: 0.8,
+          completed_at: '2026-08-15T12:00:00.000Z',
+        },
+        {
+          run_id: 'run:1',
+          chart_revision: 'chart:1',
+          manifest_revision: 'manifest:1',
+          skill_id: 'coord.rock_three_way',
+          item_id: '01.03',
+          context_signature: 'rock',
+          evidence_kind: 'retention' as const,
+          quality: 0.78,
+          weight: 0.4,
+          playback_speed: 0.8,
+          completed_at: '2026-08-15T12:00:00.000Z',
+        },
+      ],
+    };
+    const { modal } = renderSummary({
+      scoreData: undefined,
+      practiceSummary: summary,
+    });
+    const skills = modal.getByTestId('run-skill-movements');
+
+    expect(skills).toHaveTextContent(
+      'Eighth-note pulseFirst evidence · 84% quality · +0.42 evidence',
+    );
+    expect(skills).toHaveTextContent(
+      'Rock three-way coordinationHeld on revisit · 78% quality · +0.31 evidence',
+    );
+  });
+
+  it('renders typed sibling insights when supplied and omits their sections when absent', () => {
+    const focusSection: FocusSectionInsight = {
+      label: 'Bars 17–20',
+      barStart: 17,
+      barEnd: 20,
+      tempoMultiplier: 0.6,
+      passCriteria: 'Land 3 clean passes at 82%+.',
+      novel: true,
+    };
+    const lessonRecommendations: LessonRecommendationInsight[] = [
+      {
+        lessonId: '04.02',
+        title: 'Rock three-way builder',
+        family: 'coordination',
+      },
+    ];
+    const withSiblingData = renderSummary({
+      scoreData: undefined,
+      practiceSummary: multiLaneRunFixture(),
+      focusSection,
+      lessonRecommendations,
+    });
+
+    expect(
+      withSiblingData.modal.getByTestId('run-focus-section'),
+    ).toHaveTextContent(
+      'Bars 17–20 · new patternReplay at 60% · Land 3 clean passes at 82%+.',
+    );
+    expect(
+      withSiblingData.modal.getByTestId('run-lesson-recommendations'),
+    ).toHaveTextContent('Rock three-way builder · coordination');
+
+    withSiblingData.unmount();
+
+    const withoutSiblingData = renderSummary({
+      scoreData: undefined,
+      practiceSummary: multiLaneRunFixture(),
+    }).modal;
+
+    expect(
+      withoutSiblingData.queryByTestId('run-focus-section'),
+    ).not.toBeInTheDocument();
+    expect(
+      withoutSiblingData.queryByTestId('run-lesson-recommendations'),
+    ).not.toBeInTheDocument();
   });
 
   it('omits the run-mode label for a Practice run at the default 1x speed', () => {

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { Song } from '../../../types';
 import { UseGamificationResult } from '../../hooks/useGamification';
-import { summarizeRun } from '../../services/practice-stats';
+import { RunSummary, summarizeRun } from '../../services/practice-stats';
 import { ScoreSummary } from './ScoreSummary';
 
 const songData = {
@@ -29,6 +29,19 @@ function kickRun(hits: number, misses: number, completedAt: string) {
     ],
     completedAt,
   );
+}
+
+function songRun(
+  hits: number,
+  misses: number,
+  completedAt: string,
+  playbackSpeed: number,
+): RunSummary {
+  return {
+    ...kickRun(hits, misses, completedAt),
+    mode: 'practice',
+    playbackSpeed,
+  };
 }
 
 const previousRun = kickRun(6, 4, '2026-08-10T12:00:00.000Z');
@@ -158,6 +171,94 @@ export const NoAttemptsThisRun: Story = {
   args: {
     scoreData: undefined,
     practiceSummary: kickRun(0, 0, '2026-08-12T12:00:00.000Z'),
+  },
+};
+
+const catastrophicRun = songRun(24, 1054, '2026-08-15T10:00:00.000Z', 0.7);
+
+export const CatastrophicMiss: Story = {
+  args: {
+    scoreData: undefined,
+    practiceSummary: catastrophicRun,
+    practiceHistory: [
+      songRun(122, 956, '2026-08-12T10:00:00.000Z', 0.8),
+      songRun(61, 1017, '2026-08-14T10:00:00.000Z', 0.7),
+      catastrophicRun,
+    ],
+    onAdaptiveRetry: () => {},
+    handsFreeControlsEnabled: true,
+    focusSection: {
+      label: 'Bars 17–20',
+      barStart: 17,
+      barEnd: 20,
+      tempoMultiplier: 0.6,
+      passCriteria: 'Land 3 clean passes at 82%+.',
+      novel: true,
+    },
+    lessonRecommendations: [
+      {
+        lessonId: '04.02',
+        title: 'Rock three-way builder',
+        family: 'coordination',
+      },
+    ],
+  },
+};
+
+const strongRun: RunSummary = {
+  ...songRun(1002, 76, '2026-08-15T11:00:00.000Z', 1),
+  atomicSkillEvidence: [
+    {
+      run_id: 'run:strong',
+      chart_revision: 'chart:master-of-puppets',
+      manifest_revision: 'manifest:master-of-puppets',
+      skill_id: 'pulse.eighth',
+      item_id: 'song:master-of-puppets',
+      context_signature: 'metal',
+      evidence_kind: 'retention',
+      quality: 0.93,
+      weight: 0.5,
+      playback_speed: 1,
+      completed_at: '2026-08-15T11:00:00.000Z',
+    },
+    {
+      run_id: 'run:strong',
+      chart_revision: 'chart:master-of-puppets',
+      manifest_revision: 'manifest:master-of-puppets',
+      skill_id: 'coord.rock_three_way',
+      item_id: 'song:master-of-puppets',
+      context_signature: 'metal',
+      evidence_kind: 'transfer',
+      quality: 0.91,
+      weight: 0.45,
+      playback_speed: 1,
+      completed_at: '2026-08-15T11:00:00.000Z',
+    },
+  ],
+};
+
+export const StrongPass: Story = {
+  args: {
+    scoreData: undefined,
+    practiceSummary: strongRun,
+    practiceHistory: [
+      songRun(701, 377, '2026-08-10T11:00:00.000Z', 0.7),
+      songRun(816, 262, '2026-08-12T11:00:00.000Z', 0.8),
+      songRun(938, 140, '2026-08-14T11:00:00.000Z', 0.9),
+      strongRun,
+    ],
+    persistenceState: 'saved',
+  },
+};
+
+const firstSongRun = songRun(840, 238, '2026-08-15T12:00:00.000Z', 0.8);
+
+export const FirstTimeSong: Story = {
+  args: {
+    scoreData: undefined,
+    practiceSummary: firstSongRun,
+    practiceHistory: [],
+    persistenceState: 'saved',
   },
 };
 

@@ -26,15 +26,26 @@ import { RESULT_KIT_COMMANDS } from '../../services/gestures';
 import { LearningEvidenceReceipt } from '../LearningEvidenceReceipt';
 import { musicalReceipt } from './musicalReceipt';
 import {
+  buildRunInsights,
+  focusSectionFromStruggle,
+  lessonRecommendationsFromPatternProfile,
+  type FocusSectionInsight,
+  type LessonRecommendationInsight,
+  type PatternPlayerProfile,
+  type StruggleReport,
+} from '../../services/run-insights';
+import {
   buildPerformancePostcard,
   PerformancePostcard,
   type PerformancePostcardField,
 } from '../PerformancePostcard';
+import { RunInsightPanel } from './RunInsightPanel';
 import './ScoreSummary.css';
 
 interface Props {
   isOpen: boolean;
   onRetry: () => void;
+  onAdaptiveRetry?: (playbackSpeed: number) => void;
   onNextSong: () => void;
   nextLabel?: string;
   continuationLabelLocked?: boolean;
@@ -48,6 +59,7 @@ interface Props {
   practiceSummary?: RunSummary;
   noMusicalInput?: boolean;
   previousPracticeSummary?: RunSummary;
+  practiceHistory?: readonly RunSummary[];
   /** Live streak/XP-vs-goal state, shared with the library header (see
    * SongListView's <Outlet context>). Only used to phrase "N XP to
    * today's goal" — everything specific to *this* run comes from
@@ -61,6 +73,10 @@ interface Props {
   runResult?: RecordRunResult;
   lessonProgression?: LessonProgressionDecision;
   handsFreeControlsEnabled?: boolean;
+  focusSection?: FocusSectionInsight;
+  lessonRecommendations?: readonly LessonRecommendationInsight[];
+  struggleReport?: StruggleReport;
+  patternProfile?: PatternPlayerProfile;
 }
 
 function noteCountLabel(count: number, verb: string): string {
@@ -80,6 +96,7 @@ function capitalize(value: string): string {
 export function ScoreSummary({
   isOpen,
   onRetry,
+  onAdaptiveRetry,
   onNextSong,
   nextLabel = 'Back to library',
   continuationLabelLocked = false,
@@ -91,10 +108,15 @@ export function ScoreSummary({
   practiceSummary,
   noMusicalInput = false,
   previousPracticeSummary,
+  practiceHistory = [],
   gamification,
   runResult,
   lessonProgression,
   handsFreeControlsEnabled = false,
+  focusSection,
+  lessonRecommendations,
+  struggleReport,
+  patternProfile,
 }: Props) {
   const starRating = useMemo(() => {
     if (!scoreData) {
@@ -113,7 +135,6 @@ export function ScoreSummary({
     // round up to a perfect-looking ratio. "Perfect" and "Every note
     // landed" are absolute claims shown on the same screen as the
     // hit/missed/false-hit grid — they must agree with the unrounded
-    // counts that grid is built from, not the rounded display accuracy.
     const hitNotes = scoreData.hitNotes ?? 0;
 
     return (
@@ -133,17 +154,43 @@ export function ScoreSummary({
     : 0;
   const streakCurrent =
     gamification?.streak.current ?? runResult?.streakCurrent ?? 0;
+  const resolvedFocusSection = useMemo(
+    () => focusSection ?? focusSectionFromStruggle(struggleReport),
+    [focusSection, struggleReport],
+  );
+  const resolvedLessonRecommendations = useMemo(
+    () =>
+      lessonRecommendations ??
+      lessonRecommendationsFromPatternProfile(patternProfile),
+    [lessonRecommendations, patternProfile],
+  );
   const receipt = useMemo(
     () =>
       noMusicalInput
         ? undefined
-        : musicalReceipt(practiceSummary, previousPracticeSummary),
-    [noMusicalInput, practiceSummary, previousPracticeSummary],
+        : musicalReceipt(
+            practiceSummary,
+            previousPracticeSummary,
+            resolvedFocusSection,
+          ),
+    [
+      noMusicalInput,
+      practiceSummary,
+      previousPracticeSummary,
+      resolvedFocusSection,
+    ],
+  );
+  const runInsights = useMemo(
+    () => buildRunInsights(practiceSummary, practiceHistory),
+    [practiceHistory, practiceSummary],
   );
   const [postcardOpen, setPostcardOpen] = useState(false);
   const [postcardExporting, setPostcardExporting] = useState(false);
   const [postcardStatus, setPostcardStatus] = useState<string>();
   const primaryIsReplay = receipt?.action === 'replay';
+  const adaptiveReplayAvailable = Boolean(
+    receipt?.replaySpeed !== undefined && onAdaptiveRetry,
+  );
   // A player may explicitly continue after an honest failure/no-evidence
   // warning, but never while the main-process write is still unresolved:
   // leaving then would tear down the only acknowledgement listener.
@@ -194,26 +241,6 @@ export function ScoreSummary({
   const contextDetail = isLesson
     ? songData?.lesson?.unit
     : capitalize(difficulty);
-  const attempted = practiceSummary
-    ? practiceSummary.totalHits + practiceSummary.totalMisses
-    : 0;
-  // Practice speed is a fact the player needs to keep reading their own
-  // result correctly (an honest 0% at half speed reads differently than
-  // 0% at full tempo) - fold it in rather than letting it disappear behind
-  // the evidence expand the way it vanished from the transport line.
-  const practiceSpeedSuffix =
-    practiceSummary?.playbackSpeed !== undefined &&
-    practiceSummary.playbackSpeed !== 1
-      ? ` at ${practiceSummary.playbackSpeed}×`
-      : '';
-  const practiceAccuracyValue =
-    practiceSummary && attempted > 0
-      ? `${Math.round(
-          practiceSummary.overallAccuracy * 100,
-        )}%${practiceSpeedSuffix} · ${practiceSummary.totalHits} hit, ${
-          practiceSummary.totalMisses
-        } missed`
-      : 'No notes played';
   // The kit controls print the same verbs the on-screen buttons carry, so
   // the pad and the button are visibly the same command rather than two
   // vocabularies for one screen. Order matches reading order: what happens
@@ -222,7 +249,26 @@ export function ScoreSummary({
     continuationLabelLocked || receipt?.action !== 'continue'
       ? nextLabel
       : receipt.actionLabel;
-  const retryLabel = primaryIsReplay ? 'Replay this loop' : 'Play again';
+  const retryLabel = primaryIsReplay
+    ? receipt.replaySpeed !== undefined
+      ? adaptiveReplayAvailable
+        ? receipt.actionLabel
+        : 'Replay this loop'
+      : receipt.actionLabel
+    : 'Play again';
+  const retry = () => {
+    if (
+      adaptiveReplayAvailable &&
+      receipt?.replaySpeed !== undefined &&
+      onAdaptiveRetry
+    ) {
+      onAdaptiveRetry(receipt.replaySpeed);
+
+      return;
+    }
+
+    onRetry();
+  };
   const coachAvailable = Boolean(practiceSummary && onCoach && !noMusicalInput);
   const kitCommands = RESULT_KIT_COMMANDS.filter(
     ({ action }) => action !== 'open-coach' || coachAvailable,
@@ -361,31 +407,13 @@ export function ScoreSummary({
               </div>
             ) : (
               receipt &&
-              practiceSummary && (
-                <div className="drumroll-score-summary__cells">
-                  <div className="drumroll-score-summary__cell">
-                    <div className="drumroll-score-summary__cell-label">
-                      This pass
-                    </div>
-                    <div
-                      className="drumroll-score-summary__cell-value"
-                      data-testid="score-cell-accuracy"
-                    >
-                      {practiceAccuracyValue}
-                    </div>
-                  </div>
-                  <div className="drumroll-score-summary__cell">
-                    <div className="drumroll-score-summary__cell-label">
-                      Next
-                    </div>
-                    <div
-                      className="drumroll-score-summary__cell-value"
-                      data-testid="musical-receipt-action"
-                    >
-                      {receipt.actionLabel}
-                    </div>
-                  </div>
-                </div>
+              runInsights && (
+                <RunInsightPanel
+                  insight={runInsights}
+                  actionLabel={primaryIsReplay ? retryLabel : continueLabel}
+                  focusSection={resolvedFocusSection}
+                  lessonRecommendations={resolvedLessonRecommendations}
+                />
               )
             )}
 
@@ -487,7 +515,7 @@ export function ScoreSummary({
               >
                 <div className="flex items-center justify-between gap-3">
                   <div
-                    className="flex items-center gap-2 text-sm font-semibold text-[var(--dr-ink)]"
+                    className="flex items-center gap-2 text-base font-semibold text-[var(--dr-ink)]"
                     data-testid="run-streak-status"
                   >
                     <FontAwesomeIcon
@@ -609,13 +637,13 @@ export function ScoreSummary({
               data-testid="score-retry"
               type="primary"
               disabled={continuationBlocked}
-              onClick={() => onRetry()}
+              onClick={retry}
               icon={<FontAwesomeIcon icon={faRepeat} />}
               size="large"
               block
               autoFocus
             >
-              Replay this loop
+              {retryLabel}
             </Button>
           ) : (
             <Button
@@ -649,7 +677,7 @@ export function ScoreSummary({
                 data-testid="score-retry"
                 type="text"
                 disabled={continuationBlocked}
-                onClick={() => onRetry()}
+                onClick={retry}
                 icon={<FontAwesomeIcon icon={faRepeat} />}
               >
                 Play again

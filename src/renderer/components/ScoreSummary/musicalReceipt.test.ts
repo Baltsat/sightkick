@@ -34,9 +34,72 @@ describe('musicalReceipt', () => {
 
   it('calls out a run that fell apart instead of staying neutral', () => {
     expect(musicalReceipt(allMissRunFixture(), undefined)).toMatchObject({
-      headline: 'This pass did not connect',
+      headline: 'No chart notes landed at this tempo',
       action: 'replay',
       changed: false,
+    });
+  });
+
+  it('names a catastrophic chart mismatch and carries the slower replay in the action', () => {
+    const summary = {
+      ...multiLaneRunFixture(),
+      totalHits: 24,
+      totalMisses: 1054,
+      totalWrong: 0,
+      overallAccuracy: 24 / 1078,
+      playbackSpeed: 0.7,
+    };
+
+    expect(musicalReceipt(summary, undefined)).toMatchObject({
+      headline: 'This chart is far above your current tempo ceiling',
+      meaning:
+        '24 of 1,078 notes landed at 70% tempo. Drumroll will replay at 60% to find a playable floor.',
+      action: 'replay',
+      actionLabel: 'Replay at 60% tempo',
+      replaySpeed: 0.6,
+      changed: false,
+    });
+  });
+
+  it('uses attempted-section evidence instead of misreading late entry as a tempo ceiling', () => {
+    const summary = {
+      ...multiLaneRunFixture(),
+      totalHits: 24,
+      totalMisses: 1054,
+      totalWrong: 36,
+      overallAccuracy: 24 / 1078,
+      playbackSpeed: 0.7,
+      sectionEvidence: [
+        {
+          barStart: 34,
+          barEnd: 37,
+          startTick: 167040,
+          endTick: 175440,
+          startTimeSeconds: 210,
+          endTimeSeconds: 224,
+          expectedNotes: 60,
+          hits: 24,
+          misses: 36,
+          wrongHits: 36,
+          patternSignature: 'pattern:late-entry',
+          attempted: true,
+        },
+      ],
+    };
+
+    expect(
+      musicalReceipt(summary, undefined, {
+        label: 'Bars 34–37',
+        barStart: 34,
+        barEnd: 37,
+        tempoMultiplier: 0.5,
+        passCriteria: 'Land 60 notes at 82%+ for 3 clean passes.',
+        novel: false,
+      }),
+    ).toMatchObject({
+      headline: 'This was a section attempt, not a full-song pass',
+      actionLabel: 'Replay bars 34–37 at 50%',
+      replaySpeed: 0.5,
     });
   });
 
@@ -61,7 +124,7 @@ describe('musicalReceipt', () => {
     };
 
     expect(musicalReceipt(summary, undefined)).toMatchObject({
-      headline: 'This pass did not connect',
+      headline: 'No chart notes landed at this tempo',
       // The concrete next step (replay the saved loop target) is still the
       // right action even though the headline no longer claims readiness.
       action: 'replay',
@@ -166,7 +229,7 @@ describe('musicalReceipt', () => {
 
   it('keeps an older or first run honest when no comparison exists', () => {
     expect(musicalReceipt(multiLaneRunFixture(), undefined)).toMatchObject({
-      headline: 'This run is saved for comparison',
+      headline: 'This tempo is playable',
       changed: false,
     });
   });
@@ -188,7 +251,7 @@ describe('musicalReceipt', () => {
     };
 
     expect(musicalReceipt(summary, previous)).toMatchObject({
-      headline: 'This run is saved for comparison',
+      headline: 'This tempo is playable',
       changed: false,
     });
   });
@@ -214,7 +277,7 @@ describe('musicalReceipt', () => {
     };
 
     expect(musicalReceipt(summary, previous)).toMatchObject({
-      headline: 'This run is saved for comparison',
+      headline: 'This tempo is playable',
       changed: false,
     });
   });
