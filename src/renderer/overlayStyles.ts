@@ -42,18 +42,8 @@ export const popoverStyles: {
 
 export const MODAL_ABOVE_POPOVER_Z_INDEX = 1050;
 
-export function isAnyModalOpen(): boolean {
-  return Array.from(document.querySelectorAll('.ant-modal-wrap')).some(
-    (element) => (element as HTMLElement).style.display !== 'none',
-  );
-}
-
 export function popoverOpenChange(
   setOpen: (open: boolean) => void,
 ): (open: boolean) => void {
-  return (open) => {
-    if (open || !isAnyModalOpen()) {
-      setOpen(open);
-    }
-  };
+  return setOpen;
 }

@@ -11,6 +11,7 @@ import { antdTheme } from '../antdTheme';
 import { InputDevice } from '../input';
 import {
   InputProvider,
+  MAX_MIDI_RECONNECT_DELAY_MS,
   MIDI_AUTO_CONNECT_OPT_OUT_KEY,
   MIDI_HEALTH_CHECK_DELAY_MS,
   MIDI_RECONNECT_DELAY_MS,
@@ -174,6 +175,56 @@ describe('InputContext midi stream ownership', () => {
     expect(
       await screen.findByText("Couldn't connect to your MIDI device"),
     ).toBeInTheDocument();
+  });
+
+  it('does not let health probes bypass reconnect backoff for an unresponsive kit', async () => {
+    vi.useFakeTimers();
+    localStorage.setItem('settings.selectedDevice', JSON.stringify(DEVICE_A));
+    ipc.sendMessage.mockImplementation((channel, ...args) => {
+      ipc.sent.push({ channel, args });
+
+      if (channel === 'midi-device-list') {
+        queueMicrotask(() => {
+          ipc.emit('midi-device-list', [{ name: 'Pad A', port: 2 }]);
+        });
+      }
+
+      if (channel === 'listen-midi') {
+        queueMicrotask(() => {
+          ipc.emit('midi-error', { error: 'device unavailable' });
+        });
+      }
+    });
+
+    try {
+      let consumerRenders = 0;
+      const { result } = renderHook(
+        () => {
+          consumerRenders += 1;
+
+          return useInput();
+        },
+        { wrapper },
+      );
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      const rendersAfterInitialFailure = consumerRenders;
+
+      for (let second = 0; second < 60; second += 1) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1_000);
+        });
+      }
+
+      expect(listenPorts()).toHaveLength(8);
+      expect(result.current.midiPortEpoch).toBe(0);
+      expect(consumerRenders).toBe(rendersAfterInitialFailure);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('stops listening for connect errors once the device is cleared', async () => {
@@ -566,6 +617,23 @@ describe('InputContext input latency', () => {
 });
 
 describe('InputContext MIDI auto-select', () => {
+  it('backs off monotonically to the steady-state cap', () => {
+    const delays = Array.from({ length: 8 }, (_, attempt) =>
+      midiReconnectDelayMs(attempt),
+    );
+
+    expect(delays).toEqual([
+      1_000,
+      2_000,
+      4_000,
+      8_000,
+      MAX_MIDI_RECONNECT_DELAY_MS,
+      MAX_MIDI_RECONNECT_DELAY_MS,
+      MAX_MIDI_RECONNECT_DELAY_MS,
+      MAX_MIDI_RECONNECT_DELAY_MS,
+    ]);
+  });
+
   it('keeps enumerating and auto-connects a kit plugged into a fresh profile later', async () => {
     vi.useFakeTimers();
 
