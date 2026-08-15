@@ -475,7 +475,7 @@ describe('toSong', () => {
           sk_mastery_rule: 'Three clean passes.',
           sk_cue: 'Keep the notes even.',
           sk_assessment_boundary:
-            'MIDI assesses timing and pad choice; sticking/form cue is not assessed.',
+            'MIDI assesses timing and pad choice. It does not assess sticking or form.',
         }),
       );
 
@@ -491,7 +491,7 @@ describe('toSong', () => {
         masteryRule: 'Three clean passes.',
         cue: 'Keep the notes even.',
         assessmentBoundary:
-          'MIDI assesses timing and pad choice; sticking/form cue is not assessed.',
+          'MIDI assesses timing and pad choice. It does not assess sticking or form.',
       });
     });
   });
