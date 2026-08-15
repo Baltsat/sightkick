@@ -5,6 +5,7 @@ import {
   emptyPracticeRunArchive,
   historicalDetailState,
   MAX_ARCHIVED_CHART_REVISIONS_PER_DAY,
+  MAX_ARCHIVED_PATTERN_SIGNATURES_PER_DAY,
   mergePracticeRunArchives,
   readPracticeRunArchive,
 } from './archive';
@@ -112,6 +113,62 @@ describe('practice archive learning evidence', () => {
       bars: { '7': { recoveryDeferredCount: 1 } },
     });
     expect(historicalDetailState(archive)).toBe('available');
+  });
+
+  it('retains bounded pattern coverage from attempted sections after summaries age out', () => {
+    const sectionEvidence = Array.from(
+      { length: MAX_ARCHIVED_PATTERN_SIGNATURES_PER_DAY + 1 },
+      (_, index) => ({
+        barStart: index + 1,
+        barEnd: index + 1,
+        startTick: index * 100,
+        endTick: (index + 1) * 100,
+        startTimeSeconds: index,
+        endTimeSeconds: index + 1,
+        expectedNotes: 4,
+        hits: 4,
+        misses: 0,
+        wrongHits: 0,
+        patternSignature: `rhythm-${String(index).padStart(4, '0')}`,
+        attempted: true,
+      }),
+    );
+    const archive = archiveRunSummaries(emptyPracticeRunArchive(), [
+      run({ sectionEvidence }),
+    ]);
+    const day = archive.days['2026-08-10'];
+
+    expect(Object.keys(day.patternCounts ?? {})).toHaveLength(
+      MAX_ARCHIVED_PATTERN_SIGNATURES_PER_DAY,
+    );
+    expect(day.patternCounts?.['rhythm-0000']).toBe(1);
+    expect(day.patternHistoryTruncated).toBe(true);
+    expect(readPracticeRunArchive(archive)).toEqual(archive);
+  });
+
+  it('does not count unattempted patterns as played history', () => {
+    const archive = archiveRunSummaries(emptyPracticeRunArchive(), [
+      run({
+        sectionEvidence: [
+          {
+            barStart: 1,
+            barEnd: 1,
+            startTick: 0,
+            endTick: 100,
+            startTimeSeconds: 0,
+            endTimeSeconds: 1,
+            expectedNotes: 4,
+            hits: 0,
+            misses: 4,
+            wrongHits: 0,
+            patternSignature: 'not-played',
+            attempted: false,
+          },
+        ],
+      }),
+    ]);
+
+    expect(archive.days['2026-08-10'].patternCounts).toBeUndefined();
   });
 
   it('reports legacy and summary-only history as detail-unavailable instead of reconstructing bars', () => {

@@ -23,6 +23,8 @@ export const MAX_ARCHIVED_SKILLS_PER_REVISION = 24;
 
 export const MAX_ARCHIVED_BARS_PER_REVISION = 96;
 
+export const MAX_ARCHIVED_PATTERN_SIGNATURES_PER_DAY = 512;
+
 export interface ArchivedLaneStats {
   hits: number;
   misses: number;
@@ -84,6 +86,8 @@ export interface PracticeRunDayArchive {
   difficulties: Partial<Record<Difficulty, number>>;
   /** Explicitly distinguishes raw legacy summaries from detail-backed data. */
   historicalDetailState: HistoricalDetailState;
+  patternCounts?: Record<string, number>;
+  patternHistoryTruncated?: boolean;
   /** Present only when the evicted summaries carried chart-revision evidence. */
   chartRevisions?: Record<string, ArchivedChartRevisionEvidence>;
 }
@@ -293,6 +297,24 @@ function normalizeArchiveDay(
     }),
   );
   const chartRevisions = normalizeChartRevisions(day.chartRevisions);
+  const rawPatternCounts = normalizeNumberRecord<string>(day.patternCounts);
+  const normalizedPatternEntries: Array<[string, number]> = Object.entries(
+    rawPatternCounts,
+  )
+    .flatMap(([key, count]) =>
+      count !== undefined && count > 0
+        ? ([[key, count]] as Array<[string, number]>)
+        : [],
+    )
+    .sort(
+      ([leftKey, leftCount], [rightKey, rightCount]) =>
+        rightCount - leftCount || leftKey.localeCompare(rightKey),
+    );
+  const patternCounts = Object.fromEntries(
+    normalizedPatternEntries
+      .slice(0, MAX_ARCHIVED_PATTERN_SIGNATURES_PER_DAY)
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
 
   return {
     date,
@@ -323,6 +345,11 @@ function normalizeArchiveDay(
       day.historicalDetailState === 'available'
         ? 'available'
         : 'historical-detail-unavailable',
+    ...(Object.keys(patternCounts).length > 0 ? { patternCounts } : {}),
+    ...(day.patternHistoryTruncated === true ||
+    normalizedPatternEntries.length > MAX_ARCHIVED_PATTERN_SIGNATURES_PER_DAY
+      ? { patternHistoryTruncated: true }
+      : {}),
     ...(chartRevisions ? { chartRevisions } : {}),
   };
 }
@@ -463,6 +490,43 @@ function addLearningEvidence(
   };
 }
 
+function addPatternEvidence(
+  current: PracticeRunDayArchive,
+  summary: RunSummary,
+): Pick<PracticeRunDayArchive, 'patternCounts' | 'patternHistoryTruncated'> {
+  const counts = { ...(current.patternCounts ?? {}) };
+
+  (summary.sectionEvidence ?? [])
+    .filter(({ attempted }) => attempted !== false)
+    .flatMap(
+      ({ patternSignatures, patternSignature }) =>
+        patternSignatures ?? (patternSignature ? [patternSignature] : []),
+    )
+    .filter((pattern) => pattern.trim())
+    .forEach((pattern) => {
+      counts[pattern] = (counts[pattern] ?? 0) + 1;
+    });
+
+  const entries = Object.entries(counts).sort(
+    ([leftKey, leftCount], [rightKey, rightCount]) =>
+      rightCount - leftCount || leftKey.localeCompare(rightKey),
+  );
+  const patternCounts = Object.fromEntries(
+    entries
+      .slice(0, MAX_ARCHIVED_PATTERN_SIGNATURES_PER_DAY)
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+
+  return {
+    ...(Object.keys(patternCounts).length > 0 ? { patternCounts } : {}),
+    ...(current.patternHistoryTruncated ||
+    summary.sectionEvidence === undefined ||
+    entries.length > MAX_ARCHIVED_PATTERN_SIGNATURES_PER_DAY
+      ? { patternHistoryTruncated: true }
+      : {}),
+  };
+}
+
 function addToDay(
   previous: PracticeRunDayArchive | undefined,
   summary: RunSummary,
@@ -521,6 +585,7 @@ function addToDay(
   }
 
   const learning = addLearningEvidence(current, summary);
+  const patterns = addPatternEvidence(current, summary);
 
   return {
     ...current,
@@ -554,6 +619,7 @@ function addToDay(
     modes,
     difficulties,
     ...learning,
+    ...patterns,
   };
 }
 
@@ -746,6 +812,27 @@ function mergeArchiveDay(
     left.chartRevisions,
     right.chartRevisions,
   );
+  const allPatternCounts = mergeNumberRecords<string>(
+    left.patternCounts ?? {},
+    right.patternCounts ?? {},
+  );
+  const allPatternEntries: Array<[string, number]> = Object.entries(
+    allPatternCounts,
+  )
+    .flatMap(([key, count]) =>
+      count !== undefined && count > 0
+        ? ([[key, count]] as Array<[string, number]>)
+        : [],
+    )
+    .sort(
+      ([leftKey, leftCount], [rightKey, rightCount]) =>
+        rightCount - leftCount || leftKey.localeCompare(rightKey),
+    );
+  const patternCounts = Object.fromEntries(
+    allPatternEntries
+      .slice(0, MAX_ARCHIVED_PATTERN_SIGNATURES_PER_DAY)
+      .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey)),
+  );
 
   return {
     date: left.date,
@@ -786,6 +873,12 @@ function mergeArchiveDay(
       right.historicalDetailState === 'available'
         ? 'available'
         : 'historical-detail-unavailable',
+    ...(Object.keys(patternCounts).length > 0 ? { patternCounts } : {}),
+    ...(left.patternHistoryTruncated ||
+    right.patternHistoryTruncated ||
+    allPatternEntries.length > MAX_ARCHIVED_PATTERN_SIGNATURES_PER_DAY
+      ? { patternHistoryTruncated: true }
+      : {}),
     ...(chartRevisions ? { chartRevisions } : {}),
   };
 }

@@ -28,6 +28,8 @@ export const MAX_PRACTICE_ATTEMPT_CHECKPOINTS_PER_SONG = 3;
  */
 export const MAX_PRACTICE_ATTEMPT_RECORDS = 20_000;
 
+export const MAX_PERSISTED_RUN_SECTIONS = 512;
+
 export const SCORING_POLICY_VERSION = 'judge-evidence-v3';
 
 /**
@@ -154,6 +156,22 @@ export interface RunLearningEvidence {
   bars?: Record<string, RunLearningEvidenceCount>;
 }
 
+export interface RunSectionEvidence {
+  barStart: number;
+  barEnd: number;
+  startTick?: number;
+  endTick?: number;
+  startTimeSeconds: number;
+  endTimeSeconds: number;
+  expectedNotes: number;
+  hits: number;
+  misses: number;
+  wrongHits: number;
+  patternSignatures?: string[];
+  patternSignature?: string;
+  attempted?: boolean;
+}
+
 export interface PracticeCardRunEvidence {
   kind: 'review' | 'build' | 'apply';
   candidate_id: string;
@@ -252,6 +270,7 @@ export interface RunSummary {
   /** Authored lesson skills stamped for longitudinal atomic-skill evidence. */
   authoredSkills?: string[];
   atomicSkillEvidence?: SkillEvidenceEvent[];
+  sectionEvidence?: RunSectionEvidence[];
   practiceCard?: PracticeCardRunEvidence;
   audition?: SongSectionAuditionEvidence;
 }
