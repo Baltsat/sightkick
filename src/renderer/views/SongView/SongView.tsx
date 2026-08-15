@@ -121,6 +121,10 @@ import {
   remediationQueueSlotKey,
 } from '../../services/remediation';
 import {
+  buildRunSectionEvidence,
+  createStruggleSectionDefinitions,
+} from '../../services/struggle';
+import {
   decideLessonProgression,
   EMPTY_LESSON_TRAVERSAL,
   LessonProgressionDecision,
@@ -133,6 +137,16 @@ import { curriculumItemManifest } from '../../services/pedagogy/item-manifest';
 import { build_my_wave_item_profile } from '../../services/pedagogy/my-wave';
 import { deriveAtomicSkillEvidence } from '../../services/pedagogy/skill-state';
 import { ItemSkillManifest } from '../../services/pedagogy/types';
+import {
+  build_pattern_player_profile,
+  decompose_chart_patterns,
+} from '../../services/pattern-model';
+import { analyzeStruggle } from '../../services/struggle';
+import {
+  focusSectionFromStruggle,
+  hasSectionCoverageMismatch,
+  recommendedActionReplaySpeed,
+} from '../../services/run-insights';
 import { useWordBoundaryTruncate } from './useWordBoundaryTruncate';
 import './SongView.css';
 
@@ -651,6 +665,61 @@ export function SongView() {
     () => fullRuns?.flatMap((run) => run.records) ?? [],
     [fullRuns],
   );
+  const scoreSummaryHistory = useMemo(
+    () => fullRuns?.map(({ summary }) => summary) ?? [],
+    [fullRuns],
+  );
+  const resultStruggleReport = useMemo(() => {
+    if (!isScoreModalOpen || !practiceSummary) {
+      return undefined;
+    }
+
+    return analyzeStruggle({
+      run: { summary: practiceSummary, records: [] },
+      history: { runs: fullRuns ?? [] },
+    });
+  }, [fullRuns, isScoreModalOpen, practiceSummary]);
+  const resultFocusSection = useMemo(
+    () => focusSectionFromStruggle(resultStruggleReport),
+    [resultStruggleReport],
+  );
+  const resultSectionCoverageMismatch = hasSectionCoverageMismatch(
+    practiceSummary,
+    resultFocusSection,
+  );
+  const resultReplaySpeed = recommendedActionReplaySpeed(
+    practiceSummary,
+    resultFocusSection,
+  );
+  const resultPatternProfile = useMemo(() => {
+    if (!isScoreModalOpen || !practiceSummary || !chart) {
+      return undefined;
+    }
+
+    const currentKey =
+      practiceSummary.context?.sessionId ?? practiceSummary.completedAt;
+    const history = scoreSummaryHistory.filter(
+      (summary) =>
+        (summary.context?.sessionId ?? summary.completedAt) !== currentKey,
+    );
+    const patterns = decompose_chart_patterns(chart, {
+      item_id: id ?? 'chart',
+      title: songData?.name,
+      kind: songData?.lesson ? 'lesson' : 'song',
+    });
+
+    return build_pattern_player_profile({
+      families: patterns.families,
+      history: { runs: [...history, practiceSummary] },
+    });
+  }, [
+    chart,
+    id,
+    isScoreModalOpen,
+    practiceSummary,
+    scoreSummaryHistory,
+    songData,
+  ]);
   const delaySeconds = songData?.delaySeconds ?? 0;
   // Hands-free start uses the same transport policy as the on-screen play
   // button. Count-in is enabled by default, but an explicit user choice to
@@ -747,6 +816,19 @@ export function SongView() {
         tutor: tutorEvidence,
         authoredSkills: songData?.lesson?.skills,
       });
+      const coachChart =
+        chart && parsedMidi
+          ? buildCoachChart(chart, parsedMidi.measures)
+          : undefined;
+      const sectionEvidence = coachChart
+        ? buildRunSectionEvidence({
+            records,
+            sections: createStruggleSectionDefinitions(
+              coachChart,
+              delaySeconds,
+            ),
+          })
+        : [];
       const baseRunSummary: RunSummary = {
         ...summary,
         mode: gameMode ?? 'perform',
@@ -767,6 +849,7 @@ export function SongView() {
         },
         ...(tutorEvidence ? { tutor: tutorEvidence } : {}),
         ...(learningEvidence ? { learningEvidence } : {}),
+        ...(sectionEvidence.length > 0 ? { sectionEvidence } : {}),
         timingWindowMs: Math.round(hitToleranceSeconds * 1000),
         ...(songData?.lesson?.skills
           ? { authoredSkills: [...songData.lesson.skills] }
@@ -783,15 +866,14 @@ export function SongView() {
             }
           : {}),
       };
-      const coachEvidence =
-        chart && parsedMidi
-          ? summarizeCoachFindings(
-              analyzePracticeRuns({
-                runs: [{ summary: baseRunSummary, records }],
-                chart: buildCoachChart(chart, parsedMidi.measures),
-              }).findings,
-            )
-          : [];
+      const coachEvidence = coachChart
+        ? summarizeCoachFindings(
+            analyzePracticeRuns({
+              runs: [{ summary: baseRunSummary, records }],
+              chart: coachChart,
+            }).findings,
+          )
+        : [];
       const itemManifest = songData?.lesson
         ? curriculumItemManifest(songData.lesson.id)
         : chartManifestForFreePlay(id, chart, currentChartRevision);
@@ -1300,6 +1382,48 @@ export function SongView() {
       onPracticeRangeChange(range);
     },
     [onPracticeRangeChange, setIsLooping],
+  );
+  const onAdaptiveRetry = useCallback(
+    (speed: number) => {
+      if (practicePersistenceState === 'saving') {
+        return;
+      }
+
+      setPlaybackSpeed(speed);
+      engine?.setPlaybackSpeed(speed);
+
+      if (resultFocusSection && resultSectionCoverageMismatch) {
+        const start = Math.max(0, resultFocusSection.barStart - 1);
+        const end = Math.min(
+          renderData.length - 1,
+          resultFocusSection.barEnd - 1,
+        );
+        const startMeasure = renderData[start]?.measure;
+
+        if (startMeasure && end >= start) {
+          setIsScoreModalOpen(false);
+          setPracticePersistenceState('no-evidence');
+          setNoMusicalInput(false);
+          selectPracticeLoop({ start, end });
+          playRunFromTick(startMeasure.startTick, 'force');
+
+          return;
+        }
+      }
+
+      onRetry();
+    },
+    [
+      engine,
+      onRetry,
+      playRunFromTick,
+      practicePersistenceState,
+      renderData,
+      resultFocusSection,
+      resultSectionCoverageMismatch,
+      selectPracticeLoop,
+      setPlaybackSpeed,
+    ],
   );
   const clearPracticeLoop = useCallback(() => {
     setIsLooping(false);
@@ -1833,7 +1957,14 @@ export function SongView() {
       }
 
       if (action === 'retry') {
-        onRetry();
+        if (
+          drumGestureSurface === 'result' &&
+          resultReplaySpeed !== undefined
+        ) {
+          onAdaptiveRetry(resultReplaySpeed);
+        } else {
+          onRetry();
+        }
 
         return;
       }
@@ -1869,8 +2000,10 @@ export function SongView() {
     [
       cancel,
       engine,
+      drumGestureSurface,
       navigate,
       noMusicalInput,
+      onAdaptiveRetry,
       onNextSong,
       onOpenCoach,
       onRetry,
@@ -1878,6 +2011,7 @@ export function SongView() {
       practiceSummary,
       playRun,
       playRunFromTick,
+      resultReplaySpeed,
       seekSeconds,
       timeStore,
       interruptedAttempt,
@@ -2713,13 +2847,17 @@ export function SongView() {
         continuationLabelLocked={gameMode === 'practice'}
         persistenceState={practicePersistenceState}
         onRetry={onRetry}
+        onAdaptiveRetry={onAdaptiveRetry}
         onCoach={onOpenCoach}
         songData={songData}
         difficulty={difficulty}
         scoreData={scoreData}
         practiceSummary={practiceSummary}
+        practiceHistory={scoreSummaryHistory}
         noMusicalInput={noMusicalInput}
         previousPracticeSummary={previousPracticeSummary}
+        struggleReport={resultStruggleReport}
+        patternProfile={resultPatternProfile}
         gamification={gamification}
         runResult={gamificationResult}
         lessonProgression={lessonProgressionResult}

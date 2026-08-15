@@ -58,6 +58,11 @@ import { KitCommandPrompt } from '../../components/KitCommandPrompt';
 import ProfileView from '../../components/Profile';
 import { buildDrumLearningProfile } from '../../services/learning-profile';
 import {
+  build_pattern_player_profile,
+  cluster_pattern_figures,
+  decompose_chart_patterns,
+} from '../../services/pattern-model';
+import {
   buildPracticeWave,
   composeHomeSession,
   OneKickHomeSession,
@@ -604,7 +609,39 @@ export function SongListView() {
   // use-library-difficulty-charts.ts. Only requested while Songs is the
   // open tab; a song whose chart never resolves stays honestly unrated.
   const { charts: libraryDifficultyCharts, settled: libraryDifficultySettled } =
-    useLibraryDifficultyCharts(librarySongs, !songOpen && view === 'songs');
+    useLibraryDifficultyCharts(
+      librarySongs,
+      !songOpen && (view === 'songs' || view === 'insights'),
+    );
+  const patternFamilies = useMemo(
+    () =>
+      cluster_pattern_figures(
+        [...libraryDifficultyCharts.entries()].flatMap(
+          ([itemId, chart]) =>
+            decompose_chart_patterns(chart, { item_id: itemId }).figures,
+        ),
+      ),
+    [libraryDifficultyCharts],
+  );
+  const patternProfile = useMemo(
+    () =>
+      patternFamilies.length === 0
+        ? undefined
+        : build_pattern_player_profile({
+            families: patternFamilies,
+            history: {
+              runs: practiceHistory.map(({ summary }) => summary),
+              archived_events: Object.values(
+                gamification.atomicSkillEvidenceArchiveBySong ?? {},
+              ).flat(),
+            },
+          }),
+    [
+      gamification.atomicSkillEvidenceArchiveBySong,
+      patternFamilies,
+      practiceHistory,
+    ],
+  );
   // Every song whose parse settled with no learner-relative score — a
   // ready song row says "Unrated" once instead of leaving the rated/
   // unrated boundary invisible. Never includes a song still parsing.
@@ -1343,6 +1380,7 @@ export function SongListView() {
               rejectedAtomicEvidenceCount:
                 atomicStateReplay.rejected_events.length,
               latestRun: gamification.latestRun?.summary,
+              patternProfile,
               practiceCards,
               weeklySet: weeklyPracticeSet,
               weeklyRhythm,
@@ -1362,6 +1400,15 @@ export function SongListView() {
             onPracticeRhythmChange={setPracticeRhythm}
             onRefreshPracticeSet={refreshPracticeSet}
             onStartAudition={startSectionAudition}
+            onOpenLesson={(lessonId) => {
+              const entry = lessonProgress.entries.find(
+                ({ lesson }) => lesson.id === lessonId,
+              );
+
+              if (entry) {
+                playLesson(entry);
+              }
+            }}
           />
         )}
 
