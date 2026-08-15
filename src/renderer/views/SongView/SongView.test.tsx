@@ -47,15 +47,25 @@ afterEach(() => {
 });
 
 describe('opening a song', () => {
-  it('keeps the kit key closed until asked for and persists dismissal', async () => {
+  it('shows the kit key by default and persists dismissal', async () => {
     const view = setupSongView();
 
     await view.loadSong();
 
     const toggle = screen.getByTestId('notation-kit-key-toggle');
 
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('notation-kit-key')).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId('notation-kit-key')).not.toBeInTheDocument();
+    expect(
+      JSON.parse(
+        window.localStorage.getItem('settings.notationKitKeyVisible') ?? 'true',
+      ),
+    ).toBe(false);
 
     fireEvent.click(toggle);
 
@@ -67,16 +77,6 @@ describe('opening a song', () => {
           'false',
       ),
     ).toBe(true);
-
-    fireEvent.click(toggle);
-
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId('notation-kit-key')).not.toBeInTheDocument();
-    expect(
-      JSON.parse(
-        window.localStorage.getItem('settings.notationKitKeyVisible') ?? 'true',
-      ),
-    ).toBe(false);
   });
 
   it('shows the song header and real rendered sheet music', async () => {

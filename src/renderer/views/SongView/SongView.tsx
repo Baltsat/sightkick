@@ -352,7 +352,7 @@ export function SongView() {
     usePersisted<SheetMusicLayout>('settings.lessonNotationLayout', 'classic');
   const [notationKitKeyVisible, setNotationKitKeyVisible] = usePersisted(
     'settings.notationKitKeyVisible',
-    false,
+    true,
   );
   const [adaptiveTutorEnabled, setAdaptiveTutorEnabled] = usePersisted<boolean>(
     'settings.adaptiveTutorEnabled',
@@ -1934,8 +1934,8 @@ export function SongView() {
         lastAttempt && !lastAttempt.hasSufficientCoverage
           ? 'Finish every authored note in the loop.'
           : lastAttempt && !lastAttempt.qualifiesAsCleanPass
-          ? 'That attempt was saved. Settle the pattern and try once more.'
-          : 'A good-enough pass can include one developing hit; useful progress is retained.';
+            ? 'That attempt was saved. Settle the pattern and try once more.'
+            : 'A good-enough pass can include one developing hit; useful progress is retained.';
       const tempoDetail =
         remediationTask.approach === 'target-probe'
           ? 'This is the target-tempo probe.'
@@ -1971,8 +1971,8 @@ export function SongView() {
             )}× with 82%+ to open the next lesson; the full-tempo mark is 90%+ at 1.0×.`
           : 'Kick once to start. Finish from the beginning at 82%+; Tutor rewinds are okay, and the full-tempo mark is still there.'
         : countIn
-        ? 'Kick once to start the count-in.'
-        : 'Kick once to start.';
+          ? 'Kick once to start the count-in.'
+          : 'Kick once to start.';
 
       return {
         title: songData?.lesson ? 'Lesson ready' : 'Ready when you are',
@@ -2618,19 +2618,19 @@ export function SongView() {
     practicePresentationPhase === 'inactivity-paused'
       ? 'inactivity-paused'
       : remediationSession.activeTask
-      ? 'remediation'
-      : practicePresentationPhase === 'ready'
-      ? 'kit-ready'
-      : practicePresentationPhase === 'paused'
-      ? 'kit-paused'
-      : practicePresentationPhase === 'recovery-explain'
-      ? 'recovery-explain'
-      : undefined;
+        ? 'remediation'
+        : practicePresentationPhase === 'ready'
+          ? 'kit-ready'
+          : practicePresentationPhase === 'paused'
+            ? 'kit-paused'
+            : practicePresentationPhase === 'recovery-explain'
+              ? 'recovery-explain'
+              : undefined;
   const practiceReadinessPhase: PracticeReadinessPhase = isLoading
     ? 'idle'
     : practicePresentationPhase === 'ready'
-    ? 'ready'
-    : 'playing';
+      ? 'ready'
+      : 'playing';
   const showInactivityCaption =
     gameMode === 'practice' && inactivityPauseVeil.visible;
   const showCountInCaption = !showInactivityCaption && isCounting;
@@ -2690,7 +2690,7 @@ export function SongView() {
   const toolbarTitleText = songData?.name ?? '';
   const toolbarSubtitleText = practiceRecommendationReason
     ? `My Wave · ${practiceRecommendationReason}`
-    : songData?.artist ?? '';
+    : (songData?.artist ?? '');
   const { ref: toolbarTitleRef, display: toolbarTitleDisplay } =
     useWordBoundaryTruncate<HTMLHeadingElement>(toolbarTitleText);
   const { ref: toolbarSubtitleRef, display: toolbarSubtitleDisplay } =
