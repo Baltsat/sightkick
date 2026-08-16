@@ -297,6 +297,7 @@ export function SongListView() {
     useState(readinessFilter);
   const gameModeSelector = useGameModeSelector();
   const [view, setView] = useState<ArenaView>('home');
+  const [isLibraryWarm, setIsLibraryWarm] = useState(false);
   const [candidateResolutions, setCandidateResolutions] = useState<
     Record<string, LibraryCandidateResolution>
   >({});
@@ -315,6 +316,33 @@ export function SongListView() {
 
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (songOpen || view !== 'songs' || isLibraryWarm) {
+      return undefined;
+    }
+
+    let cancelIdle: (() => void) | undefined;
+    const frameId = window.requestAnimationFrame(() => {
+      if (typeof window.requestIdleCallback === 'function') {
+        const idleId = window.requestIdleCallback(
+          () => setIsLibraryWarm(true),
+          { timeout: 250 },
+        );
+
+        cancelIdle = () => window.cancelIdleCallback(idleId);
+      } else {
+        const timeoutId = window.setTimeout(() => setIsLibraryWarm(true), 0);
+
+        cancelIdle = () => window.clearTimeout(timeoutId);
+      }
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      cancelIdle?.();
+    };
+  }, [isLibraryWarm, songOpen, view]);
 
   // The Lessons unlock chain always looks at every lesson song, regardless
   // of the app's globally selected difficulty tab — lesson charts only ever
@@ -619,21 +647,23 @@ export function SongListView() {
   const { charts: libraryDifficultyCharts, settled: libraryDifficultySettled } =
     useLibraryDifficultyCharts(
       librarySongs,
-      !songOpen && (view === 'songs' || view === 'insights'),
+      !songOpen && (view === 'insights' || (view === 'songs' && isLibraryWarm)),
     );
-  const patternFamilies = useMemo(
-    () =>
-      cluster_pattern_figures(
-        [...libraryDifficultyCharts.entries()].flatMap(
-          ([itemId, chart]) =>
-            decompose_chart_patterns(chart, { item_id: itemId }).figures,
-        ),
+  const patternFamilies = useMemo(() => {
+    if (view !== 'insights') {
+      return [];
+    }
+
+    return cluster_pattern_figures(
+      [...libraryDifficultyCharts.entries()].flatMap(
+        ([itemId, chart]) =>
+          decompose_chart_patterns(chart, { item_id: itemId }).figures,
       ),
-    [libraryDifficultyCharts],
-  );
+    );
+  }, [libraryDifficultyCharts, view]);
   const patternProfile = useMemo(
     () =>
-      patternFamilies.length === 0
+      view !== 'insights' || patternFamilies.length === 0
         ? undefined
         : build_pattern_player_profile({
             families: patternFamilies,
@@ -648,6 +678,7 @@ export function SongListView() {
       gamification.atomicSkillEvidenceArchiveBySong,
       patternFamilies,
       practiceHistory,
+      view,
     ],
   );
   // Every song whose parse settled with no learner-relative score — a
@@ -1767,6 +1798,7 @@ export function SongListView() {
                   resolvingTrackIds={resolvingCandidateIds}
                   canUseLocalAudio={currentPath !== null}
                   onPlaySong={play}
+                  onLikeChange={handleLikeChange}
                   onResolveSource={resolveCandidate}
                   onUseLocalAudioForSource={autoChartCandidate}
                   onUseLocalAudioForSong={autoChartSong}

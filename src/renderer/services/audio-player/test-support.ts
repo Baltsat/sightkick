@@ -180,6 +180,10 @@ export class FakeAudioContext {
 export function installWebAudio() {
   const context = new FakeAudioContext();
   const Ctor = function AudioContextStub(this: unknown) {
+    // Production creates a fresh context per player; this shared fake must
+    // not leak a previous player's closed state into the next construction.
+    context.state = 'running';
+
     return context;
   } as unknown as typeof AudioContext;
 

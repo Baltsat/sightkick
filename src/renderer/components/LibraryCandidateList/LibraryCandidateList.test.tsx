@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Difficulty } from 'scan-chart';
 import songArtPlaceholder from '../../../../assets/song-art-placeholder.svg';
@@ -167,6 +167,36 @@ describe('LibraryCandidateList — song rows', () => {
     expect(
       screen.getByLabelText('Unready Song is not playable yet'),
     ).toHaveTextContent('Needs a playable drum chart');
+  });
+
+  it('keeps the favourite control available on a ready library row', () => {
+    const onLikeChange = vi.fn();
+    const song = makeListSong('favourite-song', { name: 'Favourite Song' });
+    const entries = build_unified_library({
+      songs: [song],
+      sources: sources([]),
+      now: '2026-08-12T00:00:00.000Z',
+    });
+
+    render(
+      <LibraryCandidateList
+        entries={entries}
+        difficulty={DIFFICULTY}
+        canUseLocalAudio
+        onPlaySong={vi.fn()}
+        onLikeChange={onLikeChange}
+        onResolveSource={vi.fn()}
+        onUseLocalAudioForSource={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      within(screen.getByTestId('song-item-favourite-song')).getByTestId(
+        'like-toggle',
+      ),
+    );
+
+    expect(onLikeChange).toHaveBeenCalledWith('favourite-song', true);
   });
 
   it('marks the focused row and starts/stops hover preview only for a ready row', async () => {

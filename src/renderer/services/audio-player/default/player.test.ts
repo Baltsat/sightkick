@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DefaultAudioPlayer } from './player';
 import { TrackConfig } from '../types';
 import {
+  FakeAudioBuffer,
   FakeAudioContext,
   FakeGainNode,
   installFetchByByteLength,
@@ -210,5 +211,31 @@ describe('AudioPlayer', () => {
     expect(player.audioTracks).toHaveLength(0);
     expect(player.onEnded).toBeNull();
     expect(onEnded).not.toHaveBeenCalled();
+  });
+
+  it('does not create tracks when destruction races pending decoding', async () => {
+    let resolveDecode!: (buffer: FakeAudioBuffer) => void;
+
+    context.decodeAudioData = vi.fn(
+      () =>
+        new Promise<FakeAudioBuffer>((resolve) => {
+          resolveDecode = resolve;
+        }),
+    );
+
+    const player = new DefaultAudioPlayer(
+      [{ name: 'late', urls: [], buffers: [new ArrayBuffer(100)] }],
+      vi.fn(),
+    );
+
+    await vi.waitFor(() =>
+      expect(context.decodeAudioData).toHaveBeenCalledTimes(1),
+    );
+    player.destroy();
+    resolveDecode(new FakeAudioBuffer(1, 100, 1));
+    await player.ready;
+
+    expect(player.audioTracks).toEqual([]);
+    expect(context.gainNodes).toHaveLength(1);
   });
 });

@@ -3,13 +3,15 @@
   --arena-shell-nav-ink: var(--dr-ink);
   --arena-shell-nav-muted: color-mix(in srgb, var(--dr-ink) 68%, transparent);
   --arena-shell-nav-active: var(--dr-wine);
+  --arena-shell-bridge-opacity: 0.46;
   position: relative;
   display: block;
   height: 100vh;
   min-height: 0;
   overflow: hidden;
   color: var(--dr-ink);
-  background: radial-gradient(
+  background:
+    radial-gradient(
       74% 96% at 8% 8%,
       color-mix(in srgb, var(--dr-field-ember) 34%, transparent),
       transparent 72%
@@ -36,11 +38,41 @@
     transparent
   );
   --arena-shell-nav-active: var(--dr-count);
+  --arena-shell-bridge-opacity: 0.18;
+}
+
+.arena-shell[data-view='journey'],
+.arena-shell[data-view='insights'] {
+  --arena-shell-bridge-opacity: 0.38;
+}
+
+.arena-shell::after {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  content: '';
+  background:
+    radial-gradient(
+      86% 48% at 14% -2%,
+      rgb(42 34 27 / 74%),
+      rgb(107 69 45 / 36%) 48%,
+      transparent 78%
+    ),
+    linear-gradient(
+      180deg,
+      rgb(40 34 27 / 68%) 0%,
+      rgb(107 69 45 / 30%) 28%,
+      color-mix(in srgb, var(--dr-field-ember) 18%, transparent) 52%,
+      transparent 76%
+    );
+  opacity: var(--arena-shell-bridge-opacity);
+  pointer-events: none;
+  transition: opacity 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .arena-shell__rail {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   inset: 0 auto 0 0;
   display: flex;
   width: var(--arena-shell-rail-width);
@@ -216,6 +248,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .arena-shell::after,
   .arena-shell__nav-item,
   .arena-shell__settings-control button,
   .arena-shell__settings-label {
