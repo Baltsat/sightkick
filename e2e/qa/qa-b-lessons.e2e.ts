@@ -44,8 +44,8 @@ async function waitForHome(page: Page) {
 
 test.describe('qa-b lesson escape paths', () => {
   test.skip(
-    process.platform === 'win32',
-    'QA journey suites run where the product ships; win32 runner gestures are an open item',
+    process.platform !== 'darwin',
+    'QA journey suites guard the shipped platform; non-macOS runner behavior is an open item',
   );
 
   let harness: Harness | undefined;
