@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   bootstrapLessonLibrary,
   DESKTOP_LESSON_LIBRARY_FOLDER,
+  loadLocalLessonPacks,
+  LOCAL_LESSON_PACKS_FOLDER,
 } from './lessonLibrary';
 
 const CHART = `[Song]
@@ -88,7 +90,84 @@ function makeImportedSong(libraryRoot: string, name = 'Imported Song'): string {
   return dir;
 }
 
+function makeLocalLessonPack(
+  userDataRoot: string,
+  name = 'Local Pack',
+): string {
+  const pack = makeLessonBundle(2, 'local-source');
+  const packRoot = path.join(userDataRoot, LOCAL_LESSON_PACKS_FOLDER, name);
+
+  fs.cpSync(pack, packRoot, { recursive: true });
+
+  const manifestPath = path.join(packRoot, 'manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+
+  manifest.pack = { id: 'local-pack', title: 'Local Pack' };
+  manifest.lessons.forEach(
+    (entry: { song: { id: string }; sticking: string }, index: number) => {
+      entry.song.id = `local:local-pack:01.${String(index + 1).padStart(
+        3,
+        '0',
+      )}`;
+
+      const folder = `SightKick Method - Lesson 01.${String(index + 1).padStart(
+        2,
+        '0',
+      )}`;
+
+      entry.sticking = `${folder}/sticking.json`;
+      fs.appendFileSync(
+        path.join(packRoot, folder, 'song.ini'),
+        `sk_lesson_id = book:01.${String(index + 1).padStart(
+          3,
+          '0',
+        )}\nsk_unit = Local Pack — Unit 1\n`,
+      );
+    },
+  );
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+
+  return packRoot;
+}
+
 describe('bootstrapLessonLibrary', () => {
+  it('loads a local pack beside bundled lessons without copying it into the profile library', () => {
+    const userDataRoot = path.join(root, 'local-pack-profile');
+    const pack = makeLocalLessonPack(userDataRoot);
+    const result = loadLocalLessonPacks(userDataRoot);
+
+    expect(result.libraryRoots).toEqual([pack]);
+    expect(result.rejectedPacks).toEqual([]);
+    expect(Object.keys(result.songs)).toEqual([
+      'local:local-pack:01.001',
+      'local:local-pack:01.002',
+    ]);
+    expect(result.songs['local:local-pack:01.001']?.sk_unit).toBe(
+      'Local Pack — Unit 1',
+    );
+  });
+
+  it('leaves startup unchanged when local packs are absent or malformed', () => {
+    const userDataRoot = path.join(root, 'no-local-pack-profile');
+
+    expect(loadLocalLessonPacks(userDataRoot)).toEqual({
+      libraryRoots: [],
+      songs: {},
+      rejectedPacks: [],
+    });
+
+    const malformed = path.join(userDataRoot, LOCAL_LESSON_PACKS_FOLDER, 'bad');
+
+    fs.mkdirSync(malformed, { recursive: true });
+    fs.writeFileSync(path.join(malformed, 'manifest.json'), '{bad json');
+
+    expect(loadLocalLessonPacks(userDataRoot)).toEqual({
+      libraryRoots: [],
+      songs: {},
+      rejectedPacks: ['bad'],
+    });
+  });
+
   it('makes all 170 bundled lessons discoverable in a clean private profile with stable IDs', () => {
     const bundle = makeLessonBundle();
     const userDataRoot = path.join(root, 'clean-profile');

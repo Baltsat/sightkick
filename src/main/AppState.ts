@@ -56,7 +56,7 @@ import { searchYoutube } from './ipc/searchYoutube';
 import { fetchMyMusic } from './ipc/myMusic';
 import { loadLibraryCandidates } from './ipc/loadLibraryCandidates';
 import { resolveLibraryCandidates } from './ipc/resolveLibraryCandidates';
-import { bootstrapLessonLibrary } from './lessonLibrary';
+import { bootstrapLessonLibrary, loadLocalLessonPacks } from './lessonLibrary';
 import { applyLessonProfileMigration } from './lessonIdentityMigration';
 import {
   finalizePracticeAttemptCheckpoint,
@@ -98,6 +98,7 @@ class AppState {
   });
   private libraryRoot = this.store.get('lastOpenedPath') as string | undefined;
   private lessonLibraryRoot: string | undefined;
+  private localLessonPackRoots: string[] = [];
 
   static getInstance(): AppState {
     if (!AppState.instance) {
@@ -113,7 +114,11 @@ class AppState {
   }
 
   getLibraryRoots(): string[] {
-    return [this.libraryRoot, this.lessonLibraryRoot].filter(
+    return [
+      this.libraryRoot,
+      this.lessonLibraryRoot,
+      ...this.localLessonPackRoots,
+    ].filter(
       (root, index, roots): root is string =>
         Boolean(root) && roots.indexOf(root) === index,
     );
@@ -325,6 +330,18 @@ class AppState {
       }
 
       applyLessonProfileMigration(this.store, result);
+
+      const localPacks = loadLocalLessonPacks(app.getPath('userData'));
+
+      this.localLessonPackRoots = localPacks.libraryRoots;
+
+      if (Object.keys(localPacks.songs).length > 0) {
+        const songs =
+          (this.store.get('songs') as StorageSchema['songs'] | undefined) ??
+          existingSongs;
+
+        this.store.set('songs', { ...songs, ...localPacks.songs });
+      }
 
       if (!existingLibraryRoot && result.libraryRoot) {
         this.setLibraryRoot(result.libraryRoot);
