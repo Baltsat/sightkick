@@ -20,6 +20,11 @@ import { launchApp, type Harness } from '../support';
 
 test.setTimeout(180_000);
 
+test.skip(
+  process.platform !== 'darwin',
+  'QA journey suites guard the shipped platform; non-macOS runner behavior is an open item',
+);
+
 const MAIN_ENTRY = path.join(__dirname, '..', '..', 'out', 'main', 'index.js');
 const CHART = [
   '[Song]',

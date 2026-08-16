@@ -28,6 +28,13 @@ const METRICS_PATH = path.join(OUT_DIR, 'QA-E-watchdog-metrics.json');
 
 test.setTimeout(780_000);
 
+// The ten-minute watchdog is a scheduled/deep check, not a per-push gate:
+// it costs half an hour of CI in retries. Run it on macOS with QA_WATCHDOG=1.
+test.skip(
+  process.platform !== 'darwin' || process.env.QA_WATCHDOG !== '1',
+  'watchdog runs on macOS with QA_WATCHDOG=1',
+);
+
 async function waitForRoute(page: Page, route: string): Promise<void> {
   const locators: Record<string, () => ReturnType<Page['getByTestId']>> = {
     home: () => page.getByTestId('home-cockpit'),
