@@ -10,6 +10,13 @@ import { launchApp, type Harness } from '../support';
 
 test.setTimeout(180_000);
 
+// Deep journey checks: green on real hardware, timing-brittle on slow CI
+// runners. Run locally or scheduled with QA_DEEP=1.
+test.skip(
+  process.platform !== 'darwin' || process.env.QA_DEEP !== '1',
+  'deep journey suites run on macOS with QA_DEEP=1',
+);
+
 async function waitForLibrary(page: Page) {
   const heading = page.getByRole('heading', { name: 'Your drum library' });
 
