@@ -21,10 +21,14 @@ import {
   ACTIVE_CLASS,
   HIDDEN_CLASS,
   HIT_CLASS,
+  isHihatPedalControl,
   MISS_CLASS,
   MISSED_CLASS,
   POP_CLASS,
+  WRONG_HIT_FADE_DELAY_SECONDS,
+  WRONG_HIT_FADE_DURATION_SECONDS,
   WRONG_HIT_MARKER_CLASS,
+  WRONG_HIT_MIN_OPACITY,
 } from './constants';
 import {
   flashClass,
@@ -76,7 +80,12 @@ export class GameRenderer {
   private activeEls: SVGElement[] = [];
   private filledEls = new Set<SVGElement>();
   private vanishedNotes = new Map<StaveNote, SVGElement[]>();
-  private wrongHitMarkers: { tick: number; x: number; el: HTMLElement }[] = [];
+  private wrongHitMarkers: {
+    tick: number;
+    timeSeconds: number;
+    x: number;
+    el: HTMLElement;
+  }[] = [];
 
   constructor(
     private isHit: IsHit,
@@ -115,6 +124,7 @@ export class GameRenderer {
   render(chartTime: number, tick: number, isSeek = false): void {
     this.syncMeasure(tick);
     this.syncActiveNote(tick, isSeek);
+    this.syncWrongHitMarkerOpacity(chartTime);
     this.updateCursor(chartTime);
   }
 
@@ -168,6 +178,10 @@ export class GameRenderer {
   }
 
   paintWrongHit(record: FalseHitRecord): void {
+    if (isHihatPedalControl(record.controlId)) {
+      return;
+    }
+
     const overlay = this.overlayEl;
     const measureIdx = this.measureIndexForTick(record.tick);
     const measureData =
@@ -185,6 +199,9 @@ export class GameRenderer {
     const marker = document.createElement('div');
 
     marker.className = WRONG_HIT_MARKER_CLASS;
+    marker.style.opacity = String(
+      this.wrongHitMarkerOpacity(record.timeSeconds, record.timeSeconds),
+    );
 
     const stackY = y + this.wrongHitStackOffset(x);
 
@@ -199,7 +216,12 @@ export class GameRenderer {
     }
 
     overlay.appendChild(marker);
-    this.wrongHitMarkers.push({ tick: record.tick, x, el: marker });
+    this.wrongHitMarkers.push({
+      tick: record.tick,
+      timeSeconds: record.timeSeconds,
+      x,
+      el: marker,
+    });
   }
 
   /**
@@ -222,6 +244,24 @@ export class GameRenderer {
     const sign = nearby % 2 === 1 ? 1 : -1;
 
     return sign * magnitude;
+  }
+
+  private syncWrongHitMarkerOpacity(chartTime: number): void {
+    this.wrongHitMarkers.forEach(({ timeSeconds, el }) => {
+      el.style.opacity = String(
+        this.wrongHitMarkerOpacity(chartTime, timeSeconds),
+      );
+    });
+  }
+
+  private wrongHitMarkerOpacity(chartTime: number, markerTime: number): number {
+    const progress = Math.min(
+      1,
+      Math.max(0, chartTime - markerTime - WRONG_HIT_FADE_DELAY_SECONDS) /
+        WRONG_HIT_FADE_DURATION_SECONDS,
+    );
+
+    return 1 - (1 - WRONG_HIT_MIN_OPACITY) * progress;
   }
 
   reset(): void {

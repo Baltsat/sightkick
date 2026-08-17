@@ -27,18 +27,23 @@ export function RunTrendChart({ points }: Props) {
   const coords = points.map((point, index) =>
     position(point, index, points.length),
   );
-  const line = coords.map(({ x, y }) => `${x},${y}`).join(' ');
+  const baseline = coords.length === 1;
+  const line = baseline
+    ? `${X_PADDING},${coords[0].y} ${WIDTH - X_PADDING},${coords[0].y}`
+    : coords.map(({ x, y }) => `${x},${y}`).join(' ');
   const area =
-    coords.length > 1
+    coords.length > 0
       ? `${X_PADDING},${HEIGHT - Y_PADDING} ${line} ${WIDTH - X_PADDING},${
           HEIGHT - Y_PADDING
         }`
       : '';
-  const aria = `Hit rate across ${points.length} run${
-    points.length === 1 ? '' : 's'
-  }: ${points
-    .map(({ hitRate }) => `${Math.round(hitRate * 100)}%`)
-    .join(', ')}.`;
+  const aria = baseline
+    ? `First saved run baseline: ${Math.round(
+        points[0].hitRate * 100,
+      )}% hit rate.`
+    : `Hit rate across ${points.length} runs: ${points
+        .map(({ hitRate }) => `${Math.round(hitRate * 100)}%`)
+        .join(', ')}.`;
 
   return (
     <svg

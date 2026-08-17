@@ -61,7 +61,7 @@ const REQUEST_DELAY_MS = 250;
 const FEATURING_TAG =
   /\s*[([]?\s*(?:feat\.?|ft\.?|featuring)\s+[^()[\]]*[)\]]?\s*$/i;
 const ARTIST_SEPARATOR =
-  /\s*(?:,|&|\bx\b|\bfeat\.?\b|\bft\.?\b|\bfeaturing\b)\s*/i;
+  /\s*(?:,|&|\/|\bx\b|\band\b|\bfeat\.?\b|\bft\.?\b|\bfeaturing\b)\s*/i;
 
 function normalize(value) {
   return value.normalize('NFKC').trim().toLowerCase();
@@ -195,21 +195,22 @@ async function findItunesArtwork(artist, title) {
       continue;
     }
 
-    const score = titleSimilarity(
-      normalizeTitle(trackName),
-      normalizedQueryTitle,
-    );
+    const normalizedTrackTitle = normalizeTitle(trackName);
+    const score = titleSimilarity(normalizedTrackTitle, normalizedQueryTitle);
 
     if (score < MIN_TITLE_SIMILARITY) {
       continue;
     }
 
-    if (!best || score > best.score) {
+    const matchScore =
+      score + Number(normalizedTrackTitle === normalizedQueryTitle);
+
+    if (!best || matchScore > best.score) {
       best = {
         url: upgradeArtworkUrl(artworkUrl100),
         trackName,
         artistName: resultArtist,
-        score,
+        score: matchScore,
       };
     }
   }
@@ -294,6 +295,25 @@ function alreadyRepaired(dir) {
   );
 }
 
+function releaseIdentity(meta) {
+  const artist = String(meta?.artist || '')
+    .normalize('NFKC')
+    .trim()
+    .toLowerCase();
+  const title = String(meta?.name || '')
+    .normalize('NFKC')
+    .trim()
+    .toLowerCase();
+  const album = String(meta?.album || '')
+    .normalize('NFKC')
+    .trim()
+    .toLowerCase();
+
+  return artist && title && album
+    ? `${artist}\u0000${title}\u0000${album}`
+    : undefined;
+}
+
 /** Decides whether `dir` is a repair candidate, returning
  * `{ candidate: boolean, reason: string }`. */
 function classify(dir, meta, coverFile) {
@@ -354,7 +374,7 @@ function writeCoverAtomically(dir, buffer) {
   }
 }
 
-async function repairSong(dir, meta, coverFile, apply) {
+async function repairSong(dir, meta, coverFile, sharedReleaseCover, apply) {
   const artist = String(meta.artist || '').trim();
   const title = String(meta.name || '').trim();
 
@@ -363,6 +383,18 @@ async function repairSong(dir, meta, coverFile, apply) {
       status: 'skipped',
       reason: 'song.ini has no artist/name to search with',
     };
+  }
+
+  if (!coverFile && sharedReleaseCover) {
+    const detail = 'copied existing art for the same artist, song, and album';
+
+    if (!apply) {
+      return { status: 'would-repair', reason: detail };
+    }
+
+    writeCoverAtomically(dir, fs.readFileSync(sharedReleaseCover));
+
+    return { status: 'repaired', reason: detail };
   }
 
   const match = await findItunesArtwork(artist, title);
@@ -424,12 +456,29 @@ async function main() {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort((a, b) => a.localeCompare(b));
+  const librarySongs = entries.map((name) => {
+    const dir = path.join(library, name);
+
+    return {
+      dir,
+      name,
+      meta: readSongMeta(dir),
+      coverFile: existingCoverFile(dir),
+    };
+  });
+  const releaseCovers = new Map();
+
+  for (const song of librarySongs) {
+    const identity = releaseIdentity(song.meta);
+
+    if (identity && song.coverFile) {
+      releaseCovers.set(identity, song.coverFile);
+    }
+  }
+
   const summary = { repaired: 0, wouldRepair: 0, skipped: 0 };
 
-  for (const name of entries) {
-    const dir = path.join(library, name);
-    const meta = readSongMeta(dir);
-    const coverFile = existingCoverFile(dir);
+  for (const { dir, name, meta, coverFile } of librarySongs) {
     const { candidate, reason: skipReason } = classify(dir, meta, coverFile);
 
     if (!candidate) {
@@ -437,7 +486,13 @@ async function main() {
     }
 
     // to stay polite to the free, unauthenticated iTunes Search API.
-    const result = await repairSong(dir, meta, coverFile, apply);
+    const result = await repairSong(
+      dir,
+      meta,
+      coverFile,
+      releaseCovers.get(releaseIdentity(meta)),
+      apply,
+    );
 
     if (result.status === 'repaired') {
       summary.repaired += 1;

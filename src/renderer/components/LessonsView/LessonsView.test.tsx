@@ -317,6 +317,29 @@ describe('LessonsView — chain progress header', () => {
     );
   });
 
+  it('honors a completed lesson return in its original season instead of resetting to Foundations', () => {
+    const progress = makeMixedProgress();
+
+    render(
+      <LessonsView
+        progress={progress}
+        onPlay={vi.fn()}
+        onRescan={vi.fn()}
+        initialUnit="Reading"
+        initialFocusedLessonId="d"
+      />,
+      { wrapper },
+    );
+
+    expect(screen.getByTestId('journey-world-title')).toHaveTextContent(
+      'Reading',
+    );
+    expect(screen.getByTestId('lesson-item-02.02')).toHaveAttribute(
+      'data-kit-focused',
+      'true',
+    );
+  });
+
   it('calls onPlay with the continue entry when Play is clicked', () => {
     const progress = makeMixedProgress();
     const onPlay = vi.fn();

@@ -61,6 +61,13 @@ export const Default: Story = {};
 
 export const WithMixer: Story = { args: { volumeSliders } };
 
+export const SlimInspector: Story = {
+  args: {
+    volumeSliders,
+    onExportPdf: noop,
+  },
+};
+
 export const ColorsOff: Story = {
   decorators: [withSettings({ 'settings.enableColors': false })],
 };

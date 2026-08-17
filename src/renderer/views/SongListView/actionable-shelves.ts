@@ -22,6 +22,7 @@ export interface ActionableLibraryShelf {
 export interface ActionableLibraryShelves {
   shelves: readonly ActionableLibraryShelf[];
   rest: readonly UnifiedLibraryEntry[];
+  scrollingEntries: readonly LocalLibraryEntry[];
 }
 
 function is_local_song(entry: UnifiedLibraryEntry): entry is LocalLibraryEntry {
@@ -46,6 +47,75 @@ function timestamp(entry: LocalLibraryEntry): number {
   const parsed = entry.updatedAt ? Date.parse(entry.updatedAt) : Number.NaN;
 
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function rank_library_songs({
+  entries,
+  inZoneSongIds,
+  favouriteSongIds,
+  sourceSeededSongIds = new Set(),
+  recentPlayedAt = new Map(),
+}: {
+  entries: readonly UnifiedLibraryEntry[];
+  inZoneSongIds: readonly string[];
+  favouriteSongIds: ReadonlySet<string>;
+  sourceSeededSongIds?: ReadonlySet<string>;
+  recentPlayedAt?: ReadonlyMap<string, number>;
+}): LocalLibraryEntry[] {
+  const inZone = new Set(inZoneSongIds);
+
+  return entries.filter(is_local_song).sort((left, right) => {
+    const leftSong = left.song;
+    const rightSong = right.song;
+    const ready = Number(right.ready) - Number(left.ready);
+
+    if (ready !== 0) {
+      return ready;
+    }
+
+    const zone =
+      Number(inZone.has(rightSong.id)) - Number(inZone.has(leftSong.id));
+
+    if (zone !== 0) {
+      return zone;
+    }
+
+    const favourite =
+      Number(favouriteSongIds.has(rightSong.id)) -
+      Number(favouriteSongIds.has(leftSong.id));
+
+    if (favourite !== 0) {
+      return favourite;
+    }
+
+    const taste =
+      Number(sourceSeededSongIds.has(rightSong.id)) -
+      Number(sourceSeededSongIds.has(leftSong.id));
+
+    if (taste !== 0) {
+      return taste;
+    }
+
+    const recent =
+      (recentPlayedAt.get(rightSong.id) ?? 0) -
+      (recentPlayedAt.get(leftSong.id) ?? 0);
+
+    if (recent !== 0) {
+      return recent;
+    }
+
+    const difficulty =
+      (left.difficulty?.learner_relative_difficulty ??
+        Number.POSITIVE_INFINITY) -
+      (right.difficulty?.learner_relative_difficulty ??
+        Number.POSITIVE_INFINITY);
+
+    return (
+      difficulty ||
+      left.title.localeCompare(right.title) ||
+      left.key.localeCompare(right.key)
+    );
+  });
 }
 
 export function yandex_taste_seeded_song_ids(
@@ -83,14 +153,24 @@ export function build_actionable_library_shelves({
   entries,
   inZoneSongIds,
   favouriteSongIds,
+  sourceSeededSongIds,
+  recentPlayedAt,
   limit = 3,
 }: {
   entries: readonly UnifiedLibraryEntry[];
   inZoneSongIds: readonly string[];
   favouriteSongIds: ReadonlySet<string>;
+  sourceSeededSongIds?: ReadonlySet<string>;
+  recentPlayedAt?: ReadonlyMap<string, number>;
   limit?: number;
 }): ActionableLibraryShelves {
-  const localEntries = entries.filter(is_local_song);
+  const localEntries = rank_library_songs({
+    entries,
+    inZoneSongIds,
+    favouriteSongIds,
+    sourceSeededSongIds,
+    recentPlayedAt,
+  });
   const readyEntries = localEntries.filter((entry) => entry.ready);
   const bySongId = new Map(
     readyEntries.map((entry) => [entry.song.id, entry] as const),
@@ -149,5 +229,6 @@ export function build_actionable_library_shelves({
       },
     ],
     rest: entries.filter((entry) => !selected.has(entry.key)),
+    scrollingEntries: localEntries.filter((entry) => !selected.has(entry.key)),
   };
 }

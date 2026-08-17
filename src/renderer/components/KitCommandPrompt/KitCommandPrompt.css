@@ -155,6 +155,36 @@
   pointer-events: none;
 }
 
+/* Laptop in use: the prompt stops owning the screen. No dimming wash, no
+   full-bleed field, no captured clicks - it settles low and small so the
+   controls he is reaching for stay visible and clickable. */
+.drumroll-kit-command-veil[data-yielding] {
+  place-items: end center;
+  padding: 0 0 clamp(1rem, 2.5vh, 2rem);
+  background: none;
+  backdrop-filter: none;
+  pointer-events: none;
+}
+
+.drumroll-kit-command-veil[data-yielding] .drumroll-kit-command-veil__content {
+  width: auto;
+  max-width: min(46rem, 92vw);
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-studio) 92%, transparent);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+  opacity: 0.92;
+}
+
+.drumroll-kit-command-veil[data-yielding] .drumroll-kit-command-veil__title {
+  font-size: clamp(1.05rem, 1.5vw, 1.35rem);
+}
+
+.drumroll-kit-command-veil[data-yielding] .drumroll-kit-command-veil__kicker,
+.drumroll-kit-command-veil[data-yielding] .drumroll-kit-command-veil__detail {
+  display: none;
+}
+
 .drumroll-kit-command-veil__content {
   display: grid;
   width: min(76rem, 100%);

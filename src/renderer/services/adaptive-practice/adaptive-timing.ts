@@ -1,32 +1,46 @@
+import type { Measure, ParsedChart } from '../../../chart-parser/types';
+import { ticksToSeconds } from '../../../chart-parser/timing';
 import type {
-  AdaptivePracticeKind,
   AdaptiveTimingEvidence,
   AdaptiveTimingWindowInput,
   AdaptiveTimingWindowRecommendation,
+  TimingGrid,
+  TimingLadderAction,
+  TimingRunEvidence,
+  TimingRunState,
   TimingWindowConfidence,
+  TimingWindowStandard,
 } from './types';
 
-export const MIN_TIMING_WINDOW_MS = 120;
+export const MIN_TIMING_WINDOW_MS = 35;
 
-export const MAX_TIMING_WINDOW_MS = 230;
-
-export const LESSON_STARTING_WINDOW_MS = 220;
-
-export const SONG_STARTING_WINDOW_MS = 200;
-
-export const EXPERIENCED_TARGET_WINDOW_MS = 140;
+/** Used only when the caller has no chart to measure a grid from. */
+export const GRIDLESS_FALLBACK_WINDOW_MS = 200;
 
 const DEFAULT_RECENT_RUN_LIMIT = 6;
 const MIN_RECENT_RUN_LIMIT = 3;
 const MAX_RECENT_RUN_LIMIT = 12;
-const MIN_HIGH_QUALITY_TIMING_SAMPLES = 8;
+
+export const MIN_HIGH_QUALITY_TIMING_SAMPLES = 8;
+
+export const CLEAN_ACCURACY = 0.94;
+
+export const CLEAN_SPREAD_MS = 40;
+
+export const TEMPO_STEP = 0.1;
+
+export const WRONG_RATE_MAX = 0.05;
 
 interface UsableRunEvidence {
   accuracy: number;
   spreadMs?: number;
   timingSampleCount: number;
+  totalHits?: number;
+  totalMisses?: number;
+  totalWrong?: number;
   playbackSpeed?: number;
   completedAtMs?: number;
+  timingStandard?: TimingWindowStandard;
   sourceIndex: number;
 }
 
@@ -56,6 +70,12 @@ function completedAtMs(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function standard(value: unknown): TimingWindowStandard | undefined {
+  return value === 'target' || value === 'better' || value === 'ceiling'
+    ? value
+    : undefined;
+}
+
 function sanitizeRun(
   value: unknown,
   sourceIndex: number,
@@ -76,9 +96,8 @@ function sanitizeRun(
   const rawSpread = finiteNumber(timingBias?.spreadMs);
   const rawSampleCount = finiteNumber(timingBias?.sampleCount);
   const totalHits = finiteNumber(run.totalHits);
-  // A zero-sample `spreadMs: 0` is common in legacy summaries. It means
-  // "unknown", not perfect timing. If sampleCount is absent, a positive hit
-  // count is a safe legacy fallback that lets a real spread remain usable.
+  const totalMisses = finiteNumber(run.totalMisses);
+  const totalWrong = finiteNumber(run.totalWrong);
   const timingSampleCount =
     rawSampleCount !== undefined && rawSampleCount > 0
       ? Math.floor(rawSampleCount)
@@ -90,23 +109,23 @@ function sanitizeRun(
       ? rawSpread
       : undefined;
   const rawSpeed = finiteNumber(run.playbackSpeed);
-  let playbackSpeed: number | undefined;
-
-  if (rawSpeed !== undefined && rawSpeed >= 0.25 && rawSpeed <= 2) {
-    playbackSpeed = rawSpeed;
-  } else if (run.mode === 'perform' || run.mode === undefined) {
-    // Historical Perform summaries did not store playbackSpeed. Perform was
-    // fixed at 1x, so that evidence remains interpretable. A legacy Practice
-    // run with no speed never qualifies as proof for tightening.
-    playbackSpeed = 1;
-  }
+  const playbackSpeed =
+    rawSpeed !== undefined && rawSpeed >= 0.25 && rawSpeed <= 2
+      ? rawSpeed
+      : run.mode === 'perform' || run.mode === undefined
+      ? 1
+      : undefined;
 
   return {
     accuracy,
     spreadMs,
     timingSampleCount,
+    totalHits,
+    totalMisses,
+    totalWrong,
     playbackSpeed,
     completedAtMs: completedAtMs(run.completedAt),
+    timingStandard: standard(run.timingStandard),
     sourceIndex,
   };
 }
@@ -127,8 +146,6 @@ function newestFirst(
     return 1;
   }
 
-  // Archives are written oldest-to-newest, so preserve that useful convention
-  // for malformed legacy rows that have no parseable completion timestamp.
   return right.sourceIndex - left.sourceIndex;
 }
 
@@ -170,31 +187,183 @@ function confidenceFor(
   return 'low';
 }
 
-function startingWindow(kind: AdaptivePracticeKind): number {
-  return kind === 'lesson'
-    ? LESSON_STARTING_WINDOW_MS
-    : SONG_STARTING_WINDOW_MS;
+function rounded(value: number): number {
+  return Math.round(value * 10) / 10;
 }
 
-function roundAndClampWindow(value: number): number {
-  return Math.round(clamp(value, MIN_TIMING_WINDOW_MS, MAX_TIMING_WINDOW_MS));
+function positiveFinite(value: number | undefined): value is number {
+  return value !== undefined && Number.isFinite(value) && value > 0;
 }
 
-function startingReason(kind: AdaptivePracticeKind): string {
-  return `0 usable completed runs. Use the ${kind} starting window.`;
+function windowFor(
+  gapMs: number,
+  desiredStandard: TimingWindowStandard,
+): Pick<TimingRunState, 'timingWindowMs' | 'timingGapMs' | 'timingStandard'> {
+  const fraction =
+    desiredStandard === 'target'
+      ? 1 / 3
+      : desiredStandard === 'better'
+      ? 1 / 2
+      : 1;
+  const timingWindowMs = Math.min(
+    gapMs,
+    Math.max(MIN_TIMING_WINDOW_MS, gapMs * fraction),
+  );
+
+  return {
+    timingWindowMs: rounded(timingWindowMs),
+    timingGapMs: rounded(gapMs),
+    timingStandard: timingWindowStandard(timingWindowMs, gapMs),
+  };
+}
+
+function cleanRun(run: UsableRunEvidence | undefined): boolean {
+  if (!run) {
+    return false;
+  }
+
+  const attempts =
+    (run.totalHits ?? 0) + (run.totalMisses ?? 0) + (run.totalWrong ?? 0);
+  const wrongRate = attempts > 0 ? (run.totalWrong ?? 0) / attempts : 0;
+
+  return (
+    run.accuracy >= CLEAN_ACCURACY &&
+    run.spreadMs !== undefined &&
+    run.spreadMs <= CLEAN_SPREAD_MS &&
+    run.timingSampleCount >= MIN_HIGH_QUALITY_TIMING_SAMPLES &&
+    wrongRate <= WRONG_RATE_MAX
+  );
+}
+
+function timingState(
+  grid: TimingGrid,
+  playbackSpeed: number,
+  desiredStandard: TimingWindowStandard,
+): TimingRunState {
+  const gapMs = grid.gapMs;
+  const window = windowFor(gapMs, desiredStandard);
+
+  return {
+    ...window,
+    playbackSpeed,
+    ...(positiveFinite(grid.effectiveTempoBpm)
+      ? { effectiveTempoBpm: rounded(grid.effectiveTempoBpm) }
+      : {}),
+  };
 }
 
 /**
- * Derive an explainable hit-tolerance window from recent completed-run
- * evidence. The policy is deliberately conservative: weak evidence can make
- * play more forgiving immediately, while tighter timing requires at least
- * three repeated high-accuracy, low-spread, near-full-speed runs.
+ * Finds the closest pair of active note onsets in real playback time. Chords
+ * share one tick and therefore do not create a smaller rhythmic subdivision.
+ */
+export function deriveTimingGrid(
+  chart: Pick<ParsedChart, 'resolution' | 'tempos'>,
+  measures: readonly Measure[],
+  playbackSpeed = 1,
+): TimingGrid | undefined {
+  if (!positiveFinite(chart.resolution) || !positiveFinite(playbackSpeed)) {
+    return undefined;
+  }
+
+  const ticks = [
+    ...new Set(
+      measures.flatMap((measure) =>
+        measure.notes.filter((note) => !note.isRest).map((note) => note.tick),
+      ),
+    ),
+  ].sort((left, right) => left - right);
+  const tempoAt = (tick: number) =>
+    chart.tempos.filter((tempo) => tempo.tick <= tick).at(-1) ??
+    chart.tempos[0];
+  const candidates = ticks.slice(1).map((tick, index) => ({
+    seconds:
+      (ticksToSeconds(tick, chart.resolution, chart.tempos) -
+        ticksToSeconds(ticks[index], chart.resolution, chart.tempos)) /
+      playbackSpeed,
+    tempo: tempoAt(ticks[index]),
+  }));
+
+  candidates.push({
+    seconds:
+      (ticksToSeconds(chart.resolution, chart.resolution, chart.tempos) -
+        ticksToSeconds(0, chart.resolution, chart.tempos)) /
+      playbackSpeed,
+    tempo: tempoAt(0),
+  });
+
+  const closest = candidates
+    .filter(
+      (candidate) =>
+        Number.isFinite(candidate.seconds) && candidate.seconds > 0,
+    )
+    .sort((left, right) => left.seconds - right.seconds)[0];
+
+  if (!closest) {
+    return undefined;
+  }
+
+  return {
+    gapMs: closest.seconds * 1000,
+    ...(positiveFinite(closest.tempo?.beatsPerMinute)
+      ? { effectiveTempoBpm: closest.tempo.beatsPerMinute * playbackSpeed }
+      : {}),
+  };
+}
+
+/** The label is calculated from the recorded numbers, including floor cases. */
+export function timingWindowStandard(
+  windowMs: number,
+  gapMs: number,
+): TimingWindowStandard {
+  if (windowMs <= gapMs / 3) {
+    return 'target';
+  }
+
+  if (windowMs <= gapMs / 2) {
+    return 'better';
+  }
+
+  return 'ceiling';
+}
+
+/**
+ * Gives old stored runs an honest label. A window without its grid context
+ * predates this standard; it must never be inferred from a bare percentage.
+ */
+export function timingStandardForRun(
+  run: TimingRunEvidence,
+): TimingWindowStandard | 'pre-grid-standard' {
+  const recordedStandard = standard(run.timingStandard);
+
+  if (recordedStandard) {
+    return recordedStandard;
+  }
+
+  if (positiveFinite(run.timingWindowMs) && positiveFinite(run.timingGapMs)) {
+    return timingWindowStandard(run.timingWindowMs, run.timingGapMs);
+  }
+
+  return 'pre-grid-standard';
+}
+
+/**
+ * Derives a grid-bounded practice pair. The policy never widens a failed run:
+ * it lowers tempo at the same standard, and promotes tempo only after a clean
+ * target or better-band result.
  */
 export function deriveAdaptiveTimingWindow({
-  kind,
+  grid,
+  playbackSpeed = 1,
   runs,
   recentRunLimit = DEFAULT_RECENT_RUN_LIMIT,
 }: AdaptiveTimingWindowInput): AdaptiveTimingWindowRecommendation {
+  // No chart, no grid, no honest clamp. Inventing a gap here would let the
+  // app claim a "target" standard it never measured. Callers that know the
+  // music always pass a grid; the rest fall back to the legacy safe window.
+  const gridKnown = Boolean(grid && positiveFinite(grid.gapMs));
+  const resolvedGrid = gridKnown
+    ? (grid as TimingGrid)
+    : { gapMs: GRIDLESS_FALLBACK_WINDOW_MS * 3 };
   const normalizedLimit = Math.round(
     clamp(
       Number.isFinite(recentRunLimit)
@@ -231,13 +400,7 @@ export function deriveAdaptiveTimingWindow({
       recencyIndex,
     })),
   );
-  const highQualityRuns = timedRuns.filter(
-    ({ run }) =>
-      run.accuracy >= 0.94 &&
-      run.spreadMs <= 40 &&
-      run.timingSampleCount >= MIN_HIGH_QUALITY_TIMING_SAMPLES &&
-      (run.playbackSpeed ?? 0) >= 0.85,
-  ).length;
+  const highQualityRuns = timedRuns.filter(({ run }) => cleanRun(run)).length;
   const evidence: AdaptiveTimingEvidence = {
     usableRuns: recentRuns.length,
     timedRuns: timedRuns.length,
@@ -246,75 +409,59 @@ export function deriveAdaptiveTimingWindow({
     weightedSpreadMs: spreadMs,
   };
   const confidence = confidenceFor(evidence);
-  const baseWindowMs = startingWindow(kind);
+  const latest = recentRuns[0];
+  const priorStandard = latest?.timingStandard ?? 'better';
+  const isClean = cleanRun(latest);
+  let desiredStandard = priorStandard;
+  let nextPlaybackSpeed = rounded(clamp(playbackSpeed, 0.3, 2));
+  let ladderAction: TimingLadderAction = 'hold';
+  let reason = 'Start at the better timing band before raising tempo.';
 
-  if (accuracy === undefined) {
-    return {
-      timingWindowMs: baseWindowMs,
-      confidence,
-      phase: 'starting',
-      reason: startingReason(kind),
-      evidence,
-    };
+  if (latest) {
+    if (isClean && priorStandard === 'ceiling') {
+      desiredStandard = 'better';
+      ladderAction = 'tighten-window';
+      reason = 'Clean timing at the ceiling band earns a tighter better band.';
+    } else if (isClean && priorStandard === 'better') {
+      desiredStandard = 'target';
+      ladderAction = 'tighten-window';
+      reason = 'Clean timing at the better band earns the target window.';
+    } else if (isClean && priorStandard === 'target') {
+      nextPlaybackSpeed = rounded(
+        clamp(nextPlaybackSpeed + TEMPO_STEP, 0.3, 2),
+      );
+      ladderAction = 'raise-tempo';
+      reason = 'Clean target timing earns one tempo step.';
+    } else if (!isClean) {
+      nextPlaybackSpeed = rounded(
+        clamp(nextPlaybackSpeed - TEMPO_STEP, 0.3, 2),
+      );
+      ladderAction = 'lower-tempo';
+      reason = 'Hold this timing standard and lower tempo for the next run.';
+    }
   }
 
-  const canTighten =
-    highQualityRuns >= 3 &&
-    spreadMs !== undefined &&
-    accuracy >= 0.94 &&
-    spreadMs <= 40;
-
-  if (canTighten) {
-    // Three confirming runs begin the progression; six reach the experienced
-    // target. This avoids a single lucky performance creating an abrupt,
-    // discouraging scoring change.
-    const tighteningProgress = clamp((highQualityRuns - 2) / 4, 0, 1);
-    const timingWindowMs = roundAndClampWindow(
-      baseWindowMs -
-        (baseWindowMs - EXPERIENCED_TARGET_WINDOW_MS) * tighteningProgress,
-    );
-
-    return {
-      timingWindowMs,
-      confidence,
-      phase: 'tightening',
-      reason: `${highQualityRuns} recent high-accuracy, low-spread runs support a gradual move toward the experienced timing window.`,
-      evidence,
-    };
-  }
-
-  const accuracyPressure =
-    accuracy < 0.86 ? clamp((0.86 - accuracy) / 0.24, 0, 1) * 24 : 0;
-  const spreadPressure =
-    spreadMs !== undefined && spreadMs > 65
-      ? clamp((spreadMs - 65) / 90, 0, 1) * 12
-      : 0;
-  const pressure = accuracyPressure + spreadPressure;
-
-  if (pressure > 0.5) {
-    const timingWindowMs = roundAndClampWindow(baseWindowMs + pressure);
-
-    return {
-      timingWindowMs,
-      confidence,
-      phase: 'developing',
-      reason: `Recent accuracy${
-        spreadMs !== undefined ? ' and timing spread' : ''
-      } show that a more forgiving window keeps this ${kind} in reach.`,
-      evidence,
-    };
-  }
+  const currentState = timingState(
+    resolvedGrid,
+    clamp(playbackSpeed, 0.3, 2),
+    desiredStandard,
+  );
+  const speedRatio = nextPlaybackSpeed / clamp(playbackSpeed, 0.3, 2);
+  const nextGrid: TimingGrid = {
+    ...resolvedGrid,
+    gapMs: resolvedGrid.gapMs / speedRatio,
+    ...(positiveFinite(resolvedGrid.effectiveTempoBpm)
+      ? { effectiveTempoBpm: resolvedGrid.effectiveTempoBpm * speedRatio }
+      : {}),
+  };
+  const nextRun = timingState(nextGrid, nextPlaybackSpeed, desiredStandard);
 
   return {
-    timingWindowMs: baseWindowMs,
+    ...currentState,
     confidence,
-    phase: 'calibrating',
-    reason:
-      highQualityRuns > 0
-        ? `${highQualityRuns} strong run${
-            highQualityRuns === 1 ? '' : 's'
-          } recorded. Keep 3 consistent runs before tightening the timing window.`
-        : `Current evidence supports the standard learner-friendly ${kind} window while calibration continues.`,
+    ladderAction,
+    nextRun,
+    reason,
     evidence,
   };
 }

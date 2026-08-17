@@ -114,7 +114,8 @@ const meta: Meta<typeof ActionableSongShelves> = {
   args: {
     shelves,
     sourceSeededSongIds: new Set(['raging']),
-    restCount: 18,
+    allEntries: entries,
+    restCount: 2,
     difficulty: 'expert',
     splittingIds: new Set(),
     onPlaySong: () => {},

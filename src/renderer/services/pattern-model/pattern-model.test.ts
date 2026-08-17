@@ -4,9 +4,12 @@ import { buildParsedChartFromDsl } from '../../components/SheetMusic/helpers';
 import type { SkillEvidenceEvent } from '../pedagogy';
 import {
   build_pattern_player_profile,
+  build_pattern_fragment_map,
   cluster_pattern_figures,
   decompose_chart_patterns,
   lesson_ids_for_pattern_family,
+  propose_pattern_fragment_loops,
+  rank_pattern_fragments,
 } from '.';
 import type { PatternFamily } from '.';
 
@@ -212,5 +215,116 @@ describe('pattern player profile', () => {
       strength: 0,
       trend: 'unknown',
     });
+  });
+});
+
+describe('pattern fragments', () => {
+  it('maps exact recurring bars and phrases with the real note share', () => {
+    const chart = buildParsedChartFromDsl(
+      Array.from({ length: 8 }, () => eighthGroove()).join('\n\n'),
+    );
+    const map = build_pattern_fragment_map(chart, { item_id: 'repeat' });
+    const recurringBar = map.fragments.find(
+      ({ kind, measure_count }) => kind === 'bar' && measure_count === 1,
+    )!;
+    const phrase = map.fragments.find(
+      ({ kind, measure_count }) => kind === 'phrase' && measure_count === 4,
+    )!;
+
+    expect(recurringBar).toMatchObject({
+      occurrence_count: 8,
+      song_note_share: 1,
+    });
+    expect(phrase).toMatchObject({ occurrence_count: 2, song_note_share: 1 });
+    expect(
+      map.fragments.some(({ occurrence_count }) => occurrence_count === 8),
+    ).toBe(true);
+  });
+
+  it('keeps a phrase together when one repeat has a small ending variation', () => {
+    const chart = buildParsedChartFromDsl(
+      [
+        eighthGroove(),
+        eighthGroove(),
+        eighthGroove(),
+        eighthGroove(),
+        eighthGroove(),
+        eighthGroove(),
+        eighthGroove(),
+        eighthGroove(true),
+      ].join('\n\n'),
+    );
+    const map = build_pattern_fragment_map(chart, { item_id: 'variant' });
+    const phrase = map.fragments.find(
+      ({ kind, measure_count, occurrence_count }) =>
+        kind === 'phrase' && measure_count === 4 && occurrence_count === 2,
+    );
+
+    expect(phrase?.song_note_share).toBeGreaterThan(0.99);
+    expect(
+      phrase?.members.map(({ start_measure_index }) => start_measure_index),
+    ).toEqual([0, 4]);
+  });
+
+  it('does not merge structurally different figures or rank thin evidence', () => {
+    const chart = buildParsedChartFromDsl(
+      [
+        eighthGroove(),
+        bar(['0 kick', '480 snare', '960 kick', '1440 snare']),
+        eighthGroove(),
+        bar(['0 kick', '480 snare', '960 kick', '1440 snare']),
+      ].join('\n\n'),
+    );
+    const map = build_pattern_fragment_map(chart, { item_id: 'different' });
+    const bars = map.fragments.filter(({ kind }) => kind === 'bar');
+    const ranked = rank_pattern_fragments({
+      chart,
+      fragments: map.fragments.filter(({ kind }) => kind === 'bar'),
+      records: [
+        { tick: 0, deltaMs: 0, element: 'kick', verdict: 'miss' },
+        { tick: 480, deltaMs: 0, element: 'snare', verdict: 'hit' },
+      ],
+    });
+
+    expect(bars).toHaveLength(2);
+    expect(bars.every(({ occurrence_count }) => occurrence_count === 2)).toBe(
+      true,
+    );
+    expect(ranked.every(({ score }) => score === undefined)).toBe(true);
+  });
+
+  it('ranks observed recurring fragments and returns a grid-bounded opening loop', () => {
+    const chart = buildParsedChartFromDsl(
+      [eighthGroove(), eighthGroove(), eighthGroove(), eighthGroove()].join(
+        '\n\n',
+      ),
+    );
+    const map = build_pattern_fragment_map(chart, { item_id: 'practice' });
+    const records = Array.from({ length: 8 }, (_, index) => {
+      const element: 'kick' | 'hihat' = index % 4 === 0 ? 'kick' : 'hihat';
+
+      return {
+        tick: index * 240,
+        deltaMs: index % 2 === 0 ? 75 : -75,
+        element,
+        verdict: index % 3 === 0 ? ('miss' as const) : ('hit' as const),
+      };
+    });
+    const ranked = rank_pattern_fragments({
+      chart,
+      fragments: map.fragments.filter(({ kind }) => kind === 'bar'),
+      records,
+    });
+    const loops = propose_pattern_fragment_loops({
+      chart,
+      fragments: map.fragments,
+      records,
+      playback_speed: 1,
+    });
+
+    expect(ranked[0].score).toBeGreaterThan(0);
+    expect(loops[0]).toMatchObject({ bar_start: 1, bar_end: 1 });
+    expect(loops[0].opening_window_ms).toBeLessThanOrEqual(250);
+    expect(loops[0].reason).toContain('covers');
   });
 });

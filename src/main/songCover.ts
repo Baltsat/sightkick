@@ -20,6 +20,13 @@ export type SongCoverSource =
 // type-checking without widening it.
 export type PreviewCoverSource = Exclude<SongCoverSource, 'itunes'>;
 
+export interface SongCoverBackfillCandidate {
+  dir: string;
+  artist: string;
+  title: string;
+  album?: string;
+}
+
 const COVER_EXTENSIONS = ['png', 'jpg', 'jpeg'];
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.ogg', '.opus']);
 const MAX_REMOTE_IMAGE_BYTES = 10_000_000;
@@ -164,6 +171,20 @@ interface SongIdentity {
   title?: string;
 }
 
+function releaseIdentity(
+  candidate: SongCoverBackfillCandidate,
+): string | undefined {
+  const album = candidate.album?.normalize('NFKC').trim().toLocaleLowerCase();
+
+  if (!album) {
+    return undefined;
+  }
+
+  return [candidate.artist, candidate.title, album]
+    .map((value) => value.normalize('NFKC').trim().toLocaleLowerCase())
+    .join('\u0000');
+}
+
 // Looks up real album art on iTunes for `identity` and, on a confident
 // match, downloads and writes it as album.jpg. Returns whether it won so
 // the caller can skip the embedded/thumbnail fallbacks; any failure
@@ -275,4 +296,61 @@ export async function ingestSongCover(
   log.info('[songCover] no cover art found (source=none)');
 
   return 'none';
+}
+
+export async function backfillSongCovers(
+  candidates: readonly SongCoverBackfillCandidate[],
+): Promise<ReadonlySet<string>> {
+  const updated = new Set<string>();
+  const releaseCovers = new Map<string, string>();
+
+  for (const candidate of candidates) {
+    const identity = releaseIdentity(candidate);
+    const cover = existingCoverPath(candidate.dir);
+
+    if (identity && cover) {
+      releaseCovers.set(identity, cover);
+    }
+  }
+
+  for (const candidate of candidates) {
+    if (existingCoverPath(candidate.dir)) {
+      continue;
+    }
+
+    const identity = releaseIdentity(candidate);
+    const releaseCover = identity ? releaseCovers.get(identity) : undefined;
+
+    if (releaseCover) {
+      try {
+        writeCoverAtomically(
+          candidate.dir,
+          toUint8Array(jpegData(toUint8Array(fs.readFileSync(releaseCover)))),
+        );
+        updated.add(candidate.dir);
+
+        continue;
+      } catch (error) {
+        log.warn(
+          `[songCover] shared release cover failed for "${candidate.title}":`,
+          error,
+        );
+      }
+    }
+
+    try {
+      const source = await ingestSongCover(candidate.dir, undefined, {
+        artist: candidate.artist,
+        title: candidate.title,
+      });
+
+      if (source !== 'none') {
+        updated.add(candidate.dir);
+      }
+    } catch (error) {
+      log.warn(`[songCover] backfill failed for "${candidate.title}":`, error);
+    }
+  }
+
+  return updated;
 }

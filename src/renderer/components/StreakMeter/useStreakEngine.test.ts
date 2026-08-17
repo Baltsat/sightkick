@@ -1,11 +1,32 @@
 import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Engine } from '../../services/engine';
 import { ResolvedJudgement } from '../../services/engine/types';
-import { STREAK_STAGES } from '../../services/streak';
-import { INITIAL_STREAK_UI_STATE, useStreakEngine } from './useStreakEngine';
+import {
+  STREAK_STAGES,
+  StreakQualificationContext,
+} from '../../services/streak';
+import {
+  INITIAL_STREAK_UI_STATE,
+  STREAK_CELEBRATION_DURATION_MS,
+  useStreakEngine,
+} from './useStreakEngine';
 
 type Listener = (...args: never[]) => void;
+
+const targetSixteenthQualification: StreakQualificationContext = {
+  resolution: 4,
+  measures: [
+    {
+      notes: Array.from({ length: 1_000 }, (_, tick) => ({
+        tick,
+        isRest: false,
+      })),
+    },
+  ] as never,
+  playbackSpeed: 0.8,
+  timingStandard: 'target',
+};
 
 /**
  * A minimal stand-in for Engine exposing only the subscription methods
@@ -85,9 +106,13 @@ describe('useStreakEngine', () => {
     expect(result.current.streak.count).toBe(1);
   });
 
-  it('announces a stage-up exactly on the hit that crosses a threshold', () => {
+  it('appears on a qualified threshold, then clears itself', () => {
+    vi.useFakeTimers();
+
     const { engine, emitHit } = fakeEngine();
-    const { result } = renderHook(() => useStreakEngine(engine));
+    const { result } = renderHook(() =>
+      useStreakEngine(engine, targetSixteenthQualification),
+    );
     const firstThreshold = STREAK_STAGES[0].threshold;
 
     act(() => {
@@ -100,10 +125,33 @@ describe('useStreakEngine', () => {
     expect(result.current.announceStage?.id).toBe(STREAK_STAGES[0].id);
     expect(result.current.announceSeq).toBe(1);
 
-    act(() => emitHit({ measureIdx: 0, noteIdx: firstThreshold }));
+    act(() => vi.advanceTimersByTime(STREAK_CELEBRATION_DURATION_MS - 1));
+    expect(result.current.announceStage?.id).toBe(STREAK_STAGES[0].id);
 
-    // Still within the same stage - no second announce.
+    act(() => vi.advanceTimersByTime(1));
+    expect(result.current.announceStage).toBeUndefined();
+
+    vi.useRealTimers();
+  });
+
+  it('does not replay a second threshold celebration inside the cooldown', () => {
+    vi.useFakeTimers();
+
+    const { engine, emitHit } = fakeEngine();
+    const { result } = renderHook(() =>
+      useStreakEngine(engine, targetSixteenthQualification),
+    );
+    const secondThreshold = STREAK_STAGES[1].threshold;
+
+    act(() => {
+      for (let i = 0; i < secondThreshold; i += 1) {
+        emitHit({ measureIdx: 0, noteIdx: i });
+      }
+    });
+
     expect(result.current.announceSeq).toBe(1);
+
+    vi.useRealTimers();
   });
 
   it('shatters (resets, bumps shatterSeq) on a miss after a running streak', () => {

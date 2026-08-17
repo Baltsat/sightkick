@@ -16,6 +16,7 @@ import type {
   FocusSectionInsight,
   LessonRecommendationInsight,
 } from '../../services/run-insights';
+import type { FragmentLoopProposal } from '../../services/pattern-model';
 
 const songData = {
   name: 'Master of Puppets',
@@ -537,6 +538,9 @@ describe('ScoreSummary', () => {
       scoreData: undefined,
       practiceSummary: summary,
     });
+
+    fireEvent.click(modal.getByText('Skills and detail'));
+
     const skills = modal.getByTestId('run-skill-movements');
 
     expect(skills).toHaveTextContent(
@@ -547,7 +551,7 @@ describe('ScoreSummary', () => {
     );
   });
 
-  it('renders typed sibling insights when supplied and omits their sections when absent', () => {
+  it('opens the named lesson in one press and keeps detail collapsed', () => {
     const focusSection: FocusSectionInsight = {
       label: 'Bars 17–20',
       barStart: 17,
@@ -563,21 +567,28 @@ describe('ScoreSummary', () => {
         family: 'coordination',
       },
     ];
+    const onOpenLesson = vi.fn();
     const withSiblingData = renderSummary({
       scoreData: undefined,
       practiceSummary: multiLaneRunFixture(),
       focusSection,
       lessonRecommendations,
+      onOpenLesson,
     });
+
+    expect(
+      withSiblingData.modal.getByTestId('run-details'),
+    ).not.toHaveAttribute('open');
 
     expect(
       withSiblingData.modal.getByTestId('run-focus-section'),
     ).toHaveTextContent(
       'Bars 17–20 · new patternReplay at 60% · Land 3 clean passes at 82%+.',
     );
-    expect(
-      withSiblingData.modal.getByTestId('run-lesson-recommendations'),
-    ).toHaveTextContent('Rock three-way builder · coordination');
+    fireEvent.click(
+      withSiblingData.modal.getByTestId('lesson-recommendation-action'),
+    );
+    expect(onOpenLesson).toHaveBeenCalledWith('04.02');
 
     withSiblingData.unmount();
 
@@ -592,6 +603,56 @@ describe('ScoreSummary', () => {
     expect(
       withoutSiblingData.queryByTestId('run-lesson-recommendations'),
     ).not.toBeInTheDocument();
+  });
+
+  it('starts the named ranked fragment loop in one press', () => {
+    const onFragmentLoop = vi.fn();
+    const fragmentLoop = {
+      fragment: {
+        fragment_id: 'song:master:bar:17',
+        kind: 'bar',
+        measure_count: 1,
+        label: '1-bar figure',
+        members: [],
+        occurrence_count: 18,
+        note_count: 92,
+        song_note_share: 0.24,
+        skill_weights: [],
+      },
+      bar_start: 17,
+      bar_end: 17,
+      opening_speed: 0.6,
+      opening_window_ms: 60,
+      opening_window_standard: 'target',
+      reason: 'This figure covers 24% of the song and measured 46% missed.',
+      practice_value: {
+        fragment: {
+          fragment_id: 'song:master:bar:17',
+          kind: 'bar',
+          measure_count: 1,
+          label: '1-bar figure',
+          members: [],
+          occurrence_count: 18,
+          note_count: 92,
+          song_note_share: 0.24,
+          skill_weights: [],
+        },
+        difficulty: { state: 'measured', expected_notes: 24, score: 0.4 },
+        skill_weakness: 0.4,
+        skill_evidence_state: 'measured',
+        score: 0.2,
+      },
+    } satisfies FragmentLoopProposal;
+    const { modal } = renderSummary({
+      scoreData: undefined,
+      practiceSummary: multiLaneRunFixture(),
+      fragmentLoops: [fragmentLoop],
+      onFragmentLoop,
+    });
+
+    fireEvent.click(modal.getByTestId('fragment-loop-action'));
+
+    expect(onFragmentLoop).toHaveBeenCalledWith(fragmentLoop);
   });
 
   it('omits the run-mode label for a Practice run at the default 1x speed', () => {

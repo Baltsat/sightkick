@@ -1,5 +1,16 @@
-import { act, render, renderHook, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+} from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  InteractionModeArbiter,
+  InteractionModeProvider,
+  INTERACTION_MODE_IDLE_MS,
+} from '../../services/interaction-mode';
 import {
   InactivityPauseVeil,
   useInactivityPauseVeil,
@@ -41,5 +52,28 @@ describe('useInactivityPauseVeil', () => {
     expect(
       screen.queryByTestId('inactivity-pause-veil'),
     ).not.toBeInTheDocument();
+  });
+
+  it('steps out of the way during computer input', () => {
+    vi.useFakeTimers();
+
+    const arbiter = new InteractionModeArbiter({
+      subscribeToDrumStrikes: () => () => {},
+    });
+
+    render(
+      <InteractionModeProvider arbiter={arbiter}>
+        <InactivityPauseVeil visible checkpointMeasure={12} />
+      </InteractionModeProvider>,
+    );
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByTestId('inactivity-pause-veil')).toHaveAttribute(
+      'data-yielding',
+      'true',
+    );
+
+    act(() => vi.advanceTimersByTime(INTERACTION_MODE_IDLE_MS));
+    expect(screen.getByTestId('inactivity-pause-veil')).toBeInTheDocument();
   });
 });

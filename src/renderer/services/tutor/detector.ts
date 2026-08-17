@@ -188,6 +188,15 @@ function summarizeOutcomes(
       : [],
   );
   const timingSpreadMs = standardDeviation(timingDeltas);
+  const timingBiasMs =
+    timingDeltas.length > 0
+      ? timingDeltas.reduce((sum, deltaMs) => sum + deltaMs, 0) /
+        timingDeltas.length
+      : 0;
+  const timingMaxAbsMs = Math.max(
+    0,
+    ...timingDeltas.map((deltaMs) => Math.abs(deltaMs)),
+  );
   const timingOutlierCount = timingDeltas.filter(
     // A single outlying hit can raise a standard deviation substantially.
     // Count only values at least one spread away from zero so it cannot alone
@@ -207,7 +216,9 @@ function summarizeOutcomes(
     wrong: wrongs.length,
     distinctErrorIds: [...misses, ...wrongs].map((judgement) => judgement.id),
     timingSampleCount: timingDeltas.length,
+    timingBiasMs,
     timingSpreadMs,
+    timingMaxAbsMs,
     timingOutlierCount,
     wrongPadPairs: wrongPadPairs(chart, misses, wrongs),
     accuracy: resolved === 0 ? 0 : hits / resolved,
@@ -334,6 +345,16 @@ export function detectTutorTrigger(
     };
   }
 
+  const errorDensity = (stats.misses + stats.wrong) / stats.resolved;
+
+  if (
+    settings.triggerErrorDensity !== undefined &&
+    errorDensity >= settings.triggerErrorDensity &&
+    stats.distinctErrorIds.length >= settings.minimumDistinctErrors
+  ) {
+    return { id, reason: 'sustained-error-density', stats };
+  }
+
   if (
     stats.accuracy < settings.triggerAccuracy &&
     stats.distinctErrorIds.length >= settings.minimumDistinctErrors
@@ -373,17 +394,29 @@ export function detectTutorTrigger(
 export function isCleanRecovery(
   stats: TutorWindowStats,
   settings: TutorSettings,
+  timing?: { windowMs: number; gapMs: number },
 ) {
   const minimumResolvedEvents = Math.min(
     settings.cleanMinimumResolvedEvents,
     Math.max(1, stats.expected),
   );
+  const honestTiming =
+    timing === undefined ||
+    (Number.isFinite(timing.windowMs) &&
+      Number.isFinite(timing.gapMs) &&
+      timing.windowMs > 0 &&
+      timing.gapMs > 0 &&
+      timing.windowMs <= timing.gapMs / 2 &&
+      (stats.timingMaxAbsMs ?? 0) <= timing.gapMs / 2 &&
+      (stats.timingSampleCount < 2 ||
+        stats.timingSpreadMs <= timing.gapMs / 4));
 
   return (
     stats.resolved >= minimumResolvedEvents &&
     stats.accuracy >= settings.cleanMinimumAccuracy &&
     stats.misses <= settings.cleanMaximumMisses &&
-    stats.wrong <= settings.cleanMaximumWrongHits
+    stats.wrong <= settings.cleanMaximumWrongHits &&
+    honestTiming
   );
 }
 

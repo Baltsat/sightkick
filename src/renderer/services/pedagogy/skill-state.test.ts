@@ -7,6 +7,15 @@ import {
 } from './index';
 import type { ItemSkillManifest, SkillEvidenceEvent } from './types';
 
+function records(deltaMs = 0) {
+  return Array.from({ length: 12 }, (_, index) => ({
+    tick: index * 120,
+    deltaMs,
+    element: 'snare' as const,
+    verdict: 'hit' as const,
+  }));
+}
+
 const manifest = (
   context_signature = 'meter=4/4;phrase=groove',
 ): ItemSkillManifest => ({
@@ -80,6 +89,42 @@ function evidence(
 }
 
 describe('atomic skill-state replay', () => {
+  it('records steadiness independently of note accuracy when raw offsets are available', () => {
+    const context = 'meter=4/4;subdivision=sixteenth';
+    const item = {
+      ...manifest(context),
+      demands: [
+        {
+          skill_id: 'pulse.sixteenth',
+          weight: 0.5,
+          target_bpm: 80,
+          context,
+        },
+        {
+          skill_id: 'timing.steadiness.sixteenth',
+          weight: 0.5,
+          target_bpm: 80,
+          context,
+        },
+      ],
+    };
+    const derived = deriveAtomicSkillEvidence({
+      run_id: 'independent-timing',
+      summary: run('2026-08-01T10:00:00.000Z', { overallAccuracy: 0 }),
+      manifest: item,
+      records: records(),
+    });
+    const timing = derived.events.find(
+      ({ skill_id }) => skill_id === 'timing.steadiness.sixteenth',
+    );
+
+    expect(timing?.quality).toBe(1);
+    expect(
+      derived.events.find(({ skill_id }) => skill_id === 'pulse.sixteenth')
+        ?.quality,
+    ).toBeLessThan(1);
+  });
+
   it('replays a fixed recorded-evidence fixture identically', () => {
     const first = evidence('run:1', '2026-08-01T10:00:00.000Z');
     const second = evidence('run:2', '2026-08-01T11:00:00.000Z', first.events);

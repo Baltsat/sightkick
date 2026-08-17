@@ -142,6 +142,7 @@ export interface SongViewOptions {
 export interface SongViewHarness {
   ipc: IpcMock;
   audio: FakeAudioContext;
+  emit(channel: string, ...args: unknown[]): void;
   loadSong(song?: Song, chartText?: string): Promise<void>;
   clickPlay(): void;
   navigate(path: string): void;
@@ -270,6 +271,12 @@ export function setupSongView({
     audio,
     unmount,
 
+    emit(channel: string, ...args: unknown[]) {
+      act(() => {
+        ipc.emit(channel, ...args);
+      });
+    },
+
     async loadSong(song = makeSong(), chartText = DRUM_CHART) {
       const response: IpcLoadSongResponse = {
         data: song,
@@ -309,20 +316,34 @@ export function setupSongView({
     },
 
     clickTestId(testId: string) {
+      // The result screen shows kit command chips when hands-free controls
+      // are on and plain buttons when they are off. Prefer whatever is
+      // actually mounted so a test does not have to know which it got.
+      const legacyAlias: Record<string, string> = {
+        'score-command-retry': 'score-retry',
+        'score-command-continue': 'score-next',
+        'score-retry': 'score-command-retry',
+        'score-next': 'score-command-continue',
+      };
+      const resolvedTestId =
+        screen.queryByTestId(testId) || !legacyAlias[testId]
+          ? testId
+          : legacyAlias[testId];
+
       if (
-        !screen.queryByTestId(testId) &&
+        !screen.queryByTestId(resolvedTestId) &&
         [
           'loop-toggle',
           'notation-flow-toggle',
           'notation-classic-toggle',
           'ai-coach-button',
           'practice-stats-button',
-        ].includes(testId)
+        ].includes(resolvedTestId)
       ) {
         fireEvent.click(screen.getByTestId('settings-trigger'));
       }
 
-      fireEvent.click(screen.getByTestId(testId));
+      fireEvent.click(screen.getByTestId(resolvedTestId));
     },
 
     clickTrackMuteToggle() {

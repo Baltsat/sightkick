@@ -85,6 +85,10 @@ function judgementTick(judgement: ResolvedJudgement): number | undefined {
     : judgement.expectedTick ?? judgement.actualTick;
 }
 
+function failureTick(judgement: ResolvedJudgement): number | undefined {
+  return judgement.expectedTick ?? judgement.actualTick;
+}
+
 function snapshotTickJudgements(
   source: TutorState['judgementsByMeasure'],
   startMeasure: number,
@@ -287,7 +291,7 @@ function beginRecovery(
   const hardTicks = triggerJudgements
     .filter(({ verdict }) => verdict === 'miss' || verdict === 'wrong')
     .flatMap((judgement) => {
-      const tick = judgementTick(judgement);
+      const tick = failureTick(judgement);
 
       return tick === undefined ? [] : [tick];
     });
@@ -297,8 +301,10 @@ function beginRecovery(
   const chunkGrowth =
     chunkPlan && chunkPlan.windows.length > 0
       ? createTutorChunkGrowthState(chunkPlan, {
-          requiredQualifyingPasses:
+          requiredQualifyingPasses: Math.max(
+            2,
             observedState.settings.requiredCleanRepetitions,
+          ),
           maximumAttemptsPerWindow:
             observedState.settings.maximumChunkAttemptsPerWindow,
           regressionFailureThreshold:
@@ -369,6 +375,7 @@ function beginRecovery(
 function finishChunkGrowthAttempt(
   state: TutorState,
   chart: TutorChartPlan,
+  timing?: { windowMs: number; gapMs: number },
 ): TutorTransition {
   const recovery = state.recovery;
   const growth = recovery?.chunkGrowth;
@@ -383,7 +390,7 @@ function finishChunkGrowthAttempt(
     state.judgementsByMeasure,
     window,
   );
-  const clean = isCleanRecovery(stats, state.settings);
+  const clean = isCleanRecovery(stats, state.settings, timing);
   const qualityScore = recoveryQualityScore(stats, state.settings);
   const minimumResolved = Math.min(
     state.settings.cleanMinimumResolvedEvents,
@@ -421,10 +428,59 @@ function finishChunkGrowthAttempt(
     chunkWindowIndex: growth.activeWindowIndex,
     chunkWindowCount: growth.plan.windows.length,
     chunkLabel: window.label,
+    ...(recovery.tempoProbe ? { tempoProbe: true } : {}),
   };
   const attempts = [...state.recoveryAttempts, attempt];
   const bestQuality = Math.max(recovery.bestQuality, qualityScore);
   const fullRegion = recovery.fullRegion ?? growth.plan.phrase;
+
+  if (mastered && !recovery.tempoProbe && state.currentSpeed < 1) {
+    const fullWindow = growth.plan.windows.at(-1)!;
+    const probeSpeed = speedToTenth(Math.min(1, state.currentSpeed + 0.1));
+    const probeGrowth = createTutorChunkGrowthState(
+      { ...growth.plan, windows: [fullWindow] },
+      {
+        requiredQualifyingPasses: 1,
+        maximumAttemptsPerWindow: growth.maximumAttemptsPerWindow,
+        regressionFailureThreshold: growth.regressionFailureThreshold,
+      },
+    );
+    const probeRecovery: TutorRecovery = {
+      ...recovery,
+      region: fullWindow,
+      approach: chunkApproach(fullWindow.stage),
+      repetition: recovery.repetition + 1,
+      cleanRepetitions: 0,
+      qualityProgress: 0,
+      bestQuality,
+      chunkGrowth: probeGrowth,
+      tempoProbe: true,
+    };
+    const nextState: TutorState = {
+      ...state,
+      currentSpeed: probeSpeed,
+      recovery: probeRecovery,
+      recoveryAttempts: attempts,
+      nextSequence: state.nextSequence + 1,
+      judgementsByMeasure: clearJudgements(
+        state.judgementsByMeasure,
+        fullWindow.startMeasure,
+        fullWindow.endMeasure,
+      ),
+    };
+
+    return {
+      state: nextState,
+      commands: [
+        {
+          type: 'repeat-recovery',
+          recovery: probeRecovery,
+          speed: probeSpeed,
+          attempt,
+        },
+      ],
+    };
+  }
 
   if (mastered || deferred) {
     const qualityProgress = mastered
@@ -763,7 +819,7 @@ export function transitionTutor(
 
   if (event.type === 'recovery-pass-complete') {
     return state.phase === 'recovering' && state.recovery?.chunkGrowth
-      ? finishChunkGrowthAttempt(state, chart)
+      ? finishChunkGrowthAttempt(state, chart, event.timing)
       : { state, commands: [] };
   }
 

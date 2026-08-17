@@ -46,6 +46,7 @@ import {
   useLessonAutoRescan,
   useLessons,
 } from '../../hooks/useLessons';
+import { journey_return_target } from '../../services/lesson-progression/journey-return';
 import { calculateAccuracy, getStarRating } from '../../scoring';
 import { Stars } from '../../components/Stars';
 import { last7Dates, useGamification } from '../../hooks/useGamification';
@@ -349,6 +350,34 @@ export function SongListView() {
   // carry an Expert drum track, so filtering by difficulty here would hide
   // the whole curriculum whenever the tab isn't set to Expert.
   const lessonProgress = useLessons(songList);
+  const journeyReturn = useMemo(
+    () =>
+      journey_return_target(
+        lessonProgress.groups,
+        searchParams.get('journeyUnit') ?? undefined,
+        searchParams.get('journeyLesson') ?? undefined,
+      ),
+    [lessonProgress.groups, searchParams],
+  );
+  const journeyReturnKey = journeyReturn
+    ? `${journeyReturn.unit}:${journeyReturn.lessonId}`
+    : undefined;
+  const [appliedJourneyReturn, setAppliedJourneyReturn] = useState<string>();
+
+  // Coming back from a lesson opens the Journey once. The lessons load after
+  // the first render, so the target only appears later - but this adjusts
+  // state during render rather than in an effect, so it costs one extra pass
+  // instead of a visible flash of the wrong screen, and he can still leave
+  // the Journey afterwards.
+  if (
+    journeyReturnKey &&
+    !songOpen &&
+    appliedJourneyReturn !== journeyReturnKey
+  ) {
+    setAppliedJourneyReturn(journeyReturnKey);
+    setView('journey');
+  }
+
   const practiceCandidates = useMemo<PracticeCandidate[]>(() => {
     const lessonState = new Map(
       lessonProgress.entries.map((entry, index) => [
@@ -431,6 +460,21 @@ export function SongListView() {
       ),
     [gamification.runsBySong],
   );
+  const recentPlayedAt = useMemo(
+    () =>
+      new Map(
+        Object.entries(gamification.runsBySong ?? {}).map(([songId, runs]) => [
+          songId,
+          Math.max(
+            0,
+            ...runs
+              .map((run) => Date.parse(run.completedAt))
+              .filter(Number.isFinite),
+          ),
+        ]),
+      ),
+    [gamification.runsBySong],
+  );
   const activeGoal = useMemo<SongGoal | undefined>(
     () =>
       activeGoalRecord
@@ -455,12 +499,15 @@ export function SongListView() {
   const atomicStateReplay = useMemo(
     () =>
       replayAtomicSkillState(
-        practiceHistory.flatMap(
-          ({ summary }) => summary.atomicSkillEvidence ?? [],
-        ),
+        [
+          ...practiceHistory.flatMap(
+            ({ summary }) => summary.atomicSkillEvidence ?? [],
+          ),
+          ...Object.values(gamification.timingEvidenceBySong ?? {}).flat(),
+        ],
         { manifests: CURRICULUM_ITEM_MANIFESTS },
       ),
-    [practiceHistory],
+    [gamification.timingEvidenceBySong, practiceHistory],
   );
   const atomicStates = atomicStateReplay.states;
   const atomicReviews = useMemo(
@@ -819,8 +866,16 @@ export function SongListView() {
         entries: browsableEntries,
         inZoneSongIds,
         favouriteSongIds,
+        sourceSeededSongIds: yandexTasteSeededSongIds,
+        recentPlayedAt,
       }),
-    [browsableEntries, favouriteSongIds, inZoneSongIds],
+    [
+      browsableEntries,
+      favouriteSongIds,
+      inZoneSongIds,
+      recentPlayedAt,
+      yandexTasteSeededSongIds,
+    ],
   );
   const isBrowsingLibrary =
     showEntireLibrary ||
@@ -1513,6 +1568,8 @@ export function SongListView() {
             scanPercent={scanPercent}
             onRescan={rescanLibrary}
             onBack={() => setView('home')}
+            initialUnit={journeyReturn?.unit}
+            initialFocusedLessonId={journeyReturn?.lessonId}
             kitConnected={kitConnected}
           />
         )}
@@ -1779,7 +1836,12 @@ export function SongListView() {
                 <ActionableSongShelves
                   shelves={actionableLibrary.shelves}
                   sourceSeededSongIds={yandexTasteSeededSongIds}
-                  restCount={actionableLibrary.rest.length}
+                  allEntries={actionableLibrary.scrollingEntries}
+                  restCount={
+                    actionableLibrary.rest.filter(
+                      (entry) => entry.kind !== 'song',
+                    ).length
+                  }
                   difficulty={difficulty}
                   splittingIds={splittingIds}
                   onPlaySong={play}

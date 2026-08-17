@@ -785,6 +785,10 @@ export class ChartParser {
 
   endOfTrackTicks: number;
 
+  readonly resolution: number;
+
+  readonly tempos: ParsedChart['tempos'];
+
   private ppq: number;
 
   private meters: Meter[] = [];
@@ -805,6 +809,8 @@ export class ChartParser {
     }
 
     this.ppq = chart.resolution;
+    this.resolution = chart.resolution;
+    this.tempos = chart.tempos;
 
     const allTicks = drumTrack.noteEventGroups.flat().map((e) => e.tick);
 

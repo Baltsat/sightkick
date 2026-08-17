@@ -34,10 +34,15 @@ export const MAX_STORED_RUNS_PER_SONG = MAX_RECENT_PRACTICE_SUMMARIES_PER_SONG;
 export const MAX_STORED_FULL_RUNS_PER_SONG =
   MAX_RECENT_FULL_PRACTICE_RUNS_PER_SONG;
 
+export const MAX_STORED_PARTIAL_RUNS_PER_SONG =
+  MAX_RECENT_FULL_PRACTICE_RUNS_PER_SONG;
+
 const storeKey = (songId: string) => `practiceRuns.${songId}`;
 const detailsStoreKey = (songId: string) => `practiceRunDetails.${songId}`;
 const PRACTICE_RUNS_STORE_KEY = 'practiceRuns';
 const PRACTICE_RUN_DETAILS_STORE_KEY = 'practiceRunDetails';
+
+export const PRACTICE_PARTIAL_RUNS_STORE_KEY = 'practicePartialRuns';
 
 /**
  * In-progress evidence lives in a deliberately separate namespace. It must
@@ -118,6 +123,7 @@ export interface IpcPracticeRunsResponse {
   songId: string;
   runs: RunSummary[];
   fullRuns: StoredPracticeRun[];
+  partialRuns: StoredPracticeRun[];
   /** Compact evidence for detailed summaries evicted by the retention cap. */
   archive: PracticeRunArchive;
   /**
@@ -137,6 +143,8 @@ export interface IpcPracticeStatsError {
 type PracticeRunsStore = Record<string, RunSummary[]>;
 
 type PracticeRunDetailsStore = Record<string, StoredPracticeRun[]>;
+
+type PracticePartialRunsStore = Record<string, StoredPracticeRun[]>;
 
 type PracticeRunArchiveStore = Record<string, PracticeRunArchive>;
 
@@ -239,6 +247,35 @@ function isMidiInputTelemetry(value: unknown): value is MidiInputTelemetry {
   );
 }
 
+function readAttemptScope(
+  value: unknown,
+): PracticeAttemptCheckpoint['scope'] | undefined {
+  if (!isObject(value)) {
+    return undefined;
+  }
+
+  if (
+    (value.scope !== 'full-chart' && value.scope !== 'loop-range') ||
+    !isOptionalFiniteNumber(value.rangeStartTick) ||
+    !isOptionalFiniteNumber(value.rangeEndTick)
+  ) {
+    return undefined;
+  }
+
+  const rangeStartTick = isFiniteNumber(value.rangeStartTick)
+    ? value.rangeStartTick
+    : undefined;
+  const rangeEndTick = isFiniteNumber(value.rangeEndTick)
+    ? value.rangeEndTick
+    : undefined;
+
+  return {
+    scope: value.scope,
+    ...(rangeStartTick === undefined ? {} : { rangeStartTick }),
+    ...(rangeEndTick === undefined ? {} : { rangeEndTick }),
+  };
+}
+
 function isSkillEvidenceEvent(value: unknown): value is SkillEvidenceEvent {
   if (!isObject(value)) {
     return false;
@@ -332,6 +369,10 @@ function assertValidCheckpointPayload(
   ) {
     throw new Error('checkpoint MIDI telemetry is invalid');
   }
+
+  if (checkpoint.scope !== undefined && !readAttemptScope(checkpoint.scope)) {
+    throw new Error('checkpoint scope is invalid');
+  }
 }
 
 /**
@@ -356,6 +397,7 @@ export function readPracticeAttemptCheckpoints(
       const midiTelemetry = isMidiInputTelemetry(value.midiTelemetry)
         ? value.midiTelemetry
         : undefined;
+      const scope = readAttemptScope(value.scope);
 
       if (
         value.state !== 'in-progress' ||
@@ -397,6 +439,7 @@ export function readPracticeAttemptCheckpoints(
           records: value.records
             .filter(isStoredHitRecord)
             .slice(-MAX_PRACTICE_ATTEMPT_RECORDS),
+          ...(scope ? { scope } : {}),
           ...(midiTelemetry ? { midiTelemetry } : {}),
         },
       ];
@@ -591,6 +634,64 @@ function mergeOrphanedCheckpointEvidence(
   };
 }
 
+function partialRunFromCheckpoint(
+  checkpoint: PracticeAttemptCheckpoint,
+): StoredPracticeRun {
+  const records = checkpoint.records.map((record) => ({
+    ...record,
+    timeSeconds: 0,
+  }));
+
+  return {
+    summary: {
+      ...summarizeRun(records, checkpoint.updatedAt),
+      mode: checkpoint.mode,
+      difficulty: checkpoint.difficulty,
+      playbackSpeed: checkpoint.playbackSpeed,
+      context: {
+        sessionId: checkpoint.sessionId,
+        schemaVersion: 1,
+        appVersion: 'checkpoint',
+        scoringPolicyVersion: 'checkpoint',
+        startedAt: checkpoint.startedAt,
+        chartRevision: checkpoint.chartRevision,
+        inputLatencyMs: 0,
+        inputMapping: {},
+      },
+      attemptOutcome: {
+        completion: 'partial',
+        termination: 'in-progress',
+        scope: checkpoint.scope?.scope ?? 'full-chart',
+        ...(checkpoint.scope?.rangeStartTick === undefined
+          ? {}
+          : { rangeStartTick: checkpoint.scope.rangeStartTick }),
+        ...(checkpoint.scope?.rangeEndTick === undefined
+          ? {}
+          : { rangeEndTick: checkpoint.scope.rangeEndTick }),
+      },
+    },
+    records: checkpoint.records,
+  };
+}
+
+function isPartialSummary(summary: RunSummary): boolean {
+  return summary.attemptOutcome?.completion === 'partial';
+}
+
+function replacePartialRun(
+  existing: StoredPracticeRun[],
+  run: StoredPracticeRun,
+): StoredPracticeRun[] {
+  const sessionId = run.summary.context?.sessionId;
+
+  return [
+    ...existing.filter(
+      (candidate) => candidate.summary.context?.sessionId !== sessionId,
+    ),
+    run,
+  ].slice(-MAX_STORED_PARTIAL_RUNS_PER_SONG);
+}
+
 /**
  * Appends one run summary to the song's detailed history. The latest
  * `MAX_STORED_RUNS_PER_SONG` summaries remain individually inspectable;
@@ -632,6 +733,10 @@ export function savePracticeRun(
       (appState.store.get(PRACTICE_RUN_DETAILS_STORE_KEY) as
         | PracticeRunDetailsStore
         | undefined) ?? {};
+    const practicePartialRuns =
+      (appState.store.get(PRACTICE_PARTIAL_RUNS_STORE_KEY) as
+        | PracticePartialRunsStore
+        | undefined) ?? {};
     const practiceAttemptCheckpoints =
       finalizedSessionIds.size > 0
         ? (appState.store.get(PRACTICE_ATTEMPT_CHECKPOINTS_STORE_KEY) as
@@ -662,7 +767,8 @@ export function savePracticeRun(
       orphanedRecords,
     );
     const existing = practiceRuns[songId] ?? [];
-    const allRuns = [...existing, summary];
+    const partialSummary = isPartialSummary(summary);
+    const allRuns = partialSummary ? existing : [...existing, summary];
     const firstRetainedIndex = Math.max(
       0,
       allRuns.length - MAX_STORED_RUNS_PER_SONG,
@@ -689,12 +795,21 @@ export function savePracticeRun(
     ].slice(-MAX_ARCHIVED_SKILL_EVIDENCE_EVENTS_PER_SONG);
     const existingFullRuns = practiceRunDetails[songId] ?? [];
     const fullRuns =
-      records !== undefined
+      records !== undefined && !partialSummary
         ? [
             ...existingFullRuns,
             { summary, records: records.map(compactRecord) },
           ].slice(-MAX_STORED_FULL_RUNS_PER_SONG)
         : existingFullRuns;
+    const partialRuns = partialSummary
+      ? replacePartialRun(practicePartialRuns[songId] ?? [], {
+          summary,
+          records: (records ?? []).map(compactRecord),
+        })
+      : (practicePartialRuns[songId] ?? []).filter(
+          (run) =>
+            !finalizedSessionIds.has(run.summary.context?.sessionId ?? ''),
+        );
     const finalizedCheckpoints =
       finalizedSessionIds.size > 0
         ? checkpointsForSong.filter(
@@ -714,9 +829,13 @@ export function savePracticeRun(
           ? { ...practiceRunArchive, [songId]: archive }
           : practiceRunArchive,
       [PRACTICE_RUN_DETAILS_STORE_KEY]:
-        records !== undefined
+        records !== undefined && !partialSummary
           ? { ...practiceRunDetails, [songId]: fullRuns }
           : practiceRunDetails,
+      [PRACTICE_PARTIAL_RUNS_STORE_KEY]: {
+        ...practicePartialRuns,
+        [songId]: partialRuns,
+      },
       [PRACTICE_RUN_SKILL_EVIDENCE_ARCHIVE_STORE_KEY]:
         evictedSkillEvidence.length > 0
           ? {
@@ -765,6 +884,10 @@ export function savePracticeAttemptCheckpoint(
       (appState.store.get(PRACTICE_ATTEMPT_CHECKPOINTS_STORE_KEY) as
         | PracticeAttemptCheckpointsStore
         | undefined) ?? {};
+    const partialRunsBySong =
+      (appState.store.get(PRACTICE_PARTIAL_RUNS_STORE_KEY) as
+        | PracticePartialRunsStore
+        | undefined) ?? {};
     const existing = readPracticeAttemptCheckpoints(
       checkpointsBySong[checkpoint.songId],
     );
@@ -783,6 +906,7 @@ export function savePracticeAttemptCheckpoint(
       records: checkpoint.records
         .map(compactRecord)
         .slice(-MAX_PRACTICE_ATTEMPT_RECORDS),
+      ...(checkpoint.scope ? { scope: checkpoint.scope } : {}),
       ...(checkpoint.midiTelemetry
         ? { midiTelemetry: checkpoint.midiTelemetry }
         : {}),
@@ -795,6 +919,10 @@ export function savePracticeAttemptCheckpoint(
     ]
       .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
       .slice(-MAX_PRACTICE_ATTEMPT_CHECKPOINTS_PER_SONG);
+    const partialRuns = replacePartialRun(
+      partialRunsBySong[normalized.songId] ?? [],
+      partialRunFromCheckpoint(normalized),
+    );
 
     // One object-form store write leaves either the prior valid draft or the
     // full replacement on disk; it never creates a completed run as a
@@ -803,6 +931,10 @@ export function savePracticeAttemptCheckpoint(
       [PRACTICE_ATTEMPT_CHECKPOINTS_STORE_KEY]: {
         ...checkpointsBySong,
         [normalized.songId]: checkpoints,
+      },
+      [PRACTICE_PARTIAL_RUNS_STORE_KEY]: {
+        ...partialRunsBySong,
+        [normalized.songId]: partialRuns,
       },
     });
 
@@ -870,14 +1002,38 @@ export function finalizePracticeAttemptCheckpoint(
       (appState.store.get(PRACTICE_ATTEMPT_CHECKPOINTS_STORE_KEY) as
         | PracticeAttemptCheckpointsStore
         | undefined) ?? {};
+    const partialRunsBySong =
+      (appState.store.get(PRACTICE_PARTIAL_RUNS_STORE_KEY) as
+        | PracticePartialRunsStore
+        | undefined) ?? {};
     const checkpoints = readPracticeAttemptCheckpoints(
       checkpointsBySong[songId],
     ).filter((checkpoint) => checkpoint.sessionId !== sessionId);
+    const partialRuns = (partialRunsBySong[songId] ?? []).map((run) =>
+      run.summary.context?.sessionId === sessionId
+        ? {
+            ...run,
+            summary: {
+              ...run.summary,
+              attemptOutcome: {
+                ...run.summary.attemptOutcome,
+                completion: 'partial' as const,
+                termination: 'natural-end' as const,
+                scope: run.summary.attemptOutcome?.scope ?? 'full-chart',
+              },
+            },
+          }
+        : run,
+    );
 
     appState.store.set({
       [PRACTICE_ATTEMPT_CHECKPOINTS_STORE_KEY]: {
         ...checkpointsBySong,
         [songId]: checkpoints,
+      },
+      [PRACTICE_PARTIAL_RUNS_STORE_KEY]: {
+        ...partialRunsBySong,
+        [songId]: partialRuns,
       },
     });
 
@@ -908,6 +1064,10 @@ export function loadPracticeRuns(event: IpcMainEvent, songId: string): void {
       (appState.store.get(detailsStoreKey(songId)) as
         | StoredPracticeRun[]
         | undefined) ?? [];
+    const partialRuns =
+      (appState.store.get(`${PRACTICE_PARTIAL_RUNS_STORE_KEY}.${songId}`) as
+        | StoredPracticeRun[]
+        | undefined) ?? [];
     const archive = readPracticeRunArchive(
       appState.store.get(archiveStoreKey(songId)),
     );
@@ -919,6 +1079,7 @@ export function loadPracticeRuns(event: IpcMainEvent, songId: string): void {
       songId,
       runs,
       fullRuns,
+      partialRuns,
       archive,
       atomicSkillEvidenceArchive,
     } satisfies IpcPracticeRunsResponse);

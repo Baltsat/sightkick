@@ -754,6 +754,36 @@ describe('Judge', () => {
     expect(engine.falseHitCount).toBe(1);
   });
 
+  it('ignores hi-hat pedal false hits before they can affect score or coach evidence', () => {
+    const onFalseHit = vi.fn();
+    const onJudgement = vi.fn<ResolvedJudgementHandler>();
+    const { engine } = setup(
+      {
+        measures: [
+          measure([note(['c/5'], 5000)], { startTick: 0, endTick: 10000 }),
+        ],
+        mapping: { hihat: ['midi:42', 'midi:44'] },
+      },
+      { tick: 480 },
+    );
+
+    engine.onFalseHit(onFalseHit);
+    engine.onJudgement(onJudgement);
+    engine.handleInput(hit('midi:44'));
+
+    expect(engine.falseHitCount).toBe(0);
+    expect(onFalseHit).not.toHaveBeenCalled();
+    expect(onJudgement).not.toHaveBeenCalled();
+
+    engine.handleInput(hit('midi:42'));
+
+    expect(engine.falseHitCount).toBe(1);
+    expect(onFalseHit).toHaveBeenCalledOnce();
+    expect(onJudgement).toHaveBeenCalledWith(
+      expect.objectContaining({ verdict: 'wrong', actualElement: 'hihat' }),
+    );
+  });
+
   it('does not count or show a false hit past the last measure', () => {
     const onFalseHit = vi.fn();
     const { engine } = setup(

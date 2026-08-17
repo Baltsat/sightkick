@@ -45,6 +45,34 @@ export const ATOMIC_SKILL_GRAPH: readonly SkillNode[] = [
   node('pulse.shuffle', 'Shuffle pulse', 'pulse and meter', 'midi', [
     hard('pulse.eighth'),
   ]),
+  node(
+    'timing.steadiness.quarter',
+    'Quarter-note steadiness',
+    'rhythmic steadiness',
+    'midi',
+    [hard('pulse.quarter')],
+  ),
+  node(
+    'timing.steadiness.eighth',
+    'Eighth-note steadiness',
+    'rhythmic steadiness',
+    'midi',
+    [hard('timing.steadiness.quarter'), hard('pulse.eighth')],
+  ),
+  node(
+    'timing.steadiness.sixteenth',
+    'Sixteenth-note steadiness',
+    'rhythmic steadiness',
+    'midi',
+    [hard('timing.steadiness.eighth'), hard('pulse.sixteenth')],
+  ),
+  node(
+    'timing.steadiness.triplet',
+    'Triplet steadiness',
+    'rhythmic steadiness',
+    'midi',
+    [hard('timing.steadiness.eighth'), hard('pulse.triplet')],
+  ),
   node('meter.3_4', 'Three-four meter', 'pulse and meter', 'midi', [
     hard('pulse.quarter'),
   ]),

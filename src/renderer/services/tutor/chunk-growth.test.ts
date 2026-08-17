@@ -6,7 +6,11 @@ import {
   planTutorChunkGrowth,
   recordTutorChunkAttempt,
 } from './chunk-growth';
-import type { TutorChunkGrowthPlan, TutorRecoveryRegion } from './types';
+import type {
+  TutorChartPlan,
+  TutorChunkGrowthPlan,
+  TutorRecoveryRegion,
+} from './types';
 
 function measure(index: number): Measure {
   const startTick = index * 768;
@@ -35,8 +39,82 @@ const fullPhrase: TutorRecoveryRegion = {
   startTick: 0,
   endTick: 1536,
 };
+const BOULEVARD_HARD_070X_RECORDS = [
+  { tick: 172813, verdict: 'wrong', expectedTick: 172800 },
+  { tick: 172800, verdict: 'miss' },
+  { tick: 172800, verdict: 'miss' },
+  { tick: 173056, verdict: 'wrong', expectedTick: 173040 },
+  { tick: 173084, verdict: 'wrong', expectedTick: 173040 },
+  { tick: 173127, verdict: 'wrong', expectedTick: 173040 },
+  { tick: 173040, verdict: 'miss' },
+  { tick: 173313, verdict: 'wrong', expectedTick: 173280 },
+  { tick: 173280, verdict: 'miss' },
+  { tick: 173280, verdict: 'miss' },
+  { tick: 173556, verdict: 'wrong', expectedTick: 173520 },
+  { tick: 173556, verdict: 'wrong', expectedTick: 173520 },
+  { tick: 173520, verdict: 'miss' },
+] as const;
+const BOULEVARD_HARD_PHRASE: TutorRecoveryRegion = {
+  startMeasure: 0,
+  endMeasure: 2,
+  startTick: 172032,
+  endTick: 174336,
+};
+const BOULEVARD_HARD_CHART: TutorChartPlan = {
+  measures: Array.from({ length: 3 }, (_, index) => {
+    const startTick = 172032 + index * 768;
+    const onsets = [0, 240, 480, 720].map((offset) => startTick + offset);
+
+    return {
+      index,
+      startTick,
+      endTick: startTick + 768,
+      expectedKeys: 4,
+      beatCount: 4,
+      strongOnsets: onsets,
+      noteOnsets: onsets.map((tick) => ({ tick, expectedKeys: 1 })),
+    };
+  }),
+};
 
 describe('recursive tutor chunk growth', () => {
+  it('plans the saved Boulevard hard 0.7× breakdown from its actual missed and wrong note records', () => {
+    const hardTicks = BOULEVARD_HARD_070X_RECORDS.map((record) =>
+      'expectedTick' in record ? record.expectedTick : record.tick,
+    );
+    const plan = planTutorChunkGrowth(
+      BOULEVARD_HARD_CHART,
+      BOULEVARD_HARD_PHRASE,
+      hardTicks,
+    );
+
+    expect(plan.hardTick).toBe(173040);
+    expect(plan.windows[0]).toMatchObject({
+      stage: 'seed',
+      startTick: 173040,
+      endTick: 173280,
+      expectedKeys: 1,
+    });
+    expect(plan.windows.at(-1)).toMatchObject({
+      stage: 'full',
+      startTick: 172032,
+      endTick: 174336,
+    });
+  });
+
+  it('keeps recursive control when a phrase has no authored interior boundary', () => {
+    const phrase = { ...fullPhrase, endMeasure: 0, endTick: 768 };
+    const plan = planTutorChunkGrowth({ measures: [] }, phrase, []);
+
+    expect(plan.windows).toEqual([
+      expect.objectContaining({
+        stage: 'full',
+        startTick: 0,
+        endTick: 768,
+      }),
+    ]);
+  });
+
   it('starts at the densest hard spot on a strong onset and grows nested musical windows into the full phrase', () => {
     const chart = buildTutorChartPlan([measure(0), measure(1)]);
     const plan = planTutorChunkGrowth(chart, fullPhrase, [432, 432, 528]);

@@ -32,6 +32,7 @@ import {
   createSkEventReader,
   drumrollFfmpegRuntimeCandidates,
   fetchOfficialYoutubeMetadata,
+  inferTrackIdentity,
   parseSkEventLine,
   parseWorkerLine,
   validateSightkickRuntime,
@@ -387,8 +388,17 @@ describe('auto-chart source and worker protocol', () => {
       ),
     ).resolves.toMatchObject({
       songName: 'Raging',
-      artistName: 'Kygo feat. Kodaline',
+      artistName: 'Kygo',
     });
+  });
+
+  it('removes video labels and featured-credit noise before cover lookup', () => {
+    expect(
+      inferTrackIdentity(
+        'Kygo feat. Parson James - Stole The Show | Official Video [Lyrics]',
+        'KygoOfficialVEVO',
+      ),
+    ).toEqual({ songName: 'Stole The Show', artistName: 'Kygo' });
   });
 
   it('applies official metadata to a generated chart without ini injection', async () => {

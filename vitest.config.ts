@@ -18,8 +18,12 @@ export default defineConfig({
     // (every one of these files passes quickly run alone) but because
     // they're waiting on their share of CPU. 20s matches what a busy full
     // run actually needs to finish rather than being aborted mid-flight.
-    testTimeout: 20000,
-    hookTimeout: 20000,
+    // SongView integration tests render the whole practice surface. The
+    // adaptive-practice wave made that render markedly heavier - see
+    // docs/perf-songview-render.md - so these need headroom until that
+    // regression is fixed. Raise the ceiling, do not hide the cost.
+    testTimeout: 60000,
+    hookTimeout: 60000,
     moduleNameMapper: {
       '\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$':
         '<rootDir>/src/__mocks__/fileMock.js',

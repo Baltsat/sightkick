@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import {
   NotationGlossary,
+  NotationKitKey,
   NotationKind,
+  shouldShowNotationKitKey,
   useNotationGlossaryIntent,
 } from './NotationGlossary';
 
@@ -92,4 +94,71 @@ export const DeliberateInspect: Story = {};
 
 export const VisibleTripleBeam: Story = {
   args: { pinnedKind: 'triple-beam' },
+};
+
+function KitKeyDemo({
+  interactionMode,
+  manualVisible = false,
+  presentationPhase,
+}: {
+  interactionMode: 'kit' | 'computer';
+  manualVisible?: boolean;
+  presentationPhase:
+    | 'ready'
+    | 'counting-in'
+    | 'playing'
+    | 'paused'
+    | 'inactivity-paused'
+    | 'recovery-explain'
+    | 'result';
+}) {
+  const visible = shouldShowNotationKitKey({
+    interactionMode,
+    manualVisible,
+    presentationPhase,
+  });
+
+  return (
+    <main
+      style={{
+        position: 'relative',
+        minHeight: '100vh',
+        padding: '6vh 8vw',
+        background: '#24201b',
+        color: '#fffdf8',
+        fontFamily: 'var(--font-ui)',
+      }}
+    >
+      <p>score {presentationPhase}</p>
+      <h1 style={{ fontFamily: 'var(--font-display)' }}>read the next hit</h1>
+      <p>{visible ? 'kit key visible' : 'kit key hidden'}</p>
+      {visible && <NotationKitKey layout="flow" />}
+    </main>
+  );
+}
+
+export const KitKeyPaused: StoryObj<typeof KitKeyDemo> = {
+  render: () => <KitKeyDemo interactionMode="kit" presentationPhase="paused" />,
+};
+
+export const KitKeyComputerMode: StoryObj<typeof KitKeyDemo> = {
+  render: () => (
+    <KitKeyDemo interactionMode="computer" presentationPhase="playing" />
+  ),
+};
+
+export const KitKeyPlayingHidden: StoryObj<typeof KitKeyDemo> = {
+  render: () => (
+    <KitKeyDemo interactionMode="kit" presentationPhase="playing" />
+  ),
+};
+
+export const KitKeyManualToggle: StoryObj<typeof KitKeyDemo> = {
+  render: () => (
+    <KitKeyDemo
+      interactionMode="kit"
+      manualVisible
+      presentationPhase="playing"
+    />
+  ),
 };

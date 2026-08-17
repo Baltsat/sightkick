@@ -82,6 +82,9 @@ export interface UseGamificationResult {
   atomicSkillEvidenceArchiveBySong?: Readonly<
     Record<string, readonly SkillEvidenceEvent[]>
   >;
+  timingEvidenceBySong?: Readonly<
+    Record<string, readonly SkillEvidenceEvent[]>
+  >;
   /** Bounded monthly plus all-history evidence. Archived (evicted) summaries
    * and recent verbatim summaries are each counted exactly once. */
   longitudinalProgress?: LongitudinalProgress;
@@ -106,6 +109,7 @@ interface LoadRunsReply {
   runsBySong?: Record<string, RunSummary[]>;
   archiveBySong?: PracticeRunArchiveBySong;
   atomicSkillEvidenceArchiveBySong?: Record<string, SkillEvidenceEvent[]>;
+  timingEvidenceBySong?: Record<string, SkillEvidenceEvent[]>;
 }
 
 function isErrorReply(reply: object): reply is { error: string } {
@@ -176,6 +180,8 @@ export function useGamification(
     atomicSkillEvidenceArchiveBySongCache,
     setAtomicSkillEvidenceArchiveBySongCache,
   ] = useState<Record<string, SkillEvidenceEvent[]>>();
+  const [timingEvidenceBySongCache, setTimingEvidenceBySongCache] =
+    useState<Record<string, SkillEvidenceEvent[]>>();
   const [goalOption, setGoalOption] = usePersisted<GoalOption>(
     'settings.dailyGoalOption',
     DEFAULT_GOAL_OPTION,
@@ -254,6 +260,7 @@ export function useGamification(
         setAtomicSkillEvidenceArchiveBySongCache(
           reply.atomicSkillEvidenceArchiveBySong ?? {},
         );
+        setTimingEvidenceBySongCache(reply.timingEvidenceBySong ?? {});
       }
     });
   }, []);
@@ -371,6 +378,9 @@ export function useGamification(
           const atomicSkillEvidenceArchiveBySong = isErrorReply(runsReply)
             ? undefined
             : runsReply.atomicSkillEvidenceArchiveBySong || {};
+          const timingEvidenceBySong = isErrorReply(runsReply)
+            ? undefined
+            : runsReply.timingEvidenceBySong || {};
 
           setRunsCache(runs);
           setRunsBySongCache(runsBySong);
@@ -378,6 +388,7 @@ export function useGamification(
           setAtomicSkillEvidenceArchiveBySongCache(
             atomicSkillEvidenceArchiveBySong,
           );
+          setTimingEvidenceBySongCache(timingEvidenceBySong);
 
           const achievementRuns = achievementRunsFor(runs, runsBySong);
           const results = computeAchievements({
@@ -442,6 +453,7 @@ export function useGamification(
     latestRun,
     runsBySong: runsBySongCache,
     atomicSkillEvidenceArchiveBySong: atomicSkillEvidenceArchiveBySongCache,
+    timingEvidenceBySong: timingEvidenceBySongCache,
     longitudinalProgress,
     loadAchievements,
     recordRun,

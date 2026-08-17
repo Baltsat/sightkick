@@ -1,5 +1,7 @@
 import type { RunSummary } from '../practice-stats';
+import type { StoredHitRecord } from '../practice-stats';
 import type { SkillEvidenceEvent } from '../pedagogy';
+import type { ParsedChart } from '../../../chart-parser/types';
 
 export type PatternSubdivision =
   | 'quarter'
@@ -130,4 +132,72 @@ export interface PatternPlayerProfile {
   total_family_count: number;
   evidence_event_count: number;
   computed_through?: string;
+}
+
+export type PatternFragmentKind = 'bar' | 'phrase';
+
+export interface PatternFragmentMember {
+  start_measure_index: number;
+  end_measure_index: number;
+  start_tick: number;
+  end_tick: number;
+  similarity: number;
+}
+
+export interface PatternFragment {
+  fragment_id: string;
+  kind: PatternFragmentKind;
+  measure_count: number;
+  label: string;
+  members: readonly PatternFragmentMember[];
+  occurrence_count: number;
+  note_count: number;
+  song_note_share: number;
+  skill_weights: readonly PatternSkillWeight[];
+}
+
+export interface PatternFragmentMap {
+  item_id: string;
+  total_note_count: number;
+  fragments: readonly PatternFragment[];
+}
+
+export type FragmentEvidenceState = 'measured' | 'thin-evidence';
+
+export interface FragmentDifficulty {
+  state: FragmentEvidenceState;
+  expected_notes: number;
+  miss_density?: number;
+  wrong_density?: number;
+  timing_spread_ms?: number;
+  score?: number;
+}
+
+export interface FragmentPracticeValue {
+  fragment: PatternFragment;
+  difficulty: FragmentDifficulty;
+  skill_weakness: number;
+  skill_evidence_state: 'measured' | 'unknown';
+  score?: number;
+}
+
+export interface FragmentLoopProposal {
+  fragment: PatternFragment;
+  bar_start: number;
+  bar_end: number;
+  opening_speed: number;
+  opening_window_ms: number;
+  opening_window_standard: 'target' | 'better' | 'ceiling';
+  reason: string;
+  practice_value: FragmentPracticeValue;
+}
+
+export interface RankFragmentPracticeOptions {
+  chart: ParsedChart;
+  fragments: readonly PatternFragment[];
+  records: readonly StoredHitRecord[];
+  runs?: readonly RunSummary[];
+  profile?: PatternPlayerProfile;
+  playback_speed?: number;
+  minimum_expected_notes?: number;
 }

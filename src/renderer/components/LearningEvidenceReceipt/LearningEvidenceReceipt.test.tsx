@@ -84,4 +84,19 @@ describe('LearningEvidenceReceipt', () => {
 
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('rounds a timing window to a whole visible millisecond', () => {
+    render(
+      <LearningEvidenceReceipt
+        summary={{ ...summary(), timingWindowMs: 123.4 }}
+      />,
+    );
+
+    expect(screen.getByTestId('learning-evidence-receipt')).toHaveTextContent(
+      '±123 ms',
+    );
+    expect(
+      screen.getByTestId('learning-evidence-receipt'),
+    ).not.toHaveTextContent('123.4');
+  });
 });

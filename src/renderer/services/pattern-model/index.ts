@@ -8,6 +8,8 @@ import {
 } from '../pedagogy/skill-state';
 import type { SkillEvidenceEvent } from '../pedagogy/types';
 import { lessonsForAtomicSkills } from '../coach/lessons';
+import { selectPracticeOpening } from '../opening-state';
+import type { StoredHitRecord } from '../practice-stats';
 import type {
   AtomicPatternFigure,
   DecomposePatternChartOptions,
@@ -24,6 +26,13 @@ import type {
   PatternSkillWeight,
   PatternSubdivision,
   PatternTrend,
+  PatternFragment,
+  PatternFragmentKind,
+  PatternFragmentMap,
+  FragmentDifficulty,
+  FragmentLoopProposal,
+  FragmentPracticeValue,
+  RankFragmentPracticeOptions,
 } from './types';
 
 export * from './types';
@@ -639,6 +648,374 @@ export function decompose_chart_patterns(
       .map(({ skill_id }) => skill_id)
       .sort(),
   };
+}
+
+interface FragmentCandidate {
+  kind: PatternFragmentKind;
+  figures: readonly AtomicPatternFigure[];
+}
+
+function fragmentSimilarity(
+  left: FragmentCandidate,
+  right: FragmentCandidate,
+): number {
+  if (
+    left.kind !== right.kind ||
+    left.figures.length !== right.figures.length ||
+    left.figures.some(
+      (figure, index) => figure.meter !== right.figures[index].meter,
+    )
+  ) {
+    return 0;
+  }
+
+  return round(
+    left.figures.reduce(
+      (sum, figure, index) =>
+        sum + figureSimilarity(figure, right.figures[index]),
+      0,
+    ) / left.figures.length,
+    6,
+  );
+}
+
+function clusterFragmentCandidates(
+  candidates: readonly FragmentCandidate[],
+): readonly (readonly FragmentCandidate[])[] {
+  const groups: FragmentCandidate[][] = [];
+  const threshold = (candidate: FragmentCandidate) =>
+    candidate.kind === 'bar' ? DEFAULT_SIMILARITY_THRESHOLD : 0.72;
+
+  candidates.forEach((candidate) => {
+    const group = groups.find(
+      (current) =>
+        fragmentSimilarity(candidate, current[0]) >= threshold(candidate),
+    );
+
+    if (group) {
+      group.push(candidate);
+    } else {
+      groups.push([candidate]);
+    }
+  });
+
+  return groups;
+}
+
+function fragmentNoteCount(figures: readonly AtomicPatternFigure[]): number {
+  return figures.reduce(
+    (sum, figure) =>
+      sum +
+      figure.onsets.reduce((count, onset) => count + onset.limbs.length, 0),
+    0,
+  );
+}
+
+function fragmentFromCandidates(
+  itemId: string,
+  group: readonly FragmentCandidate[],
+  totalNoteCount: number,
+  kind: PatternFragmentKind,
+): PatternFragment {
+  const exemplar = group[0];
+  const members = group
+    .map((candidate) => ({
+      start_measure_index: candidate.figures[0].measure_index,
+      end_measure_index: candidate.figures.at(-1)!.measure_index,
+      start_tick: 0,
+      end_tick: 0,
+      similarity: fragmentSimilarity(exemplar, candidate),
+    }))
+    .sort(
+      (left, right) =>
+        left.start_measure_index - right.start_measure_index ||
+        left.end_measure_index - right.end_measure_index,
+    );
+  const noteCount = group.reduce(
+    (sum, candidate) => sum + fragmentNoteCount(candidate.figures),
+    0,
+  );
+  const measureCount = exemplar.figures.length;
+  const identity = [
+    itemId,
+    kind,
+    measureCount,
+    exemplar.figures
+      .map(({ rhythmic_signature }) => rhythmic_signature)
+      .join('>'),
+  ].join('|');
+
+  return {
+    fragment_id: `fragment:${hash(identity)}`,
+    kind,
+    measure_count: measureCount,
+    label: `${measureCount}-bar ${kind === 'bar' ? 'figure' : 'phrase'}`,
+    members,
+    occurrence_count: members.length,
+    note_count: noteCount,
+    song_note_share: round(noteCount / Math.max(1, totalNoteCount), 4),
+    skill_weights: normalizedSkillWeights(
+      group.flatMap((candidate) =>
+        candidate.figures.flatMap((figure) => figure.skill_weights),
+      ),
+    ),
+  };
+}
+
+export function build_pattern_fragment_map(
+  chart: ParsedChart,
+  options: DecomposePatternChartOptions = {},
+): PatternFragmentMap {
+  const model = decompose_chart_patterns(chart, options);
+  const figures = [...model.figures].sort(
+    (left, right) => left.measure_index - right.measure_index,
+  );
+  const totalNoteCount = fragmentNoteCount(figures);
+  const candidates: FragmentCandidate[] = figures.map((figure) => ({
+    kind: 'bar',
+    figures: [figure],
+  }));
+
+  [2, 4].forEach((length) => {
+    for (let start = 0; start <= figures.length - length; start += length) {
+      const phrase = figures.slice(start, start + length);
+
+      if (
+        phrase.at(-1)!.measure_index - phrase[0].measure_index ===
+        length - 1
+      ) {
+        candidates.push({ kind: 'phrase', figures: phrase });
+      }
+    }
+  });
+
+  const parser = new ChartParser(chart, chart.drumType === 2);
+  const fragments = clusterFragmentCandidates(candidates)
+    .flatMap((group) => {
+      const fragment = fragmentFromCandidates(
+        model.item_id,
+        group,
+        totalNoteCount,
+        group[0].kind,
+      );
+      const members = fragment.members.map((member) => ({
+        ...member,
+        start_tick: parser.measures[member.start_measure_index]?.startTick ?? 0,
+        end_tick: parser.measures[member.end_measure_index]?.endTick ?? 0,
+      }));
+
+      return fragment.occurrence_count >= 2 ? [{ ...fragment, members }] : [];
+    })
+    .sort(
+      (left, right) =>
+        right.song_note_share - left.song_note_share ||
+        right.measure_count - left.measure_count ||
+        left.fragment_id.localeCompare(right.fragment_id),
+    );
+
+  return {
+    item_id: model.item_id,
+    total_note_count: totalNoteCount,
+    fragments,
+  };
+}
+
+function recordsForFragment(
+  records: readonly StoredHitRecord[],
+  fragment: PatternFragment,
+): readonly StoredHitRecord[] {
+  return records.filter((record) => {
+    const tick =
+      record.verdict === 'wrong'
+        ? record.actualTick ?? record.tick
+        : record.expectedTick ?? record.tick;
+
+    return fragment.members.some(
+      ({ start_tick, end_tick }) => tick >= start_tick && tick < end_tick,
+    );
+  });
+}
+
+function standardDeviation(values: readonly number[]): number | undefined {
+  if (values.length < 2) {
+    return undefined;
+  }
+
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+
+  return Math.sqrt(
+    values.reduce((sum, value) => sum + (value - average) ** 2, 0) /
+      values.length,
+  );
+}
+
+function difficultyFor(
+  records: readonly StoredHitRecord[],
+  minimumExpectedNotes: number,
+): FragmentDifficulty {
+  const expectedNotes = records.filter(
+    ({ verdict }) => verdict === 'hit' || verdict === 'miss',
+  ).length;
+
+  if (expectedNotes < minimumExpectedNotes) {
+    return { state: 'thin-evidence', expected_notes: expectedNotes };
+  }
+
+  const misses = records.filter(({ verdict }) => verdict === 'miss').length;
+  const wrongs = records.filter(({ verdict }) => verdict === 'wrong').length;
+  const spread = standardDeviation(
+    records
+      .filter(({ verdict }) => verdict === 'hit')
+      .map(({ deltaMs }) => deltaMs),
+  );
+  const missDensity = misses / expectedNotes;
+  const wrongDensity = wrongs / expectedNotes;
+  const score =
+    0.55 * missDensity +
+    0.25 * Math.min(1, wrongDensity * 2) +
+    0.2 * Math.min(1, (spread ?? 0) / 100);
+
+  return {
+    state: 'measured',
+    expected_notes: expectedNotes,
+    miss_density: round(missDensity, 4),
+    wrong_density: round(wrongDensity, 4),
+    ...(spread === undefined ? {} : { timing_spread_ms: round(spread, 1) }),
+    score: round(score, 4),
+  };
+}
+
+function skillWeaknessFor(
+  fragment: PatternFragment,
+  profile: PatternPlayerProfile | undefined,
+): Pick<FragmentPracticeValue, 'skill_weakness' | 'skill_evidence_state'> {
+  const evidence = new Map<string, { strength: number; weight: number }>();
+
+  profile?.families
+    .filter(({ coverage }) => coverage === 'played')
+    .forEach(({ family, strength }) => {
+      family.skill_weights.forEach(({ skill_id, weight }) => {
+        const current = evidence.get(skill_id);
+
+        evidence.set(skill_id, {
+          strength: (current?.strength ?? 0) + strength * weight,
+          weight: (current?.weight ?? 0) + weight,
+        });
+      });
+    });
+
+  const measured = fragment.skill_weights.filter(({ skill_id }) =>
+    evidence.has(skill_id),
+  );
+
+  if (measured.length === 0) {
+    return { skill_weakness: 0.5, skill_evidence_state: 'unknown' };
+  }
+
+  const totalWeight = measured.reduce((sum, { weight }) => sum + weight, 0);
+  const strength =
+    measured.reduce((sum, { skill_id, weight }) => {
+      const state = evidence.get(skill_id)!;
+
+      return sum + (state.strength / state.weight) * weight;
+    }, 0) / totalWeight;
+
+  return {
+    skill_weakness: round(1 - strength / 100, 4),
+    skill_evidence_state: 'measured',
+  };
+}
+
+export function rank_pattern_fragments({
+  fragments,
+  records,
+  profile,
+  minimum_expected_notes = 8,
+}: RankFragmentPracticeOptions): readonly FragmentPracticeValue[] {
+  return fragments
+    .map((fragment) => {
+      const difficulty = difficultyFor(
+        recordsForFragment(records, fragment),
+        minimum_expected_notes,
+      );
+      const skill = skillWeaknessFor(fragment, profile);
+
+      return {
+        fragment,
+        difficulty,
+        ...skill,
+        ...(difficulty.score === undefined
+          ? {}
+          : {
+              score: round(
+                fragment.song_note_share *
+                  difficulty.score *
+                  (0.5 + 0.5 * skill.skill_weakness),
+                6,
+              ),
+            }),
+      };
+    })
+    .sort(
+      (left, right) =>
+        (right.score ?? -1) - (left.score ?? -1) ||
+        right.fragment.song_note_share - left.fragment.song_note_share ||
+        left.fragment.fragment_id.localeCompare(right.fragment.fragment_id),
+    );
+}
+
+export function propose_pattern_fragment_loops({
+  chart,
+  fragments,
+  records,
+  runs = [],
+  profile,
+  playback_speed = 1,
+  minimum_expected_notes,
+}: RankFragmentPracticeOptions): readonly FragmentLoopProposal[] {
+  const ranked = rank_pattern_fragments({
+    chart,
+    fragments,
+    records,
+    profile,
+    minimum_expected_notes,
+  }).filter(({ score }) => score !== undefined);
+  const measures = new ChartParser(chart, chart.drumType === 2).measures;
+
+  return ranked.slice(0, 3).map((practiceValue) => {
+    const member = practiceValue.fragment.members[0];
+    const opening = selectPracticeOpening({
+      chart,
+      measures: measures.slice(
+        member.start_measure_index,
+        member.end_measure_index + 1,
+      ),
+      runs,
+    });
+    const difficulty = practiceValue.difficulty;
+    const difficultyText = `${Math.round(
+      (difficulty.miss_density ?? 0) * 100,
+    )}% missed, ${Math.round((difficulty.wrong_density ?? 0) * 100)}% wrong`;
+    const weaknessText =
+      practiceValue.skill_evidence_state === 'measured'
+        ? `; linked skills are ${Math.round(
+            practiceValue.skill_weakness * 100,
+          )}% weak`
+        : '';
+
+    return {
+      fragment: practiceValue.fragment,
+      bar_start: member.start_measure_index + 1,
+      bar_end: member.end_measure_index + 1,
+      opening_speed: opening?.playbackSpeed ?? playback_speed,
+      opening_window_ms: opening?.timingWindowMs ?? 0,
+      opening_window_standard: opening?.timingStandard ?? 'target',
+      reason: `This figure covers ${Math.round(
+        practiceValue.fragment.song_note_share * 100,
+      )}% of the song and measured ${difficultyText}${weaknessText}.`,
+      practice_value: practiceValue,
+    };
+  });
 }
 
 function eventKey(event: SkillEvidenceEvent): string {

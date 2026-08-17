@@ -155,7 +155,7 @@
 }
 
 .drumroll-score-summary__body {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -380,6 +380,86 @@
   stroke-width: 5;
 }
 
+.drumroll-score-summary__timing-quality {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  color: var(--dr-ink, var(--color-ink));
+  font-size: clamp(15px, 1.1vw, 17px);
+  line-height: 1.35;
+}
+
+.drumroll-score-summary__timing-quality span:last-child {
+  color: var(--dr-wine, var(--color-accent-text));
+  font-weight: 700;
+}
+
+.drumroll-score-summary__next-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.drumroll-score-summary__next-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.drumroll-score-summary__next-action {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--dr-ember) 55%, transparent);
+  border-left: 5px solid var(--dr-ember);
+  background: color-mix(in srgb, var(--dr-ember) 10%, transparent);
+  color: var(--dr-ink, var(--color-ink));
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.drumroll-score-summary__next-action:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--dr-ember) 18%, transparent);
+}
+
+.drumroll-score-summary__next-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.drumroll-score-summary__next-action strong {
+  font-size: clamp(17px, 1.35vw, 20px);
+}
+
+.drumroll-score-summary__next-action span {
+  color: var(--dr-ink-muted, var(--color-text-muted));
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.drumroll-score-summary__details {
+  border-top: 1px solid var(--dr-line, rgb(36 31 25 / 16%));
+  padding-top: 10px;
+}
+
+.drumroll-score-summary__details > summary {
+  width: fit-content;
+  color: var(--dr-ink, var(--color-ink));
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.drumroll-score-summary__details[open] {
+  display: grid;
+  gap: 14px;
+}
+
+.drumroll-score-summary__notation-fallback {
+  color: var(--dr-ember);
+  font-size: 26px;
+}
+
 .drumroll-score-summary__insight-section {
   display: flex;
   flex-direction: column;
@@ -400,6 +480,10 @@
   gap: 3px;
   padding-left: 14px;
   border-left: 4px solid var(--dr-ember, var(--color-accent));
+}
+
+.drumroll-score-summary__skill .relative {
+  margin-bottom: 2px;
 }
 
 .drumroll-score-summary__skill strong,
@@ -744,6 +828,35 @@
     grid-column: 1 / -1;
     justify-self: start;
     text-align: left;
+  }
+}
+
+@media (min-width: 1121px) and (min-height: 780px) {
+  .drumroll-score-summary__header {
+    padding-top: 14px;
+    padding-bottom: 12px;
+  }
+
+  .drumroll-score-summary__body {
+    gap: 14px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+    overflow: hidden;
+  }
+
+  .drumroll-score-summary__footer {
+    padding-top: 12px;
+    padding-bottom: 14px;
+  }
+
+  .drumroll-score-summary__metric-block,
+  .drumroll-score-summary__trend-block {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .drumroll-score-summary__trend-chart {
+    height: 92px;
   }
 }
 

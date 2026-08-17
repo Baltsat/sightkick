@@ -23,9 +23,13 @@ export const CleanHits: Story = {
   args: {
     ui: {
       ...INITIAL_STREAK_UI_STATE,
+      announceSeq: 1,
+      announceStage: STREAK_STAGES[2],
       streak: {
         count: STREAK_STAGES[2].threshold,
+        credit: STREAK_STAGES[2].threshold,
         best: STREAK_STAGES[2].threshold,
+        bestCredit: STREAK_STAGES[2].threshold,
         stage: STREAK_STAGES[2],
         countedNoteIds: new Set(),
       },
@@ -34,16 +38,18 @@ export const CleanHits: Story = {
   },
 };
 
-export const ReturnToPhrase: Story = {
+export const HigherThreshold: Story = {
   args: {
     ui: {
       ...INITIAL_STREAK_UI_STATE,
-      returnSeq: 1,
-      returnBest: 18,
+      announceSeq: 1,
+      announceStage: STREAK_STAGES[6],
       streak: {
-        count: 0,
-        best: 18,
-        stage: STREAK_STAGES[2],
+        count: STREAK_STAGES[6].threshold,
+        credit: STREAK_STAGES[6].threshold,
+        best: STREAK_STAGES[6].threshold,
+        bestCredit: STREAK_STAGES[6].threshold,
+        stage: STREAK_STAGES[6],
         countedNoteIds: new Set(),
       },
     },

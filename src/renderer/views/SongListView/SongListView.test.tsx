@@ -52,7 +52,11 @@ function setupSongListView(...args: Parameters<typeof mountSongListView>) {
 }
 
 function browseAllLibrary(): void {
-  fireEvent.click(screen.getByTestId('browse-all-library'));
+  const button = screen.queryByTestId('browse-all-library');
+
+  if (button) {
+    fireEvent.click(button);
+  }
 }
 
 describe('SongListView — loading the library', () => {
@@ -457,7 +461,7 @@ describe('SongListView — loading the library', () => {
     expect(
       screen.getByTestId('library-shelf-recently-imported'),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('browse-all-library')).toBeInTheDocument();
+    expect(screen.getByTestId('library-full-scroll')).toBeInTheDocument();
     expect(screen.queryByTestId('add-music-actions')).not.toBeInTheDocument();
     expect(screen.queryByTestId('import-song-trigger')).not.toBeInTheDocument();
     expect(screen.queryByTestId('my-music-trigger')).not.toBeInTheDocument();

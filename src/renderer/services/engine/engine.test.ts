@@ -794,6 +794,46 @@ describe('Engine', () => {
     ]);
   });
 
+  it('excludes a hi-hat pedal false hit from the score marker and saved wrong-hit evidence', async () => {
+    const note = staveNote(['c/5']);
+    const { engine, onEnded, player } = await setup({
+      renderData: [
+        measureData(
+          0,
+          1920,
+          [rendered(480, note)],
+          [{ tick: 480, isRest: false, notes: ['c/5'] } as Note],
+        ),
+      ],
+    });
+    const overlayEl = document.createElement('div');
+
+    engine.setSettings({ playheadStyle: 'Cursor' });
+    engine.setRendererRefs({
+      cursorEl: document.createElement('div'),
+      highlightEls: [],
+      overlayEl,
+    });
+    engine.setMapping({ hihat: ['midi:44'] });
+    engine.playFromTick(0);
+    engine.seekSeconds(0.5);
+
+    emitInput('midi:44');
+
+    expect(overlayEl.querySelector('.vf-wronghit-marker')).toBeNull();
+    expect(engine.getRunRecords()).toEqual([]);
+
+    player.onEnded();
+
+    expect(onEnded).toHaveBeenCalledWith(
+      expect.objectContaining({ falseHits: 0 }),
+      expect.objectContaining({ totalWrong: 0, wrongHitCounts: [] }),
+      expect.not.arrayContaining([
+        expect.objectContaining({ verdict: 'wrong', element: 'hihat' }),
+      ]),
+    );
+  });
+
   it('paints a false hit inside a fully silent measure but never persists it as scored evidence', async () => {
     const { engine, onEnded, player } = await setup({
       renderData: [

@@ -9,6 +9,9 @@ export const DESKTOP_LESSON_LIBRARY_FOLDER = 'Drumroll Lessons';
 
 export const LOCAL_LESSON_PACKS_FOLDER = 'Local Lesson Packs';
 
+export const LOCAL_LESSON_PACK_SONG_ARCHIVE_STORE_KEY =
+  'localLessonPackSongArchive';
+
 interface LessonManifestSong {
   id: string;
   drumDifficulties?: SongData['drumDifficulties'];
@@ -63,6 +66,59 @@ export interface LocalLessonPackResult {
   libraryRoots: string[];
   songs: StorageSchema['songs'];
   rejectedPacks: string[];
+}
+
+export interface LocalLessonPackReconciliation {
+  songs: StorageSchema['songs'];
+  archivedSongs: StorageSchema['songs'];
+}
+
+function isLocalLessonPackSongId(id: string): boolean {
+  return /^local:[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9._-]*$/.test(id);
+}
+
+function preserveLocalLessonProgress(
+  song: SongData,
+  previous: SongData | undefined,
+): SongData {
+  return {
+    ...song,
+    ...(previous?.liked !== undefined ? { liked: previous.liked } : {}),
+    ...(previous?.scoreData ? { scoreData: previous.scoreData } : {}),
+  };
+}
+
+export function reconcileLocalLessonPacks(
+  existingSongs: StorageSchema['songs'],
+  availableSongs: StorageSchema['songs'],
+  archivedSongs: StorageSchema['songs'] = {},
+): LocalLessonPackReconciliation {
+  const existingLocalSongs = Object.fromEntries(
+    Object.entries(existingSongs).filter(([id]) => isLocalLessonPackSongId(id)),
+  );
+  const activeSongs = Object.fromEntries(
+    Object.entries(existingSongs).filter(
+      ([id]) => !isLocalLessonPackSongId(id),
+    ),
+  );
+  const restoredSongs = Object.fromEntries(
+    Object.entries(availableSongs).map(([id, song]) => [
+      id,
+      preserveLocalLessonProgress(
+        song,
+        existingLocalSongs[id] ?? archivedSongs[id],
+      ),
+    ]),
+  );
+
+  return {
+    songs: { ...activeSongs, ...restoredSongs },
+    archivedSongs: {
+      ...archivedSongs,
+      ...existingLocalSongs,
+      ...restoredSongs,
+    },
+  };
 }
 
 function lessonManifestPath(root: string): string {

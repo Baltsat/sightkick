@@ -34,44 +34,16 @@ export function StreakMeter({
   animated = true,
   className,
 }: StreakMeterProps) {
-  const { streak, announceSeq, announceStage, returnSeq, returnBest } = ui;
+  const { announceSeq, announceStage } = ui;
 
-  // The meter represents a live streak, not run history. Once the current
-  // streak is broken, the best value remains available in Results; keeping a
-  // 0/best pill over the score is both distracting and visually collides with
-  // the location HUD at exactly the moment the player needs to recover.
-  if (streak.count <= 0 && !returnBest) {
+  if (!announceStage) {
     return null;
   }
-
-  if (streak.count <= 0) {
-    return (
-      <div
-        className={cn(
-          'pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center',
-          className,
-        )}
-        data-testid="streak-meter"
-      >
-        <div
-          key={`sk-streak-return-${returnSeq}`}
-          className="sk-streak-return"
-          data-testid="streak-return"
-          aria-live="polite"
-        >
-          Back to the phrase · best {returnBest} clean hit
-          {returnBest === 1 ? '' : 's'}
-        </div>
-      </div>
-    );
-  }
-
-  const tier = streak.stage?.tier ?? -1;
 
   return (
     <div
       className={cn(
-        'pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center',
+        'pointer-events-none fixed inset-0 z-20 grid place-items-center',
         className,
       )}
       data-testid="streak-meter"
@@ -82,27 +54,20 @@ export function StreakMeter({
           className={cn(
             'sk-streak-meter',
             animated && 'sk-streak-pulse',
-            animated && announceSeq > 0 && 'sk-streak-tier-up',
+            animated && 'sk-streak-tier-up',
           )}
-          data-tier={tier}
+          data-tier={announceStage.tier}
           data-testid="streak-meter-pill"
+          aria-live="polite"
         >
           <span className="sk-streak-energy" aria-hidden="true" />
-          {streak.stage && (
-            <strong className="sk-streak-title" data-testid="streak-stage-name">
-              {streak.stage.name}
-            </strong>
-          )}
-          <span key={streak.count} className="sk-streak-proof">
-            Phrase tier · <b data-testid="streak-count">{streak.count}</b>
-            {' clean hits'}
+          <strong className="sk-streak-title" data-testid="streak-stage-name">
+            {announceStage.name}
+          </strong>
+          <span className="sk-streak-proof" data-testid="streak-proof">
+            <b>{announceStage.threshold} clean 16ths</b> · target window · 0.8×+
           </span>
-          {streak.best > streak.count && (
-            <span className="sk-streak-best" data-testid="streak-best">
-              best {streak.best}
-            </span>
-          )}
-          {animated && tier >= PARTICLE_TIER_THRESHOLD && (
+          {animated && announceStage.tier >= PARTICLE_TIER_THRESHOLD && (
             <span
               className="sk-streak-particles"
               aria-hidden="true"
@@ -114,20 +79,18 @@ export function StreakMeter({
             </span>
           )}
         </div>
-        {announceStage && (
-          <span
-            key={`sk-streak-announce-${announceSeq}`}
-            className={cn(
-              'sk-streak-announce-text sr-only',
-              animated && 'sk-streak-announce',
-            )}
-            data-tier={announceStage.tier}
-            data-testid="streak-announce"
-            aria-live="polite"
-          >
-            {announceStage.name}
-          </span>
-        )}
+        <span
+          key={`sk-streak-announce-${announceSeq}`}
+          className={cn(
+            'sk-streak-announce-text sr-only',
+            animated && 'sk-streak-announce',
+          )}
+          data-tier={announceStage.tier}
+          data-testid="streak-announce"
+          aria-live="polite"
+        >
+          {announceStage.name}
+        </span>
       </div>
     </div>
   );

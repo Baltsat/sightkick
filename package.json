@@ -22,6 +22,7 @@
   "scripts": {
     "build": "electron-vite build",
     "package:lesson-library": "node web/scripts/package-lessons.mjs",
+    "import:groove-midi": "node scripts/import-groove-midi-dataset.mjs",
     "validate:yandex-library": "node scripts/validate-yandex-library-manifests.mjs",
     "distribution:integrity": "node scripts/generate-distribution-integrity.mjs",
     "prepare:ffmpeg:mac": "scripts/prepare-ffmpeg-runtime.sh",

@@ -3,6 +3,8 @@ import {
   SetStateAction,
   useCallback,
   useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
 } from 'react';
 import { clamp } from 'es-toolkit';
@@ -49,7 +51,7 @@ interface UsePracticeSessionResult {
   controlHandlers: InputControlHandlers;
   practiceRange: PracticeRange | undefined;
   playbackSpeed: number;
-  setPlaybackSpeed: Dispatch<SetStateAction<number>>;
+  setPlaybackSpeed: (speed: number) => void;
   stepSpeed: (direction: 1 | -1) => void;
   isLooping: boolean;
   setIsLooping: Dispatch<SetStateAction<boolean>>;
@@ -73,8 +75,34 @@ export function usePracticeSession({
   const [focusIndex, setFocusIndex] = useState<number>();
   const [loopAnchor, setLoopAnchor] = useState<number>();
   const [practiceRange, setPracticeRange] = useState<PracticeRange>();
-  const [playbackSpeed, setPlaybackSpeed] = useState(() =>
-    clamp(initialPlaybackSpeed, MIN_SPEED, MAX_SPEED),
+  const initialSpeed = clamp(initialPlaybackSpeed, MIN_SPEED, MAX_SPEED);
+  const [playbackSpeedState, setPlaybackSpeedState] = useState(() => ({
+    initialSpeed,
+    value: initialSpeed,
+  }));
+
+  if (playbackSpeedState.initialSpeed !== initialSpeed) {
+    setPlaybackSpeedState({ initialSpeed, value: initialSpeed });
+  }
+
+  const playbackSpeed =
+    playbackSpeedState.initialSpeed === initialSpeed
+      ? playbackSpeedState.value
+      : initialSpeed;
+  const playbackSpeedRef = useRef(playbackSpeed);
+
+  useLayoutEffect(() => {
+    playbackSpeedRef.current = playbackSpeed;
+  }, [playbackSpeed]);
+
+  const setSelectedPlaybackSpeed = useCallback(
+    (speed: number) => {
+      const next = clamp(speed, MIN_SPEED, MAX_SPEED);
+
+      playbackSpeedRef.current = next;
+      setPlaybackSpeedState({ initialSpeed, value: next });
+    },
+    [initialSpeed],
   );
   // Looping used to default to on, which (combined with no practice range
   // selected looping the whole song) meant a practice run's onEnded never
@@ -135,6 +163,27 @@ export function usePracticeSession({
 
     return measureIndexAtTick(renderData, tick);
   };
+  const startPlayback = (tick?: number) => {
+    if (policy.speedControl) {
+      engine?.setPlaybackSpeed(playbackSpeedRef.current);
+    }
+
+    if (tick === undefined) {
+      if (onPlay) {
+        onPlay();
+      } else {
+        engine?.play();
+      }
+
+      return;
+    }
+
+    if (onPlayFromTick) {
+      onPlayFromTick(tick);
+    } else {
+      engine?.playFromTick(tick);
+    }
+  };
   const moveFocus = (direction: PracticeNavDirection) => {
     if (focusIndex === undefined) {
       setFocusIndex(measureAtPlayhead());
@@ -159,21 +208,13 @@ export function usePracticeSession({
   };
   const confirm = () => {
     if (focusIndex === undefined) {
-      if (onPlay) {
-        onPlay();
-      } else {
-        engine?.play();
-      }
+      startPlayback();
 
       return;
     }
 
     if (isLooping && loopAnchor !== undefined) {
-      if (onPlay) {
-        onPlay();
-      } else {
-        engine?.play();
-      }
+      startPlayback();
 
       clearSelection();
 
@@ -184,11 +225,7 @@ export function usePracticeSession({
       const measure = renderData[focusIndex]?.measure;
 
       if (measure) {
-        if (onPlayFromTick) {
-          onPlayFromTick(measure.startTick);
-        } else {
-          engine?.playFromTick(measure.startTick);
-        }
+        startPlayback(measure.startTick);
       }
 
       return;
@@ -232,19 +269,17 @@ export function usePracticeSession({
   };
   const stepSpeed = useCallback(
     (direction: 1 | -1) => {
-      setPlaybackSpeed((speed) => {
-        const next = clamp(
-          Math.round((speed + direction * SPEED_STEP) * 10) / 10,
-          MIN_SPEED,
-          MAX_SPEED,
-        );
+      const next = clamp(
+        Math.round((playbackSpeedRef.current + direction * SPEED_STEP) * 10) /
+          10,
+        MIN_SPEED,
+        MAX_SPEED,
+      );
 
-        onExplicitSpeedChange?.(next);
-
-        return next;
-      });
+      setSelectedPlaybackSpeed(next);
+      onExplicitSpeedChange?.(next);
     },
-    [onExplicitSpeedChange],
+    [onExplicitSpeedChange, setSelectedPlaybackSpeed],
   );
   const controlHandlers: InputControlHandlers = {
     up: () => moveFocus('up'),
@@ -268,7 +303,7 @@ export function usePracticeSession({
     controlHandlers,
     practiceRange,
     playbackSpeed,
-    setPlaybackSpeed,
+    setPlaybackSpeed: setSelectedPlaybackSpeed,
     stepSpeed,
     isLooping,
     setIsLooping,

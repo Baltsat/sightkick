@@ -689,6 +689,68 @@ describe('GameRenderer paintWrongHit', () => {
     expect(overlay.children.length).toBe(0);
   });
 
+  it.each([
+    ['Flow', 0],
+    ['Classic', 180],
+  ])(
+    'keeps a wrong hit in its %s score position while it fades to a readable state',
+    (_layout, yOffset) => {
+      const overlay = div();
+      const data = measureData(0, 1920, [
+        rendered(0, staveNote(['c/5'], { isRest: true })),
+      ]);
+
+      data.yOffset = yOffset;
+
+      const view = setup([data], { overlayEl: overlay });
+
+      view.paintWrongHit({
+        tick: 480,
+        controlId: 'midi:49',
+        element: 'crash',
+        timeSeconds: 0.5,
+        scoreable: true,
+      });
+
+      const marker = overlay.querySelector<HTMLElement>('.vf-wronghit-marker');
+
+      expect(marker).not.toBeNull();
+      expect(markerY(marker as HTMLElement)).toBe(yOffset + 30);
+
+      view.render(0.5, 480);
+      expect(Number(marker?.style.opacity)).toBe(1);
+
+      view.render(2.6, 960);
+      expect(Number(marker?.style.opacity)).toBeCloseTo(0.74);
+
+      view.render(4.1, 1600);
+      expect(marker?.parentElement).toBe(overlay);
+      expect(Number(marker?.style.opacity)).toBeCloseTo(0.48);
+    },
+  );
+
+  it('never adds a marker for the hi-hat pedal', () => {
+    const overlay = div();
+    const view = setup(
+      [
+        measureData(0, 1920, [
+          rendered(0, staveNote(['c/5'], { isRest: true })),
+        ]),
+      ],
+      { overlayEl: overlay },
+    );
+
+    view.paintWrongHit({
+      tick: 480,
+      controlId: 'midi:44',
+      element: 'hihat',
+      timeSeconds: 0.5,
+      scoreable: true,
+    });
+
+    expect(overlay.querySelector('.vf-wronghit-marker')).toBeNull();
+  });
+
   it('prunes wrong-hit markers at or after the tick on a backward seek', () => {
     const n0 = staveNote(['c/5']);
     const n1 = staveNote(['d/5']);

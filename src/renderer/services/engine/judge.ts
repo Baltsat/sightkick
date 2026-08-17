@@ -16,6 +16,7 @@ import {
   ELEMENT_TO_KEYS,
   GHOST_VALUE_THRESHOLD,
   HIT_TOLERANCE_SECONDS,
+  isHihatPedalControl,
   KEY_TO_ELEMENT,
 } from './constants';
 import { keyPrefix } from './helpers';
@@ -382,6 +383,10 @@ export class Judge {
     timeSeconds: number,
     expected: NoteEntry | undefined,
   ): void {
+    if (isHihatPedalControl(controlId)) {
+      return;
+    }
+
     // Visual honesty vs. scoring lenience: a wrong hit is shown at the
     // timing it was struck, unqualified — the player sees exactly what
     // they did, silent region or not. Scoring stays lenient: a hit inside

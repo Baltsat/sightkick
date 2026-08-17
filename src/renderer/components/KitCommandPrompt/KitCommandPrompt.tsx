@@ -6,6 +6,7 @@ import bronzeCymbal from '../../assets/daybreak/journey-nodes/bronze-cymbal.png'
 import kickPad from '../../assets/daybreak/journey-nodes/kick-pad.png';
 import meshPad from '../../assets/daybreak/journey-nodes/mesh-pad.png';
 import pearlSnare from '../../assets/daybreak/journey-nodes/pearl-snare.png';
+import { useInteractionMode } from '../../services/interaction-mode';
 import './KitCommandPrompt.css';
 
 export type KitCommandElement = KitElement | 'any';
@@ -154,6 +155,7 @@ export function KitCommandVeil({
   animated?: boolean;
   state?: string;
 }) {
+  const interactionMode = useInteractionMode();
   const primaryElement = model?.steps[0];
   const primaryColor = primaryElement
     ? KIT_COMMAND_PRESENTATION[primaryElement].color
@@ -162,12 +164,18 @@ export function KitCommandVeil({
   const accessibleLabel = [kicker, instruction, detail]
     .filter(Boolean)
     .join('. ');
+  // At the laptop the prompt must never take the screen or swallow a click,
+  // but it must not vanish either - he still needs to know which pad returns
+  // him to playing. It recedes to a quiet, click-through hint instead.
+  const yielding = interactionMode === 'computer';
 
   return (
     <aside
       className="drumroll-kit-command-veil"
       data-animated={animated}
-      data-fullscreen-moment="kit-command"
+      data-interaction-mode={interactionMode}
+      data-yielding={yielding || undefined}
+      data-fullscreen-moment={yielding ? undefined : 'kit-command'}
       data-phase={state}
       data-primary-element={primaryElement}
       data-state={state}

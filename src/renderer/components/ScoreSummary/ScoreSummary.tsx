@@ -13,7 +13,10 @@ import { calculateAccuracy, getStarRating } from '../../scoring';
 import { MODAL_ABOVE_POPOVER_Z_INDEX } from '../../overlayStyles';
 import { cn } from '../../cn';
 import { Stars } from '../Stars';
-import { RunSummary } from '../../services/practice-stats';
+import type {
+  RunSummary,
+  StoredHitRecord,
+} from '../../services/practice-stats';
 import { PracticeStats } from '../PracticeStats';
 import {
   RecordRunResult,
@@ -43,6 +46,8 @@ import {
   type PerformancePostcardField,
 } from '../PerformancePostcard';
 import { RunInsightPanel } from './RunInsightPanel';
+import type { FragmentLoopProposal } from '../../services/pattern-model';
+import { timingQualityReceipt } from './timingQuality';
 import './ScoreSummary.css';
 
 interface Props {
@@ -81,6 +86,10 @@ interface Props {
   lessonRecommendations?: readonly LessonRecommendationInsight[];
   struggleReport?: StruggleReport;
   patternProfile?: PatternPlayerProfile;
+  fragmentLoops?: readonly FragmentLoopProposal[];
+  onFragmentLoop?: (loop: FragmentLoopProposal) => void;
+  practiceRecords?: readonly StoredHitRecord[];
+  onOpenLesson?: (lessonId: string) => void;
 }
 
 function noteCountLabel(count: number, verb: string): string {
@@ -122,6 +131,10 @@ export function ScoreSummary({
   lessonRecommendations,
   struggleReport,
   patternProfile,
+  fragmentLoops,
+  onFragmentLoop,
+  practiceRecords,
+  onOpenLesson,
 }: Props) {
   const starRating = useMemo(() => {
     if (!scoreData) {
@@ -203,6 +216,10 @@ export function ScoreSummary({
   const runInsights = useMemo(
     () => buildRunInsights(practiceSummary, practiceHistory),
     [practiceHistory, practiceSummary],
+  );
+  const timingQuality = useMemo(
+    () => timingQualityReceipt(practiceSummary, practiceRecords),
+    [practiceRecords, practiceSummary],
   );
   const [postcardOpen, setPostcardOpen] = useState(false);
   const [postcardExporting, setPostcardExporting] = useState(false);
@@ -444,13 +461,17 @@ export function ScoreSummary({
                   data-changed={receipt.changed}
                 >
                   <h3 className="drumroll-score-summary__statement-headline">
-                    {receipt.headline}
+                    {timingQuality && Math.abs(timingQuality.meanMs) <= 12
+                      ? 'Centred. Tighten consistency.'
+                      : receipt.headline}
                   </h3>
                   <p
                     className="drumroll-score-summary__statement-meaning"
                     data-testid="musical-receipt-meaning"
                   >
-                    {receipt.meaning}
+                    {timingQuality && Math.abs(timingQuality.meanMs) <= 12
+                      ? `Spread ${timingQuality.spreadMs} ms. ${timingQuality.insideThirtyPercent}% landed inside ±30 ms.`
+                      : receipt.meaning}
                   </p>
                 </section>
               )
@@ -462,6 +483,12 @@ export function ScoreSummary({
                 actionLabel={primaryIsReplay ? retryLabel : continueLabel}
                 focusSection={resolvedFocusSection}
                 lessonRecommendations={resolvedLessonRecommendations}
+                summary={practiceSummary}
+                records={practiceRecords}
+                patternProfile={patternProfile}
+                fragmentLoop={fragmentLoops?.[0]}
+                onFragmentLoop={onFragmentLoop}
+                onOpenLesson={onOpenLesson}
               />
             ) : null}
 

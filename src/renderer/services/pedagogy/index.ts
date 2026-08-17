@@ -18,6 +18,8 @@ export * from './skill-graph';
 
 export * from './skill-state';
 
+export * from './timing-steadiness';
+
 export * from './song-goals';
 
 export * from './types';

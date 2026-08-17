@@ -34,6 +34,7 @@ function judgement(
     verdict,
     measureIndex,
     expectedTick: measureIndex * 100 + offset,
+    deltaMs: 0,
     scoreable: true,
   };
 }
@@ -42,12 +43,14 @@ function wrongJudgement(
   measureIndex: number,
   offset: number,
   scoreable = true,
+  expectedTick = measureIndex * 100 + offset,
 ): ResolvedJudgement {
   return {
     id: `wrong:${measureIndex}:${offset}`,
     verdict: 'wrong',
     measureIndex,
     actualTick: measureIndex * 100 + offset,
+    expectedTick,
     actualElement: 'tom1',
     expectedElement: 'snare',
     deltaMs: 23,
@@ -241,6 +244,142 @@ describe('tutor machine', () => {
     expect(state.recoveryAttempts.at(-1)).toMatchObject({
       chunkTransition: 'regress',
     });
+  });
+
+  it('keeps a practice-song seed after one qualifying pass even when its launch recommendation asks for one pass', () => {
+    let { state } = beginFailedSession({
+      recursiveChunkGrowthEnabled: true,
+      requiredCleanRepetitions: 1,
+    });
+
+    expect(state.recovery?.chunkGrowth).toMatchObject({
+      activeWindowIndex: 0,
+      requiredQualifyingPasses: 2,
+    });
+
+    state = addMeasure(state, 1, ['hit', 'hit', 'hit', 'hit']);
+
+    const result = dispatch(state, { type: 'recovery-pass-complete' });
+
+    expect(result.commands).toEqual([
+      expect.objectContaining({
+        type: 'repeat-recovery',
+        attempt: expect.objectContaining({ chunkTransition: 'repeat' }),
+      }),
+    ]);
+    expect(result.state.recovery?.chunkGrowth).toMatchObject({
+      activeWindowIndex: 0,
+      qualifyingPasses: 1,
+      status: 'active',
+    });
+  });
+
+  it('anchors a wrong-hit drill to the expected failed note, not the later physical strike', () => {
+    let state = dispatch(
+      createTutorState({
+        recursiveChunkGrowthEnabled: true,
+        triggerErrorDensity: 0.3,
+      }),
+      { type: 'start', targetSpeed: 0.7 },
+    ).state;
+
+    state = addMeasure(state, 0, ['hit', 'hit', 'hit', 'hit']);
+    state = addMeasure(state, 1, ['hit', 'hit', 'hit', 'hit']);
+
+    for (let index = 0; index < 3; index += 1) {
+      state = dispatch(state, {
+        type: 'judgement',
+        judgement: wrongJudgement(1, 75 - index, true, 125),
+      }).state;
+    }
+
+    const result = dispatch(state, {
+      type: 'measure-complete',
+      measureIndex: 1,
+    });
+
+    expect(result.state.recovery?.region).toMatchObject({
+      startTick: 125,
+      endTick: 150,
+    });
+  });
+
+  it('keeps a recursive window when its hits exceed the grid half-gap or lack steadiness', () => {
+    let { state } = beginFailedSession({ recursiveChunkGrowthEnabled: true });
+    const region = state.recovery!.region;
+
+    state = addMeasure(state, region.startMeasure, [
+      'hit',
+      'hit',
+      'hit',
+      'hit',
+    ]);
+    state = {
+      ...state,
+      judgementsByMeasure: {
+        ...state.judgementsByMeasure,
+        [region.startMeasure]: state.judgementsByMeasure[
+          region.startMeasure
+        ].map((item, index) => ({
+          ...item,
+          deltaMs: index % 2 === 0 ? 51 : -51,
+        })),
+      },
+    };
+
+    const result = dispatch(state, {
+      type: 'recovery-pass-complete',
+      timing: { windowMs: 50, gapMs: 100 },
+    });
+
+    expect(result.state.phase).toBe('recovering');
+    expect(result.commands).toEqual([
+      expect.objectContaining({
+        type: 'repeat-recovery',
+        attempt: expect.objectContaining({ result: 'retry' }),
+      }),
+    ]);
+  });
+
+  it('re-proves the full phrase once at a 0.1× tempo nudge before returning to the song', () => {
+    let { state } = beginFailedSession({ recursiveChunkGrowthEnabled: true });
+
+    state = dispatch(state, { type: 'speed-changed', speed: 0.7 }).state;
+
+    let probeStarted = false;
+    let finalResult;
+
+    for (let attempt = 0; attempt < 32 && state.recovery; attempt += 1) {
+      const region = state.recovery.region;
+
+      state = addCleanRegion(state, region.startMeasure, region.endMeasure);
+
+      const result = dispatch(state, {
+        type: 'recovery-pass-complete',
+        timing: { windowMs: 40, gapMs: 100 },
+      });
+
+      if (result.state.recovery?.tempoProbe) {
+        probeStarted = true;
+        expect(result.commands).toEqual([
+          expect.objectContaining({ type: 'repeat-recovery', speed: 0.8 }),
+        ]);
+      }
+
+      state = result.state;
+      finalResult = result;
+    }
+
+    expect(probeStarted).toBe(true);
+    expect(state.phase).toBe('observing');
+    expect(finalResult?.commands).toEqual([
+      expect.objectContaining({
+        type: 'resume-main',
+        reason: 'chunk-plan-mastered',
+        speed: 0.8,
+        attempt: expect.objectContaining({ tempoProbe: true, result: 'clean' }),
+      }),
+    ]);
   });
 
   it('preserves an immutable raw snapshot of the failed trigger window', () => {

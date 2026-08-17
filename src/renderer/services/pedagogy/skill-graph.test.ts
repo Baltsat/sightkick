@@ -9,6 +9,7 @@ import {
   validateItemSkillManifests,
   validateSkillGraph,
 } from './index';
+import { timingSteadinessSkillId } from './timing-steadiness';
 
 describe('atomic skill graph and curriculum manifests', () => {
   it('is acyclic, declares a boundary for every node, and maps all 170 exercises', () => {
@@ -59,6 +60,9 @@ describe('atomic skill graph and curriculum manifests', () => {
         demands.some(({ skill_id }) => skill_id.startsWith('tempo.')),
       ),
     ).toBe(true);
+    expect(timingSteadinessSkillId('sixteenth')).toBe(
+      'timing.steadiness.sixteenth',
+    );
     expect(curriculumItemManifest('13.01')?.demands).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ skill_id: 'sticking.paradiddle_accent' }),

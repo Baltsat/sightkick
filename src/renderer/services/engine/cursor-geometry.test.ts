@@ -51,6 +51,17 @@ function measureData(
   } as unknown as RenderData;
 }
 
+function timeProportionalMeasureData(): RenderData {
+  return {
+    ...measureData(0, 2000, [renderedNote(0, 0)], 0, 150),
+    timeAnchors: [
+      { tick: 0, x: 0 },
+      { tick: 1000, x: 100 },
+      { tick: 2000, x: 150 },
+    ],
+  } as RenderData;
+}
+
 describe('getCursorX', () => {
   const CHART = {
     resolution: 1,
@@ -145,6 +156,59 @@ describe('getCursorX', () => {
 });
 
 describe('getXForTick', () => {
+  it('keeps one measured playhead velocity through mixed note values', () => {
+    const chart = {
+      resolution: 1000,
+      tempos: [tempo(0, 60, 0)],
+    } as unknown as ParsedChart;
+    const data = {
+      ...measureData(0, 1000, [
+        renderedNote(0, 0),
+        renderedNote(500, 32),
+        renderedNote(750, 96),
+        renderedNote(875, 144),
+      ]),
+      timeAnchors: [
+        { tick: 0, x: 0 },
+        { tick: 1000, x: 200 },
+      ],
+    } as RenderData;
+    const samples = [0, 0.25, 0.5, 0.75, 1];
+    const velocities = samples.slice(1).map((seconds, index) => {
+      const previousSeconds = samples[index];
+
+      return (
+        (getCursorX(seconds, chart, data) -
+          getCursorX(previousSeconds, chart, data)) /
+        (seconds - previousSeconds)
+      );
+    });
+
+    velocities.forEach((velocity) => expect(velocity).toBeCloseTo(200, 6));
+  });
+
+  it('changes tick spacing only at an authored tempo boundary', () => {
+    const chart = {
+      resolution: 1000,
+      tempos: [tempo(0, 60, 0), tempo(1000, 120, 1000)],
+    } as unknown as ParsedChart;
+    const data = timeProportionalMeasureData();
+    const samples = [0, 0.25, 0.5, 0.75, 1, 1.125, 1.25, 1.375, 1.5];
+    const velocities = samples.slice(1).map((seconds, index) => {
+      const previousSeconds = samples[index];
+
+      return (
+        (getCursorX(seconds, chart, data) -
+          getCursorX(previousSeconds, chart, data)) /
+        (seconds - previousSeconds)
+      );
+    });
+
+    velocities.forEach((velocity) => expect(velocity).toBeCloseTo(100, 6));
+    expect(getXForTick(500, data)).toBe(50);
+    expect(getXForTick(1500, data)).toBe(125);
+  });
+
   describe('rest-only measure', () => {
     const restMeasure = () =>
       measureData(0, 1000, [renderedNote(0, 0, true)], 0, 200);

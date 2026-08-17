@@ -3,6 +3,26 @@
 This file accompanies Drumroll distributions. It does not replace or alter
 the license texts shipped beside the corresponding components.
 
+## Groove MIDI Dataset
+
+The optional local "Groove MIDI Dataset" practice pack is created from the
+Groove MIDI Dataset by Google LLC. The source dataset is available at
+<https://magenta.tensorflow.org/datasets/groove> under the Creative Commons
+Attribution 4.0 International license:
+<https://creativecommons.org/licenses/by/4.0/>.
+
+Each imported item identifies the source in its player-visible artist field:
+"Groove MIDI Dataset · Google LLC · CC BY 4.0." Its `song.ini` and the pack's
+`catalogue.json` retain the source URL, licence URL, source performance ID, and
+the conversion notice. Drumroll changes the Roland TD-11 mapping into its
+`PART DRUMS` chart format, uses an eight-bar practice crop, repeats short fills
+when needed, and creates a click track. The pack contains no source audio.
+
+The dataset's MIDI-only archive is downloaded to a user-selected working
+directory and imported into a local pack. It is not part of Drumroll's source
+tree or application distribution. The import command verifies the upstream
+archive SHA-256 before extraction.
+
 ## FFmpeg 8.1.2
 
 The Apple Silicon edition of Drumroll includes separate `ffmpeg` and

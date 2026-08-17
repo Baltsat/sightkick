@@ -69,6 +69,79 @@ function detect(
 }
 
 describe('tutor detector', () => {
+  it('interrupts a sustained practice failure at that completed bar', () => {
+    expect(
+      detect(
+        {
+          0: [
+            expected(0, 0, 'hit'),
+            expected(0, 1, 'miss'),
+            expected(0, 2, 'miss'),
+            expected(0, 3, 'miss'),
+          ],
+        },
+        0,
+        {},
+        { ...DEFAULT_TUTOR_SETTINGS, ...GUIDED_PRACTICE_TUTOR_SETTINGS },
+      ),
+    ).toMatchObject({
+      reason: 'sustained-error-density',
+      stats: { startMeasure: 0, endMeasure: 0, resolved: 4, misses: 3 },
+    });
+  });
+
+  it('does not interrupt practice on one stray stroke', () => {
+    expect(
+      detect(
+        {
+          0: [
+            expected(0, 0, 'hit'),
+            expected(0, 1, 'hit'),
+            expected(0, 2, 'hit'),
+            expected(0, 3, 'miss'),
+          ],
+        },
+        0,
+        {},
+        { ...DEFAULT_TUTOR_SETTINGS, ...GUIDED_PRACTICE_TUTOR_SETTINGS },
+      ),
+    ).toBeUndefined();
+  });
+
+  it('interrupts a catastrophic practice bar without waiting for a second bar', () => {
+    expect(
+      detect(
+        {
+          0: Array.from({ length: 4 }, (_, index) =>
+            expected(0, index, 'miss'),
+          ),
+        },
+        0,
+        {},
+        { ...DEFAULT_TUTOR_SETTINGS, ...GUIDED_PRACTICE_TUTOR_SETTINGS },
+      ),
+    ).toMatchObject({
+      reason: 'sustained-error-density',
+      stats: { startMeasure: 0, endMeasure: 0, accuracy: 0 },
+    });
+  });
+
+  it('keeps the non-guided profile from interrupting on extra strokes alone', () => {
+    expect(
+      detect({
+        0: [
+          expected(0, 0, 'hit'),
+          expected(0, 1, 'hit'),
+          expected(0, 2, 'hit'),
+          expected(0, 3, 'hit'),
+          wrong(0, 0),
+          wrong(0, 1),
+          wrong(0, 2),
+        ],
+      }),
+    ).toBeUndefined();
+  });
+
   it('does not interrupt on one isolated miss', () => {
     expect(
       detect({

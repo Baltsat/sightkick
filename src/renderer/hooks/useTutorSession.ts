@@ -51,6 +51,12 @@ interface UseTutorSessionParams {
   onStateChange?: (state: TutorState) => void;
   settings?: Partial<TutorSettings>;
   hitToleranceSeconds?: number;
+  timingGapMs?: number;
+  adaptiveTempoEnabled?: boolean;
+  onChunkStall?: (input: {
+    reason: 'maximum-failed-attempts' | 'chunk-plan-deferred';
+  }) => void;
+  onTutorTempoChange?: (speed: number) => void;
 }
 
 export interface UseTutorSessionResult {
@@ -196,6 +202,14 @@ export function messageForTutorCommand(
     const window = growth?.plan.windows[growth.activeWindowIndex];
 
     if (growth && window) {
+      if (command.recovery.tempoProbe) {
+        return {
+          title: `Prove it at ${command.speed.toFixed(1)}×`,
+          detail: `Play ${window.label} once. Keep every hit inside the timing window.`,
+          tone: 'recovery',
+        };
+      }
+
       const transition = command.attempt.chunkTransition;
       const title =
         transition === 'expand'
@@ -278,9 +292,9 @@ export function messageForTutorCommand(
 
     if (command.reason === 'chunk-plan-mastered') {
       return {
-        title: 'Full phrase joined',
+        title: `Tempo step earned at ${command.speed.toFixed(1)}×`,
         detail:
-          'The hard spot grew through its musical half and the full phrase qualified. Returning to the run at your own speed.',
+          'One clean full-phrase pass cleared the new tempo. Continue from the next bar.',
         tone: 'success',
       };
     }
@@ -439,6 +453,10 @@ export function useTutorSession({
   onStateChange,
   settings = {},
   hitToleranceSeconds = HIT_TOLERANCE_SECONDS,
+  timingGapMs,
+  adaptiveTempoEnabled = false,
+  onChunkStall,
+  onTutorTempoChange,
 }: UseTutorSessionParams): UseTutorSessionResult {
   const sectionStarts = useMemo(
     () =>
@@ -504,11 +522,11 @@ export function useTutorSession({
         command.type === 'begin-recovery' ||
         command.type === 'repeat-recovery'
       ) {
-        // Learner-owned tempo: recovery only ever moves the playhead. It
-        // must never call engine.setPlaybackSpeed - whatever speed the
-        // player is already at (theirs to set, on the transport controls)
-        // is exactly the speed the replay plays at. `command.speed` remains
-        // available to messageForTutorCommand as a recommendation only.
+        if (command.recovery.chunkGrowth && onTutorTempoChange) {
+          engine.setPlaybackSpeed(command.speed);
+          onTutorTempoChange(command.speed);
+        }
+
         onTutorTakeover?.();
         engine.pause();
 
@@ -540,6 +558,15 @@ export function useTutorSession({
       if (command.type === 'resume-main') {
         window.clearTimeout(recoveryTimerRef.current);
         recoveryTimerRef.current = undefined;
+
+        if (
+          adaptiveTempoEnabled &&
+          (command.reason === 'maximum-failed-attempts' ||
+            command.reason === 'chunk-plan-deferred')
+        ) {
+          onChunkStall?.({ reason: command.reason });
+        }
+
         engine.pause();
         engine.setLoopRegion(undefined);
 
@@ -552,7 +579,14 @@ export function useTutorSession({
         }
       }
     },
-    [engine, measures, onTutorTakeover],
+    [
+      adaptiveTempoEnabled,
+      engine,
+      measures,
+      onChunkStall,
+      onTutorTakeover,
+      onTutorTempoChange,
+    ],
   );
   const send = useCallback(
     (event: TutorEvent) => {
@@ -596,7 +630,13 @@ export function useTutorSession({
       );
 
       if (finalChunkAtChartEnd) {
-        const commands = send({ type: 'recovery-pass-complete' });
+        const commands = send({
+          type: 'recovery-pass-complete',
+          timing:
+            timingGapMs === undefined
+              ? undefined
+              : { windowMs: hitToleranceSeconds * 1000, gapMs: timingGapMs },
+        });
         const retry = commands.find(
           (command) => command.type === 'repeat-recovery',
         );
@@ -677,7 +717,16 @@ export function useTutorSession({
 
       queueMicrotask(() => {
         if (!disposed) {
-          send({ type: 'recovery-pass-complete' });
+          send({
+            type: 'recovery-pass-complete',
+            timing:
+              timingGapMs === undefined
+                ? undefined
+                : {
+                    windowMs: hitToleranceSeconds * 1000,
+                    gapMs: timingGapMs,
+                  },
+          });
         }
       });
     });
@@ -772,6 +821,7 @@ export function useTutorSession({
     hitToleranceSeconds,
     measures,
     send,
+    timingGapMs,
   ]);
 
   return snapshot;

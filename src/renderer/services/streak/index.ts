@@ -9,3 +9,7 @@ export {
   resetForSeek,
   stageForCount,
 } from './streak-tracker';
+
+export { streakCreditForTick } from './streak-qualification';
+
+export type { StreakQualificationContext } from './streak-qualification';

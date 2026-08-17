@@ -28,7 +28,7 @@
   }
 
   .actionable-song-shelves__secondary,
-  .actionable-song-shelves__browse {
+  .actionable-song-shelves__all {
     grid-column: 1 / -1;
   }
 

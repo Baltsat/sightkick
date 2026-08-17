@@ -354,6 +354,7 @@ describe('savePracticeRun', () => {
           ],
         },
       ],
+      partialRuns: [],
       archive: emptyArchive(),
       atomicSkillEvidenceArchive: [],
     });
@@ -398,6 +399,7 @@ describe('savePracticeRun', () => {
       'practiceRuns',
       'practiceRunArchive',
       'practiceRunDetails',
+      'practicePartialRuns',
       'practiceRunSkillEvidenceArchive',
     ]);
 
@@ -893,6 +895,7 @@ describe('loadPracticeRuns', () => {
       songId: 'song-1',
       runs,
       fullRuns: [],
+      partialRuns: [],
       archive: emptyArchive(),
       atomicSkillEvidenceArchive: [],
     });
@@ -922,6 +925,7 @@ describe('loadPracticeRuns', () => {
       songId: 'song-1',
       runs: [summary],
       fullRuns: [{ summary, records: [legacyRecord] }],
+      partialRuns: [],
       archive: emptyArchive(),
       atomicSkillEvidenceArchive: [],
     });
@@ -938,6 +942,7 @@ describe('loadPracticeRuns', () => {
       songId: 'song-1',
       runs: [],
       fullRuns: [],
+      partialRuns: [],
       archive: emptyArchive(),
       atomicSkillEvidenceArchive: [],
     });
@@ -1022,7 +1027,7 @@ describe('practice attempt checkpoints', () => {
     });
   });
 
-  it('upserts an in-progress attempt without manufacturing a completed run', () => {
+  it('persists loop-only evidence separately from completed mastery history', () => {
     storeHolder.current = makeStore({});
 
     const firstEvent = makeEvent();
@@ -1036,6 +1041,18 @@ describe('practice attempt checkpoints', () => {
     expect(
       storeHolder.current.get('practiceRunDetails.song-1'),
     ).toBeUndefined();
+    expect(storeHolder.current.get('practicePartialRuns.song-1')).toEqual([
+      expect.objectContaining({
+        summary: expect.objectContaining({
+          attemptOutcome: {
+            completion: 'partial',
+            termination: 'in-progress',
+            scope: 'full-chart',
+          },
+        }),
+        records: [expect.objectContaining({ tick: 480 })],
+      }),
+    ]);
     expect(
       storeHolder.current.get('practiceAttemptCheckpoints.song-1'),
     ).toEqual([
@@ -1085,6 +1102,65 @@ describe('practice attempt checkpoints', () => {
       songId: 'song-1',
       checkpoints: [expect.objectContaining({ sessionId: 'attempt-1' })],
     });
+    expect(storeHolder.current.get('practicePartialRuns.song-1')).toEqual([
+      expect.objectContaining({
+        summary: expect.objectContaining({ totalHits: 2 }),
+        records: [
+          expect.objectContaining({ tick: 480 }),
+          expect.objectContaining({ tick: 960 }),
+        ],
+      }),
+    ]);
+  });
+
+  it('labels an explicit abandoned partial run without admitting it to mastery history', () => {
+    storeHolder.current = makeStore({});
+
+    const summary: RunSummary = {
+      ...fakeSummary(),
+      context: {
+        sessionId: 'loop-exit',
+        schemaVersion: 3,
+        appVersion: 'test',
+        scoringPolicyVersion: 'test',
+        startedAt: '2026-08-10T00:00:00.000Z',
+        chartRevision: 'chart-revision-1',
+        inputLatencyMs: 0,
+        inputMapping: {},
+      },
+      attemptOutcome: {
+        completion: 'partial',
+        termination: 'abandoned',
+        scope: 'loop-range',
+        rangeStartTick: 1_920,
+        rangeEndTick: 3_840,
+      },
+    };
+
+    savePracticeRun(makeEvent() as never, {
+      songId: 'song-1',
+      summary,
+      records: [fakeRecord(1_920)],
+    });
+
+    expect(storeHolder.current.get('practiceRuns.song-1')).toEqual([]);
+    expect(
+      storeHolder.current.get('practiceRunDetails.song-1'),
+    ).toBeUndefined();
+    expect(storeHolder.current.get('practicePartialRuns.song-1')).toEqual([
+      {
+        summary,
+        records: [
+          {
+            tick: 1_920,
+            deltaMs: -12,
+            element: 'snare',
+            verdict: 'hit',
+            velocity: 92,
+          },
+        ],
+      },
+    ]);
   });
 
   it('keeps a bounded chronological recovery buffer per song', () => {
@@ -1216,6 +1292,7 @@ describe('practice attempt checkpoints', () => {
     expect(
       storeHolder.current.get('practiceAttemptCheckpoints.song-1'),
     ).toEqual([]);
+    expect(storeHolder.current.get('practicePartialRuns.song-1')).toEqual([]);
     expect(storeSetControl.calls.at(-1)).toEqual(
       expect.objectContaining({
         practiceRuns: expect.any(Object),

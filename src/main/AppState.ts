@@ -56,7 +56,12 @@ import { searchYoutube } from './ipc/searchYoutube';
 import { fetchMyMusic } from './ipc/myMusic';
 import { loadLibraryCandidates } from './ipc/loadLibraryCandidates';
 import { resolveLibraryCandidates } from './ipc/resolveLibraryCandidates';
-import { bootstrapLessonLibrary, loadLocalLessonPacks } from './lessonLibrary';
+import {
+  bootstrapLessonLibrary,
+  loadLocalLessonPacks,
+  LOCAL_LESSON_PACK_SONG_ARCHIVE_STORE_KEY,
+  reconcileLocalLessonPacks,
+} from './lessonLibrary';
 import { applyLessonProfileMigration } from './lessonIdentityMigration';
 import {
   finalizePracticeAttemptCheckpoint,
@@ -335,13 +340,24 @@ class AppState {
 
       this.localLessonPackRoots = localPacks.libraryRoots;
 
-      if (Object.keys(localPacks.songs).length > 0) {
-        const songs =
-          (this.store.get('songs') as StorageSchema['songs'] | undefined) ??
-          existingSongs;
+      const songs =
+        (this.store.get('songs') as StorageSchema['songs'] | undefined) ??
+        existingSongs;
+      const localPackArchive =
+        (this.store.get(LOCAL_LESSON_PACK_SONG_ARCHIVE_STORE_KEY) as
+          | StorageSchema['songs']
+          | undefined) ?? {};
+      const reconciledLocalPacks = reconcileLocalLessonPacks(
+        songs,
+        localPacks.songs,
+        localPackArchive,
+      );
 
-        this.store.set('songs', { ...songs, ...localPacks.songs });
-      }
+      this.store.set('songs', reconciledLocalPacks.songs);
+      this.store.set(
+        LOCAL_LESSON_PACK_SONG_ARCHIVE_STORE_KEY,
+        reconciledLocalPacks.archivedSongs,
+      );
 
       if (!existingLibraryRoot && result.libraryRoot) {
         this.setLibraryRoot(result.libraryRoot);

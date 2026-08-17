@@ -110,6 +110,30 @@
   border-right: 0;
 }
 
+.drumroll-loop-clear {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border: 3px solid var(--dr-paper, var(--color-paper-light));
+  border-radius: 50%;
+  background: var(--dr-wine, var(--color-accent-bright));
+  box-shadow: 0 2px 0 rgb(36 31 25 / 28%);
+  color: var(--dr-paper, var(--color-paper-light));
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.drumroll-loop-clear:focus-visible {
+  outline: 3px solid var(--dr-ember, var(--color-coral));
+  outline-offset: 3px;
+}
+
 .drumroll-flow-score {
   position: relative;
   z-index: 2;

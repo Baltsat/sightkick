@@ -81,6 +81,26 @@ describe('registerHit', () => {
     const state = hitN(INITIAL_STREAK_STATE, 5);
 
     expect(state.best).toBe(5);
+    expect(state.bestCredit).toBe(5);
+  });
+
+  it('uses only target-window musical credit for the stage ladder', () => {
+    let state = INITIAL_STREAK_STATE;
+    const threshold = STREAK_STAGES[0].threshold;
+
+    for (let i = 0; i < threshold * 2; i += 1) {
+      state = registerHit(state, `loose-${i}`, 0).state;
+    }
+
+    expect(state.count).toBe(threshold * 2);
+    expect(state.stage).toBeUndefined();
+
+    for (let i = 0; i < threshold; i += 1) {
+      state = registerHit(state, `clean-${i}`, 1).state;
+    }
+
+    expect(state.credit).toBe(threshold);
+    expect(state.stage?.id).toBe(STREAK_STAGES[0].id);
   });
 
   it('dedupes a chord: a second key of the same note does not double-count', () => {

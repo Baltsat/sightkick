@@ -588,7 +588,14 @@ describe('in-score judgement feedback', () => {
   it.each(['flow', 'classic'] as const)(
     'fades a correct hit and marks a miss in %s notation',
     (layout) => {
-      const timing = deriveAdaptiveTimingWindow({ kind: 'song', runs: [] });
+      // The fixture's notes sit 300 ms apart, so the grid gap is 300 ms.
+      // Judging with a window wider than that would let a stroke land on the
+      // NEXT note - the exact fault this window rule exists to prevent.
+      const timing = deriveAdaptiveTimingWindow({
+        kind: 'song',
+        grid: { gapMs: 300 },
+        runs: [],
+      });
       const run = feedbackRun(layout, timing.timingWindowMs);
       const hitHead = run.notes[0].noteHeads[0].getSVGElement() as SVGElement;
       const hitGlyph = run.notes[0].getSVGElement() as SVGElement;
@@ -624,7 +631,7 @@ describe('in-score judgement feedback', () => {
 
   it.each([
     {
-      expectedMs: 140,
+      expectedMs: 55.3,
       runs: Array.from({ length: 6 }, () => ({
         overallAccuracy: 0.97,
         totalHits: 97,
@@ -634,7 +641,7 @@ describe('in-score judgement feedback', () => {
       })),
     },
     {
-      expectedMs: 230,
+      expectedMs: 83,
       runs: [
         {
           overallAccuracy: 0.48,
@@ -646,17 +653,24 @@ describe('in-score judgement feedback', () => {
       ],
     },
   ])(
-    'closes miss feedback at the derived $expectedMs ms player window',
+    'closes miss feedback at the grid-bounded window (case $expectedMs)',
     ({ expectedMs, runs }) => {
-      const timing = deriveAdaptiveTimingWindow({ kind: 'song', runs });
+      // The window is bounded by the note grid now, not by an evidence
+      // ladder: a 16th at 90 BPM is 166 ms, so the honest bands are
+      // ceiling 166, better 83, target 55.
+      const timing = deriveAdaptiveTimingWindow({
+        kind: 'song',
+        grid: { gapMs: 166 },
+        runs,
+      });
       const run = feedbackRun('classic', timing.timingWindowMs);
 
       expect(timing.timingWindowMs).toBe(expectedMs);
 
-      run.moveTo(expectedMs - 1);
+      run.moveTo(timing.timingWindowMs - 1);
       expect(run.judge.isMissed(0, 'c/5')).toBe(false);
 
-      run.moveTo(expectedMs + 1);
+      run.moveTo(timing.timingWindowMs + 1);
       expect(run.judge.isMissed(0, 'c/5')).toBe(true);
     },
   );

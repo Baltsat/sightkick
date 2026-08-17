@@ -153,6 +153,32 @@ describe('loadSongList', () => {
     expect(payload.songs.map((s) => s.id)).toEqual(['a']);
   });
 
+  it('caches a cover file added after the song was first indexed', async () => {
+    const inside = path.join(root, 'inside');
+
+    fs.mkdirSync(inside);
+    fs.writeFileSync(path.join(inside, 'song.ini'), '[song]\nname = Cover me');
+    fs.writeFileSync(path.join(inside, 'notes.mid'), 'mid');
+    fs.writeFileSync(path.join(inside, 'album.jpg'), 'cover');
+    storeHolder.current = makeStore({
+      lastOpenedPath: root,
+      songs: { a: { id: 'a', dir: inside, albumCover: null } },
+    });
+
+    const event = makeEvent();
+
+    await loadSongList(event as never);
+
+    const payload = lastReply(event, 'load-song-list')!.args[0] as {
+      songs: { albumCover: string }[];
+    };
+
+    expect(payload.songs[0].albumCover).toContain('album.jpg');
+    expect(storeHolder.current.get('songs')).toMatchObject({
+      a: { albumCover: expect.stringContaining('album.jpg') },
+    });
+  });
+
   it('replies with an error when the stored songs cannot be read', async () => {
     const base = makeStore({ lastOpenedPath: root });
 

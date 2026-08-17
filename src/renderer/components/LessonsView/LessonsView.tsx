@@ -31,6 +31,8 @@ export interface LessonsViewProps {
   onRescan: () => void;
   /** Returns from Journey to the previous top-level surface. */
   onBack?: () => void;
+  initialUnit?: string;
+  initialFocusedLessonId?: string;
   kitConnected?: boolean;
 }
 
@@ -46,6 +48,8 @@ export function LessonsView({
   scanPercent,
   onRescan,
   onBack,
+  initialUnit,
+  initialFocusedLessonId,
   kitConnected = false,
 }: LessonsViewProps) {
   const { controlMapping, inputMapping } = useInput();
@@ -62,7 +66,11 @@ export function LessonsView({
   const currentUnit =
     currentSeasonInfo(openProgress)?.group.unit ??
     groups[groups.length - 1]?.unit;
-  const [selectedUnit, setSelectedUnit] = useState(currentUnit);
+  const [selectedUnit, setSelectedUnit] = useState(
+    groups.some((group) => group.unit === initialUnit)
+      ? initialUnit
+      : currentUnit,
+  );
   const visibleUnit = useMemo(
     () =>
       groups.some((group) => group.unit === selectedUnit)
@@ -84,7 +92,7 @@ export function LessonsView({
       (entry) => entry.song.id === openProgress.continueEntry?.song.id,
     )?.song.id ?? focusableEntries[0]?.song.id;
   const [focusedLessonId, setFocusedLessonId] = useState<string | undefined>(
-    preferredFocusedLessonId,
+    initialFocusedLessonId ?? preferredFocusedLessonId,
   );
   const [journeyControlsVisible, setJourneyControlsVisible] = useState(false);
   const resolvedFocusedLessonId = focusableEntries.some(

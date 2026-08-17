@@ -1,13 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Engine } from '../../services/engine';
 import {
   INITIAL_STREAK_STATE,
   registerFailure,
   registerHit,
   resetForSeek,
+  streakCreditForTick,
   StreakStage,
   StreakState,
+  StreakQualificationContext,
 } from '../../services/streak';
+
+export const STREAK_CELEBRATION_DURATION_MS = 1800;
+
+export const STREAK_CELEBRATION_COOLDOWN_MS = 12000;
 
 export interface StreakUiState {
   streak: StreakState;
@@ -26,8 +32,6 @@ export interface StreakUiState {
    * by an administrative seek/restart reset (see `resetForSeek` in
    * `services/streak`) - that one is silent by design. */
   shatterSeq: number;
-  returnSeq: number;
-  returnBest: number | undefined;
 }
 
 export const INITIAL_STREAK_UI_STATE: StreakUiState = {
@@ -35,8 +39,6 @@ export const INITIAL_STREAK_UI_STATE: StreakUiState = {
   announceSeq: 0,
   announceStage: undefined,
   shatterSeq: 0,
-  returnSeq: 0,
-  returnBest: undefined,
 };
 
 /**
@@ -50,8 +52,12 @@ export const INITIAL_STREAK_UI_STATE: StreakUiState = {
  * `onEnded`, rather than subscribed to redundantly in more than one
  * place.
  */
-export function useStreakEngine(engine: Engine | undefined): StreakUiState {
+export function useStreakEngine(
+  engine: Engine | undefined,
+  qualification?: StreakQualificationContext,
+): StreakUiState {
   const [ui, setUi] = useState<StreakUiState>(INITIAL_STREAK_UI_STATE);
+  const lastCelebrationAt = useRef(Number.NEGATIVE_INFINITY);
   // Track which Engine instance `ui` currently reflects, so a new instance
   // (song change, or first mount) can reset the streak. This adjusts state
   // during render - React's own documented pattern for "reset state when a
@@ -64,6 +70,27 @@ export function useStreakEngine(engine: Engine | undefined): StreakUiState {
     setSyncedEngine(engine);
     setUi(INITIAL_STREAK_UI_STATE);
   }
+
+  useEffect(() => {
+    if (!ui.announceStage) {
+      return undefined;
+    }
+
+    const announceSeq = ui.announceSeq;
+    const timer = window.setTimeout(() => {
+      setUi((previous) =>
+        previous.announceSeq === announceSeq
+          ? { ...previous, announceStage: undefined }
+          : previous,
+      );
+    }, STREAK_CELEBRATION_DURATION_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [ui.announceSeq, ui.announceStage]);
+
+  useEffect(() => {
+    lastCelebrationAt.current = Number.NEGATIVE_INFINITY;
+  }, [engine]);
 
   useEffect(() => {
     if (!engine) {
@@ -82,29 +109,35 @@ export function useStreakEngine(engine: Engine | undefined): StreakUiState {
           ...prev,
           streak: state,
           shatterSeq: prev.shatterSeq + 1,
-          returnSeq: prev.returnSeq + 1,
-          returnBest: prev.streak.best,
         };
       });
     const offJudgement = engine.onJudgement((judgement) => {
       if (judgement.verdict === 'hit' && judgement.expectedTick !== undefined) {
+        const expectedTick = judgement.expectedTick;
         // All heads in a chord share an expected tick. Registering that tick
         // once keeps the streak musical: one notated event is one step.
-        const noteId = `${judgement.measureIndex ?? 'unknown'}:${
-          judgement.expectedTick
-        }`;
+        const noteId = `${judgement.measureIndex ?? 'unknown'}:${expectedTick}`;
 
         setUi((prev) => {
-          const { state, stageUp } = registerHit(prev.streak, noteId);
+          const { state, stageUp } = registerHit(
+            prev.streak,
+            noteId,
+            streakCreditForTick(qualification, expectedTick),
+          );
 
-          if (!stageUp) {
-            return { ...prev, streak: state, returnBest: undefined };
+          if (
+            !stageUp ||
+            Date.now() - lastCelebrationAt.current <
+              STREAK_CELEBRATION_COOLDOWN_MS
+          ) {
+            return { ...prev, streak: state };
           }
+
+          lastCelebrationAt.current = Date.now();
 
           return {
             ...prev,
             streak: state,
-            returnBest: undefined,
             announceSeq: prev.announceSeq + 1,
             announceStage: stageUp,
           };
@@ -124,7 +157,6 @@ export function useStreakEngine(engine: Engine | undefined): StreakUiState {
       setUi((prev) => ({
         ...prev,
         streak: resetForSeek(prev.streak).state,
-        returnBest: undefined,
       })),
     );
 
@@ -132,7 +164,7 @@ export function useStreakEngine(engine: Engine | undefined): StreakUiState {
       offJudgement();
       offReset();
     };
-  }, [engine]);
+  }, [engine, qualification]);
 
   return ui;
 }

@@ -7,7 +7,9 @@ import {
   DESKTOP_LESSON_LIBRARY_FOLDER,
   loadLocalLessonPacks,
   LOCAL_LESSON_PACKS_FOLDER,
+  reconcileLocalLessonPacks,
 } from './lessonLibrary';
+import type { StorageSchema } from '../types';
 
 const CHART = `[Song]
 {
@@ -165,6 +167,51 @@ describe('bootstrapLessonLibrary', () => {
       libraryRoots: [],
       songs: {},
       rejectedPacks: ['bad'],
+    });
+  });
+
+  it('prunes a vanished local pack from the active library and restores its progress on reinstall', () => {
+    const userDataRoot = path.join(root, 'vanished-local-pack-profile');
+    const pack = makeLocalLessonPack(userDataRoot);
+    const first = loadLocalLessonPacks(userDataRoot);
+    const localId = 'local:local-pack:01.001';
+    const existingSongs = {
+      personal: { id: 'personal', dir: '/personal/song' },
+      'lesson:01.01': { id: 'lesson:01.01', dir: '/bundled/lesson' },
+      [localId]: {
+        ...first.songs[localId],
+        liked: true,
+        scoreData: { expert: { hitNotes: 96, totalNotes: 100, falseHits: 0 } },
+      },
+    } as unknown as StorageSchema['songs'];
+
+    fs.rmSync(pack, { recursive: true, force: true });
+
+    const vanished = reconcileLocalLessonPacks(
+      existingSongs,
+      loadLocalLessonPacks(userDataRoot).songs,
+    );
+
+    expect(vanished.songs).toEqual({
+      personal: existingSongs.personal,
+      'lesson:01.01': existingSongs['lesson:01.01'],
+    });
+    expect(vanished.archivedSongs[localId]).toMatchObject({
+      liked: true,
+      scoreData: existingSongs[localId].scoreData,
+    });
+
+    makeLocalLessonPack(userDataRoot);
+
+    const reinstalled = reconcileLocalLessonPacks(
+      vanished.songs,
+      loadLocalLessonPacks(userDataRoot).songs,
+      vanished.archivedSongs,
+    );
+
+    expect(reinstalled.songs[localId]).toMatchObject({
+      liked: true,
+      scoreData: existingSongs[localId].scoreData,
     });
   });
 

@@ -490,7 +490,7 @@ function youtubeFetchedAudioProvenance(
   };
 }
 
-function inferTrackIdentity(
+export function inferTrackIdentity(
   title: string,
   authorName: string,
 ): Pick<IpcAutoChartMetadata, 'songName' | 'artistName'> {
@@ -501,19 +501,21 @@ function inferTrackIdentity(
   }
 
   let songName = parts[2]
+    .replace(/\s*(?:\[|\()\s*lyrics?\s*(?:\]|\))\s*$/i, '')
     .replace(
-      /\s*\((?:official\s+(?:music\s+)?(?:video|audio|lyric\s+video)|official\s+visuali[sz]er|lyric\s+video|official\s+audio)\)\s*$/i,
+      /\s*(?:[|\-–—]\s*)?(?:(?:\[|\()\s*)?(?:official\s+(?:music\s+)?(?:video|audio|lyric\s+video)|official\s+visuali[sz]er|lyric\s+video|official\s+audio)(?:\s*(?:\)|\]))?\s*$/i,
       '',
     )
     .trim();
-  let artistName = parts[1].trim();
+  const artistName = parts[1]
+    .replace(/\s+(?:ft\.?|feat\.?|featuring)\s+.+$/i, '')
+    .trim();
   const featured =
     songName.match(/\s+(?:ft\.?|feat\.?|featuring)\s+(.+)$/i) ??
     songName.match(/\s+\((?:ft\.?|feat\.?|featuring)\s+([^)]+)\)$/i);
 
   if (featured) {
     songName = songName.slice(0, featured.index).trim();
-    artistName = `${artistName} feat. ${featured[1].trim()}`;
   }
 
   return { songName, artistName };

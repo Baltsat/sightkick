@@ -497,7 +497,11 @@ describe('practice mode analytics', () => {
     try {
       const view = setupSongView({
         route: '/song-1?gameMode=practice',
-        settings: { countIn: false, handsFreeControlsEnabled: false },
+        settings: {
+          countIn: false,
+          handsFreeControlsEnabled: false,
+          adaptiveTutorEnabled: false,
+        },
         keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
       });
 
@@ -509,7 +513,10 @@ describe('practice mode analytics', () => {
 
       // Looping now defaults off (a practice run must be able to reach
       // onEnded without an explicit opt-in), so this run reaches the end
-      // and fires onEnded with no toggle needed.
+      // and fires onEnded with no toggle needed. The Tutor is off here for
+      // the same reason: it now drills songs as well as lessons, so a run
+      // this sloppy would loop the failed bars instead of ending. Tutor
+      // recovery and its deferral path are covered in the tutor suites.
       view.clickPlay();
 
       await act(async () => {

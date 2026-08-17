@@ -1,5 +1,10 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  InteractionModeArbiter,
+  InteractionModeProvider,
+  INTERACTION_MODE_IDLE_MS,
+} from '../../services/interaction-mode';
 import { KitCommandPrompt, KitCommandVeil } from './KitCommandPrompt';
 
 describe('KitCommandPrompt', () => {
@@ -64,5 +69,35 @@ describe('KitCommandPrompt', () => {
     expect(veil.querySelectorAll('.drumroll-kit-command__step')).toHaveLength(
       4,
     );
+  });
+
+  it('yields its full-screen veil during computer input and restores it after idle', () => {
+    vi.useFakeTimers();
+
+    const arbiter = new InteractionModeArbiter({
+      subscribeToDrumStrikes: () => () => {},
+    });
+
+    render(
+      <InteractionModeProvider arbiter={arbiter}>
+        <KitCommandVeil
+          kicker="Paused"
+          title="Resume from the kit"
+          model={{ label: 'Resume from the kit', steps: ['kick'] }}
+        />
+      </InteractionModeProvider>,
+    );
+
+    fireEvent.mouseMove(window);
+    expect(screen.getByTestId('kit-command-veil')).toHaveAttribute(
+      'data-yielding',
+      'true',
+    );
+    expect(screen.getByTestId('kit-command-veil')).not.toHaveAttribute(
+      'data-fullscreen-moment',
+    );
+
+    act(() => vi.advanceTimersByTime(INTERACTION_MODE_IDLE_MS));
+    expect(screen.getByTestId('kit-command-veil')).toBeInTheDocument();
   });
 });
