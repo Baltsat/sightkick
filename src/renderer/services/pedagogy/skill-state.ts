@@ -1,6 +1,11 @@
-import type { RunSummary } from '../practice-stats';
+import type { RunSummary, StoredHitRecord } from '../practice-stats';
 import { nextReviewAt } from './review-scheduler';
 import { skillNodeById } from './skill-graph';
+import {
+  measureTimingSteadiness,
+  steadinessSubdivision,
+  timingSteadinessSkillId,
+} from './timing-steadiness';
 import {
   AtomicEvidenceDerivation,
   AtomicSkillState,
@@ -33,6 +38,7 @@ export interface DeriveAtomicEvidenceInput {
   manifest: ItemSkillManifest;
   previous_events?: readonly SkillEvidenceEvent[];
   source_reliability?: number;
+  records?: readonly StoredHitRecord[];
 }
 
 export interface ReplayAtomicSkillStateOptions {
@@ -377,6 +383,7 @@ export function deriveAtomicSkillEvidence({
   manifest,
   previous_events = [],
   source_reliability = 1,
+  records,
 }: DeriveAtomicEvidenceInput): AtomicEvidenceDerivation {
   const chart_revision = summary.context?.chartRevision;
 
@@ -419,6 +426,10 @@ export function deriveAtomicSkillEvidence({
 
   const reliability = clamp01(source_reliability);
   const events = manifest.demands.flatMap((demand) => {
+    if (demand.skill_id.startsWith('timing.steadiness.')) {
+      return [];
+    }
+
     const node = skillNodeById().get(demand.skill_id);
 
     if (!node || node.evidence_boundary === 'unsupported') {
@@ -457,6 +468,53 @@ export function deriveAtomicSkillEvidence({
       } satisfies SkillEvidenceEvent,
     ];
   });
+  const subdivision = steadinessSubdivision(manifest.context_signature);
+  const target_bpm = manifest.demands.find(
+    ({ target_bpm: target }) => target !== undefined,
+  )?.target_bpm;
+  const timing =
+    records && subdivision && target_bpm
+      ? measureTimingSteadiness({
+          records,
+          target_bpm,
+          playback_speed: finitePositive(summary.playbackSpeed, 1),
+          subdivision,
+        })
+      : undefined;
+
+  if (timing && subdivision) {
+    const skill_id = timingSteadinessSkillId(subdivision);
+    const node = skillNodeById().get(skill_id);
+
+    if (node?.evidence_boundary !== 'unsupported') {
+      events.push({
+        run_id,
+        chart_revision,
+        manifest_revision: manifest.source_revision,
+        skill_id,
+        item_id: manifest.item_id,
+        context_signature: manifest.context_signature,
+        evidence_kind: classifySkillEvidenceKind({
+          skill_id,
+          context_signature: manifest.context_signature,
+          completed_at: summary.completedAt,
+          previous_events,
+        }),
+        quality: timing.quality,
+        weight:
+          Math.min(1, timing.sample_count / 12) *
+          manifest.assessment_confidence *
+          reliability,
+        playback_speed: finitePositive(summary.playbackSpeed, 1),
+        completed_at: summary.completedAt,
+        target_bpm,
+        scored_notes: timing.sample_count,
+        judging_window_ms: metrics.judging_window_ms,
+        raw_timing_spread_ms: timing.spread_ms,
+        normalized_timing_stability: timing.consistency,
+      });
+    }
+  }
 
   if (events.length === 0) {
     return {

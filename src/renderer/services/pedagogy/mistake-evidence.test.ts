@@ -71,7 +71,7 @@ describe('describeMistake', () => {
     expect(evidence?.kind).toBe('unscored-repeat');
     expect(evidence?.title).toContain('Kick');
     expect(evidence?.detail).not.toMatch(/accent|ghost|dynamic/i);
-    expect(evidence?.check).toMatch(/^if /i);
+    expect(evidence?.check).toMatch(/^check /i);
   });
 
   it('names both drums for a genuine wrong-pad hit', () => {
@@ -86,9 +86,7 @@ describe('describeMistake', () => {
 
     expect(evidence?.kind).toBe('wrong-drum');
     expect(evidence?.title).toBe('Ride instead of Snare');
-    expect(evidence?.detail).toBe(
-      'Bar 8 called for Snare; the strike landed on Ride.',
-    );
+    expect(evidence?.detail).toBe('Bar 8 expected Snare. You played Ride.');
     expect(evidence?.check).toContain('Snare');
   });
 

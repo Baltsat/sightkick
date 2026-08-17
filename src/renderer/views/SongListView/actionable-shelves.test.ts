@@ -8,6 +8,7 @@ import type { UnifiedLibraryEntry } from '../../services/library/unified-library
 import {
   build_actionable_library_shelves,
   favourite_song_ids,
+  rank_library_songs,
   yandex_taste_seeded_song_ids,
 } from './actionable-shelves';
 
@@ -175,6 +176,50 @@ describe('actionable song shelves', () => {
       ),
     ).toEqual([['zone'], ['favourite'], ['recent', 'old']]);
     expect(result.rest.map(({ key }) => key)).toEqual(['source:yandex:1']);
+  });
+
+  it('ranks the scrolling library by readiness, fit, taste, play recency, and difficulty', () => {
+    const ready = local_entry('ready', {
+      difficulty: { learner_relative_difficulty: 0.8 } as never,
+    });
+    const zone = local_entry('zone', {
+      difficulty: { learner_relative_difficulty: 0.5 } as never,
+    });
+    const favourite = local_entry('favourite', {
+      song: song('favourite', { liked: true }),
+      difficulty: { learner_relative_difficulty: 0.2 } as never,
+    });
+    const taste = local_entry('taste', {
+      difficulty: { learner_relative_difficulty: 0.1 } as never,
+    });
+    const recent = local_entry('recent', {
+      difficulty: { learner_relative_difficulty: 0.3 } as never,
+    });
+    const easy = local_entry('easy', {
+      difficulty: { learner_relative_difficulty: 0.1 } as never,
+    });
+    const unready = local_entry('unready', {
+      ready: false,
+      difficulty: { learner_relative_difficulty: 0 } as never,
+    });
+
+    expect(
+      rank_library_songs({
+        entries: [easy, recent, unready, taste, favourite, zone, ready],
+        inZoneSongIds: ['zone'],
+        favouriteSongIds: new Set(['favourite']),
+        sourceSeededSongIds: new Set(['taste']),
+        recentPlayedAt: new Map([['recent', Date.parse('2026-08-17')]]),
+      }).map((entry) => entry.song.id),
+    ).toEqual([
+      'zone',
+      'favourite',
+      'taste',
+      'recent',
+      'easy',
+      'ready',
+      'unready',
+    ]);
   });
 
   it('keeps empty shelves explicit instead of manufacturing a recommendation', () => {

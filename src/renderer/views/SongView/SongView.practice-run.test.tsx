@@ -80,14 +80,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function runToEnd(view: ReturnType<typeof setupSongView>) {
+async function runToEnd(
+  view: ReturnType<typeof setupSongView>,
+  probeBudget = 60,
+) {
   // The mocked stream still schedules through the real setInterval-driven
   // pump loop in speed/player.ts, which only produces (and only completes)
   // once the fake context's currentTime actually advances past each
   // chunk's scheduled end - so this has to step both the timers *and* the
   // fake clock together, the same way completeCountIn() does for the
   // count-in scheduler elsewhere in this test suite.
-  for (let i = 0; i < 60; i += 1) {
+  for (let i = 0; i < probeBudget; i += 1) {
     view.audio.currentTime += 1.5;
 
     await act(async () => {
@@ -253,10 +256,11 @@ describe('practice mode analytics', () => {
           }),
         ]),
       );
+      // During a pause the full-bleed kit-command veil replaces the tutor
+      // HUD, so assert the invariant surface-independently: a deliberate
+      // pause command must never surface as tutor failure copy anywhere.
       expect(
-        within(screen.getByTestId('tutor-hud')).queryByText(
-          'Phrase needs one more pass',
-        ),
+        screen.queryByText('Phrase needs one more pass'),
       ).not.toBeInTheDocument();
 
       clock.advance(1_200);
@@ -496,7 +500,11 @@ describe('practice mode analytics', () => {
     try {
       const view = setupSongView({
         route: '/song-1?gameMode=practice',
-        settings: { countIn: false, handsFreeControlsEnabled: false },
+        settings: {
+          countIn: false,
+          handsFreeControlsEnabled: false,
+          adaptiveTutorEnabled: false,
+        },
         keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
       });
 
@@ -508,7 +516,10 @@ describe('practice mode analytics', () => {
 
       // Looping now defaults off (a practice run must be able to reach
       // onEnded without an explicit opt-in), so this run reaches the end
-      // and fires onEnded with no toggle needed.
+      // and fires onEnded with no toggle needed. The Tutor is off here for
+      // the same reason: it now drills songs as well as lessons, so a run
+      // this sloppy would loop the failed bars instead of ending. Tutor
+      // recovery and its deferral path are covered in the tutor suites.
       view.clickPlay();
 
       await act(async () => {
@@ -565,6 +576,56 @@ describe('practice mode analytics', () => {
       // Perform-only side effects never fire for a Practice run, even
       // one that would have beaten the stored high score.
       expect(view.sentChannels()).not.toContain('update-song');
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 30000);
+
+  it('parks a sloppy Tutor run in the drill instead of playing on', async () => {
+    vi.useFakeTimers();
+
+    try {
+      // The Tutor is on, which is the shipped default, and this run misses
+      // nearly everything. It must stop at the failed bars and ask for them
+      // again rather than carry on to the end - and the transport must be
+      // parked while it waits, not silently looping past him.
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice',
+        settings: { countIn: false, handsFreeControlsEnabled: false },
+        keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+      });
+
+      await view.loadSong(
+        makeSong({
+          scoreData: { expert: { hitNotes: 8, totalNotes: 8, falseHits: 0 } },
+        }),
+      );
+
+      view.clickPlay();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+
+      view.audio.currentTime = 0.5;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+
+      await act(async () => {
+        await view.pressKey('KeyJ');
+      });
+
+      for (let step = 0; step < 40; step += 1) {
+        view.audio.currentTime += 1.5;
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(150);
+        });
+      }
+
+      expect(screen.getByTestId('tutor-recovery-caption')).toBeInTheDocument();
+      expect(screen.queryByTestId('score-modal')).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -723,8 +784,13 @@ describe('practice mode analytics', () => {
 
       expect(evidence).toBeDefined();
       expect(evidence!.map((event) => event.skill_id).sort()).toEqual([
+        'dynamic.even_velocity',
+        'grid.sixteenth',
         'hand.singles',
+        'limb.snare_only',
         'pulse.sixteenth',
+        'sticking.alternating',
+        'tempo.100_119',
       ]);
       expect(evidence!.every((event) => event.item_id === '01.01')).toBe(true);
     } finally {
@@ -968,22 +1034,26 @@ describe('practice mode analytics', () => {
         'Saving this run',
       );
 
-      for (const code of ['KeyK', 'KeyL', 'KeyK', 'KeyL']) {
-        await view.pressKey(code);
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(100);
-        });
-      }
+      // Crash continues and ride leaves, but neither may act while the run
+      // is still being written - the acknowledgement listener has to survive.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_200);
+      });
+      await view.pressKey('KeyL');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
 
       expect(continuePractice).not.toHaveBeenCalled();
       expect(screen.getByTestId('score-modal')).toBeInTheDocument();
 
-      for (const code of ['KeyI', 'KeyK', 'KeyI', 'KeyL']) {
-        await view.pressKey(code);
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(100);
-        });
-      }
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_200);
+      });
+      await view.pressKey('KeyI');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
 
       expect(continuePractice).not.toHaveBeenCalled();
       expect(screen.getByTestId('score-modal')).toBeInTheDocument();
@@ -992,7 +1062,9 @@ describe('practice mode analytics', () => {
         view.ipc.emit('save-practice-run', { songId: 'song-1' });
       });
 
-      expect(screen.getByTestId('score-next')).toBeEnabled();
+      // After the save lands the pad command chips are the single set of
+      // actions - the standalone fallback button leaves with them active.
+      expect(screen.queryByTestId('score-next')).not.toBeInTheDocument();
       expect(
         screen.queryByTestId('score-auto-continue'),
       ).not.toBeInTheDocument();
@@ -1002,12 +1074,11 @@ describe('practice mode analytics', () => {
         await vi.advanceTimersByTimeAsync(1_200);
       });
 
-      for (const code of ['KeyK', 'KeyL', 'KeyK', 'KeyL']) {
-        await view.pressKey(code);
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(100);
-        });
-      }
+      // One deliberate crash after the save lands is the whole command.
+      await view.pressKey('KeyL');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
 
       expect(continuePractice).toHaveBeenCalledWith(
         expect.objectContaining({

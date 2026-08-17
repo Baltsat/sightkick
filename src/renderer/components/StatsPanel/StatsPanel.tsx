@@ -7,6 +7,7 @@ import { LaneAccuracyBars } from '../PracticeStats/LaneAccuracyBars';
 import { WeeklyXpChart, WeeklyXpPoint } from './WeeklyXpChart';
 import { AchievementGrid } from './AchievementGrid';
 import type { PracticeRhythm } from '../../services/pedagogy';
+import { KitActionChip } from '../GamificationHeaderStrip/KitActionChip';
 
 export interface StatsPanelProps {
   streak: StreakInfo;
@@ -16,6 +17,7 @@ export interface StatsPanelProps {
   laneAccuracy: LaneAccuracy[];
   achievements: AchievementViewModel[] | undefined;
   practiceRhythm?: PracticeRhythm;
+  kitConnected?: boolean;
 }
 
 function StatTile({
@@ -33,16 +35,14 @@ function StatTile({
 }) {
   return (
     <div
-      className="flex flex-1 flex-col items-center gap-1 rounded-xl bg-fill p-3"
+      className="flex flex-1 flex-col items-center gap-2 border-l-2 border-border-soft px-4 py-3"
       data-testid={testId}
     >
       <FontAwesomeIcon icon={icon} style={{ color: iconColor }} />
-      <div className="font-display text-xl font-semibold tabular-nums text-text">
+      <div className="font-display text-4xl font-semibold tabular-nums text-text">
         {value}
       </div>
-      <div className="text-[11px] uppercase tracking-[0.1em] text-text-faint">
-        {label}
-      </div>
+      <div className="text-base text-text-muted">{label}</div>
     </div>
   );
 }
@@ -55,9 +55,16 @@ export function StatsPanel({
   laneAccuracy,
   achievements,
   practiceRhythm,
+  kitConnected = false,
 }: StatsPanelProps) {
   return (
-    <div className="flex flex-col gap-6" data-testid="stats-panel">
+    <div className="flex flex-col gap-8" data-testid="stats-panel">
+      {kitConnected && (
+        <div className="flex items-center justify-end gap-2 text-base text-text-muted">
+          <span>Close stats</span>
+          <KitActionChip action="end" />
+        </div>
+      )}
       <div className="flex gap-2">
         <StatTile
           testId="stat-current-streak"
@@ -84,7 +91,7 @@ export function StatsPanel({
 
       {streak.current === 0 && streak.longest > 0 && (
         <p
-          className="rounded-xl border border-border-soft bg-fill px-4 py-3 text-sm leading-relaxed text-text-muted"
+          className="border-l-2 border-border-soft px-4 py-3 text-base leading-relaxed text-text-muted"
           data-testid="streak-reentry"
         >
           New set, same progress. Your saved practice, stars, and goal path stay
@@ -92,16 +99,16 @@ export function StatsPanel({
         </p>
       )}
 
-      <section className="flex flex-col gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint">
+      <section className="flex flex-col gap-3">
+        <h3 className="font-display text-2xl font-semibold text-text">
           Today&apos;s set · daily XP
         </h3>
         <p
-          className="text-sm leading-relaxed text-text-muted"
+          className="text-base leading-relaxed text-text-muted"
           data-testid="today-set-definition"
         >
           This is today&apos;s effort target. A practice streak counts
-          consecutive qualifying saved practice days.
+          consecutive saved practice days that meet the target.
         </p>
         <WeeklyXpChart
           points={weeklyXp}
@@ -110,24 +117,24 @@ export function StatsPanel({
         />
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint">
+      <section className="flex flex-col gap-4">
+        <h3 className="font-display text-2xl font-semibold text-text">
           Accuracy per drum, all-time
         </h3>
         {laneAccuracy.length > 0 ? (
           <LaneAccuracyBars laneAccuracy={laneAccuracy} />
         ) : (
           <div
-            className="rounded-xl bg-fill p-4 text-center text-sm text-text-faint"
+            className="border-l-2 border-border-soft p-4 text-center text-base text-text-muted"
             data-testid="lane-accuracy-empty"
           >
-            Play a few runs to see your per-drum accuracy.
+            Play 1 scored run to see your per-drum accuracy.
           </div>
         )}
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint">
+      <section className="flex flex-col gap-4">
+        <h3 className="font-display text-2xl font-semibold text-text">
           Achievements
         </h3>
         <AchievementGrid achievements={achievements} />

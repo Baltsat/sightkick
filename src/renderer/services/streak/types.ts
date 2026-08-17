@@ -31,6 +31,7 @@ export interface StreakState {
   /** Current consecutive-correct-hit count. Zeroed by a miss, a wrong hit,
    * or an administrative reset (seek/restart). */
   count: number;
+  credit: number;
   /**
    * Highest `count` reached so far. Survives a failure reset (miss/wrong
    * hit) - that's the whole point of tracking a "best" instead of just
@@ -39,6 +40,7 @@ export interface StreakState {
    * matches the engine's own established semantics for a rewound run.
    */
   best: number;
+  bestCredit: number;
   /** The highest stage `count` has reached, or `undefined` below the
    * first stage's threshold. */
   stage: StreakStage | undefined;

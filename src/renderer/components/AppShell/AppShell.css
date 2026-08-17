@@ -1,100 +1,24 @@
-@keyframes arena-field-arrive {
-  from {
-    opacity: 0.7;
-    transform: translate3d(-1.25%, 0.9%, 0) scale(1.025);
-  }
-
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-/* The field's own idle life — not a route event, so it lives on a separate
-   layer (`::after`) from the route-change arrival (`::before`), because both
-   would otherwise fight over `transform` on the same element. Slow, warm,
-   low-contrast: a 110s alternate drift of the same ember/wine blobs, never
-   the base gradient itself, so it reads as "the light is moving" rather
-   than "the page is moving". Disabled entirely under reduced motion. */
-@keyframes arena-field-drift {
-  from {
-    transform: translate3d(-1.4%, -1%, 0) scale(1.01);
-  }
-
-  to {
-    transform: translate3d(1.4%, 1.2%, 0) scale(1.01);
-  }
-}
-
 .arena-shell {
+  --arena-shell-rail-width: clamp(11rem, 17vw, 13rem);
+  --arena-shell-nav-ink: var(--dr-ink);
+  --arena-shell-nav-muted: color-mix(in srgb, var(--dr-ink) 68%, transparent);
+  --arena-shell-nav-active: var(--dr-wine);
+  --arena-shell-bridge-opacity: 0.46;
   position: relative;
-  display: flex;
+  display: block;
   height: 100vh;
   min-height: 0;
   overflow: hidden;
-  color: var(--color-text);
-  background: var(--dr-field-base);
-  isolation: isolate;
-}
-
-.arena-shell::before {
-  position: absolute;
-  z-index: 0;
-  inset: -14%;
-  content: '';
-  pointer-events: none;
+  color: var(--dr-ink);
   background:
     radial-gradient(
-      70% 88% at 10% 10%,
-      color-mix(in srgb, var(--dr-field-ember) 36%, transparent),
+      74% 96% at 8% 8%,
+      color-mix(in srgb, var(--dr-field-ember) 34%, transparent),
       transparent 72%
     ),
     radial-gradient(
-      70% 90% at 94% 88%,
-      color-mix(in srgb, var(--dr-field-wine) 22%, transparent),
-      transparent 76%
-    ),
-    linear-gradient(
-      118deg,
-      var(--dr-field-base) 0%,
-      var(--dr-canvas) 45%,
-      var(--dr-field-low) 100%
-    );
-  transform: translate3d(0, 0, 0);
-}
-
-.arena-shell::after {
-  position: absolute;
-  z-index: 0;
-  inset: -18%;
-  content: '';
-  pointer-events: none;
-  background:
-    radial-gradient(
-      70% 88% at 10% 10%,
-      color-mix(in srgb, var(--dr-field-ember) 20%, transparent),
-      transparent 72%
-    ),
-    radial-gradient(
-      70% 90% at 94% 88%,
-      color-mix(in srgb, var(--dr-field-wine) 16%, transparent),
-      transparent 76%
-    );
-  transform: translate3d(0, 0, 0);
-  animation: arena-field-drift 110s ease-in-out infinite alternate;
-  will-change: transform;
-}
-
-.arena-shell[data-view='home']::before {
-  background:
-    radial-gradient(
-      82% 100% at 90% 54%,
-      color-mix(in srgb, var(--dr-field-ember) 40%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      74% 86% at 3% 2%,
-      color-mix(in srgb, var(--dr-field-wine) 28%, transparent),
+      72% 92% at 96% 90%,
+      color-mix(in srgb, var(--dr-field-wine) 20%, transparent),
       transparent 76%
     ),
     linear-gradient(
@@ -103,227 +27,189 @@
       var(--dr-canvas) 48%,
       var(--dr-field-low) 100%
     );
+  isolation: isolate;
 }
 
-.arena-shell[data-view='home']::after {
+.arena-shell[data-view='home'] {
+  --arena-shell-nav-ink: var(--dr-studio-ink);
+  --arena-shell-nav-muted: color-mix(
+    in srgb,
+    var(--dr-studio-ink) 76%,
+    transparent
+  );
+  --arena-shell-nav-active: var(--dr-count);
+  --arena-shell-bridge-opacity: 0.18;
+}
+
+.arena-shell[data-view='journey'],
+.arena-shell[data-view='insights'] {
+  --arena-shell-bridge-opacity: 0.38;
+}
+
+.arena-shell::after {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  content: '';
   background:
     radial-gradient(
-      82% 100% at 90% 54%,
-      color-mix(in srgb, var(--dr-field-ember) 22%, transparent),
-      transparent 70%
+      86% 48% at 14% -2%,
+      rgb(42 34 27 / 74%),
+      rgb(107 69 45 / 36%) 48%,
+      transparent 78%
     ),
-    radial-gradient(
-      74% 86% at 3% 2%,
-      color-mix(in srgb, var(--dr-field-wine) 18%, transparent),
+    linear-gradient(
+      180deg,
+      rgb(40 34 27 / 68%) 0%,
+      rgb(107 69 45 / 30%) 28%,
+      color-mix(in srgb, var(--dr-field-ember) 18%, transparent) 52%,
       transparent 76%
     );
-}
-
-.arena-shell--transitioning::before {
-  animation: arena-field-arrive 900ms cubic-bezier(0.16, 1, 0.3, 1) 1;
+  opacity: var(--arena-shell-bridge-opacity);
+  pointer-events: none;
+  transition: opacity 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .arena-shell__rail {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  width: 13rem;
-  flex: 0 0 13rem;
-  flex-direction: column;
-  padding: 1.25rem 0.75rem 1rem;
-  border-right: 1px solid var(--line-soft);
-  background: transparent;
-  box-shadow: none;
-  transition: border-color 900ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* Home is the one route with a photograph to continue under the rail, so
-   it is the one route where a hard rail/content border would read as the
-   "panel edge" the owner rejects — everywhere else the hairline still
-   marks the rail honestly. */
-.arena-shell[data-view='home'] .arena-shell__rail {
-  border-right-color: transparent;
-}
-
-/*
- * Kit-continuity bleed — the shell's half of the handoff documented on the
- * field-bleed node in AppShell.tsx and on `--dr-home-field-crop` in
- * theme.css. Contract (one line): publish
- * `--dr-home-field-crop: url(<right-edge crop of the exact home kit
- * photo, at least rail-width wide>)` on `:root` while home's kit is
- * mounted, and clear it on unmount — this layer does the rest.
- *
- * `background-image: none` (the unset default) paints nothing, so an
- * unpublished crop is pixel-identical to today's plain rail: that is the
- * safe fallback. When a crop *is* published, it is anchored to the right
- * (the seam with the content panel), sized to cover the rail, held at a
- * quiet 55% so the ambient field still shows through, and dissolved via a
- * mask before it reaches the brand/nav side rather than cut off — a blend,
- * not a second hard edge.
- */
-.arena-shell__field-bleed {
   position: absolute;
-  inset: 0;
-  z-index: -1;
-  background-image: var(--dr-home-field-crop, none);
-  background-position: right center;
-  background-size: cover;
-  background-repeat: no-repeat;
-  opacity: 0;
-  -webkit-mask-image: linear-gradient(
-    to left,
-    black 0%,
-    black 42%,
-    transparent 88%
-  );
-  mask-image: linear-gradient(to left, black 0%, black 42%, transparent 88%);
-  transition: opacity 900ms cubic-bezier(0.16, 1, 0.3, 1);
-  pointer-events: none;
-}
-
-.arena-shell[data-view='home'] .arena-shell__field-bleed {
-  opacity: 0.55;
-}
-
-.arena-shell__brand {
+  z-index: 3;
+  inset: 0 auto 0 0;
   display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.45rem 0.55rem 1.2rem;
+  width: var(--arena-shell-rail-width);
+  flex-direction: column;
+  padding: clamp(1.25rem, 3vh, 2rem) clamp(0.75rem, 1.2vw, 1rem);
   border: 0;
-  color: var(--color-ink);
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.arena-shell__brand-name {
-  font-family: var(--font-display);
-  font-size: 1.4rem;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.04em;
-}
-
-.arena-shell__brand-mark {
-  display: grid;
-  overflow: hidden;
-  width: 2rem;
-  height: 2rem;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 0;
-  border-radius: 50%;
+  color: var(--arena-shell-nav-ink);
   background: transparent;
   box-shadow: none;
 }
 
-.arena-shell__brand-mark img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.arena-shell__rail[hidden] {
+  display: none;
 }
 
 .arena-shell__nav {
-  display: grid;
-  gap: 0.18rem;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(0.35rem, 1vh, 0.75rem);
+}
+
+.arena-shell__nav-item,
+.arena-shell__settings {
+  min-height: clamp(4rem, 8vh, 4.75rem);
 }
 
 .arena-shell__nav-item {
   display: flex;
-  min-height: 2.7rem;
+  width: 100%;
   align-items: center;
-  gap: 0.72rem;
-  padding: 0.62rem 0.7rem 0.62rem 0.8rem;
+  gap: 1rem;
+  padding: 0.8rem 1rem;
   border: 0;
-  border-left: 2px solid transparent;
-  color: var(--color-ink-soft);
+  color: var(--arena-shell-nav-muted);
   background: transparent;
+  box-shadow: inset 4px 0 0 transparent;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: clamp(1.125rem, 1.45vw, 1.35rem);
   font-weight: 650;
+  line-height: 1.1;
   text-align: left;
   cursor: pointer;
   transition:
     color 160ms ease,
-    border-color 160ms ease;
+    box-shadow 160ms ease;
+}
+
+.arena-shell__nav-item svg,
+.arena-shell__settings-control svg {
+  flex: 0 0 auto;
+  font-size: 1.1em;
 }
 
 .arena-shell__nav-item:hover {
-  border-left-color: color-mix(in srgb, var(--signal-wine) 40%, transparent);
-  color: var(--color-ink);
-  background: transparent;
+  color: var(--arena-shell-nav-ink);
+  box-shadow: inset 4px 0 0
+    color-mix(in srgb, var(--arena-shell-nav-active) 48%, transparent);
 }
 
 .arena-shell__nav-item--active {
-  border-left-color: var(--signal-wine);
-  color: var(--color-ink);
-  background: transparent;
-  box-shadow: none;
+  color: var(--arena-shell-nav-ink);
+  box-shadow: inset 4px 0 0 var(--arena-shell-nav-active);
+  font-weight: 780;
 }
 
 .arena-shell__nav-item--active svg {
-  color: var(--signal-wine);
-  filter: none;
+  color: var(--arena-shell-nav-active);
 }
 
-/* One quiet, fixed foot: profile and settings, never the top of the page. */
-.arena-shell__rail-foot {
-  display: flex;
-  margin-top: auto;
-  flex-direction: column;
-  gap: 0.18rem;
-  border-top: 1px solid var(--line-soft);
-  padding-top: 0.5rem;
+.arena-shell__settings {
+  position: relative;
 }
 
-.arena-shell__rail-utility {
-  display: flex;
-  align-items: center;
-  padding: 0.2rem 0.7rem;
+.arena-shell__settings-control,
+.arena-shell__settings-control > * {
+  width: 100%;
+  height: 100%;
 }
 
-.arena-shell__profile {
-  display: flex;
-  min-height: 2.7rem;
-  align-items: center;
-  gap: 0.72rem;
-  padding: 0.62rem 0.7rem 0.62rem 0.8rem;
-  border: 0;
-  border-left: 2px solid transparent;
-  border-radius: 0;
-  color: var(--color-ink-soft);
-  background: transparent;
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 650;
-  text-align: left;
-  cursor: pointer;
+.arena-shell__settings-control button {
+  display: flex !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: clamp(4rem, 8vh, 4.75rem) !important;
+  justify-content: flex-start !important;
+  padding: 0.8rem 1rem !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: var(--arena-shell-nav-muted) !important;
+  background: transparent !important;
+  box-shadow: inset 4px 0 0 transparent !important;
+  font: inherit !important;
+  font-size: clamp(1.125rem, 1.45vw, 1.35rem) !important;
   transition:
     color 160ms ease,
-    border-color 160ms ease;
+    box-shadow 160ms ease !important;
 }
 
-.arena-shell__profile:hover,
-.arena-shell__profile--active {
-  border-left-color: var(--signal-wine);
-  color: var(--color-ink);
+.arena-shell__settings-control button:hover {
+  color: var(--arena-shell-nav-ink) !important;
+  box-shadow: inset 4px 0 0
+    color-mix(in srgb, var(--arena-shell-nav-active) 48%, transparent) !important;
 }
 
-.arena-shell__profile--active svg {
-  color: var(--signal-wine);
+.arena-shell__settings-label {
+  position: absolute;
+  top: 50%;
+  left: 3.6rem;
+  color: var(--arena-shell-nav-muted);
+  font-size: clamp(1.125rem, 1.45vw, 1.35rem);
+  font-weight: 650;
+  line-height: 1.1;
+  transform: translateY(-50%);
+  transition: color 160ms ease;
+  pointer-events: none;
+}
+
+.arena-shell__settings:hover .arena-shell__settings-label {
+  color: var(--arena-shell-nav-ink);
 }
 
 .arena-shell__workspace {
-  display: flex;
-  position: relative;
+  position: absolute;
   z-index: 1;
-  height: 100%;
+  inset: 0 0 0 var(--arena-shell-rail-width);
+  display: flex;
   min-height: 0;
   min-width: 0;
-  flex: 1;
   flex-direction: column;
+}
+
+.arena-shell[data-view='home'] .arena-shell__workspace,
+.arena-shell[data-run-open='true'] .arena-shell__workspace {
+  left: 0;
 }
 
 .arena-shell__content {
@@ -334,57 +220,38 @@
   background: transparent;
 }
 
-.arena-shell__brand:focus-visible,
 .arena-shell__nav-item:focus-visible,
-.arena-shell__profile:focus-visible {
-  outline: 2px solid var(--dr-focus, #256eaa);
-  outline-offset: -2px;
+.arena-shell__settings-control button:focus-visible {
+  outline: 3px solid var(--dr-focus);
+  outline-offset: -4px;
 }
 
-/* Below the doc's compact threshold the rail narrows to icons; it stays a
-   fixed-width vertical column so a route never gains a horizontal header
-   bar or an externally-scrolling workspace. */
-@media (max-width: 1120px) {
+@media (max-width: 900px) {
+  .arena-shell {
+    --arena-shell-rail-width: 5.5rem;
+  }
+
   .arena-shell__rail {
-    width: 4rem;
-    flex: 0 0 4rem;
-    padding: 1rem 0.5rem;
-  }
-
-  .arena-shell__brand {
-    justify-content: center;
-    padding: 0.3rem 0 1rem;
-  }
-
-  /* Each control already carries its own aria-label; hide the redundant
-     visible word entirely instead of leaving a visually-hidden duplicate
-     that assistive tech would announce twice. */
-  .arena-shell__brand-name,
-  .arena-shell__nav-label,
-  .arena-shell__profile-label {
-    display: none;
+    padding-inline: 0.65rem;
   }
 
   .arena-shell__nav-item,
-  .arena-shell__profile {
-    justify-content: center;
-    padding: 0.62rem 0;
+  .arena-shell__settings-control button {
+    justify-content: center !important;
+    padding-inline: 0 !important;
+  }
+
+  .arena-shell__nav-label,
+  .arena-shell__settings-label {
+    display: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .arena-shell--transitioning::before {
-    animation: none;
-  }
-
-  .arena-shell::after {
-    animation: none;
-  }
-
-  .arena-shell__rail,
-  .arena-shell__field-bleed,
+  .arena-shell::after,
   .arena-shell__nav-item,
-  .arena-shell__profile {
+  .arena-shell__settings-control button,
+  .arena-shell__settings-label {
     transition: none;
   }
 }

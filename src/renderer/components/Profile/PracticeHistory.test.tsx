@@ -66,9 +66,7 @@ describe('PracticeHistory', () => {
     );
     expect(
       screen.getByTestId('profile-practice-history-definition'),
-    ).toHaveTextContent(
-      'adds the evicted archive and currently retained recent summaries once each',
-    );
+    ).toHaveTextContent('counts each archived and recent run once');
   });
 
   it('provides a readable monthly table in addition to the chart', () => {

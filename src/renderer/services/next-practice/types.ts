@@ -18,6 +18,7 @@ import type {
   SkillReview,
   SongGoal,
   ZpdRankedCandidate,
+  ZpdAdaptation,
 } from '../pedagogy/types';
 
 export type PracticeCandidateKind = 'song' | 'lesson';
@@ -187,6 +188,7 @@ export interface RankedPracticeCandidate {
   score: number;
   predictedSuccess: number;
   suggestedSpeed: number;
+  adaptation?: ZpdAdaptation;
   mastery: number;
   directRemediation?: DirectRemediationRoute;
   deadlinePacing?: CandidateDeadlinePacing;

@@ -1,7 +1,9 @@
+/* No rail offset: AppShell withdraws the rail for the whole run
+   (`[data-run-open]`), so the run is a genuine full-window surface rather
+   than a panel indented past navigation that is no longer there. */
 .drumroll-practice-shell {
   height: 100%;
   min-height: 0;
-  margin-left: 13rem;
   overflow: hidden;
   color: var(--dr-ink, var(--color-ink));
   background: transparent;
@@ -57,63 +59,6 @@
   flex: 0 1 17rem;
 }
 
-/* He practices at 0.7x and needs the mode and speed at a glance - never
- * drop .drumroll-practice-toolbar__mode-label/layout-label/speed-label at
- * any captured width. This block is shrink-0 and the Playback scrubber
- * next to it is grow, so the scrubber absorbs width first; nothing here
- * needs to degrade down to the 1024px minimum. */
-.drumroll-practice-toolbar__session-state {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--dr-ink-muted, var(--color-text-muted));
-  font-family: var(--font-ui);
-  font-size: 0.72rem;
-  font-weight: 650;
-  letter-spacing: 0;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.drumroll-practice-toolbar__session-state
-  > span:not(.drumroll-practice-input-readiness)
-  + span:not(.drumroll-practice-input-readiness)::before {
-  margin-right: 0.4rem;
-  color: var(--dr-line, rgb(36 31 25 / 34%));
-  content: '·';
-}
-
-.drumroll-practice-toolbar__session-state[data-looping='true'] {
-  color: var(--dr-ember, var(--color-coral));
-}
-
-.drumroll-practice-input-readiness {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.32rem;
-  color: inherit;
-  font: inherit;
-  white-space: nowrap;
-}
-
-.drumroll-practice-input-readiness > span {
-  width: 0.42rem;
-  height: 0.42rem;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--dr-earned, var(--color-green));
-}
-
-.drumroll-practice-input-readiness[data-state='reconnecting'] > span {
-  background: var(--dr-warning, var(--color-amber));
-}
-
-.drumroll-practice-input-readiness[data-state='waiting'] > span {
-  background: var(--dr-line, var(--color-text-faint));
-}
-
 .drumroll-performance-inspector {
   max-width: calc(100vw - 1.5rem);
 }
@@ -141,6 +86,12 @@
 .drumroll-performance-inspector__body .grid,
 .drumroll-performance-inspector__body .grid > * {
   min-width: 0;
+}
+
+.drumroll-performance-inspector__minor-action {
+  align-self: flex-start;
+  color: var(--dr-ink-muted, var(--color-text-muted));
+  font-size: 0.78rem;
 }
 
 .drumroll-practice-streak {
@@ -177,11 +128,5 @@
 
   .drumroll-practice-streak {
     top: 0.75rem;
-  }
-}
-
-@media (max-width: 1120px) {
-  .drumroll-practice-shell {
-    margin-left: 4rem;
   }
 }

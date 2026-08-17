@@ -7,3 +7,5 @@ export { StreakFlame } from './StreakFlame';
 export { WeekDots } from './WeekDots';
 
 export { GoalPopover } from './GoalPopover';
+
+export { KitActionChip } from './KitActionChip';

@@ -21,10 +21,14 @@ import {
   ACTIVE_CLASS,
   HIDDEN_CLASS,
   HIT_CLASS,
+  isHihatPedalControl,
   MISS_CLASS,
   MISSED_CLASS,
   POP_CLASS,
+  WRONG_HIT_FADE_DELAY_SECONDS,
+  WRONG_HIT_FADE_DURATION_SECONDS,
   WRONG_HIT_MARKER_CLASS,
+  WRONG_HIT_MIN_OPACITY,
 } from './constants';
 import {
   flashClass,
@@ -42,13 +46,7 @@ import {
 const WRONG_HIT_STACK_THRESHOLD_PX = 12;
 const WRONG_HIT_STACK_OFFSET_PX = 10;
 
-/**
- * Older builds hid completed noteheads with `vf-note-hidden`; interrupted
- * practice/recovery transitions could leave that class (or its inline
- * equivalent) behind. Every renderer reconciliation now reasserts the core
- * score invariant: feedback may recolour a notehead, but never remove it.
- */
-function ensureGlyphVisible(el: SVGElement): void {
+function restoreGlyph(el: SVGElement): void {
   el.classList.remove(HIDDEN_CLASS);
   el.removeAttribute('hidden');
   el.style.removeProperty('display');
@@ -56,13 +54,13 @@ function ensureGlyphVisible(el: SVGElement): void {
   el.style.removeProperty('opacity');
 }
 
-function ensureNoteVisible(note: StaveNote): void {
+function restoreNote(note: StaveNote): void {
   const elements = new Set([
     ...getNoteGlyphElements(note),
     ...getNoteSvg(note),
   ]);
 
-  elements.forEach(ensureGlyphVisible);
+  elements.forEach(restoreGlyph);
 }
 
 export class GameRenderer {
@@ -81,7 +79,13 @@ export class GameRenderer {
   private endResolved = false;
   private activeEls: SVGElement[] = [];
   private filledEls = new Set<SVGElement>();
-  private wrongHitMarkers: { tick: number; x: number; el: HTMLElement }[] = [];
+  private vanishedNotes = new Map<StaveNote, SVGElement[]>();
+  private wrongHitMarkers: {
+    tick: number;
+    timeSeconds: number;
+    x: number;
+    el: HTMLElement;
+  }[] = [];
 
   constructor(
     private isHit: IsHit,
@@ -120,6 +124,7 @@ export class GameRenderer {
   render(chartTime: number, tick: number, isSeek = false): void {
     this.syncMeasure(tick);
     this.syncActiveNote(tick, isSeek);
+    this.syncWrongHitMarkerOpacity(chartTime);
     this.updateCursor(chartTime);
   }
 
@@ -131,7 +136,7 @@ export class GameRenderer {
       return;
     }
 
-    ensureNoteVisible(note);
+    let lastFlashedEl: SVGElement | undefined;
 
     note.getKeys().forEach((key, i) => {
       if (!prefixes.includes(keyPrefix(key))) {
@@ -144,15 +149,39 @@ export class GameRenderer {
         return;
       }
 
-      ensureGlyphVisible(el);
       el.classList.remove(MISSED_CLASS);
       el.classList.add(HIT_CLASS);
       this.filledEls.add(el);
       flashClass(el, POP_CLASS);
+      lastFlashedEl = el;
     });
+
+    const allHit = note
+      .getKeys()
+      .every((key) => this.isHit(entry.tick, keyPrefix(key)));
+
+    if (!allHit) {
+      return;
+    }
+
+    if (!lastFlashedEl) {
+      this.vanishNote(note);
+
+      return;
+    }
+
+    lastFlashedEl.addEventListener(
+      'animationend',
+      () => this.vanishNote(note),
+      { once: true },
+    );
   }
 
   paintWrongHit(record: FalseHitRecord): void {
+    if (isHihatPedalControl(record.controlId)) {
+      return;
+    }
+
     const overlay = this.overlayEl;
     const measureIdx = this.measureIndexForTick(record.tick);
     const measureData =
@@ -170,6 +199,9 @@ export class GameRenderer {
     const marker = document.createElement('div');
 
     marker.className = WRONG_HIT_MARKER_CLASS;
+    marker.style.opacity = String(
+      this.wrongHitMarkerOpacity(record.timeSeconds, record.timeSeconds),
+    );
 
     const stackY = y + this.wrongHitStackOffset(x);
 
@@ -184,7 +216,12 @@ export class GameRenderer {
     }
 
     overlay.appendChild(marker);
-    this.wrongHitMarkers.push({ tick: record.tick, x, el: marker });
+    this.wrongHitMarkers.push({
+      tick: record.tick,
+      timeSeconds: record.timeSeconds,
+      x,
+      el: marker,
+    });
   }
 
   /**
@@ -209,6 +246,24 @@ export class GameRenderer {
     return sign * magnitude;
   }
 
+  private syncWrongHitMarkerOpacity(chartTime: number): void {
+    this.wrongHitMarkers.forEach(({ timeSeconds, el }) => {
+      el.style.opacity = String(
+        this.wrongHitMarkerOpacity(chartTime, timeSeconds),
+      );
+    });
+  }
+
+  private wrongHitMarkerOpacity(chartTime: number, markerTime: number): number {
+    const progress = Math.min(
+      1,
+      Math.max(0, chartTime - markerTime - WRONG_HIT_FADE_DELAY_SECONDS) /
+        WRONG_HIT_FADE_DURATION_SECONDS,
+    );
+
+    return 1 - (1 - WRONG_HIT_MIN_OPACITY) * progress;
+  }
+
   reset(): void {
     this.measureIdx = -1;
     this.activePos = undefined;
@@ -221,14 +276,14 @@ export class GameRenderer {
     this.activeEls = [];
     this.renderData.forEach(({ renderedNotes }) => {
       renderedNotes.forEach(({ note }) => {
-        ensureNoteVisible(note);
+        restoreNote(note);
         forEachNoteHead(note, (el) => {
-          ensureGlyphVisible(el);
           el.classList.remove(HIT_CLASS, MISSED_CLASS, POP_CLASS, MISS_CLASS);
         });
       });
     });
     this.filledEls.clear();
+    this.vanishedNotes.clear();
     this.wrongHitMarkers.forEach(({ el }) => el.remove());
     this.wrongHitMarkers = [];
   }
@@ -329,9 +384,6 @@ export class GameRenderer {
   private toActiveNote(pos: NotePos): ActiveNote | undefined {
     const note =
       this.renderData[pos.measureIdx].renderedNotes[pos.noteIdx].note;
-
-    ensureNoteVisible(note);
-
     const noteHeadEls = getNoteSvg(note);
 
     return noteHeadEls.length === 0 ? undefined : { ...pos, noteHeadEls };
@@ -340,10 +392,7 @@ export class GameRenderer {
   private applyActive(target: ActiveNote | undefined): void {
     this.activeEls.forEach((el) => el.classList.remove(ACTIVE_CLASS));
     this.activeEls = target?.noteHeadEls ?? [];
-    this.activeEls.forEach((el) => {
-      ensureGlyphVisible(el);
-      el.classList.add(ACTIVE_CLASS);
-    });
+    this.activeEls.forEach((el) => el.classList.add(ACTIVE_CLASS));
   }
 
   private applyColoring(
@@ -357,6 +406,8 @@ export class GameRenderer {
         el.classList.remove(HIT_CLASS, MISSED_CLASS);
       });
       this.filledEls.clear();
+      this.vanishedNotes.forEach((els) => els.forEach(restoreGlyph));
+      this.vanishedNotes.clear();
     };
 
     if (!target) {
@@ -391,8 +442,6 @@ export class GameRenderer {
       key: string,
       isRest: boolean,
     ) => {
-      ensureGlyphVisible(el);
-
       const hit = this.isHit(tick, key);
       const missed = !hit && this.isMissed(tick, key);
       const wasMissed = el.classList.contains(MISSED_CLASS);
@@ -413,8 +462,8 @@ export class GameRenderer {
     const walkNote = (note: StaveNote, tick: number) => {
       const isRest = note.isRest();
 
-      ensureNoteVisible(note);
       forEachNoteHead(note, (el, key) => colorNote(el, tick, key, isRest));
+      this.syncNoteState(note, tick, isRest);
     };
 
     if (isBackward) {
@@ -467,6 +516,44 @@ export class GameRenderer {
     }
 
     this.coloredPos = { measureIdx, noteIdx };
+  }
+
+  private syncNoteState(note: StaveNote, tick: number, isRest: boolean): void {
+    if (isRest) {
+      return;
+    }
+
+    const allHit = note
+      .getKeys()
+      .every((key) => this.isHit(tick, keyPrefix(key)));
+
+    if (allHit) {
+      this.vanishNote(note);
+    } else {
+      this.unvanishNote(note);
+    }
+  }
+
+  private vanishNote(note: StaveNote): void {
+    if (this.vanishedNotes.has(note)) {
+      return;
+    }
+
+    const elements = getNoteGlyphElements(note);
+
+    elements.forEach((el) => el.classList.add(HIDDEN_CLASS));
+    this.vanishedNotes.set(note, elements);
+  }
+
+  private unvanishNote(note: StaveNote): void {
+    const elements = this.vanishedNotes.get(note);
+
+    if (!elements) {
+      return;
+    }
+
+    elements.forEach(restoreGlyph);
+    this.vanishedNotes.delete(note);
   }
 
   private pruneWrongHitMarkers(currentTick: number): void {

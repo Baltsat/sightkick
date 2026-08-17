@@ -39,42 +39,42 @@ export const alpha = (color: string, value: number) => {
   return `rgba(${r}, ${g}, ${b}, ${value})`;
 };
 
-const accent = '#f73586';
-const accentBright = '#ff684f';
+const accent = '#e85a36';
+const accentBright = '#e85a36';
 const accentHover = lighten(accent, 0.12);
 const accentDeep = darken(accent, 0.22);
 const accentText = darken(accent, 0.25);
 
 export const themedark = {
   color: {
-    bg: '#f8f5ef',
-    surface: '#ffffff',
-    surfaceRaised: '#eee8dc',
-    surfaceSunken: '#e4ddd0',
-    headerGradient: 'linear-gradient(180deg, #ffffff, #eee8dc)',
+    bg: '#f4efe5',
+    surface: '#fcf9f2',
+    surfaceRaised: '#fcf9f2',
+    surfaceSunken: '#eae1d3',
+    headerGradient: 'linear-gradient(180deg, #fcf9f2, #eae1d3)',
 
-    border: 'rgba(17,23,34,0.14)',
-    borderSoft: 'rgba(17,23,34,0.08)',
-    divider: 'rgba(17,23,34,0.10)',
-    fill: 'rgba(17,23,34,0.055)',
-    fillStrong: 'rgba(17,23,34,0.11)',
+    border: 'rgba(36,31,25,0.14)',
+    borderSoft: 'rgba(36,31,25,0.08)',
+    divider: 'rgba(36,31,25,0.10)',
+    fill: 'rgba(36,31,25,0.055)',
+    fillStrong: 'rgba(36,31,25,0.11)',
 
-    text: '#111722',
-    textBody: '#1b2430',
-    textMuted: '#526172',
-    textFaint: '#667588',
-    textDim: '#748195',
-    textDimmer: '#8490a1',
+    text: '#241f19',
+    textBody: '#241f19',
+    textMuted: '#71685e',
+    textFaint: '#71685e',
+    textDim: '#71685e',
+    textDimmer: '#71685e',
 
-    star: '#ffad2f',
-    starPerfect: '#56d8f2',
+    star: '#f4bd3d',
+    starPerfect: '#f4bd3d',
 
     accent,
     accentBright,
     accentHover,
     accentDeep,
     accentText,
-    accentInk: '#111722',
+    accentInk: '#241f19',
     accentGradient: `linear-gradient(145deg, ${accentHover}, ${accentDeep})`,
     accentGradientFade: `linear-gradient(90deg, ${alpha(
       accent,
@@ -84,8 +84,8 @@ export const themedark = {
     accentSoftBorder: alpha(accent, 0.22),
 
     paper: '#eee8dc',
-    ink: '#111722',
-    inkSoft: '#536274',
+    ink: '#241f19',
+    inkSoft: '#71685e',
 
     green: '#16885b',
     orange: '#e95d37',
@@ -106,12 +106,12 @@ export const themedark = {
     songTitle: 19,
     panelTitle: 21,
     transportTitle: 17,
-    body: 15,
-    label: 14,
-    small: 13.5,
-    caption: 12.5,
-    overline: 12,
-    micro: 11,
+    body: 16,
+    label: 15,
+    small: 14,
+    caption: 13,
+    overline: 13,
+    micro: 12,
   },
 
   radius: {
@@ -126,11 +126,11 @@ export const themedark = {
 
   shadow: {
     frame:
-      '0 40px 90px -30px rgba(17,23,34,0.18), 0 0 0 1px rgba(255,255,255,0.72)',
-    star: 'drop-shadow(rgba(255, 173, 47, 0.45) 0px 3px 8px)',
-    starPerfect: 'drop-shadow(0 3px 10px rgba(86,216,242,0.5))',
+      '0 40px 90px -30px rgba(36,31,25,0.18), 0 0 0 1px rgba(255,255,255,0.72)',
+    star: 'drop-shadow(rgba(244,189,61,0.45) 0px 3px 8px)',
+    starPerfect: 'drop-shadow(0 3px 10px rgba(244,189,61,0.5))',
     panel:
-      '0 40px 90px -30px rgba(17,23,34,0.18), 0 0 0 1px rgba(255,255,255,0.72)',
+      '0 40px 90px -30px rgba(36,31,25,0.18), 0 0 0 1px rgba(255,255,255,0.72)',
     accentButton: `0 12px 32px -6px ${alpha(
       accent,
       0.6,
@@ -138,22 +138,22 @@ export const themedark = {
     accentChip: `0 6px 16px -4px ${alpha(accent, 0.5)}`,
     accentSoft: `0 6px 6px -6px ${alpha(accent, 0.5)}`,
     paper:
-      'inset 0 1px 0 rgba(255,255,255,0.9), 0 18px 40px -20px rgba(17,23,34,0.22)',
-    floatLabel: '0 8px 20px rgba(17,23,34,0.16)',
+      'inset 0 1px 0 rgba(255,255,255,0.9), 0 18px 40px -20px rgba(36,31,25,0.22)',
+    floatLabel: '0 8px 20px rgba(36,31,25,0.16)',
   },
 
   space: { xs: 4, sm: 8, md: 14, lg: 22, xl: 26, xxl: 40 },
 
   control: {
     toggleOn: accent,
-    toggleOffTrack: 'rgba(17,23,34,0.16)',
+    toggleOffTrack: 'rgba(36,31,25,0.16)',
     toggleKnobOn: '#ffffff',
     toggleKnobOff: '#ffffff',
-    sliderTrack: 'rgba(17,23,34,0.12)',
+    sliderTrack: 'rgba(36,31,25,0.12)',
     sliderFill: `linear-gradient(90deg, ${accentDeep}, ${accent})`,
-    sliderFillMuted: 'rgba(17,23,34,0.18)',
+    sliderFillMuted: 'rgba(36,31,25,0.18)',
     sliderThumb: '#ffffff',
-    iconButtonBg: 'rgba(17,23,34,0.055)',
+    iconButtonBg: 'rgba(36,31,25,0.055)',
     iconButtonActiveBg: alpha(accent, 0.14),
     iconButtonActiveBorder: alpha(accent, 0.28),
   },

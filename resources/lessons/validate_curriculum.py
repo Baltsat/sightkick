@@ -10,7 +10,7 @@ when deciding whether a tom exists in the generated chart.
 
 Run from the repository root:
 
-    resources/lessons/.venv/bin/python3 resources/lessons/validate_curriculum.py
+    uv run --python 3.12 --with pyyaml python resources/lessons/validate_curriculum.py
 
 No user library is read or changed. The validator only uses the committed
 curriculum and the deterministic MIDI writer.
@@ -33,6 +33,7 @@ from generate import (
     TOM_MARKER_NOTE,
     bar_ticks_for,
     build_notes_mid,
+    duplicate_pattern_report,
     build_timeline,
     iter_exercises,
     load_curriculum,
@@ -467,6 +468,7 @@ def validate(curriculum_path: Path) -> dict[str, object]:
     exercises = [exercise for _, _, exercise in iter_exercises(curriculum)]
     _validate_structure(exercises)
     learning_model = _validate_learning_model_semantics(curriculum, exercises)
+    duplicates = duplicate_pattern_report(exercises)
 
     evidence = {exercise["id"]: _evidence_for(exercise) for exercise in exercises}
     missing_lesson_seven_ids = set(LESSON_SEVEN_EXPECTED_TOMS) - set(evidence)
@@ -593,6 +595,7 @@ def validate(curriculum_path: Path) -> dict[str, object]:
         "groove_contexts": sorted(groove_contexts),
         "fill_contexts": sorted(fill_contexts),
         "learning_model": learning_model,
+        "duplicates": duplicates,
     }
 
 
@@ -627,6 +630,10 @@ def main() -> int:
         f"{len(report['learning_model']['tempo_ladders'])} rising tempo ladders; "
         f"{len(report['learning_model']['reading_ids'])} reading / "
         f"{len(report['learning_model']['transfer_ids'])} transfer lessons"
+    )
+    print(
+        f"  note+sticking patterns: {report['duplicates']['distinct_pattern_count']} distinct; "
+        f"{len(report['duplicates']['duplicate_groups'])} intentional tempo families"
     )
     return 0
 

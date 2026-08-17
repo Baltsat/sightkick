@@ -1,5 +1,10 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  InteractionModeArbiter,
+  InteractionModeProvider,
+  INTERACTION_MODE_IDLE_MS,
+} from '../../services/interaction-mode';
 import { PracticeReadinessCue } from './PracticeReadinessCue';
 
 describe('PracticeReadinessCue', () => {
@@ -7,26 +12,30 @@ describe('PracticeReadinessCue', () => {
     render(<PracticeReadinessCue phase="idle" />);
 
     expect(screen.getByTestId('practice-readiness-cue')).toHaveAttribute(
-      'data-phase',
+      'data-state',
       'idle',
     );
     expect(screen.getByText('Score preparing')).toBeInTheDocument();
-    expect(
-      screen.queryByLabelText('Hit the kick pad once to start the count-in'),
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('practice-readiness-cue')).not.toHaveAttribute(
+      'data-primary-element',
+    );
   });
 
   it('shows the one-kick infographic only when ready to play', () => {
     render(<PracticeReadinessCue phase="ready" />);
 
     expect(screen.getByTestId('practice-readiness-cue')).toHaveAttribute(
-      'data-phase',
+      'data-state',
       'ready',
     );
     expect(screen.getByText('Kick to count in')).toBeInTheDocument();
-    expect(
-      screen.getByLabelText('Hit the kick pad once to start the count-in'),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('practice-readiness-cue')).toHaveAttribute(
+      'data-primary-element',
+      'kick',
+    );
+    expect(screen.getByTestId('practice-readiness-cue')).toHaveAccessibleName(
+      'Ready. Kick to count in: Kick. The first beat is armed.',
+    );
   });
 
   it('keeps an interrupted attempt in the same one-kick cue', () => {
@@ -35,7 +44,10 @@ describe('PracticeReadinessCue', () => {
     expect(screen.getByTestId('practice-readiness-cue')).toHaveTextContent(
       'Resume bar 4 · kick to count in',
     );
-    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+    expect(screen.getByTestId('practice-readiness-cue')).toHaveAttribute(
+      'data-primary-element',
+      'kick',
+    );
   });
 
   it('names the section, scaffold, and tested skill before an audition starts', () => {
@@ -68,5 +80,28 @@ describe('PracticeReadinessCue', () => {
     expect(
       screen.queryByTestId('practice-readiness-cue'),
     ).not.toBeInTheDocument();
+  });
+
+  it('steps out of the way during computer input', () => {
+    vi.useFakeTimers();
+
+    const arbiter = new InteractionModeArbiter({
+      subscribeToDrumStrikes: () => () => {},
+    });
+
+    render(
+      <InteractionModeProvider arbiter={arbiter}>
+        <PracticeReadinessCue phase="ready" />
+      </InteractionModeProvider>,
+    );
+
+    fireEvent.wheel(window);
+    expect(screen.getByTestId('practice-readiness-cue')).toHaveAttribute(
+      'data-yielding',
+      'true',
+    );
+
+    act(() => vi.advanceTimersByTime(INTERACTION_MODE_IDLE_MS));
+    expect(screen.getByTestId('practice-readiness-cue')).toBeInTheDocument();
   });
 });

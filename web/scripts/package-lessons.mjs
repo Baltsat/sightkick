@@ -16,9 +16,34 @@ import { fileURLToPath } from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, '../..');
+const outputFlagIndex = process.argv.indexOf('--out-dir');
+const requestedOutput =
+  outputFlagIndex === -1 ? undefined : process.argv[outputFlagIndex + 1];
+
+if (outputFlagIndex !== -1 && !requestedOutput) {
+  throw new Error('--out-dir requires a path.');
+}
+
+const defaultLibraryRoot = path.join(repoRoot, 'web/public/library');
+const stagingRoot = path.join(repoRoot, 'tmp/lanes/f-staging');
+const stagingLibraryRoot = path.join(stagingRoot, 'library');
+const libraryRoot = requestedOutput
+  ? path.resolve(repoRoot, requestedOutput)
+  : defaultLibraryRoot;
+
+if (
+  libraryRoot !== defaultLibraryRoot &&
+  libraryRoot !== stagingLibraryRoot &&
+  !libraryRoot.startsWith(`${stagingLibraryRoot}${path.sep}`)
+) {
+  throw new Error('--out-dir must stay under tmp/lanes/f-staging/library.');
+}
+
+const librarySourcesRoot =
+  libraryRoot === defaultLibraryRoot
+    ? path.join(repoRoot, 'web/public/library-sources')
+    : path.join(path.dirname(libraryRoot), 'library-sources');
 const generatedRoot = mkdtempSync(path.join(tmpdir(), 'drumroll-lessons-'));
-const libraryRoot = path.join(repoRoot, 'web/public/library');
-const librarySourcesRoot = path.join(repoRoot, 'web/public/library-sources');
 const yandexSourceFiles = [
   'yandex-drums-2026-08-09.json',
   'yandex-favorites-2026-08-10.json',
@@ -121,6 +146,9 @@ try {
     const files = readdirSync(source).sort();
     const ini = parseIni(readFileSync(path.join(source, 'song.ini'), 'utf8'));
     const base = `/library/${encodeURIComponent(folder)}`;
+    const sticking = readFileSync(path.join(source, 'sticking.json'), 'utf8');
+
+    JSON.parse(sticking);
 
     cpSync(source, destination, { recursive: true });
 
@@ -190,6 +218,7 @@ try {
         },
       },
       chart: `${base}/notes.mid`,
+      sticking: `${base}/sticking.json`,
       files,
     };
   });

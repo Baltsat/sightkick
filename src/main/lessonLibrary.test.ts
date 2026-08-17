@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   bootstrapLessonLibrary,
   DESKTOP_LESSON_LIBRARY_FOLDER,
+  loadLocalLessonPacks,
+  LOCAL_LESSON_PACKS_FOLDER,
+  reconcileLocalLessonPacks,
 } from './lessonLibrary';
+import type { StorageSchema } from '../types';
 
 const CHART = `[Song]
 {
@@ -51,8 +55,15 @@ function makeLessonBundle(
     );
     fs.writeFileSync(path.join(dir, 'notes.chart'), CHART);
     fs.writeFileSync(path.join(dir, 'drums.ogg'), audio);
+    fs.writeFileSync(
+      path.join(dir, 'sticking.json'),
+      JSON.stringify({ version: 1, lessonId, bars: [] }),
+    );
 
-    return { song: { id: `lesson:${lessonId}`, drumDifficulties: ['expert'] } };
+    return {
+      song: { id: `lesson:${lessonId}`, drumDifficulties: ['expert'] },
+      sticking: `${lessonId}/sticking.json`,
+    };
   });
 
   fs.writeFileSync(
@@ -81,7 +92,129 @@ function makeImportedSong(libraryRoot: string, name = 'Imported Song'): string {
   return dir;
 }
 
+function makeLocalLessonPack(
+  userDataRoot: string,
+  name = 'Local Pack',
+): string {
+  const pack = makeLessonBundle(2, 'local-source');
+  const packRoot = path.join(userDataRoot, LOCAL_LESSON_PACKS_FOLDER, name);
+
+  fs.cpSync(pack, packRoot, { recursive: true });
+
+  const manifestPath = path.join(packRoot, 'manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+
+  manifest.pack = { id: 'local-pack', title: 'Local Pack' };
+  manifest.lessons.forEach(
+    (entry: { song: { id: string }; sticking: string }, index: number) => {
+      entry.song.id = `local:local-pack:01.${String(index + 1).padStart(
+        3,
+        '0',
+      )}`;
+
+      const folder = `SightKick Method - Lesson 01.${String(index + 1).padStart(
+        2,
+        '0',
+      )}`;
+
+      entry.sticking = `${folder}/sticking.json`;
+      fs.appendFileSync(
+        path.join(packRoot, folder, 'song.ini'),
+        `sk_lesson_id = book:01.${String(index + 1).padStart(
+          3,
+          '0',
+        )}\nsk_unit = Local Pack — Unit 1\n`,
+      );
+    },
+  );
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+
+  return packRoot;
+}
+
 describe('bootstrapLessonLibrary', () => {
+  it('loads a local pack beside bundled lessons without copying it into the profile library', () => {
+    const userDataRoot = path.join(root, 'local-pack-profile');
+    const pack = makeLocalLessonPack(userDataRoot);
+    const result = loadLocalLessonPacks(userDataRoot);
+
+    expect(result.libraryRoots).toEqual([pack]);
+    expect(result.rejectedPacks).toEqual([]);
+    expect(Object.keys(result.songs)).toEqual([
+      'local:local-pack:01.001',
+      'local:local-pack:01.002',
+    ]);
+    expect(result.songs['local:local-pack:01.001']?.sk_unit).toBe(
+      'Local Pack — Unit 1',
+    );
+  });
+
+  it('leaves startup unchanged when local packs are absent or malformed', () => {
+    const userDataRoot = path.join(root, 'no-local-pack-profile');
+
+    expect(loadLocalLessonPacks(userDataRoot)).toEqual({
+      libraryRoots: [],
+      songs: {},
+      rejectedPacks: [],
+    });
+
+    const malformed = path.join(userDataRoot, LOCAL_LESSON_PACKS_FOLDER, 'bad');
+
+    fs.mkdirSync(malformed, { recursive: true });
+    fs.writeFileSync(path.join(malformed, 'manifest.json'), '{bad json');
+
+    expect(loadLocalLessonPacks(userDataRoot)).toEqual({
+      libraryRoots: [],
+      songs: {},
+      rejectedPacks: ['bad'],
+    });
+  });
+
+  it('prunes a vanished local pack from the active library and restores its progress on reinstall', () => {
+    const userDataRoot = path.join(root, 'vanished-local-pack-profile');
+    const pack = makeLocalLessonPack(userDataRoot);
+    const first = loadLocalLessonPacks(userDataRoot);
+    const localId = 'local:local-pack:01.001';
+    const existingSongs = {
+      personal: { id: 'personal', dir: '/personal/song' },
+      'lesson:01.01': { id: 'lesson:01.01', dir: '/bundled/lesson' },
+      [localId]: {
+        ...first.songs[localId],
+        liked: true,
+        scoreData: { expert: { hitNotes: 96, totalNotes: 100, falseHits: 0 } },
+      },
+    } as unknown as StorageSchema['songs'];
+
+    fs.rmSync(pack, { recursive: true, force: true });
+
+    const vanished = reconcileLocalLessonPacks(
+      existingSongs,
+      loadLocalLessonPacks(userDataRoot).songs,
+    );
+
+    expect(vanished.songs).toEqual({
+      personal: existingSongs.personal,
+      'lesson:01.01': existingSongs['lesson:01.01'],
+    });
+    expect(vanished.archivedSongs[localId]).toMatchObject({
+      liked: true,
+      scoreData: existingSongs[localId].scoreData,
+    });
+
+    makeLocalLessonPack(userDataRoot);
+
+    const reinstalled = reconcileLocalLessonPacks(
+      vanished.songs,
+      loadLocalLessonPacks(userDataRoot).songs,
+      vanished.archivedSongs,
+    );
+
+    expect(reinstalled.songs[localId]).toMatchObject({
+      liked: true,
+      scoreData: existingSongs[localId].scoreData,
+    });
+  });
+
   it('makes all 170 bundled lessons discoverable in a clean private profile with stable IDs', () => {
     const bundle = makeLessonBundle();
     const userDataRoot = path.join(root, 'clean-profile');
@@ -150,6 +283,22 @@ describe('bootstrapLessonLibrary', () => {
     expect(
       Object.keys(result.songs ?? {}).filter((id) => id.startsWith('lesson:')),
     ).toHaveLength(170);
+  });
+
+  it('rejects a bundle with missing structured sticking before creating a profile library', () => {
+    const bundle = makeLessonBundle();
+    const userDataRoot = path.join(root, 'missing-sticking-profile');
+
+    fs.rmSync(
+      path.join(bundle, 'SightKick Method - Lesson 01.01', 'sticking.json'),
+    );
+
+    expect(() =>
+      bootstrapLessonLibrary({ bundledRoot: bundle, userDataRoot }),
+    ).toThrow('Bundled lesson lesson:01.01 has no structured sticking data.');
+    expect(
+      fs.existsSync(path.join(userDataRoot, DESKTOP_LESSON_LIBRARY_FOLDER)),
+    ).toBe(false);
   });
 
   it('keeps an imported song in the default lesson-backed library across relaunch', () => {

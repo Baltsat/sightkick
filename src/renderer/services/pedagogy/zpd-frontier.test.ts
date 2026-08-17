@@ -64,6 +64,100 @@ function state(
 }
 
 describe('graph-aware ZPD frontier', () => {
+  it('turns synthetic profile states into run-consumable speed and repeat budgets', () => {
+    const profiles = [
+      {
+        name: 'assessment',
+        states: [] as readonly AtomicSkillState[],
+        expected_state: 'assessment',
+        expected_budget: 1,
+      },
+      {
+        name: 'acquisition',
+        states: [
+          state('pulse.quarter', {
+            alpha: 6,
+            beta: 3,
+            effective_trials: 5,
+            stage: 'provisional',
+          }),
+        ],
+        expected_state: 'productive_acquisition',
+        expected_budget: 2,
+      },
+      {
+        name: 'consolidation',
+        states: [state('pulse.quarter')],
+        expected_state: 'productive_consolidation',
+        expected_budget: 2,
+      },
+      {
+        name: 'scaffold',
+        states: [
+          state('pulse.quarter', {
+            alpha: 3,
+            beta: 5,
+            effective_trials: 4,
+            best_supported_bpm: 70,
+            stage: 'assessed',
+          }),
+        ],
+        expected_state: 'scaffold_first',
+        expected_budget: 4,
+      },
+    ] as const;
+
+    profiles.forEach((profile) => {
+      const decision = rankZpdFrontier({
+        candidates: [candidate(`lesson:${profile.name}`, 'pulse.quarter')],
+        states: profile.states,
+        now: '2026-08-02T10:00:00.000Z',
+      })[0]!.decision;
+      const adaptation = decision.adaptation!;
+
+      expect(decision.state, profile.name).toBe(profile.expected_state);
+      expect(adaptation.repeat_budget, profile.name).toBe(
+        profile.expected_budget,
+      );
+      expect(adaptation.starting_speed, profile.name).toBe(
+        decision.scaffold.speed,
+      );
+      expect(adaptation.quality_passes_to_advance).toBeLessThanOrEqual(
+        adaptation.repeat_budget,
+      );
+    });
+  });
+
+  it('reduces repetition after recent attempts without changing the ZPD state', () => {
+    const input = {
+      states: [
+        state('pulse.quarter', {
+          alpha: 3,
+          beta: 5,
+          effective_trials: 4,
+          best_supported_bpm: 70,
+          stage: 'assessed' as const,
+        }),
+      ],
+      now: '2026-08-02T10:00:00.000Z',
+    };
+    const fresh = rankZpdFrontier({
+      ...input,
+      candidates: [candidate('lesson:fresh', 'pulse.quarter')],
+    })[0]!.decision;
+    const repeated = rankZpdFrontier({
+      ...input,
+      candidates: [
+        candidate('lesson:repeated', 'pulse.quarter', { recent_attempts: 3 }),
+      ],
+    })[0]!.decision;
+
+    expect(repeated.state).toBe(fresh.state);
+    expect(repeated.adaptation!.repeat_budget).toBe(
+      fresh.adaptation!.repeat_budget - 1,
+    );
+  });
+
   it('blocks independent work on a weak hard prerequisite and selects a concrete scaffold', () => {
     const ranked = rankZpdFrontier({
       candidates: [candidate('lesson:eighth', 'pulse.eighth')],

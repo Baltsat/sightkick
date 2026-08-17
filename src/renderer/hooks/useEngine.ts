@@ -123,8 +123,7 @@ export function useEngine({
       onError: () =>
         notification.error({
           title: 'Audio failed to load',
-          description:
-            'One or more audio tracks could not be loaded for this song.',
+          description: '1 or more audio tracks failed to load for this song.',
           placement: 'bottomRight',
         }),
     });

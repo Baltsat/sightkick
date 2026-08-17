@@ -5,7 +5,9 @@ const EMPTY_NOTE_IDS: ReadonlySet<string> = new Set();
 
 export const INITIAL_STREAK_STATE: StreakState = {
   count: 0,
+  credit: 0,
   best: 0,
+  bestCredit: 0,
   stage: undefined,
   countedNoteIds: EMPTY_NOTE_IDS,
 };
@@ -43,6 +45,7 @@ function noTransition(state: StreakState): StreakTransition {
 export function registerHit(
   state: StreakState,
   noteId: string,
+  credit = 1,
 ): StreakTransition {
   if (state.countedNoteIds.has(noteId)) {
     return noTransition(state);
@@ -50,14 +53,24 @@ export function registerHit(
 
   const count = state.count + 1;
   const best = Math.max(state.best, count);
-  const stage = stageForCount(count);
+  const cleanCredit = Math.max(0, credit);
+  const qualifiedCredit = state.credit + cleanCredit;
+  const bestCredit = Math.max(state.bestCredit, qualifiedCredit);
+  const stage = stageForCount(qualifiedCredit);
   const stageUp = stage && stage.id !== state.stage?.id ? stage : undefined;
   const countedNoteIds = new Set(state.countedNoteIds);
 
   countedNoteIds.add(noteId);
 
   return {
-    state: { count, best, stage, countedNoteIds },
+    state: {
+      count,
+      credit: qualifiedCredit,
+      best,
+      bestCredit,
+      stage,
+      countedNoteIds,
+    },
     stageUp,
     didShatter: false,
   };
@@ -75,7 +88,11 @@ export function registerFailure(state: StreakState): StreakTransition {
   }
 
   return {
-    state: { ...INITIAL_STREAK_STATE, best: state.best },
+    state: {
+      ...INITIAL_STREAK_STATE,
+      best: state.best,
+      bestCredit: state.bestCredit,
+    },
     stageUp: undefined,
     didShatter: true,
   };

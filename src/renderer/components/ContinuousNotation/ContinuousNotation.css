@@ -110,6 +110,30 @@
   border-right: 0;
 }
 
+.drumroll-loop-clear {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border: 3px solid var(--dr-paper, var(--color-paper-light));
+  border-radius: 50%;
+  background: var(--dr-wine, var(--color-accent-bright));
+  box-shadow: 0 2px 0 rgb(36 31 25 / 28%);
+  color: var(--dr-paper, var(--color-paper-light));
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.drumroll-loop-clear:focus-visible {
+  outline: 3px solid var(--dr-ember, var(--color-coral));
+  outline-offset: 3px;
+}
+
 .drumroll-flow-score {
   position: relative;
   z-index: 2;
@@ -242,8 +266,7 @@
 .drumroll-pattern-band {
   position: absolute;
   box-sizing: border-box;
-  border-top: 1px solid
-    color-mix(in srgb, var(--dr-violet, #7c3aed) 42%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--dr-wine) 42%, transparent);
   background: transparent;
 }
 
@@ -252,8 +275,7 @@
   position: absolute;
   top: 0;
   height: 0.45rem;
-  border-left: 1px solid
-    color-mix(in srgb, var(--dr-violet, #7c3aed) 42%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--dr-wine) 42%, transparent);
   content: '';
 }
 
@@ -271,11 +293,11 @@
   left: 0.38rem;
   color: color-mix(
     in srgb,
-    var(--dr-violet, #7c3aed) 68%,
+    var(--dr-wine) 68%,
     var(--dr-ink-muted, var(--color-text-muted))
   );
   font-family: var(--font-ui);
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 760;
   letter-spacing: 0.08em;
   text-transform: uppercase;

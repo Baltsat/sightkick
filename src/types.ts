@@ -341,6 +341,7 @@ export function isIpcError<T extends object>(
 export interface IpcLoadSongResponse {
   data: Song;
   fileData: Buffer;
+  stickingData?: unknown;
 }
 
 export interface IpcLoadSongListResponse {

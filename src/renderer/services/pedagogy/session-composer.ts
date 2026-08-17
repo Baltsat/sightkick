@@ -125,9 +125,19 @@ function block(
   ranked: ZpdRankedCandidate,
   why: string,
 ): SessionBlock {
+  const adaptation = ranked.decision.adaptation ?? {
+    starting_speed: ranked.decision.scaffold.speed,
+    repeat_budget: 2,
+    quality_passes_to_advance: 2,
+    low_quality_passes_before_stop: 2,
+  };
   const stop_rules: Record<SessionBlock['role'], string> = {
     orient: 'Stop after one counted phrase.',
-    acquire: 'Stop after two quality passes or two low-quality passes.',
+    acquire: `Stop after ${adaptation.quality_passes_to_advance} quality pass${
+      adaptation.quality_passes_to_advance === 1 ? '' : 'es'
+    } or ${adaptation.low_quality_passes_before_stop} low-quality pass${
+      adaptation.low_quality_passes_before_stop === 1 ? '' : 'es'
+    }.`,
     apply: 'Stop after one musical phrase or section pass.',
     retain: 'Stop after one delayed retrieval probe.',
     transfer: 'Stop after one different-context phrase.',
@@ -147,6 +157,7 @@ function block(
       : {}),
     speed: ranked.decision.scaffold.speed,
     scaffold: ranked.decision.scaffold.steps,
+    adaptation,
     stop_rule: stop_rules[role],
     why,
   };
@@ -322,7 +333,7 @@ export function composePracticeSession(
     launch: blocks[0],
     blocks,
     reason: input.request.explicit_song_id
-      ? 'The explicitly chosen song wins the launch; its receipt controls the scaffold.'
+      ? 'The chosen song starts first. Its receipt controls the scaffold.'
       : 'The launch is precomputed from intent, dose, and the current evidence receipt.',
   };
 }

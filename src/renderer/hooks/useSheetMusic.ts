@@ -5,6 +5,7 @@ import { ChartParser } from '../../chart-parser/parser';
 import { renderMusic, SheetMusicLayout } from '../../chart-parser/renderer';
 import { ParsedChart, RenderData } from '../../chart-parser/types';
 import { SHEET_MUSIC_COLORS } from '../constants';
+import { StickingData } from '../services/sticking';
 
 interface UseSheetMusicParams {
   fileData: Buffer | undefined;
@@ -17,6 +18,7 @@ interface UseSheetMusicParams {
   enableColors: boolean;
   showTempo: boolean;
   layout?: SheetMusicLayout;
+  stickingData?: StickingData;
 }
 
 interface UseSheetMusicResult {
@@ -37,6 +39,7 @@ export function useSheetMusic({
   enableColors,
   showTempo,
   layout = 'classic',
+  stickingData,
 }: UseSheetMusicParams): UseSheetMusicResult {
   const { notification } = App.useApp();
   const vexflowContainerRef = useRef<HTMLDivElement>(null);
@@ -68,7 +71,7 @@ export function useSheetMusic({
       notification.error({
         title: 'Chart parse failed',
         description:
-          "This song's chart could not be parsed and cannot be displayed.",
+          'Drumroll failed to parse this chart. The chart is hidden.',
         placement: 'bottomRight',
       });
     }
@@ -88,9 +91,17 @@ export function useSheetMusic({
         enableColors,
         showTempo,
         layout,
+        stickingData,
       ),
     );
-  }, [parsedMidi, showBarNumbers, enableColors, showTempo, layout]);
+  }, [
+    parsedMidi,
+    showBarNumbers,
+    enableColors,
+    showTempo,
+    layout,
+    stickingData,
+  ]);
 
   return {
     chart,

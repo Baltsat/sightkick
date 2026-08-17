@@ -109,7 +109,7 @@ export function describeKitSignal(
         headline: 'Connected. Waiting for a hit.',
         body: `"${
           ctx.deviceName ?? 'Your kit'
-        }" is connected. Hit any pad now — the count below should move.`,
+        }" is connected. Hit 1 pad. Check that the count increases.`,
       };
 
     case 'receiving-unmapped':

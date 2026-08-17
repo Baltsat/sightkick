@@ -61,6 +61,27 @@ describe('findItunesArtwork', () => {
     expect(requestUrl.toString()).toContain('entity=song');
   });
 
+  it('matches a slash-separated featured artist credit to the primary release artist', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          results: [
+            {
+              artistName: 'Jonas Blue',
+              trackName: 'What I Like About You (feat. Theresa Rex)',
+              artworkUrl100: 'https://example.com/100x100bb.jpg',
+            },
+          ],
+        }),
+      ),
+    );
+
+    await expect(
+      findItunesArtwork('Jonas Blue/Theresa Rex', 'What I Like About You'),
+    ).resolves.toBe('https://example.com/600x600bb.jpg');
+  });
+
   it('matches a candidate whose title carries an extra suffix iTunes appended', async () => {
     // "Golden Hour (Bonus Track Version)" vs a query of "Golden Hour" — the
     // feat-stripping idiom doesn't touch this suffix, so only the fuzzy
@@ -83,6 +104,32 @@ describe('findItunesArtwork', () => {
     await expect(findItunesArtwork('Kygo', 'Golden Hour')).resolves.toBe(
       'https://example.com/600x600bb.jpg',
     );
+  });
+
+  it('prefers the exact release title over a remix from the same artist', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          results: [
+            {
+              artistName: 'Kygo & Selena Gomez',
+              trackName: "It Ain't Me (Tiësto's AFTR:HRS Remix)",
+              artworkUrl100: 'https://example.com/remix/100x100bb.jpg',
+            },
+            {
+              artistName: 'Kygo & Selena Gomez',
+              trackName: "It Ain't Me",
+              artworkUrl100: 'https://example.com/original/100x100bb.jpg',
+            },
+          ],
+        }),
+      ),
+    );
+
+    await expect(
+      findItunesArtwork('Kygo & Selena Gomez', "It Ain't Me"),
+    ).resolves.toBe('https://example.com/original/600x600bb.jpg');
   });
 
   it('falls back to undefined when no result shares the queried artist', async () => {

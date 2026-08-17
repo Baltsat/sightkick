@@ -4,6 +4,7 @@ import { AccuracySparkline } from './AccuracySparkline';
 import { BiasIndicator } from './BiasIndicator';
 import { LaneAccuracyBars } from './LaneAccuracyBars';
 import { WrongHitTable } from './WrongHitTable';
+import { KitActionChip } from '../GamificationHeaderStrip/KitActionChip';
 
 /**
  * 'inline' mounts inside the expanded end-of-run ScoreSummary; 'panel'
@@ -16,6 +17,7 @@ interface Props {
   summary: RunSummary | undefined;
   trend?: RunTrendPoint[];
   variant?: PracticeStatsVariant;
+  kitConnected?: boolean;
   className?: string;
 }
 
@@ -48,6 +50,7 @@ export function PracticeStats({
   summary,
   trend = [],
   variant = 'panel',
+  kitConnected = false,
   className,
 }: Props) {
   if (!summary || !hasAnyAttempt(summary)) {
@@ -70,47 +73,63 @@ export function PracticeStats({
   // brag about.
   const hasBestStreak =
     summary.bestStreak !== undefined && summary.bestStreak > 0;
+  const accuracy = Math.round(summary.overallAccuracy * 100);
 
   return (
     <div
       className={cn(
-        'flex flex-col gap-4',
-        variant === 'panel' && 'gap-6',
+        'flex flex-col gap-6',
+        variant === 'panel' && 'gap-8',
         className,
       )}
       data-testid="practice-stats"
       data-variant={variant}
     >
-      {(modeLabel || hasBestStreak) && (
-        <div className="flex items-center justify-between gap-2">
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border-soft pb-5">
+        <div>
+          <div
+            className="font-display text-5xl font-semibold tabular-nums text-text"
+            data-testid="practice-overall-accuracy"
+          >
+            {accuracy}%
+          </div>
+          <div className="mt-1 text-base text-text-muted">Notes landed</div>
           {modeLabel && (
             <div
               data-testid="practice-run-mode"
-              className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint"
+              className="mt-1 text-sm text-text-muted"
             >
               {modeLabel}
             </div>
           )}
+        </div>
+        <div className="flex flex-wrap items-end gap-4">
           {hasBestStreak && (
             <div
               data-testid="practice-best-streak"
-              className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-text"
+              className="text-lg font-semibold text-accent-text"
             >
               Best streak {summary.bestStreak}
             </div>
           )}
+          {kitConnected && (
+            <div className="flex items-center gap-2 text-base text-text-muted">
+              <span>Close</span>
+              <KitActionChip action="end" />
+            </div>
+          )}
         </div>
-      )}
+      </header>
 
-      <section className="flex flex-col gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint">
+      <section className="flex flex-col gap-4">
+        <h3 className="font-display text-2xl font-semibold text-text">
           Accuracy per drum
         </h3>
         <LaneAccuracyBars laneAccuracy={summary.laneAccuracy} />
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint">
+      <section className="flex flex-col gap-3">
+        <h3 className="font-display text-2xl font-semibold text-text">
           Timing
         </h3>
         <BiasIndicator
@@ -119,15 +138,15 @@ export function PracticeStats({
         />
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint">
+      <section className="flex flex-col gap-3">
+        <h3 className="font-display text-2xl font-semibold text-text">
           Wrong hits
         </h3>
         <WrongHitTable wrongHitCounts={summary.wrongHitCounts} />
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-text-faint">
+      <section className="flex flex-col gap-3">
+        <h3 className="font-display text-2xl font-semibold text-text">
           Last runs
         </h3>
         <AccuracySparkline trend={trend} />

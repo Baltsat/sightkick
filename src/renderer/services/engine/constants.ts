@@ -49,6 +49,18 @@ export const HIDDEN_CLASS = 'vf-note-hidden';
 
 export const WRONG_HIT_MARKER_CLASS = 'vf-wronghit-marker';
 
+export const HIHAT_PEDAL_CONTROL_IDS = new Set(['midi:44']);
+
+export const WRONG_HIT_FADE_DELAY_SECONDS = 0.6;
+
+export const WRONG_HIT_FADE_DURATION_SECONDS = 3;
+
+export const WRONG_HIT_MIN_OPACITY = 0.48;
+
+export function isHihatPedalControl(controlId: string): boolean {
+  return HIHAT_PEDAL_CONTROL_IDS.has(controlId);
+}
+
 export const LOOKAHEAD_SECONDS = 0.2;
 
 export const COUNT_IN_MIN_VOLUME = 0.7;

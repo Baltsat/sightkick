@@ -73,7 +73,18 @@ export function useDrumGestures({
     candidateCancelRef.current = onCandidateCancel;
 
     if (!enabled || surfaceChanged) {
-      stateRef.current = createDrumGestureState();
+      // Results and Paused are the two surfaces a player arrives on straight
+      // out of live playing, so their quiet gate is seeded at the transition
+      // rather than cleared: the tail of the run that just stopped must not
+      // count as the deliberate silence a single-strike command needs. Every
+      // other surface is reached from a screen that was already quiet, so it
+      // keeps the "silent until proven otherwise" start and a first kick on
+      // Ready still starts the run immediately.
+      const arrivesFromPlaying = surface === 'result' || surface === 'paused';
+
+      stateRef.current = createDrumGestureState(
+        arrivesFromPlaying ? performance.now() : undefined,
+      );
     }
   }, [
     enabled,

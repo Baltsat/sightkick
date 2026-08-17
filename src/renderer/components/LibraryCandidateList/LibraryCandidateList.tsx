@@ -4,9 +4,11 @@ import { Difficulty } from 'scan-chart';
 import { Button, Tooltip } from 'antd';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
+  faHeart as faHeartSolid,
   faMagnifyingGlass,
   faWandMagicSparkles,
 } from '@fortawesome/free-solid-svg-icons';
+import { faHeart } from '@fortawesome/free-regular-svg-icons';
 import songArtPlaceholder from '../../../../assets/song-art-placeholder.svg';
 import type {
   LibraryCandidateResolution,
@@ -16,6 +18,7 @@ import type {
 import { cn } from '../../cn';
 import { calculateAccuracy, getStarRating } from '../../scoring';
 import { Stars } from '../Stars';
+import { IconButton } from '../IconButton';
 import { useSongHoverPreview } from '../../hooks/useSongHoverPreview';
 import type { SongHoverPreviewState } from '../../services/song-hover-preview';
 import type { UnifiedLibraryEntry } from '../../services/library/unified-library';
@@ -32,6 +35,7 @@ export interface LibraryCandidateListProps {
   resolvingTrackIds?: ReadonlySet<string>;
   canUseLocalAudio: boolean;
   onPlaySong: (songId: string) => void;
+  onLikeChange?: (songId: string, liked: boolean) => void;
   onResolveSource: (track: YandexPlaylistCandidate) => void;
   onUseLocalAudioForSource: (track: YandexPlaylistCandidate) => void;
   onUseLocalAudioForSong?: (song: Song) => void;
@@ -73,6 +77,7 @@ interface SongRowProps {
   preview: SongHoverPreviewState | undefined;
   unrated: boolean;
   onPlay: () => void;
+  onLikeChange?: (songId: string, liked: boolean) => void;
   onPreviewStart: () => void;
   onPreviewEnd: () => void;
 }
@@ -85,6 +90,7 @@ function SongRow({
   preview,
   unrated,
   onPlay,
+  onLikeChange,
   onPreviewStart,
   onPreviewEnd,
 }: SongRowProps) {
@@ -187,7 +193,7 @@ function SongRow({
         </div>
       </div>
 
-      <div className="ml-auto shrink-0 pl-2 text-right">
+      <div className="ml-auto flex shrink-0 items-center gap-2 pl-2 text-right">
         {entry.ready ? (
           <span tabIndex={0} aria-label={scoreLabel}>
             {accuracy !== undefined ? (
@@ -214,6 +220,23 @@ function SongRow({
               {entry.stateLabel}
             </span>
           </div>
+        )}
+        {onLikeChange && (
+          <IconButton
+            data-testid="like-toggle"
+            type={song.liked ? 'primary' : 'default'}
+            size="lg"
+            aria-label={
+              song.liked ? `Unlike ${song.name}` : `Like ${song.name}`
+            }
+            aria-pressed={Boolean(song.liked)}
+            icon={song.liked ? faHeartSolid : faHeart}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onLikeChange(song.id, !song.liked);
+            }}
+          />
         )}
       </div>
     </div>
@@ -351,6 +374,7 @@ export function LibraryCandidateList({
   resolutions,
   resolvingTrackIds,
   onPlaySong,
+  onLikeChange,
   onResolveSource,
   unratedSongIds,
 }: LibraryCandidateListProps) {
@@ -417,6 +441,7 @@ export function LibraryCandidateList({
                   }
                   unrated={unratedSongIds?.has(entry.song.id) ?? false}
                   onPlay={() => onPlaySong(entry.song!.id)}
+                  onLikeChange={onLikeChange}
                   onPreviewStart={() => startPreview(entry.song!)}
                   onPreviewEnd={() => stopPreview(entry.song!.id)}
                 />

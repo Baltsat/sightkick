@@ -216,7 +216,7 @@ describe('analyzePracticeRuns', () => {
 
     expect(lane).toMatchObject({
       title: 'kick lane records early hits around 120 BPM',
-      summary: expect.stringContaining('Recorded kick lane'),
+      summary: expect.stringContaining('kick lane · 100% accuracy'),
       reason: { code: 'lane-accuracy-or-timing' },
     });
     expect(`${lane?.title} ${lane?.summary}`).not.toMatch(

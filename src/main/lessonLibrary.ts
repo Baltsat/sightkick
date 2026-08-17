@@ -7,6 +7,11 @@ import { buildSongFromDir, stableLessonSongId } from './util';
 /** The app-private copy is deliberately separate from a musician's library. */
 export const DESKTOP_LESSON_LIBRARY_FOLDER = 'Drumroll Lessons';
 
+export const LOCAL_LESSON_PACKS_FOLDER = 'Local Lesson Packs';
+
+export const LOCAL_LESSON_PACK_SONG_ARCHIVE_STORE_KEY =
+  'localLessonPackSongArchive';
+
 interface LessonManifestSong {
   id: string;
   drumDifficulties?: SongData['drumDifficulties'];
@@ -14,12 +19,20 @@ interface LessonManifestSong {
 
 interface LessonManifestEntry {
   song: LessonManifestSong;
+  sticking: string;
 }
 
 interface LessonManifest {
   version: 1;
   lessonCount: number;
   lessons: LessonManifestEntry[];
+}
+
+interface LocalLessonPackManifest extends LessonManifest {
+  pack: {
+    id: string;
+    title: string;
+  };
 }
 
 export interface LessonBootstrapResult {
@@ -47,6 +60,65 @@ export interface BootstrapLessonLibraryOptions {
   userDataRoot: string;
   existingLibraryRoot?: string;
   existingSongs?: StorageSchema['songs'];
+}
+
+export interface LocalLessonPackResult {
+  libraryRoots: string[];
+  songs: StorageSchema['songs'];
+  rejectedPacks: string[];
+}
+
+export interface LocalLessonPackReconciliation {
+  songs: StorageSchema['songs'];
+  archivedSongs: StorageSchema['songs'];
+}
+
+function isLocalLessonPackSongId(id: string): boolean {
+  return /^local:[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9._-]*$/.test(id);
+}
+
+function preserveLocalLessonProgress(
+  song: SongData,
+  previous: SongData | undefined,
+): SongData {
+  return {
+    ...song,
+    ...(previous?.liked !== undefined ? { liked: previous.liked } : {}),
+    ...(previous?.scoreData ? { scoreData: previous.scoreData } : {}),
+  };
+}
+
+export function reconcileLocalLessonPacks(
+  existingSongs: StorageSchema['songs'],
+  availableSongs: StorageSchema['songs'],
+  archivedSongs: StorageSchema['songs'] = {},
+): LocalLessonPackReconciliation {
+  const existingLocalSongs = Object.fromEntries(
+    Object.entries(existingSongs).filter(([id]) => isLocalLessonPackSongId(id)),
+  );
+  const activeSongs = Object.fromEntries(
+    Object.entries(existingSongs).filter(
+      ([id]) => !isLocalLessonPackSongId(id),
+    ),
+  );
+  const restoredSongs = Object.fromEntries(
+    Object.entries(availableSongs).map(([id, song]) => [
+      id,
+      preserveLocalLessonProgress(
+        song,
+        existingLocalSongs[id] ?? archivedSongs[id],
+      ),
+    ]),
+  );
+
+  return {
+    songs: { ...activeSongs, ...restoredSongs },
+    archivedSongs: {
+      ...archivedSongs,
+      ...existingLocalSongs,
+      ...restoredSongs,
+    },
+  };
 }
 
 function lessonManifestPath(root: string): string {
@@ -87,7 +159,12 @@ function readLessonManifest(root: string): LessonManifest | undefined {
 
     if (
       ids.some((id) => !/^lesson:\d{2}\.\d{2}$/.test(id)) ||
-      new Set(ids).size !== ids.length
+      new Set(ids).size !== ids.length ||
+      manifest.lessons.some(
+        (entry) =>
+          typeof entry.sticking !== 'string' ||
+          !entry.sticking.endsWith('/sticking.json'),
+      )
     ) {
       return undefined;
     }
@@ -96,6 +173,48 @@ function readLessonManifest(root: string): LessonManifest | undefined {
   } catch {
     return undefined;
   }
+}
+
+function readLocalLessonPackManifest(
+  root: string,
+): LocalLessonPackManifest | undefined {
+  let manifest: LocalLessonPackManifest;
+
+  try {
+    manifest = JSON.parse(
+      fs.readFileSync(lessonManifestPath(root), 'utf-8'),
+    ) as LocalLessonPackManifest;
+  } catch {
+    return undefined;
+  }
+
+  if (
+    !manifest ||
+    manifest.version !== 1 ||
+    !Number.isInteger(manifest.lessonCount) ||
+    !Array.isArray(manifest.lessons) ||
+    manifest.lessonCount !== manifest.lessons.length ||
+    !manifest.pack ||
+    !/^[a-z0-9][a-z0-9-]*$/.test(manifest.pack.id) ||
+    typeof manifest.pack.title !== 'string' ||
+    !manifest.pack.title.trim()
+  ) {
+    return undefined;
+  }
+
+  const ids = manifest.lessons.map((entry) => entry.song.id);
+
+  return ids.length === new Set(ids).size &&
+    manifest.lessons.every(
+      (entry) =>
+        typeof entry.sticking === 'string' &&
+        entry.sticking.endsWith('/sticking.json'),
+    ) &&
+    ids.every((id) =>
+      new RegExp(`^local:${manifest.pack.id}:[a-z0-9][a-z0-9._-]*$`).test(id),
+    )
+    ? manifest
+    : undefined;
 }
 
 function lessonDirectories(root: string): string[] {
@@ -154,6 +273,9 @@ function scanBundledLessons(
 
   const validSongs = songs as SongData[];
   const scannedIds = validSongs.map((song) => song.id);
+  const manifestById = new Map(
+    manifest.lessons.map((entry) => [entry.song.id, entry]),
+  );
 
   if (
     new Set(scannedIds).size !== manifest.lessonCount ||
@@ -164,7 +286,93 @@ function scanBundledLessons(
     );
   }
 
+  for (const song of validSongs) {
+    const entry = manifestById.get(song.id);
+    const stickingPath = path.join(song.dir, 'sticking.json');
+
+    if (
+      !entry ||
+      !fs.statSync(stickingPath, { throwIfNoEntry: false })?.isFile()
+    ) {
+      throw new Error(
+        `Bundled lesson ${song.id} has no structured sticking data.`,
+      );
+    }
+  }
+
   return Object.fromEntries(validSongs.map((song) => [song.id, song]));
+}
+
+function scanLocalLessonPack(
+  root: string,
+  manifest: LocalLessonPackManifest,
+): StorageSchema['songs'] {
+  const byStickingPath = new Map(
+    manifest.lessons.map((entry) => [entry.sticking, entry]),
+  );
+  const songs = lessonDirectories(root).map((dir) => {
+    const entry = byStickingPath.get(`${path.basename(dir)}/sticking.json`);
+    const song = buildSongFromDir(dir, { drumDifficulties: ['expert'] });
+
+    if (
+      !entry ||
+      !song ||
+      !fs
+        .statSync(path.join(dir, 'sticking.json'), { throwIfNoEntry: false })
+        ?.isFile()
+    ) {
+      throw new Error(
+        `Local lesson pack ${manifest.pack.id} does not match its manifest.`,
+      );
+    }
+
+    return [entry.song.id, { ...song, id: entry.song.id }] as const;
+  });
+
+  if (songs.length !== manifest.lessonCount) {
+    throw new Error(`Local lesson pack ${manifest.pack.id} is incomplete.`);
+  }
+
+  return Object.fromEntries(songs);
+}
+
+/** Loads optional user-owned packs without installing, copying, or mutating them. */
+export function loadLocalLessonPacks(
+  userDataRoot: string,
+): LocalLessonPackResult {
+  const packsRoot = path.join(userDataRoot, LOCAL_LESSON_PACKS_FOLDER);
+  const libraryRoots: string[] = [];
+  const songs: StorageSchema['songs'] = {};
+  const rejectedPacks: string[] = [];
+
+  if (!fs.existsSync(packsRoot)) {
+    return { libraryRoots, songs, rejectedPacks };
+  }
+
+  for (const packRoot of lessonDirectories(packsRoot)) {
+    const manifest = readLocalLessonPackManifest(packRoot);
+
+    if (!manifest) {
+      rejectedPacks.push(path.basename(packRoot));
+
+      continue;
+    }
+
+    try {
+      const packSongs = scanLocalLessonPack(packRoot, manifest);
+
+      if (Object.keys(packSongs).some((id) => songs[id])) {
+        throw new Error('duplicate local lesson ID');
+      }
+
+      Object.assign(songs, packSongs);
+      libraryRoots.push(packRoot);
+    } catch {
+      rejectedPacks.push(path.basename(packRoot));
+    }
+  }
+
+  return { libraryRoots, songs, rejectedPacks };
 }
 
 function storedLessonId(storageId: string, song: SongData): string | undefined {

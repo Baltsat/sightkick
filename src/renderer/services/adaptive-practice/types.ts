@@ -3,11 +3,43 @@ export type AdaptivePracticeKind = 'lesson' | 'song';
 
 export type TimingWindowConfidence = 'none' | 'low' | 'medium' | 'high';
 
-export type TimingWindowPhase =
-  | 'starting'
-  | 'developing'
-  | 'calibrating'
-  | 'tightening';
+export type TimingWindowStandard = 'target' | 'better' | 'ceiling';
+
+export type TimingLadderAction =
+  | 'hold'
+  | 'tighten-window'
+  | 'lower-tempo'
+  | 'raise-tempo';
+
+export interface TimingGrid {
+  gapMs: number;
+  effectiveTempoBpm?: number;
+  subdivision?: string;
+}
+
+export interface TimingRunEvidence {
+  overallAccuracy?: number;
+  timingBias?: {
+    spreadMs?: number;
+    sampleCount?: number;
+  };
+  totalHits?: number;
+  totalMisses?: number;
+  totalWrong?: number;
+  playbackSpeed?: number;
+  completedAt?: string;
+  timingStandard?: TimingWindowStandard;
+  timingWindowMs?: number;
+  timingGapMs?: number;
+}
+
+export interface TimingRunState {
+  timingWindowMs: number;
+  timingGapMs: number;
+  timingStandard: TimingWindowStandard;
+  playbackSpeed: number;
+  effectiveTempoBpm?: number;
+}
 
 /**
  * Input is intentionally runtime-safe. Completed runs come from persisted
@@ -17,6 +49,8 @@ export type TimingWindowPhase =
  */
 export interface AdaptiveTimingWindowInput {
   kind: AdaptivePracticeKind;
+  grid?: TimingGrid;
+  playbackSpeed?: number;
   runs?: readonly unknown[] | null;
   /** Defaults to six completed runs and is clamped to a small stable range. */
   recentRunLimit?: number;
@@ -27,18 +61,17 @@ export interface AdaptiveTimingEvidence {
   usableRuns: number;
   /** Runs that also contain a usable timing spread and sample count. */
   timedRuns: number;
-  /** Recent, sufficiently sampled runs that meet the tightening standard. */
+  /** Recent, sufficiently sampled runs that meet the timing cleanliness rule. */
   highQualityRuns: number;
   weightedAccuracy?: number;
   weightedSpreadMs?: number;
 }
 
-export interface AdaptiveTimingWindowRecommendation {
-  /** Symmetric early/late hit tolerance passed to the scoring engine. */
-  timingWindowMs: number;
+export interface AdaptiveTimingWindowRecommendation extends TimingRunState {
   confidence: TimingWindowConfidence;
-  phase: TimingWindowPhase;
-  /** Short, user-facing explanation of why this window was selected. */
+  ladderAction: TimingLadderAction;
+  nextRun: TimingRunState;
+  /** Short, user-facing explanation of why this pair was selected. */
   reason: string;
   evidence: AdaptiveTimingEvidence;
 }

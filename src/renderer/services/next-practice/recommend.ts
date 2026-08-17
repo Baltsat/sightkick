@@ -161,7 +161,7 @@ function lessonPlanFor(candidate: PracticeCandidate) {
     prerequisiteIds: candidate.prerequisiteIds ?? [],
     assessmentBoundary:
       candidate.assessmentBoundary ??
-      'MIDI assesses timing and pad choice; sticking/form cue is not assessed.',
+      'MIDI assesses timing and pad choice. It does not assess sticking or form.',
   };
 }
 
@@ -850,12 +850,12 @@ function rankCandidate({
       label: 'Productive challenge zone',
       value: zpdFit(predictedSuccess),
       weight: 30,
-      detail: `Predicted ${Math.round(predictedSuccess * 100)}% success is ${
+      detail: `Predicted success: ${Math.round(predictedSuccess * 100)}%. ${
         predictedSuccess < 0.7
-          ? 'a stretch; use the suggested slower start.'
+          ? 'Use the suggested slower start.'
           : predictedSuccess <= 0.9
-          ? 'inside the productive challenge zone.'
-          : 'comfortable enough for consolidation.'
+          ? 'This is inside the productive challenge zone.'
+          : 'Use this for consolidation.'
       }`,
     },
     {
@@ -947,7 +947,7 @@ function rankCandidate({
       weight: 5,
       detail: isMastered
         ? 'This lesson is already cleared.'
-        : 'This unlocked lesson advances the structured learning path.',
+        : 'This available lesson advances the structured learning path.',
     });
   }
 
@@ -1003,7 +1003,7 @@ function rankCandidate({
     reason: directRemediation
       ? `${directRemediation.findingCount} saved Coach finding${
           directRemediation.findingCount === 1 ? '' : 's'
-        } route directly to this lesson.`
+        } match this lesson.`
       : pacing
       ? `${pacing.detail} ${reasonFromFactors(
           factors.filter((factor) => factor.key !== 'deadline-pacing'),
@@ -1049,7 +1049,7 @@ function fallbackRank(
     const isLesson = candidate.kind === 'lesson';
     const liked = candidate.liked === true;
     const detail = isLesson
-      ? 'Start with the earliest unlocked lesson to establish a trustworthy baseline.'
+      ? 'Start with the earliest available lesson to establish a trustworthy baseline.'
       : liked
       ? 'Start with a liked playable song to establish a trustworthy baseline.'
       : 'Start with a playable item to establish a trustworthy baseline.';
@@ -1082,8 +1082,7 @@ function fallbackRank(
         value: 0.15,
         level: 'low',
         evidenceRuns: 0,
-        detail:
-          'No run history exists yet; this is a deterministic baseline choice.',
+        detail: '0 saved runs. This is the baseline choice.',
       },
     };
   });
@@ -1123,7 +1122,7 @@ function atomicFactors(decision: PracticeDecision): RecommendationFactor[] {
       weight: 20,
       contribution: round(decision.prereq_fit * 20),
       detail: decision.independent_eligible
-        ? 'Hard prerequisites have retained evidence for independent work.'
+        ? 'Retained evidence covers every hard prerequisite.'
         : `Scaffolded because ${
             decision.hard_prerequisites.join(', ') || 'the active prerequisite'
           } is not yet retained.`,
@@ -1184,6 +1183,7 @@ function atomicRecommendation(
     ),
     predictedSuccess: round(decision.predicted_success, 3),
     suggestedSpeed: decision.scaffold.speed,
+    adaptation: decision.adaptation,
     reason:
       baseline.directRemediation || baseline.deadlinePacing
         ? baseline.reason

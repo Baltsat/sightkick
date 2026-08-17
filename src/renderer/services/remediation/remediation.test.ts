@@ -312,7 +312,7 @@ describe('remediation queue', () => {
 
     expect(queue).not.toBeNull();
     expect(remediationTaskWhy(queue!.tasks[0])).toBe(
-      'Build timing in this phrase first; two good-enough passes unlock the next planned tempo probe.',
+      'Build timing in this phrase. Save 2 good-enough passes. Then test the next tempo.',
     );
 
     const anchor = recordRemediationPass(queue!, {

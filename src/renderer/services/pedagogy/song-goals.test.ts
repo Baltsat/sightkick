@@ -48,6 +48,12 @@ function ranked(
     uncertainty: 0.5,
     hard_prerequisites: [],
     scaffold: { speed: 0.7, steps: ['short_loop'] },
+    adaptation: {
+      starting_speed: 0.7,
+      repeat_budget: 3,
+      quality_passes_to_advance: 2,
+      low_quality_passes_before_stop: 2,
+    },
     factors: [],
     explanation: 'test',
   };

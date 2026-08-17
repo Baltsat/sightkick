@@ -103,7 +103,7 @@ export function KitSignalCheck({ onSetupInput }: Props) {
     <div className="flex flex-col gap-2" data-testid="kit-signal-check">
       <SettingLabel
         label="Kit signal"
-        tooltip="Strike a pad and watch this update — proof the app is really hearing your kit, which drum it mapped to, and when it arrived."
+        tooltip="Strike 1 pad. Check its mapped drum and arrival time."
       />
       <div
         className="rounded-md border border-border-soft bg-surface-raised p-3 flex flex-col gap-2"

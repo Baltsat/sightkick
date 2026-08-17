@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { SkillEvidenceEvent } from '../../services/pedagogy/types';
 import { Song } from '../../../types';
 import {
   aggregateLaneAccuracy,
@@ -75,6 +76,15 @@ export interface UseGamificationResult {
   /** Versioned summaries grouped by their stable song/lesson id. The
    * recommendation layer consumes this evidence without reaching into IPC. */
   runsBySong?: Readonly<Record<string, RunSummary[]>>;
+  /** Evicted atomic-skill evidence grouped by song/lesson id. Kept alongside
+   * `runsBySong[songId][].atomicSkillEvidence` rather than in place of it:
+   * recent runs stay verbatim while archives cover evicted history. */
+  atomicSkillEvidenceArchiveBySong?: Readonly<
+    Record<string, readonly SkillEvidenceEvent[]>
+  >;
+  timingEvidenceBySong?: Readonly<
+    Record<string, readonly SkillEvidenceEvent[]>
+  >;
   /** Bounded monthly plus all-history evidence. Archived (evicted) summaries
    * and recent verbatim summaries are each counted exactly once. */
   longitudinalProgress?: LongitudinalProgress;
@@ -98,6 +108,8 @@ interface LoadRunsReply {
   runs: RunSummary[];
   runsBySong?: Record<string, RunSummary[]>;
   archiveBySong?: PracticeRunArchiveBySong;
+  atomicSkillEvidenceArchiveBySong?: Record<string, SkillEvidenceEvent[]>;
+  timingEvidenceBySong?: Record<string, SkillEvidenceEvent[]>;
 }
 
 function isErrorReply(reply: object): reply is { error: string } {
@@ -164,6 +176,12 @@ export function useGamification(
     useState<Record<string, RunSummary[]>>();
   const [archiveBySongCache, setArchiveBySongCache] =
     useState<PracticeRunArchiveBySong>();
+  const [
+    atomicSkillEvidenceArchiveBySongCache,
+    setAtomicSkillEvidenceArchiveBySongCache,
+  ] = useState<Record<string, SkillEvidenceEvent[]>>();
+  const [timingEvidenceBySongCache, setTimingEvidenceBySongCache] =
+    useState<Record<string, SkillEvidenceEvent[]>>();
   const [goalOption, setGoalOption] = usePersisted<GoalOption>(
     'settings.dailyGoalOption',
     DEFAULT_GOAL_OPTION,
@@ -239,6 +257,10 @@ export function useGamification(
         setRunsCache(reply.runs);
         setRunsBySongCache(reply.runsBySong);
         setArchiveBySongCache(reply.archiveBySong ?? {});
+        setAtomicSkillEvidenceArchiveBySongCache(
+          reply.atomicSkillEvidenceArchiveBySong ?? {},
+        );
+        setTimingEvidenceBySongCache(reply.timingEvidenceBySong ?? {});
       }
     });
   }, []);
@@ -353,10 +375,20 @@ export function useGamification(
           const archiveBySong = isErrorReply(runsReply)
             ? undefined
             : runsReply.archiveBySong || {};
+          const atomicSkillEvidenceArchiveBySong = isErrorReply(runsReply)
+            ? undefined
+            : runsReply.atomicSkillEvidenceArchiveBySong || {};
+          const timingEvidenceBySong = isErrorReply(runsReply)
+            ? undefined
+            : runsReply.timingEvidenceBySong || {};
 
           setRunsCache(runs);
           setRunsBySongCache(runsBySong);
           setArchiveBySongCache(archiveBySong);
+          setAtomicSkillEvidenceArchiveBySongCache(
+            atomicSkillEvidenceArchiveBySong,
+          );
+          setTimingEvidenceBySongCache(timingEvidenceBySong);
 
           const achievementRuns = achievementRunsFor(runs, runsBySong);
           const results = computeAchievements({
@@ -420,6 +452,8 @@ export function useGamification(
     recentLaneSignals,
     latestRun,
     runsBySong: runsBySongCache,
+    atomicSkillEvidenceArchiveBySong: atomicSkillEvidenceArchiveBySongCache,
+    timingEvidenceBySong: timingEvidenceBySongCache,
     longitudinalProgress,
     loadAchievements,
     recordRun,

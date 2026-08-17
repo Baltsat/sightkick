@@ -38,13 +38,13 @@ export function GoalPopover({
       styles={popoverStyles}
       content={
         <div
-          className="flex min-w-52 flex-col gap-1"
+          className="flex min-w-60 flex-col gap-1"
           data-testid="goal-popover-menu"
         >
-          <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-[0.12em] text-text-faint">
+          <div className="px-2 pb-1 text-base font-semibold text-text-body">
             Daily goal
           </div>
-          <p className="px-2 pb-2 text-xs leading-relaxed text-text-muted">
+          <p className="px-2 pb-2 text-sm leading-relaxed text-text-muted">
             Choose how much XP you want to earn today.
           </p>
           {GOAL_OPTIONS.map((option) => (
@@ -58,7 +58,7 @@ export function GoalPopover({
                 onOpenChange(false);
               }}
               className={cn(
-                'flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                'flex min-h-11 items-center justify-between rounded px-3 py-2 text-left text-base transition-colors',
                 option === goalOption
                   ? 'bg-accent-soft-bg text-accent-text'
                   : 'text-text-body hover:bg-fill',
@@ -78,7 +78,7 @@ export function GoalPopover({
         data-testid="goal-popover-trigger"
         aria-label="Change today’s set XP target"
         onClick={(event) => event.stopPropagation()}
-        className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs text-text-faint hover:bg-fill hover:text-text-body"
+        className="flex min-h-11 items-center gap-2 rounded px-2 text-sm text-text-muted hover:bg-fill hover:text-text-body"
       >
         <FontAwesomeIcon icon={faBullseye} size="xs" />
         {GOAL_LABELS[goalOption]}

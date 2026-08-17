@@ -1,6 +1,6 @@
 import { EvidenceBoundary, SkillNode, SkillPrerequisite } from './types';
 
-export const ATOMIC_SKILL_GRAPH_VERSION = 'atomic-skill-graph-v2';
+export const ATOMIC_SKILL_GRAPH_VERSION = 'atomic-skill-graph-v3';
 
 const default_review_days = [1, 3, 7, 14, 28] as const;
 
@@ -45,6 +45,34 @@ export const ATOMIC_SKILL_GRAPH: readonly SkillNode[] = [
   node('pulse.shuffle', 'Shuffle pulse', 'pulse and meter', 'midi', [
     hard('pulse.eighth'),
   ]),
+  node(
+    'timing.steadiness.quarter',
+    'Quarter-note steadiness',
+    'rhythmic steadiness',
+    'midi',
+    [hard('pulse.quarter')],
+  ),
+  node(
+    'timing.steadiness.eighth',
+    'Eighth-note steadiness',
+    'rhythmic steadiness',
+    'midi',
+    [hard('timing.steadiness.quarter'), hard('pulse.eighth')],
+  ),
+  node(
+    'timing.steadiness.sixteenth',
+    'Sixteenth-note steadiness',
+    'rhythmic steadiness',
+    'midi',
+    [hard('timing.steadiness.eighth'), hard('pulse.sixteenth')],
+  ),
+  node(
+    'timing.steadiness.triplet',
+    'Triplet steadiness',
+    'rhythmic steadiness',
+    'midi',
+    [hard('timing.steadiness.eighth'), hard('pulse.triplet')],
+  ),
   node('meter.3_4', 'Three-four meter', 'pulse and meter', 'midi', [
     hard('pulse.quarter'),
   ]),
@@ -283,6 +311,226 @@ export const ATOMIC_SKILL_GRAPH: readonly SkillNode[] = [
     'musical application',
     'midi',
     [hard('music.song_form')],
+  ),
+  node('grid.quarter', 'Quarter-note grid', 'subdivision grids', 'midi', [
+    hard('pulse.quarter'),
+  ]),
+  node('grid.eighth', 'Eighth-note grid', 'subdivision grids', 'midi', [
+    hard('pulse.eighth'),
+  ]),
+  node('grid.sixteenth', 'Sixteenth-note grid', 'subdivision grids', 'midi', [
+    hard('pulse.sixteenth'),
+  ]),
+  node('grid.triplet', 'Triplet grid', 'subdivision grids', 'midi', [
+    hard('pulse.triplet'),
+  ]),
+  node('tempo.60_79', 'Control at 60–79 BPM', 'tempo control', 'midi'),
+  node('tempo.80_99', 'Control at 80–99 BPM', 'tempo control', 'midi'),
+  node('tempo.100_119', 'Control at 100–119 BPM', 'tempo control', 'midi'),
+  node('tempo.120_139', 'Control at 120–139 BPM', 'tempo control', 'midi'),
+  node('tempo.140_plus', 'Control at 140+ BPM', 'tempo control', 'midi'),
+  node('limb.snare_only', 'Snare-only control', 'limb independence', 'midi', [
+    hard('hand.singles'),
+  ]),
+  node('limb.kick_only', 'Kick-only control', 'limb independence', 'midi', [
+    hard('foot.kick_pulse'),
+  ]),
+  node('limb.hands_joint', 'Hands in unison', 'limb independence', 'midi', [
+    hard('hand.singles'),
+  ]),
+  node(
+    'limb.kick_snare',
+    'Kick–snare independence',
+    'limb independence',
+    'midi',
+    [hard('coord.two_way')],
+  ),
+  node(
+    'limb.kick_hihat',
+    'Kick–hi-hat independence',
+    'limb independence',
+    'midi',
+    [hard('coord.rock_three_way')],
+  ),
+  node(
+    'limb.kick_ride',
+    'Kick–ride independence',
+    'limb independence',
+    'midi',
+    [hard('coord.ride_ostinato')],
+  ),
+  node(
+    'limb.three_way',
+    'Three-way independence',
+    'limb independence',
+    'midi',
+    [hard('coord.rock_three_way')],
+  ),
+  node(
+    'limb.linear',
+    'One-limb-at-a-time control',
+    'limb independence',
+    'midi',
+    [hard('coord.linear')],
+  ),
+  node(
+    'sticking.alternating',
+    'Alternating sticking',
+    'sticking',
+    'partial_midi',
+    [hard('hand.singles')],
+  ),
+  node(
+    'sticking.single_lead',
+    'Lead-hand singles',
+    'sticking',
+    'partial_midi',
+    [hard('hand.singles')],
+  ),
+  node(
+    'sticking.double_rebound',
+    'Double-stroke rebound',
+    'sticking',
+    'partial_midi',
+    [hard('hand.doubles')],
+  ),
+  node(
+    'sticking.triple_rebound',
+    'Triple-stroke rebound',
+    'sticking',
+    'partial_midi',
+    [hard('hand.triples')],
+  ),
+  node(
+    'sticking.paradiddle_accent',
+    'Paradiddle accent path',
+    'sticking',
+    'partial_midi',
+    [hard('hand.paradiddle_single')],
+  ),
+  node(
+    'sticking.paradiddle_inversion',
+    'Paradiddle inversions',
+    'sticking',
+    'partial_midi',
+    [hard('hand.paradiddle_single')],
+  ),
+  node(
+    'sticking.hand_foot_exchange',
+    'Hand-to-foot sticking',
+    'sticking',
+    'midi',
+    [hard('coord.hand_to_foot')],
+  ),
+  node(
+    'dynamic.even_velocity',
+    'Even stroke dynamics',
+    'dynamic control',
+    'partial_midi',
+    [hard('hand.singles')],
+  ),
+  node(
+    'dynamic.accent_grid',
+    'Accents on the grid',
+    'dynamic control',
+    'partial_midi',
+    [hard('dynamics.accent')],
+  ),
+  node(
+    'dynamic.ghost_balance',
+    'Ghost-note balance',
+    'dynamic control',
+    'partial_midi',
+    [hard('dynamics.ghost')],
+  ),
+  node(
+    'dynamic.backbeat_contrast',
+    'Backbeat contrast',
+    'dynamic control',
+    'partial_midi',
+    [hard('dynamics.loud_soft')],
+  ),
+  node(
+    'dynamic.crescendo',
+    'Crescendo control',
+    'dynamic control',
+    'partial_midi',
+    [hard('dynamics.loud_soft')],
+  ),
+  node(
+    'dynamic.decrescendo',
+    'Decrescendo control',
+    'dynamic control',
+    'partial_midi',
+    [hard('dynamics.loud_soft')],
+  ),
+  node(
+    'groove.rock_eighth',
+    'Eighth-note rock groove',
+    'groove families',
+    'midi',
+    [hard('music.groove_8th')],
+  ),
+  node(
+    'groove.rock_sixteenth',
+    'Sixteenth-note rock groove',
+    'groove families',
+    'midi',
+    [hard('music.groove_16th')],
+  ),
+  node('groove.half_time', 'Half-time groove', 'groove families', 'midi', [
+    hard('feel.backbeat'),
+  ]),
+  node('groove.shuffle', 'Shuffle groove', 'groove families', 'midi', [
+    hard('feel.shuffle'),
+  ]),
+  node('groove.jazz_ride', 'Jazz ride groove', 'groove families', 'midi', [
+    hard('feel.jazz_ride'),
+  ]),
+  node('groove.three_four', 'Three-four groove', 'groove families', 'midi', [
+    hard('meter.3_4'),
+  ]),
+  node('groove.six_eight', 'Six-eight groove', 'groove families', 'midi', [
+    hard('meter.6_8'),
+  ]),
+  node('groove.linear', 'Linear groove', 'groove families', 'midi', [
+    hard('coord.linear'),
+  ]),
+  node('fill.snare', 'Snare fill', 'fill vocabulary', 'midi', [
+    hard('kit.fill_entry'),
+  ]),
+  node('fill.two_tom', 'Two-tom fill', 'fill vocabulary', 'midi', [
+    hard('kit.tom_t1_t2'),
+  ]),
+  node('fill.three_tom', 'Three-tom fill', 'fill vocabulary', 'midi', [
+    hard('kit.tom_sweep'),
+  ]),
+  node('fill.rudimental', 'Rudimental fill', 'fill vocabulary', 'midi', [
+    hard('music.fill_16th'),
+  ]),
+  node('fill.crash_return', 'Fill-to-crash return', 'fill vocabulary', 'midi', [
+    hard('kit.crash_phrase'),
+  ]),
+  node(
+    'reading.multi_lane',
+    'Multi-lane reading',
+    'notation detail',
+    'partial_midi',
+    [hard('reading.staff_map')],
+  ),
+  node(
+    'reading.dynamic_marks',
+    'Dynamic-mark reading',
+    'notation detail',
+    'partial_midi',
+    [hard('reading.staff_map')],
+  ),
+  node(
+    'reading.sticking_cues',
+    'Sticking-cue reading',
+    'notation detail',
+    'partial_midi',
+    [hard('reading.staff_map')],
   ),
 ];
 

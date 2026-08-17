@@ -75,9 +75,8 @@ export function useSongList() {
       (payload) => {
         if (isIpcError(payload)) {
           notification.error({
-            title: "Couldn't save your progress",
-            description:
-              'Your latest score may not have been saved. Try again.',
+            title: 'Progress save failed',
+            description: 'Your latest score was not saved. Try again.',
             placement: 'bottomRight',
           });
 

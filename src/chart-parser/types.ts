@@ -42,6 +42,12 @@ export interface RenderData {
   measure: Measure;
   renderedNotes: RenderedNote[];
   yOffset: number;
+  timeAnchors?: TimeAnchor[];
+}
+
+export interface TimeAnchor {
+  tick: number;
+  x: number;
 }
 
 export type ParsedChart = ReturnType<typeof parseChartFile>;

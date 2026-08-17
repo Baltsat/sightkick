@@ -180,7 +180,9 @@ describe('recommendNextPractice', () => {
       value: 0.15,
       evidenceRuns: 0,
     });
-    expect(result.recommendation?.reason).toContain('earliest unlocked lesson');
+    expect(result.recommendation?.reason).toContain(
+      'earliest available lesson',
+    );
   });
 
   it('keeps no-history fallback finite and honest with malformed speed metadata', () => {
@@ -552,7 +554,7 @@ describe('recommendNextPractice', () => {
       bpmTarget: 80,
       prerequisiteIds: ['07.01'],
       assessmentBoundary:
-        'MIDI assesses timing and pad choice; sticking/form cue is not assessed.',
+        'MIDI assesses timing and pad choice. It does not assess sticking or form.',
     });
   });
 
@@ -658,7 +660,7 @@ describe('recommendNextPractice', () => {
     expect(result.recommendation?.candidate.id).toBe('lesson-01-01');
     expect(direct).toMatchObject({
       directRemediation: { findingCount: 3 },
-      reason: '3 saved Coach findings route directly to this lesson.',
+      reason: '3 saved Coach findings match this lesson.',
     });
     expect(direct?.score).toBeLessThan(generic?.score ?? 0);
     expect(

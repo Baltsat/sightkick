@@ -262,11 +262,13 @@ export function InputProvider({ children }: { children: ReactNode }) {
   });
   const [midiReconnectEpoch, setMidiReconnectEpoch] = useState(0);
   const [midiOpenEpoch, setMidiOpenEpoch] = useState(0);
+  const [midiPortEpoch, setMidiPortEpoch] = useState(0);
   const [confirmedMidiPort, setConfirmedMidiPort] = useState<
     number | undefined
   >(undefined);
   const reconnectAttempts = useRef(0);
   const midiRetryTimer = useRef<number | undefined>(undefined);
+  const midiHealthCheckTimer = useRef<number | undefined>(undefined);
   const [inputMappings, setInputMappings] = usePersisted<
     Record<string, InputMapping>
   >('settings.inputMappings', {});
@@ -283,6 +285,22 @@ export function InputProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(midiRetryTimer.current);
       midiRetryTimer.current = undefined;
     }
+  }, []);
+  const clearMidiHealthCheck = useCallback(() => {
+    if (midiHealthCheckTimer.current !== undefined) {
+      window.clearTimeout(midiHealthCheckTimer.current);
+      midiHealthCheckTimer.current = undefined;
+    }
+  }, []);
+  const scheduleMidiHealthCheck = useCallback(() => {
+    if (midiHealthCheckTimer.current !== undefined) {
+      return;
+    }
+
+    midiHealthCheckTimer.current = window.setTimeout(() => {
+      midiHealthCheckTimer.current = undefined;
+      setMidiReconnectEpoch((epoch) => epoch + 1);
+    }, MIDI_HEALTH_CHECK_DELAY_MS);
   }, []);
   const scheduleMidiRetry = useCallback(() => {
     if (midiRetryTimer.current !== undefined) {
@@ -303,6 +321,7 @@ export function InputProvider({ children }: { children: ReactNode }) {
       // fallback. Choosing any real input clears that opt-out again.
       setMidiAutoConnectOptOut(device === null);
       setCanAutoSelectMidi(false);
+      clearMidiHealthCheck();
       clearMidiRetry();
       reconnectAttempts.current = 0;
       setConfirmedMidiPort(undefined);
@@ -318,20 +337,26 @@ export function InputProvider({ children }: { children: ReactNode }) {
       setMidiReconnectEpoch((epoch) => epoch + 1);
       setMidiOpenEpoch((epoch) => epoch + 1);
     },
-    [clearMidiRetry, setMidiAutoConnectOptOut, setPersistedSelectedDevice],
+    [
+      clearMidiHealthCheck,
+      clearMidiRetry,
+      setMidiAutoConnectOptOut,
+      setPersistedSelectedDevice,
+    ],
   );
   const reconnectMidi = useCallback(() => {
     if (selectedDevice?.sourceId !== 'midi') {
       return;
     }
 
+    clearMidiHealthCheck();
     clearMidiRetry();
     reconnectAttempts.current = 0;
     setConfirmedMidiPort(undefined);
     setInputReadiness('reconnecting');
     setMidiReconnectEpoch((epoch) => epoch + 1);
     setMidiOpenEpoch((epoch) => epoch + 1);
-  }, [clearMidiRetry, selectedDevice]);
+  }, [clearMidiHealthCheck, clearMidiRetry, selectedDevice]);
   const inputMapping = useMemo(() => {
     const stored = selectedDevice
       ? inputMappings[selectedDevice.id]
@@ -451,19 +476,14 @@ export function InputProvider({ children }: { children: ReactNode }) {
     inputBus.start();
 
     return () => {
+      clearMidiHealthCheck();
       clearMidiRetry();
       inputBus.stop();
     };
-  }, [clearMidiRetry]);
+  }, [clearMidiHealthCheck, clearMidiRetry]);
 
   useEffect(() => {
     let cancelled = false;
-    let healthCheckTimer: number | undefined;
-    const scheduleHealthCheck = () => {
-      healthCheckTimer = window.setTimeout(() => {
-        setMidiReconnectEpoch((epoch) => epoch + 1);
-      }, MIDI_HEALTH_CHECK_DELAY_MS);
-    };
 
     inputBus.listDevices().then((list) => {
       if (cancelled) {
@@ -532,7 +552,7 @@ export function InputProvider({ children }: { children: ReactNode }) {
           setMidiOpenEpoch((epoch) => epoch + 1);
         }
 
-        scheduleHealthCheck();
+        scheduleMidiHealthCheck();
 
         return;
       }
@@ -548,17 +568,16 @@ export function InputProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
-
-      if (healthCheckTimer !== undefined) {
-        window.clearTimeout(healthCheckTimer);
-      }
+      clearMidiHealthCheck();
     };
   }, [
     selectedDevice,
     canAutoSelectMidi,
+    clearMidiHealthCheck,
     clearMidiRetry,
     midiOpenEpoch,
     midiReconnectEpoch,
+    scheduleMidiHealthCheck,
     scheduleMidiRetry,
     setPersistedSelectedDevice,
   ]);
@@ -578,6 +597,7 @@ export function InputProvider({ children }: { children: ReactNode }) {
       }
 
       failureHandled = true;
+      clearMidiHealthCheck();
       setConfirmedMidiPort(undefined);
       setInputReadiness('reconnecting');
       scheduleMidiRetry();
@@ -602,6 +622,7 @@ export function InputProvider({ children }: { children: ReactNode }) {
 
         clearMidiRetry();
         reconnectAttempts.current = 0;
+        setMidiPortEpoch((epoch) => epoch + 1);
         setInputReadiness('connected');
       },
     );
@@ -629,6 +650,7 @@ export function InputProvider({ children }: { children: ReactNode }) {
       window.electron.ipcRenderer.sendMessage('stop-listen-midi');
     };
   }, [
+    clearMidiHealthCheck,
     clearMidiRetry,
     confirmedMidiPort,
     midiOpenEpoch,
@@ -679,7 +701,7 @@ export function InputProvider({ children }: { children: ReactNode }) {
       setSelectedDevice,
       reconnectMidi,
       inputReadiness,
-      midiPortEpoch: midiOpenEpoch,
+      midiPortEpoch,
       inputMapping,
       controlMapping,
       kitControlIds,
@@ -693,7 +715,7 @@ export function InputProvider({ children }: { children: ReactNode }) {
       setSelectedDevice,
       reconnectMidi,
       inputReadiness,
-      midiOpenEpoch,
+      midiPortEpoch,
       inputMapping,
       controlMapping,
       kitControlIds,

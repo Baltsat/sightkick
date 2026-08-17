@@ -254,7 +254,7 @@ function payoffReceipt({
     return {
       title: goalPayoffCandidate.title,
       detail:
-        'Apply the session in your goal song. A safe section probe will appear when chart evidence supports one.',
+        'Play the goal song. Drumroll adds 1 section probe when chart evidence supports it.',
       candidateId: goalPayoffCandidate.id,
     };
   }
@@ -288,7 +288,7 @@ function payoffReceipt({
   return {
     unavailable: true,
     title: 'No favourite-song payoff is ready',
-    detail: `Today’s work is ${launch.candidate.title}. My Wave has no playable saved favourite linked to this session.`,
+    detail: `Today’s work: ${launch.candidate.title}. My Wave has 0 playable saved favourites for this session.`,
   };
 }
 
@@ -303,7 +303,7 @@ function distinctBuild(
     return {
       candidateId: build.candidateId,
       title: 'Build the phrase',
-      detail: 'Keep the work to two clean passes before the song payoff.',
+      detail: 'Save 2 clean passes. Then play the song payoff.',
     };
   }
 

@@ -262,7 +262,7 @@ describe('my wave', () => {
     expect(result.strategy).toBe('skill_zpd_wave');
     expect(first).toMatchObject({
       candidate: { id: 'same-16ths-faster' },
-      reason: 'a saved favourite; same 16th-hat groove, one notch faster.',
+      reason: 'a saved favourite. same 16th-hat groove, one notch faster.',
       receipt: {
         source_item_id: 'played-16ths',
         candidate_item_id: 'same-16ths-faster',
@@ -585,7 +585,7 @@ describe('my wave', () => {
         {
           candidate: { id: 'available-thin' },
           reason:
-            'playable continuation; chart and atomic-skill evidence are still thin.',
+            'Playable continuation. Chart and atomic-skill evidence remain thin.',
           receipt: { evidence: { level: 'thin' } },
         },
       ],

@@ -10,6 +10,11 @@ import {
 } from './renderer';
 import { ChartParser } from './parser';
 import { Measure, Note, ParsedChart, TempoMark } from './types';
+import { GameRenderer } from '../renderer/services/engine/game-renderer';
+import {
+  parseStickingData,
+  type StickingData,
+} from '../renderer/services/sticking';
 
 beforeAll(() => {
   (
@@ -65,6 +70,7 @@ function render(
   enableColors?: boolean,
   showTempo?: boolean,
   layout?: 'classic' | 'flow',
+  sticking?: StickingData,
 ) {
   return renderMusic(
     target.current ?? undefined,
@@ -74,6 +80,7 @@ function render(
     enableColors,
     showTempo,
     layout,
+    sticking,
   );
 }
 
@@ -83,6 +90,16 @@ function container() {
   document.body.appendChild(div);
 
   return div;
+}
+
+function markupWithoutIds(div: HTMLDivElement): string {
+  const clone = div.cloneNode(true) as HTMLDivElement;
+
+  clone
+    .querySelectorAll('[id]')
+    .forEach((element) => element.removeAttribute('id'));
+
+  return clone.innerHTML;
 }
 
 const quarters: Note[] = [0, 192, 384, 576].map((tick) =>
@@ -113,6 +130,107 @@ describe('renderMusic', () => {
 
     expect(div.querySelector('svg')).not.toBeNull();
   });
+
+  it.each(['flow', 'classic'] as const)(
+    'renders readable hand and foot sticking below %s notation and hides it with the note',
+    (layout) => {
+      const div = container();
+      const countIn = measure([
+        note({ notes: ['g/5/x2'], tick: 0, duration: 'q' }),
+      ]);
+      const exercise = measure(
+        [note({ notes: ['e/4', 'c/5'], tick: 768, duration: 'q' })],
+        { startTick: 768, endTick: 1536 },
+      );
+      const sticking = parseStickingData({
+        version: 1,
+        lessonId: '03.01',
+        timeSignature: [4, 4],
+        countInBars: 1,
+        repeatCount: 1,
+        bars: [
+          {
+            stepCount: 4,
+            notes: [
+              { step: 0, lane: 'K', symbol: 'x', limb: 'right-foot' },
+              { step: 0, lane: 'S', symbol: 'x', limb: 'left-hand' },
+            ],
+          },
+        ],
+      });
+
+      expect(sticking).toBeDefined();
+
+      const data = render(
+        ref(div),
+        song([countIn, exercise]),
+        true,
+        true,
+        true,
+        layout,
+        sticking,
+      );
+      const glyphs = Array.from(
+        div.querySelectorAll<SVGTextElement>('.vf-sticking-glyph'),
+      );
+      const noteGroup = data[1].renderedNotes[0].note.getSVGElement();
+
+      expect(div.querySelectorAll('.vf-sticking')).toHaveLength(1);
+      expect(glyphs.map((glyph) => glyph.textContent)).toEqual(['L', 'RF']);
+      expect(
+        glyphs.every(
+          (glyph) => glyph.closest('.vf-sticking')?.parentElement === noteGroup,
+        ),
+      ).toBe(true);
+      expect(
+        glyphs.every(
+          (glyph) =>
+            Number(glyph.getAttribute('y')) >
+            data[1].stave.getY() + data[1].stave.getHeight(),
+        ),
+      ).toBe(true);
+      expect(
+        glyphs.every((glyph) => Number(glyph.getAttribute('font-size')) >= 18),
+      ).toBe(true);
+
+      const gameRenderer = new GameRenderer(() => true);
+
+      gameRenderer.setContext({ chart: {} as ParsedChart, renderData: data });
+      gameRenderer.paintHit({ measureIdx: 1, noteIdx: 0 }, ['e', 'c']);
+      data[1].renderedNotes[0].note.noteHeads[1]
+        .getSVGElement()
+        ?.dispatchEvent(new Event('animationend'));
+
+      expect(noteGroup).toHaveClass('vf-note-hidden');
+      expect(glyphs.every((glyph) => glyph.closest('.vf-note-hidden'))).toBe(
+        true,
+      );
+    },
+  );
+
+  it.each(['flow', 'classic'] as const)(
+    'leaves %s songs without validated sticking data unchanged',
+    (layout) => {
+      const baseline = container();
+      const rejected = container();
+      const chart = song([measure(quarters)]);
+      const invalid = parseStickingData({
+        version: 1,
+        lessonId: '03.01',
+        timeSignature: [4, 4],
+        countInBars: 1,
+        repeatCount: 1,
+        bars: [],
+      });
+
+      render(ref(baseline), chart, true, true, true, layout);
+      render(ref(rejected), chart, true, true, true, layout, invalid);
+
+      expect(invalid).toBeUndefined();
+      expect(markupWithoutIds(rejected)).toBe(markupWithoutIds(baseline));
+      expect(rejected.querySelector('.vf-sticking')).toBeNull();
+    },
+  );
 
   it('returns one render entry per measure', () => {
     const div = container();
@@ -159,7 +277,9 @@ describe('renderMusic', () => {
 
     expect(data[0].stave.getX()).toBe(0);
     expect(data[1].stave.getX()).toBe(
-      data[0].stave.getX() + data[0].stave.getWidth(),
+      data[0].stave.getX() +
+        data[0].stave.getWidth() -
+        (data[1].stave.getNoteStartX() - data[1].stave.getX()),
     );
     expect(data[2].stave.getX()).toBe(0);
     expect(ys[0]).toBe(ys[1]);
@@ -167,7 +287,7 @@ describe('renderMusic', () => {
     expect(data[2].yOffset).toBeGreaterThan(data[0].yOffset);
   });
 
-  it('justifies a row to the full width, splitting evenly between identical measures', () => {
+  it('fills a Classic system while keeping time spans equal', () => {
     const div = container();
     const measures = [
       measure(quarters),
@@ -175,10 +295,12 @@ describe('renderMusic', () => {
     ];
     const data = render(ref(div), song(measures));
 
-    expect(data[0].stave.getWidth()).toBe(data[1].stave.getWidth());
     expect(data[1].stave.getX() + data[1].stave.getWidth()).toBe(
       TARGET_ROW_WIDTH,
     );
+    expect(
+      data[0].timeAnchors!.at(-1)!.x - data[0].timeAnchors![0].x,
+    ).toBeCloseTo(data[1].timeAnchors!.at(-1)!.x - data[1].timeAnchors![0].x);
   });
 
   it('wraps to a new row after two measures', () => {
@@ -221,6 +343,57 @@ describe('renderMusic', () => {
       FLOW_MIN_MEASURE_WIDTH,
     );
   });
+
+  it.each(['flow', 'classic'] as const)(
+    'maps mixed note values to equal elapsed-time spacing in %s',
+    (layout) => {
+      const div = container();
+      const mixed = measure([
+        note({ tick: 0, duration: 'h' }),
+        note({ tick: 384, duration: 'q' }),
+        note({ tick: 576, duration: '8' }),
+        note({ tick: 672, duration: '16' }),
+        note({ tick: 720, duration: '16' }),
+      ]);
+      const data = render(ref(div), song([mixed]), true, true, true, layout);
+      const anchors = data[0].timeAnchors!;
+      const start = anchors[0];
+      const end = anchors.at(-1)!;
+
+      data[0].renderedNotes.forEach(({ note: renderedNote, tick }) => {
+        const expected =
+          start.x + ((tick - mixed.startTick) / 768) * (end.x - start.x);
+
+        expect(renderedNote.getAbsoluteX()).toBeCloseTo(expected);
+      });
+    },
+  );
+
+  it.each(['flow', 'classic'] as const)(
+    'shows a marked tempo seam and changes bar width by elapsed time in %s',
+    (layout) => {
+      const div = container();
+      const measures = [
+        measure(quarters, { tempo: tempo(120) }),
+        measure(quarters, {
+          startTick: 768,
+          endTick: 1536,
+          hasClef: false,
+          sigChange: false,
+          tempo: tempo(60),
+        }),
+      ];
+      const data = render(ref(div), song(measures), true, true, true, layout);
+      const span = (index: number) => {
+        const anchors = data[index].timeAnchors!;
+
+        return anchors.at(-1)!.x - anchors[0].x;
+      };
+
+      expect(div.querySelectorAll('.vf-tempo-seam')).toHaveLength(1);
+      expect(span(1) / span(0)).toBeCloseTo(2);
+    },
+  );
 
   it('keeps every notehead attached when Classic wraps to later systems', () => {
     const div = container();
@@ -508,7 +681,7 @@ describe('renderMusic', () => {
     expect(div.querySelector('svg')).not.toBeNull();
   });
 
-  it('prints a tempo label only for the first tempo and after a >= 2 BPM drift from the last shown one', () => {
+  it('prints every authored tempo change', () => {
     const div = container();
     const measures = [
       measure(quarters, { tempo: tempo(83.03) }),
@@ -530,7 +703,7 @@ describe('renderMusic', () => {
       .map((el) => el.textContent)
       .filter((text): text is string => Boolean(text?.includes('=')));
 
-    expect(tempoTexts).toEqual([' = 83', ' = 90']);
+    expect(tempoTexts).toEqual([' = 83', ' = 84', ' = 90']);
   });
 
   it('prints nothing when tempo display is switched off', () => {
@@ -603,7 +776,7 @@ describe('dedupedTempoLabels', () => {
     expect(dedupedTempoLabels(measures, true)).toEqual([tempo(100)]);
   });
 
-  it('suppresses near-duplicate tempos that drift less than 2 BPM from the last one shown', () => {
+  it('keeps near tempo changes visible', () => {
     const measures = [
       measure(quarters, { tempo: tempo(83.03) }),
       measure(quarters, { tempo: tempo(83.71) }),
@@ -612,12 +785,12 @@ describe('dedupedTempoLabels', () => {
 
     expect(dedupedTempoLabels(measures, true)).toEqual([
       tempo(83),
-      undefined,
-      undefined,
+      tempo(84),
+      tempo(84),
     ]);
   });
 
-  it('shows a tempo again once it drifts at least 2 BPM from the last one shown', () => {
+  it('keeps each tempo event in measure order', () => {
     const measures = [
       measure(quarters, { tempo: tempo(83.03) }),
       measure(quarters, { tempo: tempo(83.71) }),
@@ -626,12 +799,12 @@ describe('dedupedTempoLabels', () => {
 
     expect(dedupedTempoLabels(measures, true)).toEqual([
       tempo(83),
-      undefined,
+      tempo(84),
       tempo(90),
     ]);
   });
 
-  it('treats the last SHOWN tempo as the comparison baseline, not the last measure', () => {
+  it('does not hide a tempo after another visible tempo', () => {
     const measures = [
       measure(quarters, { tempo: tempo(100) }),
       // Exactly 2 BPM up from the shown baseline (100) - meets the >= 2
@@ -645,7 +818,7 @@ describe('dedupedTempoLabels', () => {
     expect(dedupedTempoLabels(measures, true)).toEqual([
       tempo(100),
       tempo(102),
-      undefined,
+      tempo(104),
     ]);
   });
 

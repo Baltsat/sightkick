@@ -118,6 +118,13 @@ export interface ZpdScaffold {
   steps: readonly ('preview' | 'slower_tempo' | 'short_loop' | 'Tutor')[];
 }
 
+export interface ZpdAdaptation {
+  starting_speed: number;
+  repeat_budget: number;
+  quality_passes_to_advance: number;
+  low_quality_passes_before_stop: number;
+}
+
 export type ZpdCandidateState =
   | 'assessment'
   | 'too_easy'
@@ -166,6 +173,7 @@ export interface PracticeDecision {
   uncertainty: number;
   hard_prerequisites: readonly string[];
   scaffold: ZpdScaffold;
+  adaptation?: ZpdAdaptation;
   factors: readonly PracticeDecisionFactor[];
   explanation: string;
 }
@@ -265,6 +273,7 @@ export interface SessionBlock {
   bar_range?: { start: number; end: number };
   speed: number;
   scaffold: readonly ('preview' | 'slower_tempo' | 'short_loop' | 'Tutor')[];
+  adaptation?: ZpdAdaptation;
   stop_rule: string;
   why: string;
 }

@@ -47,7 +47,7 @@ afterEach(() => {
 });
 
 describe('opening a song', () => {
-  it('keeps the kit key closed until asked for and persists dismissal', async () => {
+  it('pins the kit key while playing and returns to automatic display', async () => {
     const view = setupSongView();
 
     await view.loadSong();
@@ -55,11 +55,13 @@ describe('opening a song', () => {
     const toggle = screen.getByTestId('notation-kit-key-toggle');
 
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByTestId('notation-kit-key')).not.toBeInTheDocument();
 
     fireEvent.click(toggle);
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('notation-kit-key')).toBeInTheDocument();
     expect(
       JSON.parse(
@@ -71,6 +73,7 @@ describe('opening a song', () => {
     fireEvent.click(toggle);
 
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByTestId('notation-kit-key')).not.toBeInTheDocument();
     expect(
       JSON.parse(
@@ -78,6 +81,12 @@ describe('opening a song', () => {
       ),
     ).toBe(false);
   });
+
+  // The arming RULE is unit-tested in kit-arming.test.ts. An end-to-end test
+  // through SongView is not here because this harness cannot drive
+  // InputContext to a 'connected' MIDI state - the device-list handshake
+  // settles at 'reconnecting'. That harness gap is worth closing; it is not
+  // a defect in the arming behaviour itself.
 
   it('shows the song header and real rendered sheet music', async () => {
     const view = setupSongView({
@@ -94,7 +103,8 @@ describe('opening a song', () => {
 
     const caption = screen.getByTestId('perform-kit-control-prompt');
 
-    expect(caption).toHaveAttribute('data-edge-caption', 'perform-command');
+    expect(caption).toHaveAttribute('data-fullscreen-moment', 'kit-command');
+    expect(caption).toHaveAttribute('data-primary-element', 'kick');
     expect(caption).toHaveTextContent('Kick to start the count-in');
     expect(caption).toHaveTextContent('Kick');
   });
@@ -116,7 +126,7 @@ describe('opening a song', () => {
       view.ipc.emit('load-song', { error: 'missing' });
     });
 
-    expect(screen.getByText("Couldn't open this song")).toBeInTheDocument();
+    expect(screen.getByText('Song open failed')).toBeInTheDocument();
     expect(screen.getByTestId('song-list-stub')).toBeInTheDocument();
   });
 
@@ -549,8 +559,11 @@ describe('drumming and scoring', () => {
 
     view.clickPlay();
     await view.finishSong();
+    // The run must finish saving before a result action is allowed - a
+    // command fired mid-save is deliberately ignored.
+    confirmPracticeRunSaved(view);
 
-    view.clickTestId('score-retry');
+    view.clickTestId('score-command-retry');
 
     expect(view.startedSources().length).toBeGreaterThan(0);
   });
@@ -562,8 +575,11 @@ describe('drumming and scoring', () => {
 
     view.clickPlay();
     await view.finishSong();
+    // The run must finish saving before a result action is allowed - a
+    // command fired mid-save is deliberately ignored.
+    confirmPracticeRunSaved(view);
 
-    view.clickTestId('score-next');
+    view.clickTestId('score-command-continue');
 
     expect(screen.getByTestId('song-list-stub')).toBeInTheDocument();
   });
@@ -578,6 +594,8 @@ describe('drumming and scoring', () => {
 
     view.clickPlay();
     await view.finishSong();
+    // A confirm fired while the run is still saving is deliberately ignored.
+    confirmPracticeRunSaved(view);
     await view.pressKey('Enter');
 
     expect(screen.getByTestId('song-list-stub')).toBeInTheDocument();
@@ -1103,27 +1121,102 @@ function makeScrollable(
 }
 
 describe('practice loop selection', () => {
-  it('selects a loop range by dragging across measures', async () => {
-    const view = setupSongView({ route: '/song-1?gameMode=practice' });
+  const notationLayouts = [
+    ['Flow', 'flow'],
+    ['Classic', 'classic'],
+  ] as const;
 
-    await view.loadSong();
+  it.each(notationLayouts)(
+    '%s keeps a score click as a seek without making a loop',
+    async (_label, practiceNotationLayout) => {
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice',
+        settings: { countIn: false, practiceNotationLayout },
+      });
 
-    const [a, b] = view.measureHighlights();
+      await view.loadSong();
 
-    fireEvent.pointerDown(a);
-    fireEvent.pointerEnter(b);
-    fireEvent.pointerUp(document.body);
+      const [measure] = view.measureHighlights();
 
-    expect(screen.getByTestId('practice-loop-caption')).toHaveTextContent(
-      'Bars 1–2',
-    );
-    expect(a).toHaveAttribute('data-selected', 'true');
-    expect(b).toHaveAttribute('data-selected', 'true');
-    expect(screen.getByTestId('practice-mode-indicator')).toHaveAttribute(
-      'data-looping',
-      'true',
-    );
-  });
+      fireEvent.pointerDown(measure, { clientX: 10, clientY: 10 });
+      fireEvent.pointerUp(document.body, { clientX: 10, clientY: 10 });
+
+      expect(screen.getByTestId('practice-mode-indicator')).not.toHaveAttribute(
+        'data-looping',
+        'true',
+      );
+
+      fireEvent.click(measure);
+
+      await waitFor(() => {
+        expect(view.startedSources().length).toBeGreaterThan(0);
+      });
+    },
+  );
+
+  it.each(notationLayouts)(
+    '%s creates exactly the dragged bars only when the drag releases',
+    async (_label, practiceNotationLayout) => {
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice',
+        settings: { practiceNotationLayout },
+      });
+
+      await view.loadSong();
+
+      const [a, b] = view.measureHighlights();
+
+      fireEvent.pointerDown(a, { clientX: 10, clientY: 10 });
+      fireEvent.pointerEnter(b, { clientX: 26, clientY: 10 });
+
+      expect(screen.getByTestId('practice-mode-indicator')).not.toHaveAttribute(
+        'data-looping',
+        'true',
+      );
+
+      fireEvent.pointerUp(document.body, { clientX: 26, clientY: 10 });
+
+      expect(screen.getByTestId('practice-loop-caption')).toHaveTextContent(
+        'Bars 1–2',
+      );
+      expect(a).toHaveAttribute('data-selected', 'true');
+      expect(b).toHaveAttribute('data-selected', 'true');
+      expect(screen.getByTestId('practice-mode-indicator')).toHaveAttribute(
+        'data-looping',
+        'true',
+      );
+    },
+  );
+
+  it.each(notationLayouts)(
+    '%s clears a dragged loop from the score selection',
+    async (_label, practiceNotationLayout) => {
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice',
+        settings: { practiceNotationLayout },
+      });
+
+      await view.loadSong();
+
+      const [a, b] = view.measureHighlights();
+
+      fireEvent.pointerDown(a, { clientX: 10, clientY: 10 });
+      fireEvent.pointerEnter(b, { clientX: 26, clientY: 10 });
+      fireEvent.pointerUp(document.body, { clientX: 26, clientY: 10 });
+
+      fireEvent.click(screen.getByTestId('clear-practice-loop'));
+
+      expect(
+        screen.queryByTestId('practice-loop-caption'),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId('practice-mode-indicator')).not.toHaveAttribute(
+        'data-looping',
+        'true',
+      );
+      expect(a).not.toHaveAttribute('data-selected', 'true');
+      expect(b).not.toHaveAttribute('data-selected', 'true');
+    },
+  );
 
   it('normalizes a backward drag', async () => {
     const view = setupSongView({ route: '/song-1?gameMode=practice' });
@@ -1133,8 +1226,11 @@ describe('practice loop selection', () => {
 
     const [a, b] = view.measureHighlights();
 
-    fireEvent.mouseDown(b);
-    fireEvent.mouseEnter(a);
+    // A loop now commits on RELEASE after a deliberate drag of at least
+    // 12 px onto a different bar - a stray click must never create one.
+    fireEvent.mouseDown(b, { clientX: 200, clientY: 100 });
+    fireEvent.mouseEnter(a, { clientX: 100, clientY: 100 });
+    fireEvent.mouseUp(a, { clientX: 100, clientY: 100 });
 
     expect(screen.getByTestId('practice-loop-caption')).toHaveTextContent(
       'Bars 1–2',
@@ -1149,12 +1245,18 @@ describe('practice loop selection', () => {
 
     const [a, b] = view.measureHighlights();
 
-    fireEvent.mouseDown(a);
-    fireEvent.mouseUp(document.body);
-    fireEvent.mouseEnter(b);
+    // Release ends the gesture: hovering a later bar afterwards must not
+    // keep growing the range.
+    fireEvent.mouseDown(a, { clientX: 100, clientY: 100 });
+    fireEvent.mouseEnter(b, { clientX: 200, clientY: 100 });
+    fireEvent.mouseUp(b, { clientX: 200, clientY: 100 });
+
+    const committed = screen.getByTestId('practice-loop-caption').textContent;
+
+    fireEvent.mouseEnter(a, { clientX: 100, clientY: 100 });
 
     expect(screen.getByTestId('practice-loop-caption')).toHaveTextContent(
-      'Bars 1–1',
+      committed ?? '',
     );
   });
 
@@ -1163,7 +1265,19 @@ describe('practice loop selection', () => {
 
     await view.loadSong();
 
-    fireEvent.mouseDown(view.measureHighlights()[0]);
+    // A press alone is not a loop any more - it must be a completed drag
+    // onto a different bar. This is the defect he hit: a stray click
+    // silently started looping a bar.
+    const [first, second] = view.measureHighlights();
+
+    fireEvent.mouseDown(first, { clientX: 100, clientY: 100 });
+
+    expect(
+      screen.queryByTestId('practice-loop-caption'),
+    ).not.toBeInTheDocument();
+
+    fireEvent.mouseEnter(second, { clientX: 200, clientY: 100 });
+    fireEvent.mouseUp(second, { clientX: 200, clientY: 100 });
 
     expect(screen.getByTestId('practice-loop-caption')).toBeInTheDocument();
   });
@@ -1174,7 +1288,11 @@ describe('practice loop selection', () => {
     await view.loadSong();
     view.clickTestId('loop-toggle');
 
-    fireEvent.mouseDown(view.measureHighlights()[0]);
+    const [clearA, clearB] = view.measureHighlights();
+
+    fireEvent.mouseDown(clearA, { clientX: 100, clientY: 100 });
+    fireEvent.mouseEnter(clearB, { clientX: 200, clientY: 100 });
+    fireEvent.mouseUp(clearB, { clientX: 200, clientY: 100 });
     expect(screen.getByTestId('practice-loop-caption')).toBeInTheDocument();
 
     view.clickTestId('clear-loop');
@@ -1844,8 +1962,11 @@ describe('in-practice difficulty switching', () => {
     // it to just 1. Select the second (Expert-only) measure.
     const highlights = view.measureHighlights();
 
-    fireEvent.mouseDown(highlights[1]);
-    fireEvent.mouseUp(document.body);
+    // A loop needs a completed drag onto a different bar, so select the
+    // Expert-only measure by dragging back to it from the first.
+    fireEvent.mouseDown(highlights[0], { clientX: 100, clientY: 100 });
+    fireEvent.mouseEnter(highlights[1], { clientX: 240, clientY: 100 });
+    fireEvent.mouseUp(highlights[1], { clientX: 240, clientY: 100 });
 
     expect(screen.getByTestId('practice-loop-caption')).toBeInTheDocument();
 

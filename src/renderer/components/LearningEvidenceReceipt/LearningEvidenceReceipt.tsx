@@ -13,7 +13,7 @@ function timingDetail(
   return (
     ' Timing uses ±' +
     Math.round(windowMs) +
-    ' ms; ' +
+    ' ms. ' +
     normalizedAtomicReceipts +
     '/' +
     recorded +
@@ -80,8 +80,8 @@ export function LearningEvidenceReceipt({
               {plural(receipt.tutor.interventions, 'intervention')} ·{' '}
               {plural(receipt.tutor.cleanAttempts, 'clean loop')} ·{' '}
               {plural(receipt.tutor.retryAttempts, 'retry')} ·{' '}
-              {plural(receipt.tutor.deferredAttempts, 'pause')}. This helps
-              guide practice; it does not change your level yet.
+              {plural(receipt.tutor.deferredAttempts, 'pause')}. This guides
+              practice. Your level stays unchanged.
             </dd>
           </div>
         )}

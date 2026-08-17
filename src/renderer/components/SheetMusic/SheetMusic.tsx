@@ -37,6 +37,8 @@ import {
   useNotationGlossaryIntent,
 } from '../NotationGlossary';
 
+const LOOP_DRAG_THRESHOLD_PX = 12;
+
 export interface SheetMusicProps {
   engine: Engine | undefined;
   songData: Song;
@@ -49,6 +51,7 @@ export interface SheetMusicProps {
   isLooping?: boolean;
   onPracticeRangeChange?: (range?: PracticeRange) => void;
   onLoopRangeSelect?: (range: PracticeRange) => void;
+  onClearLoop?: () => void;
   onSelectMeasure: (measure: Measure, event: MouseEvent) => void;
   zoom: number;
   layout?: SheetMusicLayout;
@@ -70,6 +73,7 @@ export function SheetMusic({
   isLooping,
   onPracticeRangeChange,
   onLoopRangeSelect,
+  onClearLoop,
   onSelectMeasure,
   zoom,
   layout = 'classic',
@@ -90,6 +94,9 @@ export function SheetMusic({
   );
   const isSelectable = gameMode === 'practice';
   const dragAnchorRef = useRef<number | undefined>(undefined);
+  const dragEndRef = useRef<number | undefined>(undefined);
+  const dragStartRef = useRef<{ x: number; y: number } | undefined>(undefined);
+  const loopDragActiveRef = useRef(false);
   const {
     intent: notationGlossaryIntent,
     summon: summonNotation,
@@ -114,31 +121,63 @@ export function SheetMusic({
     [onLoopRangeSelect, onPracticeRangeChange],
   );
   const handleMeasureMouseDown = useCallback(
-    (index: number) => {
+    (index: number, event: { clientX: number; clientY: number }) => {
       if (!isSelectable || dragAnchorRef.current !== undefined) {
         return;
       }
 
       dragAnchorRef.current = index;
+      dragEndRef.current = index;
+      dragStartRef.current = { x: event.clientX, y: event.clientY };
+      loopDragActiveRef.current = false;
       scrollContainerRef.current = getScrollParent(
         wrapperRef.current ?? undefined,
       );
-      selectLoopRange({ start: index, end: index });
     },
-    [isSelectable, selectLoopRange],
+    [isSelectable],
   );
-  const handleMeasureMouseEnter = useCallback(
-    (index: number) => {
+  const handleMeasureDrag = useCallback(
+    (index: number, event: { clientX: number; clientY: number }) => {
       const anchor = dragAnchorRef.current;
+      const start = dragStartRef.current;
 
-      if (anchor === undefined) {
+      if (anchor === undefined || !start) {
         return;
       }
 
-      selectLoopRange({
-        start: Math.min(anchor, index),
-        end: Math.max(anchor, index),
-      });
+      if (
+        Math.hypot(event.clientX - start.x, event.clientY - start.y) >=
+        LOOP_DRAG_THRESHOLD_PX
+      ) {
+        loopDragActiveRef.current = index !== anchor;
+        dragEndRef.current = index;
+      }
+    },
+    [],
+  );
+  const finishMeasureDrag = useCallback(
+    (commit: boolean) => {
+      const anchor = dragAnchorRef.current;
+      const end = dragEndRef.current;
+
+      if (
+        commit &&
+        loopDragActiveRef.current &&
+        anchor !== undefined &&
+        end !== undefined
+      ) {
+        selectLoopRange({
+          start: Math.min(anchor, end),
+          end: Math.max(anchor, end),
+        });
+      }
+
+      dragAnchorRef.current = undefined;
+      dragEndRef.current = undefined;
+      dragStartRef.current = undefined;
+      loopDragActiveRef.current = false;
+      scrollContainerRef.current = undefined;
+      autoScrollSpeedRef.current = 0;
     },
     [selectLoopRange],
   );
@@ -167,6 +206,13 @@ export function SheetMusic({
   );
   const handleScorePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest('[data-loop-clear]')
+      ) {
+        return;
+      }
+
       if (event.altKey) {
         summonNotation(event.target, event.clientX, event.clientY);
         event.preventDefault();
@@ -182,8 +228,7 @@ export function SheetMusic({
         return;
       }
 
-      event.preventDefault();
-      handleMeasureMouseDown(index);
+      handleMeasureMouseDown(index, event);
     },
     [
       dismissNotation,
@@ -200,13 +245,13 @@ export function SheetMusic({
         dismissNotation();
 
         if (index !== undefined) {
-          handleMeasureMouseEnter(index);
+          handleMeasureDrag(index, event);
         }
 
         return;
       }
     },
-    [dismissNotation, handleMeasureMouseEnter, measureIndexAtPoint],
+    [dismissNotation, handleMeasureDrag, measureIndexAtPoint],
   );
 
   // Keeps the sheet scrollable by mouse wheel / trackpad, and auto-scrolls
@@ -238,9 +283,11 @@ export function SheetMusic({
       autoScrollFrameRef.current = requestAnimationFrame(runAutoScroll);
     };
     const endDrag = () => {
-      dragAnchorRef.current = undefined;
-      scrollContainerRef.current = undefined;
-      autoScrollSpeedRef.current = 0;
+      finishMeasureDrag(true);
+      stopAutoScroll();
+    };
+    const cancelDrag = () => {
+      finishMeasureDrag(false);
       stopAutoScroll();
     };
     const handleMouseMove = (event: globalThis.MouseEvent) => {
@@ -283,7 +330,7 @@ export function SheetMusic({
     window.addEventListener('mouseup', endDrag);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('pointerup', endDrag);
-    window.addEventListener('pointercancel', endDrag);
+    window.addEventListener('pointercancel', cancelDrag);
     window.addEventListener('pointermove', handleMouseMove);
     window.addEventListener('wheel', handleWheel, { passive: false });
 
@@ -291,12 +338,12 @@ export function SheetMusic({
       window.removeEventListener('mouseup', endDrag);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('pointerup', endDrag);
-      window.removeEventListener('pointercancel', endDrag);
+      window.removeEventListener('pointercancel', cancelDrag);
       window.removeEventListener('pointermove', handleMouseMove);
       window.removeEventListener('wheel', handleWheel);
       stopAutoScroll();
     };
-  }, []);
+  }, [finishMeasureDrag]);
 
   useEffect(() => {
     engine?.setRendererRefs({
@@ -376,13 +423,12 @@ export function SheetMusic({
             (isDev || gameMode === 'practice') &&
               'drumroll-measure-overlay--selectable',
           )}
-          onMouseDown={() => handleMeasureMouseDown(index)}
+          onMouseDown={(event) => handleMeasureMouseDown(index, event)}
           onPointerDown={(event) => {
-            event.preventDefault();
-            handleMeasureMouseDown(index);
+            handleMeasureMouseDown(index, event);
           }}
-          onMouseEnter={() => handleMeasureMouseEnter(index)}
-          onPointerEnter={() => handleMeasureMouseEnter(index)}
+          onMouseEnter={(event) => handleMeasureDrag(index, event)}
+          onPointerEnter={(event) => handleMeasureDrag(index, event)}
           onClick={(event) => {
             if (
               (gameMode !== 'practice' && isDev) ||
@@ -404,8 +450,41 @@ export function SheetMusic({
     practiceRange,
     focusIndex,
     handleMeasureMouseDown,
-    handleMeasureMouseEnter,
+    handleMeasureDrag,
   ]);
+  const loopClearAffordance =
+    isLooping && practiceRange && onClearLoop
+      ? (() => {
+          const end = renderData[practiceRange.end];
+
+          if (!end) {
+            return null;
+          }
+
+          return (
+            <button
+              type="button"
+              className="drumroll-loop-clear"
+              data-testid="clear-practice-loop"
+              data-loop-clear="true"
+              aria-label={`Clear loop bars ${practiceRange.start + 1} to ${
+                practiceRange.end + 1
+              }`}
+              style={{
+                top: Math.max(0, end.yOffset + end.stave.getY() - 24),
+                left: end.stave.getX() + end.stave.getWidth() - 28,
+              }}
+              onPointerDownCapture={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onClearLoop();
+              }}
+            >
+              ×
+            </button>
+          );
+        })()
+      : null;
   const isFlow = layout === 'flow';
   const scoreCredits = songData.lesson
     ? []
@@ -607,6 +686,7 @@ export function SheetMusic({
             )}
           />
           {measureHighlights}
+          {loopClearAffordance}
           <div
             ref={cursorRef}
             data-testid="playhead-cursor"

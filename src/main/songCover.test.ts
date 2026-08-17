@@ -27,7 +27,9 @@ vi.mock('electron', () => ({
   },
 }));
 
-const { ingestSongCover, previewSongCover } = await import('./songCover');
+const { backfillSongCovers, ingestSongCover, previewSongCover } = await import(
+  './songCover'
+);
 const { parseFile } = await import('music-metadata');
 
 function itunesSearchResponse(
@@ -216,5 +218,38 @@ describe('song cover ingestion', () => {
     for (const call of fetchMock.mock.calls) {
       expect(call[0].toString()).not.toContain('itunes.apple.com');
     }
+  });
+
+  it('reuses a cover from the same known release before querying iTunes', async () => {
+    const coveredDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'cover-existing-'),
+    );
+
+    fs.writeFileSync(path.join(dir, 'song.mp3'), '');
+    fs.writeFileSync(path.join(coveredDir, 'album.jpg'), 'existing');
+
+    const fetchMock = vi.fn();
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      backfillSongCovers([
+        {
+          dir,
+          artist: 'Green Day',
+          title: 'Boulevard of Broken Dreams',
+          album: 'American Idiot',
+        },
+        {
+          dir: coveredDir,
+          artist: 'Green Day',
+          title: 'Boulevard of Broken Dreams',
+          album: 'American Idiot',
+        },
+      ]),
+    ).resolves.toEqual(new Set([dir]));
+    expect(fs.existsSync(path.join(dir, 'album.jpg'))).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+    fs.rmSync(coveredDir, { recursive: true, force: true });
   });
 });

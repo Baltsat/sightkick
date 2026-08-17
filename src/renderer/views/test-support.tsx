@@ -135,6 +135,12 @@ export interface SongViewOptions {
   route?: string;
   settings?: Record<string, unknown>;
   keyboard?: KeyboardSeed;
+  /**
+   * Seeds a real MIDI kit as the selected device. `loadSong` then answers the
+   * device list with it and sends the ready signal, so the view sees the kit
+   * as genuinely connected - the state that makes a start wait for a strike.
+   */
+  midiKit?: { name: string; port: number };
   onContinuePractice?: (completedRun?: PracticeHistoryEntry) => void;
   recommendationReason?: string;
 }
@@ -142,6 +148,7 @@ export interface SongViewOptions {
 export interface SongViewHarness {
   ipc: IpcMock;
   audio: FakeAudioContext;
+  emit(channel: string, ...args: unknown[]): void;
   loadSong(song?: Song, chartText?: string): Promise<void>;
   clickPlay(): void;
   navigate(path: string): void;
@@ -193,6 +200,7 @@ export function setupSongView({
   route = '/song-1',
   settings,
   keyboard,
+  midiKit,
   onContinuePractice,
   recommendationReason,
 }: SongViewOptions = {}): SongViewHarness {
@@ -210,6 +218,17 @@ export function setupSongView({
 
   if (keyboard) {
     seedKeyboardDevice(keyboard);
+  }
+
+  if (midiKit) {
+    seedSettings({
+      selectedDevice: {
+        id: `midi:${midiKit.name}`,
+        name: midiKit.name,
+        sourceId: 'midi',
+        port: midiKit.port,
+      },
+    });
   }
 
   let routeNavigate: NavigateFunction | undefined;
@@ -270,14 +289,39 @@ export function setupSongView({
     audio,
     unmount,
 
+    emit(channel: string, ...args: unknown[]) {
+      act(() => {
+        ipc.emit(channel, ...args);
+      });
+    },
+
     async loadSong(song = makeSong(), chartText = DRUM_CHART) {
       const response: IpcLoadSongResponse = {
         data: song,
         fileData: new TextEncoder().encode(chartText) as unknown as Buffer,
       };
 
+      if (midiKit) {
+        // A kit reaches "connected" in two hops: the device list, then the
+        // ready signal for the port it opened. They have to settle in their
+        // own passes, and before the song loads - he plugs the kit in first,
+        // then opens the song.
+        await act(async () => {
+          ipc.emit('midi-device-list', [midiKit]);
+          await new Promise((resolve) => {
+            setTimeout(resolve, 0);
+          });
+        });
+        await act(async () => {
+          ipc.emit('midi-ready', { port: midiKit.port });
+        });
+      }
+
       await act(async () => {
-        ipc.emit('midi-device-list', []);
+        if (!midiKit) {
+          ipc.emit('midi-device-list', []);
+        }
+
         ipc.emit('load-song', response);
       });
     },
@@ -309,20 +353,34 @@ export function setupSongView({
     },
 
     clickTestId(testId: string) {
+      // The result screen shows kit command chips when hands-free controls
+      // are on and plain buttons when they are off. Prefer whatever is
+      // actually mounted so a test does not have to know which it got.
+      const legacyAlias: Record<string, string> = {
+        'score-command-retry': 'score-retry',
+        'score-command-continue': 'score-next',
+        'score-retry': 'score-command-retry',
+        'score-next': 'score-command-continue',
+      };
+      const resolvedTestId =
+        screen.queryByTestId(testId) || !legacyAlias[testId]
+          ? testId
+          : legacyAlias[testId];
+
       if (
-        !screen.queryByTestId(testId) &&
+        !screen.queryByTestId(resolvedTestId) &&
         [
           'loop-toggle',
           'notation-flow-toggle',
           'notation-classic-toggle',
           'ai-coach-button',
           'practice-stats-button',
-        ].includes(testId)
+        ].includes(resolvedTestId)
       ) {
         fireEvent.click(screen.getByTestId('settings-trigger'));
       }
 
-      fireEvent.click(screen.getByTestId(testId));
+      fireEvent.click(screen.getByTestId(resolvedTestId));
     },
 
     clickTrackMuteToggle() {

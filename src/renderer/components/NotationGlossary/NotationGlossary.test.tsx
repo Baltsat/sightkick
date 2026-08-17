@@ -7,6 +7,7 @@ import {
   NotationKitKey,
   placeNotationGlossary,
   notationKindForTarget,
+  shouldShowNotationKitKey,
   useNotationGlossaryIntent,
 } from './NotationGlossary';
 
@@ -50,20 +51,67 @@ function GlossaryProbe() {
 }
 
 describe('NotationGlossary', () => {
-  it('keeps a compact shape-and-position kit key available beside the score', () => {
+  it('keeps a compact staff-position and sticking key at the score bottom', () => {
     render(<NotationKitKey layout="classic" />);
 
     const key = screen.getByTestId('notation-kit-key');
 
     expect(key).toHaveAccessibleName('Drum kit notation key');
-    expect(key.querySelectorAll('[data-kit-element]')).toHaveLength(8);
-    expect(key).toHaveTextContent('● drums · × cymbals · low → high');
-    expect(key.querySelector('[data-kit-element="kick"]')).toHaveAccessibleName(
-      'Kick: round head, low on the staff',
-    );
+    expect(key.querySelectorAll('[data-kit-element]')).toHaveLength(10);
+    expect(key).toHaveTextContent('staff position · drum name');
     expect(
-      key.querySelector('[data-kit-element="hihat"]'),
+      key.querySelector('[data-kit-element="kick"] button'),
+    ).toHaveAccessibleName('Kick: round head, low on the staff');
+    expect(
+      key.querySelector('[data-kit-element="hihat"] button'),
     ).toHaveAccessibleName('Hi-hat: cross head, high on the staff');
+    expect(key).toHaveTextContent('Cross-stick');
+    expect(key).toHaveTextContent('Hi-hat foot');
+    expect(key).toHaveTextContent('RF');
+    expect(key).toHaveTextContent('Right foot');
+  });
+
+  it('names every focused or hovered strip glyph in words', () => {
+    render(<NotationKitKey layout="flow" />);
+
+    fireEvent.pointerEnter(screen.getByTestId('notation-kit-key-item-hihat'));
+    expect(screen.getByRole('status')).toHaveTextContent('× means Hi-hat.');
+
+    fireEvent.focus(screen.getByTestId('notation-sticking-key-RF'));
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'RF means Right foot.',
+    );
+  });
+
+  it('shows automatically while paused or at the computer, unless it is already pinned', () => {
+    expect(
+      shouldShowNotationKitKey({
+        manualVisible: false,
+        interactionMode: 'kit',
+        presentationPhase: 'playing',
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowNotationKitKey({
+        manualVisible: false,
+        interactionMode: 'kit',
+        presentationPhase: 'paused',
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowNotationKitKey({
+        manualVisible: false,
+        interactionMode: 'computer',
+        presentationPhase: 'playing',
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowNotationKitKey({
+        manualVisible: true,
+        interactionMode: 'kit',
+        presentationPhase: 'playing',
+      }),
+    ).toBe(true);
   });
 
   it('requires an option-click and never reopens from ordinary pointer movement', () => {

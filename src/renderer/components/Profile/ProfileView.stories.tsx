@@ -157,6 +157,12 @@ const insights: ProfileInsights = {
       uncertainty: 0.29,
       hard_prerequisites: ['pulse.eighth'],
       scaffold: { speed: 0.72, steps: ['short_loop', 'Tutor'] },
+      adaptation: {
+        starting_speed: 0.72,
+        repeat_budget: 3,
+        quality_passes_to_advance: 2,
+        low_quality_passes_before_stop: 2,
+      },
       factors: [],
       explanation:
         'Mid-to-floor tom movement is the nearest supported bottleneck at a reachable tempo.',
@@ -355,6 +361,7 @@ const meta: Meta<typeof ProfileView> = {
     onSaveGoal: () => {},
     onSetPrimaryGoal: () => {},
     gamification,
+    kitConnected: true,
     insights,
     onStartTargetedPractice: () => {},
   },

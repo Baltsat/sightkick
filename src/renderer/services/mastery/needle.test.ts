@@ -43,6 +43,6 @@ describe('needleMoverLine', () => {
       chartTotalNotes: 100,
     });
 
-    expect(needleMoverLine(breakdown)).toMatch(/accuracy at full speed/i);
+    expect(needleMoverLine(breakdown)).toMatch(/full-speed accuracy/i);
   });
 });

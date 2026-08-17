@@ -29,23 +29,21 @@ export const popoverStyles: {
   container?: CSSProperties;
   arrow?: CSSProperties;
 } = {
-  container: { border, boxShadow: 'none' },
+  // A small screen (or a clamped window) must never push a control past the
+  // viewport edge where it can render but not receive a click — the surface
+  // scrolls inside itself instead.
+  container: {
+    border,
+    boxShadow: 'none',
+    maxHeight: 'calc(100vh - 96px)',
+    overflowY: 'auto',
+  },
 };
 
 export const MODAL_ABOVE_POPOVER_Z_INDEX = 1050;
 
-export function isAnyModalOpen(): boolean {
-  return Array.from(document.querySelectorAll('.ant-modal-wrap')).some(
-    (element) => (element as HTMLElement).style.display !== 'none',
-  );
-}
-
 export function popoverOpenChange(
   setOpen: (open: boolean) => void,
 ): (open: boolean) => void {
-  return (open) => {
-    if (open || !isAnyModalOpen()) {
-      setOpen(open);
-    }
-  };
+  return setOpen;
 }

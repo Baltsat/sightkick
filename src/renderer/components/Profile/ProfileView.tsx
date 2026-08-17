@@ -20,7 +20,6 @@ import {
   PracticeCardSet,
   PracticeRhythm,
   curriculumItemManifest,
-  skillConfidence,
   skillNodeById,
   WeeklyPracticeSet,
 } from '../../services/pedagogy';
@@ -35,6 +34,7 @@ import type {
   RankedPracticeCandidate,
 } from '../../services/next-practice';
 import type { RunSummary } from '../../services/practice-stats';
+import type { PatternPlayerProfile } from '../../services/pattern-model';
 import { LearningEvidenceReceipt } from '../LearningEvidenceReceipt';
 import { cn } from '../../cn';
 import { Goal, SaveGoalInput, SetGoalModal } from '../Goals';
@@ -45,7 +45,9 @@ import { SkillBars } from './SkillBars';
 import { useMastery } from './useMastery';
 import { useRetiredLessons } from './useRetiredLessons';
 import { AtomicSkillRadar } from './AtomicSkillRadar';
+import { SkillsRose } from './SkillsRose';
 import { EvidencePracticeCards } from '../PracticeCards';
+import { KitActionChip } from '../GamificationHeaderStrip/KitActionChip';
 
 export interface ProfileInsights {
   recommendation?: RankedPracticeCandidate;
@@ -60,6 +62,7 @@ export interface ProfileInsights {
   weeklyRecap?: WeeklyMusicalRecap;
   bestAudition?: SavedSongSectionAudition;
   auditionAvailable?: boolean;
+  patternProfile?: PatternPlayerProfile;
 }
 
 export interface ProfileViewProps {
@@ -69,12 +72,14 @@ export interface ProfileViewProps {
   onSaveGoal: (input: SaveGoalInput, onSaved?: (goals: Goal[]) => void) => void;
   onSetPrimaryGoal: (id: string) => void;
   gamification: UseGamificationResult;
+  kitConnected?: boolean;
   insights?: ProfileInsights;
   onStartTargetedPractice?: () => void;
   onStartPracticeCard?: (option: PracticeCardOption) => void;
   onPracticeRhythmChange?: (rhythm: PracticeRhythm) => void;
   onRefreshPracticeSet?: () => void;
   onStartAudition?: () => void;
+  onOpenLesson?: (lessonId: string) => void;
 }
 
 const STAGE_INDEX: Record<AtomicSkillState['stage'], number> = {
@@ -85,7 +90,7 @@ const STAGE_INDEX: Record<AtomicSkillState['stage'], number> = {
   transferable: 4,
 };
 const STAGE_COPY: Record<AtomicSkillState['stage'], string> = {
-  unknown: 'Not measured',
+  unknown: 'Awaiting evidence',
   assessed: 'Assessed',
   provisional: 'Building',
   retained: 'Retained',
@@ -185,7 +190,7 @@ function SkillSpine({
     >
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold tracking-[0.12em] text-[var(--signal-wine)]">
+          <p className="text-base font-semibold tracking-[0.08em] text-[var(--signal-wine)]">
             What to work on
           </p>
           <h2
@@ -195,9 +200,8 @@ function SkillSpine({
             Build the skill that makes the next phrase easier.
           </h2>
         </div>
-        <p className="max-w-75 text-sm leading-relaxed text-text-muted">
-          Each skill updates after a practice run. Blank means it has not been
-          measured enough yet.
+        <p className="max-w-90 text-base leading-relaxed text-text-muted">
+          Bars use saved kit evidence. Blank means no saved kit evidence.
         </p>
       </div>
 
@@ -205,50 +209,50 @@ function SkillSpine({
         {skills.map(({ node, state }) => {
           const stage = state?.stage ?? 'unknown';
           const activeIndex = STAGE_INDEX[stage];
-          const confidence = Math.round(skillConfidence(state) * 100);
 
           return (
             <article
               key={node.id}
-              className="grid gap-3 py-4 md:grid-cols-[minmax(13rem,0.9fr)_minmax(16rem,1.1fr)_minmax(8rem,0.45fr)] md:items-center"
+              className="grid gap-4 py-5 md:grid-cols-[minmax(15rem,0.8fr)_minmax(20rem,1.2fr)] md:items-center"
             >
               <div>
-                <h3 className="font-semibold text-text">{node.label}</h3>
-                <p className="mt-1 text-xs capitalize text-text-muted">
+                <h3 className="text-lg font-semibold text-text">
+                  {node.label}
+                </h3>
+                <p className="mt-1 text-sm capitalize text-text-muted">
                   {node.family}
                 </p>
               </div>
-              <div
-                className="grid grid-cols-5 gap-1"
-                aria-label={node.label + ': ' + STAGE_COPY[stage]}
-              >
-                {[
-                  'Observed',
-                  'Assessed',
-                  'Building',
-                  'Retained',
-                  'Transfer',
-                ].map((label, index) => (
-                  <span
-                    key={label}
-                    className={cn(
-                      'h-2 rounded-full bg-fill',
-                      index <= activeIndex &&
-                        stage !== 'unknown' &&
-                        (index >= 3
-                          ? 'bg-[var(--signal-green)]'
-                          : 'bg-[var(--signal-wine)]'),
-                    )}
-                  />
-                ))}
-              </div>
-              <div className="text-sm text-text-muted">
-                <strong className="font-semibold text-text">
-                  {STAGE_COPY[stage]}
-                </strong>
-                <span className="ml-2 tabular-nums">
-                  {confidence}% measured
-                </span>
+              <div>
+                <div className="mb-2 text-base text-text-muted">
+                  <strong className="font-semibold text-text">
+                    {STAGE_COPY[stage]}
+                  </strong>
+                </div>
+                <div
+                  className="grid grid-cols-5 gap-1.5"
+                  aria-label={node.label + ': ' + STAGE_COPY[stage]}
+                >
+                  {[
+                    'Observed',
+                    'Assessed',
+                    'Building',
+                    'Retained',
+                    'Transfer',
+                  ].map((label, index) => (
+                    <span
+                      key={label}
+                      className={cn(
+                        'h-4 rounded-full bg-fill',
+                        index <= activeIndex &&
+                          stage !== 'unknown' &&
+                          (index >= 3
+                            ? 'bg-[var(--signal-green)]'
+                            : 'bg-[var(--signal-wine)]'),
+                      )}
+                    />
+                  ))}
+                </div>
               </div>
             </article>
           );
@@ -335,7 +339,7 @@ function DeadlineTargets({
         </div>
       ) : (
         <p className="mt-2 text-sm leading-relaxed text-text-muted">
-          Play a few more runs before Drumroll sets a weekly pace.
+          Complete 3 scored runs before Drumroll sets a weekly pace.
         </p>
       )}
     </section>
@@ -443,7 +447,7 @@ function WeeklyRhythmPanel({
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-150 text-xs leading-relaxed text-text-muted">
           Next available session: {calendar.next_available}. Planned rests stay
-          unscored; they are part of the rhythm, not a failure.
+          unscored. They are part of the rhythm.
         </p>
         {onRefresh && (
           <button
@@ -513,7 +517,7 @@ function WeeklyMusicalRecapPanel({
       </div>
       {recap.evidence_state === 'not_enough_saved_evidence' && (
         <p className="mt-3 text-xs text-text-faint">
-          Play a few more runs to see a weekly trend.
+          Play 2 more runs to see a weekly trend.
         </p>
       )}
     </section>
@@ -616,12 +620,14 @@ export function ProfileView({
   onSaveGoal,
   onSetPrimaryGoal,
   gamification,
+  kitConnected = false,
   insights,
   onStartTargetedPractice,
   onStartPracticeCard,
   onPracticeRhythmChange,
   onRefreshPracticeSet,
   onStartAudition,
+  onOpenLesson,
 }: ProfileViewProps) {
   const [selectedGoalId, setSelectedGoalId] = useState<string | undefined>(
     undefined,
@@ -764,10 +770,12 @@ export function ProfileView({
             <Button
               type="primary"
               size="large"
+              className="min-h-14 text-base"
               data-testid="profile-target-action"
               onClick={onStartTargetedPractice}
             >
-              Start targeted loop
+              <span>Start targeted loop</span>
+              {kitConnected && <KitActionChip action="continue" compact />}
             </Button>
           )}
         </div>
@@ -806,16 +814,17 @@ export function ProfileView({
               {insights?.practiceCards && (
                 <section data-testid="evidence-practice-cards">
                   <div className="mb-4">
-                    <p className="text-xs font-semibold tracking-[0.12em] text-[var(--signal-wine)]">
+                    <p className="text-base font-semibold tracking-[0.08em] text-[var(--signal-wine)]">
                       Today’s practice
                     </p>
-                    <p className="mt-1 text-sm leading-relaxed text-text-muted">
-                      Each option starts a real practice run.
+                    <p className="mt-1 text-base leading-relaxed text-text-muted">
+                      Choose 1 practice run.
                     </p>
                   </div>
                   <EvidencePracticeCards
                     cards={insights.practiceCards.cards}
                     onStart={onStartPracticeCard}
+                    kitConnected={kitConnected}
                   />
                 </section>
               )}
@@ -929,8 +938,8 @@ export function ProfileView({
                       data-testid="retired-goal-notice"
                     >
                       This goal belongs to a retired curriculum exercise. Its
-                      score and practice history remain readable, but it does
-                      not unlock the new Journey.
+                      score and practice history remain visible. It does not
+                      open the new Journey.
                     </p>
                   )}
                   <div className="flex flex-wrap gap-2">
@@ -968,22 +977,31 @@ export function ProfileView({
                       {insights.rejectedAtomicEvidenceCount === 1
                         ? ''
                         : 's'}{' '}
-                      stay hidden because this chart has changed.
+                      stay hidden because this chart changed.
                     </p>
                   ) : null}
-                  <details data-testid="atomic-radar-disclosure">
-                    <summary className="cursor-pointer text-sm font-semibold text-text">
-                      Open skill map
-                    </summary>
-                    <div className="mt-5">
-                      <AtomicSkillRadar
-                        states={states}
-                        focusSkillIds={focusSkillIds}
-                      />
-                    </div>
-                  </details>
+                  {!insights?.patternProfile && (
+                    <details data-testid="atomic-radar-disclosure">
+                      <summary className="cursor-pointer text-sm font-semibold text-text">
+                        Open skill map
+                      </summary>
+                      <div className="mt-5">
+                        <AtomicSkillRadar
+                          states={states}
+                          focusSkillIds={focusSkillIds}
+                        />
+                      </div>
+                    </details>
+                  )}
                 </div>
               </div>
+
+              {insights?.patternProfile && (
+                <SkillsRose
+                  profile={insights.patternProfile}
+                  onOpenLesson={onOpenLesson}
+                />
+              )}
 
               <div className="border-t border-border-soft pt-7">
                 <PracticeHistory

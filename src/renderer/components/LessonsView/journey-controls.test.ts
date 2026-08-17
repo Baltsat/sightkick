@@ -12,6 +12,7 @@ describe('resolveJourneyControls', () => {
         crash: ['midi:49'],
         hihat: ['midi:42'],
         ride: ['midi:51'],
+        tom3: ['midi:43'],
       },
     );
 
@@ -19,14 +20,14 @@ describe('resolveJourneyControls', () => {
       mapping: {
         up: ['midi:48', 'midi:50'],
         down: ['midi:45'],
-        left: ['midi:42'],
-        right: ['midi:51'],
-        confirm: ['midi:38'],
-        back: ['midi:49'],
+        left: ['midi:38'],
+        right: ['midi:43'],
+        confirm: ['midi:49'],
+        back: ['midi:51'],
       },
       source: 'kit-lanes',
       legend:
-        'Tom 1 / Tom 2 select · Snare starts · Hi-hat / Ride change season · Crash backs',
+        'Tom 1 / Tom 2 select · Crash starts · Snare / Tom 3 change season · Ride backs',
       kitActions: ['up', 'down', 'left', 'right', 'confirm', 'back'],
     });
   });
@@ -47,12 +48,14 @@ describe('resolveJourneyControls', () => {
 
     expect(controls.mapping).toEqual({
       ...explicit,
-      left: [],
+      left: ['midi:38'],
       right: [],
     });
-    expect(controls.source).toBe('explicit');
-    expect(controls.legend).toBe('Up / Down select · Enter starts · Esc backs');
-    expect(controls.kitActions).toEqual([]);
+    expect(controls.source).toBe('mixed');
+    expect(controls.legend).toBe(
+      'Up / Down select · Enter starts · Esc backs · Snare selects previous season',
+    );
+    expect(controls.kitActions).toEqual(['left']);
   });
 
   it('keeps partial keyboard mappings and adds non-conflicting kit fallbacks', () => {
@@ -65,16 +68,17 @@ describe('resolveJourneyControls', () => {
         crash: ['midi:49'],
         hihat: ['midi:42'],
         ride: ['midi:51'],
+        tom3: ['midi:43'],
       },
     );
 
     expect(controls.mapping).toMatchObject({
       up: ['midi:48'],
       down: ['midi:45'],
-      left: ['midi:42'],
-      right: ['midi:51'],
+      left: ['midi:38'],
+      right: ['midi:43'],
       confirm: ['keyboard:Enter'],
-      back: ['midi:49'],
+      back: ['midi:51'],
     });
     expect(controls.source).toBe('mixed');
     expect(controls.kitActions).toEqual([

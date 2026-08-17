@@ -2,6 +2,7 @@ import { IpcMainEvent } from 'electron';
 import type {
   PracticeRunArchiveBySong,
   RunSummary,
+  StoredPracticeRun,
 } from '../../renderer/services/practice-stats';
 import type { DayRollup, PracticeDays } from '../../renderer/services/streaks';
 import type { SkillEvidenceEvent } from '../../renderer/services/pedagogy/types';
@@ -12,6 +13,10 @@ import {
   readSkillEvidenceArchive,
 } from './practiceStats';
 import { readPracticeRunArchive } from '../../renderer/services/practice-stats';
+import {
+  curriculumItemManifest,
+  deriveAtomicSkillEvidence,
+} from '../../renderer/services/pedagogy';
 
 /**
  * Daily-rollup and cross-song-run storage for the gamification feature.
@@ -35,6 +40,7 @@ export const MAX_STORED_PRACTICE_DAYS = 400;
 
 const DAYS_STORE_KEY = 'practiceDays';
 const RUNS_STORE_KEY = 'practiceRuns';
+const RUN_DETAILS_STORE_KEY = 'practiceRunDetails';
 
 export interface IpcRecordPracticeDayPayload {
   /** Local "YYYY-MM-DD" - computed renderer-side (see
@@ -73,6 +79,44 @@ export interface IpcLoadAllPracticeRunsResponse {
    * this map only ever holds evidence for runs no longer present there.
    */
   atomicSkillEvidenceArchiveBySong: Record<string, SkillEvidenceEvent[]>;
+  timingEvidenceBySong: Record<string, SkillEvidenceEvent[]>;
+}
+
+function timingEvidenceForRuns(
+  details: Record<string, StoredPracticeRun[]>,
+): Record<string, SkillEvidenceEvent[]> {
+  return Object.fromEntries(
+    Object.entries(details).flatMap(([songId, storedRuns]) => {
+      const manifest = curriculumItemManifest(songId.replace(/^lesson:/, ''));
+
+      if (!manifest) {
+        return [];
+      }
+
+      const previous_events: SkillEvidenceEvent[] = [];
+      const events = [...storedRuns]
+        .sort((left, right) =>
+          left.summary.completedAt.localeCompare(right.summary.completedAt),
+        )
+        .flatMap((run) => {
+          const timing = deriveAtomicSkillEvidence({
+            run_id: run.summary.context?.sessionId ?? run.summary.completedAt,
+            summary: run.summary,
+            manifest,
+            records: run.records,
+            previous_events,
+          }).events.filter(({ skill_id }) =>
+            skill_id.startsWith('timing.steadiness.'),
+          );
+
+          previous_events.push(...timing);
+
+          return timing;
+        });
+
+      return events.length > 0 ? [[songId, events]] : [];
+    }),
+  );
 }
 
 function toErrorMessage(error: unknown): string {
@@ -187,12 +231,18 @@ export function loadAllPracticeRuns(event: IpcMainEvent): void {
         readSkillEvidenceArchive(archive),
       ]),
     );
+    const details =
+      (appState.store.get(RUN_DETAILS_STORE_KEY) as
+        | Record<string, StoredPracticeRun[]>
+        | undefined) ?? {};
+    const timingEvidenceBySong = timingEvidenceForRuns(details);
 
     event.reply('load-all-practice-runs', {
       runs,
       runsBySong: bySong,
       archiveBySong,
       atomicSkillEvidenceArchiveBySong,
+      timingEvidenceBySong,
     } satisfies IpcLoadAllPracticeRunsResponse);
   } catch (error) {
     event.reply('load-all-practice-runs', { error: toErrorMessage(error) });

@@ -12,6 +12,11 @@ import {
 } from '../../hooks/useGamification';
 import { installIpcMock } from '../../hooks/test-support';
 import { ScoreSummary } from './ScoreSummary';
+import type {
+  FocusSectionInsight,
+  LessonRecommendationInsight,
+} from '../../services/run-insights';
+import type { FragmentLoopProposal } from '../../services/pattern-model';
 
 const songData = {
   name: 'Master of Puppets',
@@ -21,7 +26,7 @@ const songData = {
 function renderSummary(
   props: Partial<Parameters<typeof ScoreSummary>[0]> = {},
 ) {
-  render(
+  const result = render(
     <AntdApp>
       <ScoreSummary
         isOpen
@@ -33,10 +38,9 @@ function renderSummary(
       />
     </AntdApp>,
   );
-
   const modalEl = screen.getByTestId('score-modal');
 
-  return { modalEl, modal: within(modalEl) };
+  return { modalEl, modal: within(modalEl), unmount: result.unmount };
 }
 
 describe('ScoreSummary', () => {
@@ -51,6 +55,24 @@ describe('ScoreSummary', () => {
     expect(modal.getByText('70 notes hit')).toBeInTheDocument();
     expect(modal.getByText('30 notes missed')).toBeInTheDocument();
     expect(modal.getByText('5 false hits')).toBeInTheDocument();
+  });
+
+  it('uses real score bands for a large 78% song result over its album cover', () => {
+    const { modal, modalEl } = renderSummary({
+      songData: {
+        ...songData,
+        albumCover: 'asset://master-of-puppets.jpg',
+      } as Song,
+      scoreData: { hitNotes: 78, totalNotes: 100, falseHits: 0 },
+    });
+
+    expect(modal.getByText('78% accuracy')).toBeInTheDocument();
+    expect(modalEl.querySelectorAll('[data-filled]')).toHaveLength(3);
+    expect(modal.getByTestId('score-album-cover')).toHaveAttribute(
+      'src',
+      'asset://master-of-puppets.jpg',
+    );
+    expect(modalEl).toHaveAttribute('data-performance', 'earned');
   });
 
   it('labels a MIDI-silent miss-only run as missing musical input', () => {
@@ -242,22 +264,48 @@ describe('ScoreSummary', () => {
   });
 
   it('draws all result commands when kit control is enabled', () => {
+    const onRetry = vi.fn();
+    const onNextSong = vi.fn();
+    const onEndSession = vi.fn();
+    const onCoach = vi.fn();
     const { modal } = renderSummary({
+      onRetry,
+      onNextSong,
+      onEndSession,
+      onCoach,
+      practiceSummary: multiLaneRunFixture(),
       handsFreeControlsEnabled: true,
       persistenceState: 'saved',
       nextLabel: 'Next practice',
+      continuationLabelLocked: true,
     });
+    const controls = modal.getByTestId('score-kit-controls');
 
-    expect(modal.getByTestId('score-kit-controls')).toBeInTheDocument();
-    expect(
-      modal.getByLabelText(/Next practice: Kick, then Crash/i),
-    ).toBeInTheDocument();
-    expect(
-      modal.getByLabelText(/Play again: Snare, then Kick/i),
-    ).toBeInTheDocument();
-    expect(
-      modal.getByLabelText(/Leave session: Ride, then Kick/i),
-    ).toBeInTheDocument();
+    // One pad per outcome, printed with the verb its button carries - the
+    // player reads this from the stool, so there is no signature to learn.
+    expect(controls).toHaveTextContent('Next practice');
+    expect(controls).toHaveTextContent('Hit crash');
+    expect(controls).toHaveTextContent('Play again');
+    expect(controls).toHaveTextContent('Hit snare');
+    expect(controls).toHaveTextContent('Leave session');
+    expect(controls).toHaveTextContent('Hit ride');
+    expect(controls).toHaveTextContent('Coach');
+    expect(controls).toHaveTextContent('Hit hi-hat');
+    expect(controls.textContent).not.toMatch(/then/i);
+    expect(controls.querySelectorAll('button')).toHaveLength(4);
+    expect(controls.querySelectorAll('[data-primary="true"]')).toHaveLength(1);
+    expect(modal.queryByTestId('score-next')).not.toBeInTheDocument();
+    expect(modal.queryByTestId('score-retry')).not.toBeInTheDocument();
+
+    fireEvent.click(modal.getByTestId('score-command-continue'));
+    fireEvent.click(modal.getByTestId('score-command-retry'));
+    fireEvent.click(modal.getByTestId('score-command-end'));
+    fireEvent.click(modal.getByTestId('score-command-open-coach'));
+
+    expect(onNextSong).toHaveBeenCalledOnce();
+    expect(onRetry).toHaveBeenCalledOnce();
+    expect(onEndSession).toHaveBeenCalledOnce();
+    expect(onCoach).toHaveBeenCalledOnce();
   });
 
   it.each(['saved', 'failed', 'no-evidence'] as const)(
@@ -320,7 +368,7 @@ describe('ScoreSummary', () => {
     // never a canned "Nice reps".
     expect(screen.queryByText('Nice reps')).not.toBeInTheDocument();
     expect(modal.getByTestId('musical-receipt')).toHaveTextContent(
-      'This run is saved for comparison',
+      'This tempo is playable',
     );
     expect(modal.getByTestId('practice-stats')).toBeInTheDocument();
     expect(modal.getByTestId('practice-run-mode')).toHaveTextContent(
@@ -330,7 +378,10 @@ describe('ScoreSummary', () => {
     // (bug-hunt-20260812.md) - the at-a-glance cell carries it too, not
     // just the collapsed evidence.
     expect(modal.getByTestId('score-cell-accuracy')).toHaveTextContent(
-      '88% at 0.7×',
+      '88% hit rate',
+    );
+    expect(modal.getByTestId('run-current-metrics')).toHaveTextContent(
+      '70% tempo',
     );
   });
 
@@ -369,12 +420,239 @@ describe('ScoreSummary', () => {
     expect(screen.queryByText('Nice reps')).not.toBeInTheDocument();
     expect(modal.queryByText(/ready for a loop/)).not.toBeInTheDocument();
     expect(modal.getByTestId('musical-receipt')).toHaveTextContent(
-      'This pass did not connect',
+      'No chart notes landed at this tempo',
     );
     expect(modal.getByTestId('musical-receipt')).toHaveAttribute(
       'data-changed',
       'false',
     );
+  });
+
+  it('makes the catastrophic-miss adaptation visible and applies it with one action', () => {
+    const onAdaptiveRetry = vi.fn();
+    const summary = {
+      ...multiLaneRunFixture(),
+      totalHits: 24,
+      totalMisses: 1054,
+      totalWrong: 0,
+      overallAccuracy: 24 / 1078,
+      playbackSpeed: 0.7,
+    };
+    const { modal } = renderSummary({
+      scoreData: undefined,
+      practiceSummary: summary,
+      handsFreeControlsEnabled: true,
+      onAdaptiveRetry,
+    });
+
+    expect(modal.getByTestId('musical-receipt')).toHaveTextContent(
+      'This chart is far above your current tempo ceiling',
+    );
+    expect(modal.getByTestId('score-command-retry')).toHaveTextContent(
+      'Replay at 60% tempo',
+    );
+    expect(modal.getByTestId('score-command-retry')).toHaveAttribute(
+      'data-primary',
+      'true',
+    );
+    expect(modal.getAllByText('Replay at 60% tempo')).toHaveLength(1);
+    expect(modal.queryByTestId('score-retry')).not.toBeInTheDocument();
+
+    fireEvent.click(modal.getByTestId('score-command-retry'));
+
+    expect(onAdaptiveRetry).toHaveBeenCalledWith(0.6);
+  });
+
+  it('shows current song metrics and a chronological stored-run trend', () => {
+    const first = {
+      ...multiLaneRunFixture(),
+      completedAt: '2026-08-13T12:00:00.000Z',
+      totalHits: 600,
+      totalMisses: 478,
+      totalWrong: 0,
+      overallAccuracy: 600 / 1078,
+      playbackSpeed: 0.6,
+    };
+    const current = {
+      ...first,
+      completedAt: '2026-08-15T12:00:00.000Z',
+      totalHits: 840,
+      totalMisses: 238,
+      totalWrong: 0,
+      overallAccuracy: 840 / 1078,
+      playbackSpeed: 0.8,
+    };
+    const { modal } = renderSummary({
+      scoreData: undefined,
+      practiceSummary: current,
+      practiceHistory: [current, first],
+    });
+
+    expect(modal.getByTestId('run-current-metrics')).toHaveTextContent(
+      '78% hit rate',
+    );
+    expect(modal.getByTestId('run-current-metrics')).toHaveTextContent(
+      '840 hit · 238 missed · 80% tempo',
+    );
+    expect(modal.getByTestId('run-trend-chart')).toHaveAccessibleName(
+      'Hit rate across 2 runs: 56%, 78%.',
+    );
+    expect(modal.getByTestId('run-trend-summary')).toHaveTextContent(
+      'Up 22 points from the previous saved run.',
+    );
+  });
+
+  it('surfaces each atomic skill contribution from this pass', () => {
+    const summary = {
+      ...multiLaneRunFixture(),
+      atomicSkillEvidence: [
+        {
+          run_id: 'run:1',
+          chart_revision: 'chart:1',
+          manifest_revision: 'manifest:1',
+          skill_id: 'pulse.eighth',
+          item_id: '01.03',
+          context_signature: 'rock',
+          evidence_kind: 'acquisition' as const,
+          quality: 0.84,
+          weight: 0.5,
+          playback_speed: 0.8,
+          completed_at: '2026-08-15T12:00:00.000Z',
+        },
+        {
+          run_id: 'run:1',
+          chart_revision: 'chart:1',
+          manifest_revision: 'manifest:1',
+          skill_id: 'coord.rock_three_way',
+          item_id: '01.03',
+          context_signature: 'rock',
+          evidence_kind: 'retention' as const,
+          quality: 0.78,
+          weight: 0.4,
+          playback_speed: 0.8,
+          completed_at: '2026-08-15T12:00:00.000Z',
+        },
+      ],
+    };
+    const { modal } = renderSummary({
+      scoreData: undefined,
+      practiceSummary: summary,
+    });
+
+    fireEvent.click(modal.getByText('Skills and detail'));
+
+    const skills = modal.getByTestId('run-skill-movements');
+
+    expect(skills).toHaveTextContent(
+      'Eighth-note pulseFirst evidence · 84% quality · +0.42 evidence',
+    );
+    expect(skills).toHaveTextContent(
+      'Rock three-way coordinationHeld on revisit · 78% quality · +0.31 evidence',
+    );
+  });
+
+  it('opens the named lesson in one press and keeps detail collapsed', () => {
+    const focusSection: FocusSectionInsight = {
+      label: 'Bars 17–20',
+      barStart: 17,
+      barEnd: 20,
+      tempoMultiplier: 0.6,
+      passCriteria: 'Land 3 clean passes at 82%+.',
+      novel: true,
+    };
+    const lessonRecommendations: LessonRecommendationInsight[] = [
+      {
+        lessonId: '04.02',
+        title: 'Rock three-way builder',
+        family: 'coordination',
+      },
+    ];
+    const onOpenLesson = vi.fn();
+    const withSiblingData = renderSummary({
+      scoreData: undefined,
+      practiceSummary: multiLaneRunFixture(),
+      focusSection,
+      lessonRecommendations,
+      onOpenLesson,
+    });
+
+    expect(
+      withSiblingData.modal.getByTestId('run-details'),
+    ).not.toHaveAttribute('open');
+
+    expect(
+      withSiblingData.modal.getByTestId('run-focus-section'),
+    ).toHaveTextContent(
+      'Bars 17–20 · new patternReplay at 60% · Land 3 clean passes at 82%+.',
+    );
+    fireEvent.click(
+      withSiblingData.modal.getByTestId('lesson-recommendation-action'),
+    );
+    expect(onOpenLesson).toHaveBeenCalledWith('04.02');
+
+    withSiblingData.unmount();
+
+    const withoutSiblingData = renderSummary({
+      scoreData: undefined,
+      practiceSummary: multiLaneRunFixture(),
+    }).modal;
+
+    expect(
+      withoutSiblingData.queryByTestId('run-focus-section'),
+    ).not.toBeInTheDocument();
+    expect(
+      withoutSiblingData.queryByTestId('run-lesson-recommendations'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('starts the named ranked fragment loop in one press', () => {
+    const onFragmentLoop = vi.fn();
+    const fragmentLoop = {
+      fragment: {
+        fragment_id: 'song:master:bar:17',
+        kind: 'bar',
+        measure_count: 1,
+        label: '1-bar figure',
+        members: [],
+        occurrence_count: 18,
+        note_count: 92,
+        song_note_share: 0.24,
+        skill_weights: [],
+      },
+      bar_start: 17,
+      bar_end: 17,
+      opening_speed: 0.6,
+      opening_window_ms: 60,
+      opening_window_standard: 'target',
+      reason: 'This figure covers 24% of the song and measured 46% missed.',
+      practice_value: {
+        fragment: {
+          fragment_id: 'song:master:bar:17',
+          kind: 'bar',
+          measure_count: 1,
+          label: '1-bar figure',
+          members: [],
+          occurrence_count: 18,
+          note_count: 92,
+          song_note_share: 0.24,
+          skill_weights: [],
+        },
+        difficulty: { state: 'measured', expected_notes: 24, score: 0.4 },
+        skill_weakness: 0.4,
+        skill_evidence_state: 'measured',
+        score: 0.2,
+      },
+    } satisfies FragmentLoopProposal;
+    const { modal } = renderSummary({
+      scoreData: undefined,
+      practiceSummary: multiLaneRunFixture(),
+      fragmentLoops: [fragmentLoop],
+      onFragmentLoop,
+    });
+
+    fireEvent.click(modal.getByTestId('fragment-loop-action'));
+
+    expect(onFragmentLoop).toHaveBeenCalledWith(fragmentLoop);
   });
 
   it('omits the run-mode label for a Practice run at the default 1x speed', () => {
@@ -522,6 +800,7 @@ describe('ScoreSummary', () => {
     const { modal } = renderSummary({
       songData: {
         ...songData,
+        albumCover: 'asset://lesson-placeholder.jpg',
         artist: 'Drumroll Method',
         lesson: {
           id: '01.01',
@@ -537,6 +816,26 @@ describe('ScoreSummary', () => {
     expect(
       modal.getByText('Drumroll Method · Foundations'),
     ).toBeInTheDocument();
+    expect(modal.queryByTestId('score-album-cover')).not.toBeInTheDocument();
+  });
+
+  it('keeps catastrophic evidence in recovery treatment without a victory flare', () => {
+    const catastrophic = {
+      ...multiLaneRunFixture(),
+      totalHits: 2,
+      totalMisses: 98,
+      totalWrong: 0,
+      overallAccuracy: 0.02,
+    };
+    const { modalEl } = renderSummary({
+      scoreData: undefined,
+      practiceSummary: catastrophic,
+    });
+
+    expect(modalEl).toHaveAttribute('data-performance', 'recovery');
+    expect(
+      modalEl.querySelector('.drumroll-score-summary__victory-flare'),
+    ).not.toBeInTheDocument();
   });
 
   it('capitalises the chart difficulty for a real (non-lesson) song', () => {
@@ -612,6 +911,9 @@ describe('ScoreSummary', () => {
       );
       expect(modal.getByTestId('run-goal-status')).toHaveTextContent(
         "10 XP left in today's set",
+      );
+      expect(modal.getByTestId('run-earned-moment')).toHaveTextContent(
+        'Earned this run',
       );
     });
 

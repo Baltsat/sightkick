@@ -278,7 +278,7 @@ function troubleBarFindings(scores: BarScore[]): CoachFinding[] {
             : `Bars ${start}–${end} need a loop`,
         summary: `${percent(
           accuracy,
-        )}% across ${resolved} scored notes; ${misses} misses and ${wrongHits} wrong hits cluster here.`,
+        )}% · ${resolved} scored notes · ${misses} misses · ${wrongHits} wrong hits.`,
         skillTag: measureSkill(
           cluster.find((score) => measureSkill(score.measure) !== 'timing')
             ?.measure ?? first,
@@ -460,13 +460,13 @@ function laneWeaknessFindings(input: AnalyzeCoachInput): CoachFinding[] {
           kind: 'lane-weakness' as const,
           severity,
           title: `${region.lane} lane ${direction} around ${region.bpm} BPM`,
-          summary: `Recorded ${region.lane} lane: ${percent(
+          summary: `${region.lane} lane · ${percent(
             accuracy,
-          )}% accuracy and ${Math.round(
+          )}% accuracy · ${Math.round(
             bias,
-          )} ms average timing bias across ${samples} resolved notes in the ${
+          )} ms average timing bias · ${samples} resolved notes · ${
             region.bpm
-          } BPM bucket.`,
+          } BPM.`,
           skillTag:
             region.lane === 'kick'
               ? ('kick-independence' as const)

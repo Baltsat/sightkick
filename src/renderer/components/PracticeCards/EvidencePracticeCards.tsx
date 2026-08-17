@@ -5,12 +5,14 @@ import type {
   PracticeCardOption,
   PracticeCardSet,
 } from '../../services/pedagogy';
+import { KitActionChip } from '../GamificationHeaderStrip/KitActionChip';
 import './EvidencePracticeCards.css';
 
 export interface EvidencePracticeCardsProps {
   cards: PracticeCardSet['cards'];
   onStart?: (option: PracticeCardOption) => void;
   compact?: boolean;
+  kitConnected?: boolean;
   testId?: string;
 }
 
@@ -26,6 +28,7 @@ export function EvidencePracticeCards({
   cards,
   onStart,
   compact = false,
+  kitConnected = false,
   testId = 'practice-card',
 }: EvidencePracticeCardsProps) {
   const [selected, setSelected] = useState<
@@ -67,7 +70,7 @@ export function EvidencePracticeCards({
               {option.title}
             </strong>
             <span className="practice-card-control__source">
-              Based on: {option.source_label}
+              {option.source_label}
             </span>
             {isDeferred ? (
               <div className="practice-card-control__actions">
@@ -89,16 +92,20 @@ export function EvidencePracticeCards({
             ) : (
               <>
                 <span className="practice-card-control__completion">
-                  Done: {option.completion_label}
+                  {option.completion_label}
                 </span>
                 <div className="practice-card-control__actions">
                   <button
                     type="button"
+                    className="practice-card-control__start"
                     data-testid={`${testId}-${card.kind}-start`}
                     onClick={() => onStart?.(option)}
                     disabled={!onStart}
                   >
-                    Start
+                    <span>Start</span>
+                    {kitConnected && (
+                      <KitActionChip action="continue" compact={compact} />
+                    )}
                   </button>
                   <button
                     type="button"

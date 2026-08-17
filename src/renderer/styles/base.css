@@ -615,23 +615,23 @@ button,
 /* The notation surface is warm and light, so late tiers stay dark enough to
    read while their surrounding energy becomes brighter and more chromatic. */
 .sk-streak-meter[data-tier='5'] {
-  --sk-streak-ink: #a83a2e;
+  --sk-streak-ink: var(--dr-ember-pressed);
 }
 
 .sk-streak-meter[data-tier='6'] {
-  --sk-streak-ink: #972f4b;
+  --sk-streak-ink: var(--dr-wine);
 }
 
 .sk-streak-meter[data-tier='7'] {
-  --sk-streak-ink: #782d62;
+  --sk-streak-ink: color-mix(in srgb, var(--dr-wine) 86%, var(--dr-ink));
 }
 
 .sk-streak-meter[data-tier='8'] {
-  --sk-streak-ink: #572b70;
+  --sk-streak-ink: color-mix(in srgb, var(--dr-wine) 68%, var(--dr-ink));
 }
 
 .sk-streak-meter[data-tier='9'] {
-  --sk-streak-ink: #302154;
+  --sk-streak-ink: var(--dr-ink);
 }
 
 .sk-streak-meter[data-tier='7'] .sk-streak-energy,
@@ -644,8 +644,8 @@ button,
 .sk-streak-meter[data-tier='9']::before {
   height: 0.22rem;
   box-shadow:
-    0 -0.5rem 1.2rem #63d5ff,
-    0 0.5rem 1.2rem #ff4ca2;
+    0 -0.5rem 1.2rem var(--dr-count),
+    0 0.5rem 1.2rem var(--dr-ember);
 }
 
 .sk-streak-return {

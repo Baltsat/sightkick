@@ -13,17 +13,17 @@ export function needleMoverLine(breakdown: MasteryBreakdown): string {
   }
 
   if (breakdown.evidence.coverage === 'unknown') {
-    return 'Chart coverage is unknown because this chart has no saved total-note count; finish a scored full pass after the chart is available.';
+    return 'Finish 1 scored full pass after the chart loads. Saved note count: 0.';
   }
 
   const worst = worstMasteryTerm(breakdown);
   const percent = Math.round(worst.value * 100);
   const linesByTerm: Record<MasteryBreakdown['accuracy']['key'], string> = {
-    accuracy: `Accuracy at full speed is the ceiling right now (${percent}%) — a clean 1.0x pass moves the needle most.`,
-    consistency: `Consistency is the gap (${percent}%) — repeat runs at your current speed until the good ones stop being lucky.`,
-    speedFactor: `Speed is the gap (${percent}% of the way to 1.0x) — nudge the speed slider up on your next clean run.`,
-    coverage: `Coverage is the gap (${percent}% of the chart attempted) — play the song through instead of looping a section.`,
-    subReadiness: `Related-skill readiness is the gap (${percent}%) — this song leans on lanes your all-time accuracy hasn't caught up on yet.`,
+    accuracy: `Play 1 clean pass at 1.0×. Full-speed accuracy: ${percent}%.`,
+    consistency: `Play 2 runs at your current speed. Consistency: ${percent}%.`,
+    speedFactor: `Raise the speed by 0.1× after 1 clean run. Speed term: ${percent}%.`,
+    coverage: `Play 1 full-song pass. Chart coverage: ${percent}%.`,
+    subReadiness: `Practice the weakest linked lane. Related-skill readiness: ${percent}%.`,
   };
 
   return linesByTerm[worst.key];

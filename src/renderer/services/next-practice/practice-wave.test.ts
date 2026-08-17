@@ -194,7 +194,7 @@ describe('buildPracticeWave', () => {
     expect(result.stops[0]).toMatchObject({
       role: 'focus',
       recommendation: { candidate: { id: 'lesson-01-01' } },
-      reason: '3 saved Coach findings route directly to this lesson.',
+      reason: '3 saved Coach findings match this lesson.',
     });
   });
 
@@ -213,9 +213,9 @@ describe('buildPracticeWave', () => {
       result.stops.map(({ recommendation }) => recommendation.candidate.id),
     ).toEqual(['lesson', 'liked-song', 'other-song']);
     expect(result.stops[0].reason).toContain(
-      'no specific weak-skill link is proven yet',
+      'No specific weak-skill link is proven',
     );
-    expect(result.stops[1].reason).toContain('preference-based');
+    expect(result.stops[1].reason).toContain('uses preference');
     expect(result.focusSkills).toEqual([]);
   });
 

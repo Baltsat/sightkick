@@ -193,10 +193,8 @@ export function MyMusic({ librarySongs, disabled }: MyMusicProps) {
             color="var(--color-text-dim)"
           />
           <div className="max-w-sm text-sm leading-relaxed text-text-muted">
-            Drumroll can read your YouTube Music Liked Songs using your
-            already-signed-in Chrome browser session — no separate login, no
-            password shared with Drumroll. Make sure you&apos;re signed in to
-            music.youtube.com in Chrome, then connect.
+            Sign in to music.youtube.com in Chrome. Then connect your YouTube
+            Music Liked Songs. Drumroll never receives your password.
           </div>
           <Tooltip
             title={

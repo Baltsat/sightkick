@@ -7,7 +7,8 @@ function WaitingForKitInput() {
       style={{
         minHeight: '100vh',
         padding: '12vh 10vw',
-        background: 'linear-gradient(135deg, #f7f0e5, #dce7e2)',
+        background:
+          'repeating-linear-gradient(#f4efe5 0 84px, #d9cebd 85px 86px)',
         color: '#2c2824',
         fontFamily: 'var(--font-ui)',
       }}
@@ -15,12 +16,9 @@ function WaitingForKitInput() {
       <p style={{ color: '#b65338', fontWeight: 800, letterSpacing: '0.13em' }}>
         alternation warm-up
       </p>
-      <h1 style={{ fontFamily: 'var(--font-display)' }}>
-        your practice stays put
-      </h1>
+      <h1 style={{ fontFamily: 'var(--font-display)' }}>alternating singles</h1>
       <p style={{ maxWidth: 460, color: '#6d6258', lineHeight: 1.55 }}>
-        the score and controls remain underneath the pause state so screen input
-        can take over at once.
+        1 &amp; 2 &amp; 3 &amp; 4 &amp;
       </p>
       <InactivityPauseVeil visible checkpointMeasure={12} />
     </main>

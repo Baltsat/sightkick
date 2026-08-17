@@ -9,7 +9,11 @@ describe('CountIn', () => {
     const overlay = screen.getByTestId('count-in');
 
     expect(overlay).toHaveAccessibleName('Count in 2 of 4');
-    expect(screen.getByText('Count in')).toBeInTheDocument();
+    expect(overlay).toHaveAttribute('data-fullscreen-moment', 'count-in');
+    expect(overlay).toHaveAttribute('data-total', '4');
+    expect(
+      overlay.querySelector('.drumroll-count-in__current'),
+    ).toHaveAttribute('data-count', '2');
     expect(
       [...overlay.querySelectorAll('.drumroll-count-in__beat')].map((beat) =>
         beat.getAttribute('data-state'),
@@ -24,7 +28,6 @@ describe('CountIn', () => {
     expect(screen.getByTestId('count-in')).toHaveAccessibleName(
       'Count in 2 of 2',
     );
-    expect(screen.getByText('Count in')).toBeInTheDocument();
     expect(
       screen
         .getByTestId('count-in')
@@ -40,6 +43,7 @@ describe('CountIn', () => {
     const overlay = screen.getByTestId('count-in');
 
     expect(overlay).toHaveAccessibleName(`Count in ${total} of ${total}`);
+    expect(overlay).toHaveAttribute('data-total', String(total));
     expect(overlay).toHaveStyle({ '--count-in-columns': String(total) });
     expect(overlay.querySelectorAll('.drumroll-count-in__beat')).toHaveLength(
       total,

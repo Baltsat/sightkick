@@ -4,20 +4,19 @@ import { LaneAccuracyBars } from './LaneAccuracyBars';
 import { multiLaneRunFixture, singleLaneRunFixture } from './test-fixtures';
 
 describe('LaneAccuracyBars', () => {
-  it('renders a row for every kit lane, with data for the ones struck', () => {
+  it('renders only measured lanes as large named bars', () => {
     const { laneAccuracy } = multiLaneRunFixture();
 
     render(<LaneAccuracyBars laneAccuracy={laneAccuracy} />);
 
-    // kick: 3 hits, 1 miss -> 75%
-    expect(screen.getByTestId('lane-row-kick')).toHaveTextContent('75% (4)');
-    // snare: 3 hits, 0 misses -> 100%
-    expect(screen.getByTestId('lane-row-snare')).toHaveTextContent('100% (3)');
-    // hihat: 1 hit, 0 misses (wrong hits don't count here) -> 100%
-    expect(screen.getByTestId('lane-row-hihat')).toHaveTextContent('100% (1)');
-    // a lane never struck this run shows the honest empty state
-    expect(screen.getByTestId('lane-row-crash')).toHaveTextContent(
-      'No hits yet',
+    expect(screen.getByTestId('lane-row-kick')).toHaveTextContent('Kick75%');
+    expect(screen.getByTestId('lane-row-snare')).toHaveTextContent('Snare100%');
+    expect(screen.getByTestId('lane-row-hihat')).toHaveTextContent(
+      'Hi-Hat100%',
+    );
+    expect(screen.queryByTestId('lane-row-crash')).not.toBeInTheDocument();
+    expect(screen.getByTestId('lane-accuracy-evidence')).toHaveTextContent(
+      '8 matched notes',
     );
   });
 
@@ -26,16 +25,15 @@ describe('LaneAccuracyBars', () => {
 
     render(<LaneAccuracyBars laneAccuracy={laneAccuracy} />);
 
-    // kick: 3 hits, 1 miss -> 75%
-    expect(screen.getByTestId('lane-row-kick')).toHaveTextContent('75% (4)');
-    expect(screen.getByTestId('lane-row-snare')).toHaveTextContent(
-      'No hits yet',
-    );
+    expect(screen.getByTestId('lane-row-kick')).toHaveTextContent('Kick75%');
+    expect(screen.queryByTestId('lane-row-snare')).not.toBeInTheDocument();
   });
 
-  it('shows every lane as untouched for an empty run', () => {
+  it('shows one honest empty line instead of eight untouched lanes', () => {
     render(<LaneAccuracyBars laneAccuracy={[]} />);
 
-    expect(screen.getAllByText('No hits yet')).toHaveLength(8);
+    expect(screen.getByTestId('lane-accuracy-empty')).toHaveTextContent(
+      'No matched notes by pad',
+    );
   });
 });

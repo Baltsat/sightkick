@@ -81,6 +81,7 @@ function seedFreshMidiJourneyProfile() {
         crash: ['midi:74'],
         hihat: ['midi:75'],
         ride: ['midi:76'],
+        tom3: ['midi:77'],
       },
     }),
   );
@@ -313,6 +314,29 @@ describe('LessonsView — chain progress header', () => {
     ).toHaveTextContent('Reading');
     expect(screen.getByTestId('lesson-header-node-position')).toHaveTextContent(
       'Node 2 of 3',
+    );
+  });
+
+  it('honors a completed lesson return in its original season instead of resetting to Foundations', () => {
+    const progress = makeMixedProgress();
+
+    render(
+      <LessonsView
+        progress={progress}
+        onPlay={vi.fn()}
+        onRescan={vi.fn()}
+        initialUnit="Reading"
+        initialFocusedLessonId="d"
+      />,
+      { wrapper },
+    );
+
+    expect(screen.getByTestId('journey-world-title')).toHaveTextContent(
+      'Reading',
+    );
+    expect(screen.getByTestId('lesson-item-02.02')).toHaveAttribute(
+      'data-kit-focused',
+      'true',
     );
   });
 
@@ -723,7 +747,7 @@ describe('LessonsView — path nodes', () => {
 
     expect(legend).toHaveAttribute('data-control-source', 'kit-lanes');
     expect(legend).toHaveTextContent(
-      'Tom 1 / Tom 2 select · Snare starts · Hi-hat / Ride change season · Crash backs',
+      'Tom 1 / Tom 2 select · Crash starts · Snare / Tom 3 change season · Ride backs',
     );
     expect(legend).toHaveTextContent('Season');
     expect(screen.getByTestId('lesson-item-02.02')).toHaveAttribute(
@@ -731,12 +755,12 @@ describe('LessonsView — path nodes', () => {
       'true',
     );
 
-    hitMidiNote(75);
+    hitMidiNote(73);
     expect(screen.getByTestId('season-card-Foundations')).toHaveAttribute(
       'data-featured',
       'true',
     );
-    hitMidiNote(76);
+    hitMidiNote(77);
     expect(screen.getByTestId('season-card-Reading')).toHaveAttribute(
       'data-featured',
       'true',
@@ -755,7 +779,7 @@ describe('LessonsView — path nodes', () => {
     );
 
     hitMidiNote(71);
-    hitMidiNote(73);
+    hitMidiNote(74);
     expect(onPlay).toHaveBeenCalledTimes(1);
     expect(onPlay.mock.calls[0][0].lesson.id).toBe('02.01');
     expect(playKitPreviewMock).not.toHaveBeenCalled();
@@ -765,8 +789,30 @@ describe('LessonsView — path nodes', () => {
         .querySelector('.daybreak-lesson-node__strike-stick'),
     ).toHaveAttribute('data-active', 'false');
 
-    hitMidiNote(74);
+    hitMidiNote(76);
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('prints crash start and ride leave chips when the kit route is active', () => {
+    render(
+      <LessonsView
+        progress={makeMixedProgress()}
+        onPlay={vi.fn()}
+        onRescan={vi.fn()}
+        onBack={vi.fn()}
+        kitConnected
+      />,
+      { wrapper },
+    );
+
+    expect(screen.getByTestId('kit-action-chip-continue')).toHaveAttribute(
+      'data-pad',
+      'crash',
+    );
+    expect(screen.getByTestId('kit-action-chip-end')).toHaveAttribute(
+      'data-pad',
+      'ride',
+    );
   });
 
   it('keeps journey controls quiet until the player asks for them', () => {

@@ -12,6 +12,7 @@ export interface TutorSettings {
   minimumResolvedEvents: number;
   /** At least this many distinct scoreable errors trigger a low-accuracy window. */
   minimumDistinctErrors: number;
+  triggerErrorDensity?: number;
   /** Two smaller failures of the same bar can also establish a pattern. */
   minimumRepeatedBarFailures: number;
   minimumRepeatedBarErrors: number;
@@ -41,6 +42,9 @@ export interface TutorSettings {
   maximumCheckpointBars: number;
   leadInBars: number;
   contextBarsAfterFailure: number;
+  recursiveChunkGrowthEnabled?: boolean;
+  maximumChunkAttemptsPerWindow?: number;
+  chunkRegressionFailureThreshold?: number;
 }
 
 export const DEFAULT_TUTOR_SETTINGS: TutorSettings = {
@@ -70,21 +74,26 @@ export const DEFAULT_TUTOR_SETTINGS: TutorSettings = {
   maximumCheckpointBars: 4,
   leadInBars: 1,
   contextBarsAfterFailure: 1,
+  recursiveChunkGrowthEnabled: false,
+  maximumChunkAttemptsPerWindow: 4,
+  chunkRegressionFailureThreshold: 2,
 };
 
 /**
- * Guided Practice deliberately waits for a sustained pattern before taking
- * over. The original defaults are retained for deterministic service tests
- * and advanced callers; the product surface applies this learner-facing
- * profile so an isolated timing cluster cannot trap a developing player in
- * recovery. Two good-enough repetitions establish retention, a near miss
- * keeps half of the earned progress, and the failed-attempt cap guarantees a
- * terminal path back to the song at the adapted tempo.
+ * Guided Practice stops at a completed-bar boundary once it has enough
+ * scoreable evidence for a real pattern. The original defaults are retained
+ * for deterministic service tests and advanced callers; the product surface
+ * applies this learner-facing profile so an isolated timing cluster cannot
+ * trap a developing player in recovery. Two good-enough repetitions establish
+ * retention, a near miss keeps half of the earned progress, and the
+ * failed-attempt cap guarantees a terminal path back to the song at the
+ * adapted tempo.
  */
 export const GUIDED_PRACTICE_TUTOR_SETTINGS: Partial<TutorSettings> = {
   triggerAccuracy: 0.68,
-  minimumResolvedEvents: 16,
-  minimumDistinctErrors: 5,
+  minimumResolvedEvents: 4,
+  minimumDistinctErrors: 3,
+  triggerErrorDensity: 0.5,
   minimumRepeatedBarFailures: 3,
   minimumRepeatedBarErrors: 3,
   minimumRepeatedWrongPadPairs: 3,
@@ -111,6 +120,12 @@ export interface TutorMeasureSpec {
   expectedKeys: number;
   /** A known phrase/section boundary supplied by a chart or lesson author. */
   sectionStart?: boolean;
+  beatCount?: number;
+  strongOnsets?: readonly number[];
+  noteOnsets?: readonly {
+    tick: number;
+    expectedKeys: number;
+  }[];
 }
 
 export interface TutorChartPlan {
@@ -120,6 +135,8 @@ export interface TutorChartPlan {
 export interface TutorWindowStats {
   startMeasure: number;
   endMeasure: number;
+  startTick?: number;
+  endTick?: number;
   expected: number;
   resolved: number;
   hits: number;
@@ -128,7 +145,9 @@ export interface TutorWindowStats {
   /** Misses plus scoreable wrong hits, each counted by its immutable id. */
   distinctErrorIds: string[];
   timingSampleCount: number;
+  timingBiasMs?: number;
   timingSpreadMs: number;
+  timingMaxAbsMs?: number;
   timingOutlierCount: number;
   wrongPadPairs: TutorWrongPadPair[];
   accuracy: number;
@@ -146,6 +165,7 @@ export type TutorBarFailureHistory = Record<number, number>;
 
 export type TutorTriggerReason =
   | 'repeated-wrong-pad-pair'
+  | 'sustained-error-density'
   | 'three-distinct-errors'
   | 'repeated-same-bar-failure'
   | 'timing-spread';
@@ -167,11 +187,60 @@ export interface TutorRecoveryRegion {
   resumeTick?: number;
 }
 
+export type TutorChunkStage =
+  | 'seed'
+  | 'grow-right'
+  | 'grow-left'
+  | 'half'
+  | 'full';
+
+export interface TutorChunkWindow extends TutorRecoveryRegion {
+  stage: TutorChunkStage;
+  expectedKeys: number;
+  label: string;
+}
+
+export interface TutorChunkGrowthPlan {
+  phrase: TutorRecoveryRegion;
+  hardTick: number;
+  windows: readonly TutorChunkWindow[];
+}
+
+export type TutorChunkAttemptQuality = 'qualifying' | 'near-miss' | 'failed';
+
+export type TutorChunkTransition =
+  | 'repeat'
+  | 'expand'
+  | 'regress'
+  | 'master'
+  | 'defer';
+
+export interface TutorChunkGrowthState {
+  plan: TutorChunkGrowthPlan;
+  status: 'active' | 'mastered' | 'deferred';
+  activeWindowIndex: number;
+  attemptsAtWindow: number;
+  totalAttempts: number;
+  qualifyingPasses: number;
+  consecutiveFailures: number;
+  requiredQualifyingPasses: number;
+  maximumAttemptsPerWindow: number;
+  regressionFailureThreshold: number;
+  maximumTotalAttempts: number;
+}
+
 export type TutorRecoveryDeferralReason = 'maximum-failed-attempts';
 
 export type TutorRecoveryAttemptResult = 'clean' | 'retry' | 'deferred';
 
-export type TutorRecoveryApproach = 'anchor' | 'return-context';
+export type TutorRecoveryApproach =
+  | 'anchor'
+  | 'return-context'
+  | 'chunk-seed'
+  | 'chunk-grow-right'
+  | 'chunk-grow-left'
+  | 'chunk-half'
+  | 'chunk-full';
 
 export interface TutorRecoveryAttempt {
   id: string;
@@ -186,6 +255,11 @@ export interface TutorRecoveryAttempt {
   stats: TutorWindowStats;
   /** Immutable outcome timeline for this exact repetition. */
   judgements?: readonly Readonly<ResolvedJudgement>[];
+  chunkTransition?: TutorChunkTransition;
+  chunkWindowIndex?: number;
+  chunkWindowCount?: number;
+  chunkLabel?: string;
+  tempoProbe?: boolean;
 }
 
 export interface TutorRecovery {
@@ -199,6 +273,9 @@ export interface TutorRecovery {
   qualityProgress: number;
   /** Strongest observed phrase-quality score in this recovery. */
   bestQuality: number;
+  fullRegion?: TutorRecoveryRegion;
+  chunkGrowth?: TutorChunkGrowthState;
+  tempoProbe?: boolean;
 }
 
 export interface TutorRecoveryOutcome {
@@ -258,6 +335,10 @@ export type TutorEvent =
    */
   | { type: 'speed-changed'; speed: number }
   | { type: 'judgement'; judgement: ResolvedJudgement }
+  | {
+      type: 'recovery-pass-complete';
+      timing?: { windowMs: number; gapMs: number };
+    }
   | { type: 'measure-complete'; measureIndex: number }
   | { type: 'song-complete' }
   | { type: 'stop' };
@@ -283,7 +364,11 @@ export type TutorCommand =
       type: 'resume-main';
       recoveryId: string;
       speed: number;
-      reason: 'clean-repetitions' | TutorRecoveryDeferralReason;
+      reason:
+        | 'clean-repetitions'
+        | 'chunk-plan-mastered'
+        | 'chunk-plan-deferred'
+        | TutorRecoveryDeferralReason;
       failedAttempts?: number;
       maximumFailedAttempts?: number;
       resumeMeasure?: number;

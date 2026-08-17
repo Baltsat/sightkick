@@ -16,7 +16,7 @@ export function AchievementBadge({ achievement }: Props) {
       data-unlocked={unlocked}
       title={unlocked ? description : hint}
       className={cn(
-        'flex flex-col items-center gap-1.5 rounded-xl border p-3 text-center transition-colors',
+        'flex flex-col items-center gap-2 rounded border p-4 text-center transition-colors',
         unlocked
           ? 'border-accent-soft-border bg-accent-soft-bg'
           : 'border-border-soft bg-fill opacity-60',
@@ -29,8 +29,8 @@ export function AchievementBadge({ achievement }: Props) {
           color: unlocked ? 'var(--color-yellow)' : 'var(--color-text-faint)',
         }}
       />
-      <div className="text-xs font-semibold text-text-body">{title}</div>
-      <div className="text-[11px] leading-tight text-text-faint">
+      <div className="text-base font-semibold text-text-body">{title}</div>
+      <div className="text-sm leading-snug text-text-muted">
         {unlocked ? description : hint}
       </div>
     </div>

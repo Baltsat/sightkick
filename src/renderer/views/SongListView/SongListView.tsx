@@ -37,6 +37,7 @@ import {
   useInputControls,
 } from '../../hooks/useInputControls';
 import { useGameModeSelector } from '../../hooks/useGameModeSelector';
+import { useDrumGestures } from '../../hooks/useDrumGestures';
 import { usePersisted } from '../../hooks/usePersisted';
 import {
   highestAvailableDifficulty,
@@ -45,6 +46,7 @@ import {
   useLessonAutoRescan,
   useLessons,
 } from '../../hooks/useLessons';
+import { journey_return_target } from '../../services/lesson-progression/journey-return';
 import { calculateAccuracy, getStarRating } from '../../scoring';
 import { Stars } from '../../components/Stars';
 import { last7Dates, useGamification } from '../../hooks/useGamification';
@@ -57,6 +59,15 @@ import { HomeCockpit } from '../../components/HomeCockpit';
 import { KitCommandPrompt } from '../../components/KitCommandPrompt';
 import ProfileView from '../../components/Profile';
 import { buildDrumLearningProfile } from '../../services/learning-profile';
+import {
+  build_pattern_player_profile,
+  cluster_pattern_figures,
+  decompose_chart_patterns,
+} from '../../services/pattern-model';
+import type {
+  DrumGestureAction,
+  DrumGestureSurface,
+} from '../../services/gestures';
 import {
   buildPracticeWave,
   composeHomeSession,
@@ -209,7 +220,10 @@ export function SongListView() {
     'settings.songHoverPreview',
     true,
   );
-  const { controlMapping, inputMapping } = useInput();
+  const { controlMapping, inputMapping, inputReadiness, selectedDevice } =
+    useInput();
+  const kitConnected =
+    selectedDevice?.sourceId === 'midi' && inputReadiness === 'connected';
   const libraryControls = useMemo(
     () => resolveLibraryControls(controlMapping, inputMapping),
     [controlMapping, inputMapping],
@@ -284,6 +298,7 @@ export function SongListView() {
     useState(readinessFilter);
   const gameModeSelector = useGameModeSelector();
   const [view, setView] = useState<ArenaView>('home');
+  const [isLibraryWarm, setIsLibraryWarm] = useState(false);
   const [candidateResolutions, setCandidateResolutions] = useState<
     Record<string, LibraryCandidateResolution>
   >({});
@@ -303,11 +318,66 @@ export function SongListView() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (songOpen || view !== 'songs' || isLibraryWarm) {
+      return undefined;
+    }
+
+    let cancelIdle: (() => void) | undefined;
+    const frameId = window.requestAnimationFrame(() => {
+      if (typeof window.requestIdleCallback === 'function') {
+        const idleId = window.requestIdleCallback(
+          () => setIsLibraryWarm(true),
+          { timeout: 250 },
+        );
+
+        cancelIdle = () => window.cancelIdleCallback(idleId);
+      } else {
+        const timeoutId = window.setTimeout(() => setIsLibraryWarm(true), 0);
+
+        cancelIdle = () => window.clearTimeout(timeoutId);
+      }
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      cancelIdle?.();
+    };
+  }, [isLibraryWarm, songOpen, view]);
+
   // The Lessons unlock chain always looks at every lesson song, regardless
   // of the app's globally selected difficulty tab — lesson charts only ever
   // carry an Expert drum track, so filtering by difficulty here would hide
   // the whole curriculum whenever the tab isn't set to Expert.
   const lessonProgress = useLessons(songList);
+  const journeyReturn = useMemo(
+    () =>
+      journey_return_target(
+        lessonProgress.groups,
+        searchParams.get('journeyUnit') ?? undefined,
+        searchParams.get('journeyLesson') ?? undefined,
+      ),
+    [lessonProgress.groups, searchParams],
+  );
+  const journeyReturnKey = journeyReturn
+    ? `${journeyReturn.unit}:${journeyReturn.lessonId}`
+    : undefined;
+  const [appliedJourneyReturn, setAppliedJourneyReturn] = useState<string>();
+
+  // Coming back from a lesson opens the Journey once. The lessons load after
+  // the first render, so the target only appears later - but this adjusts
+  // state during render rather than in an effect, so it costs one extra pass
+  // instead of a visible flash of the wrong screen, and he can still leave
+  // the Journey afterwards.
+  if (
+    journeyReturnKey &&
+    !songOpen &&
+    appliedJourneyReturn !== journeyReturnKey
+  ) {
+    setAppliedJourneyReturn(journeyReturnKey);
+    setView('journey');
+  }
+
   const practiceCandidates = useMemo<PracticeCandidate[]>(() => {
     const lessonState = new Map(
       lessonProgress.entries.map((entry, index) => [
@@ -390,6 +460,21 @@ export function SongListView() {
       ),
     [gamification.runsBySong],
   );
+  const recentPlayedAt = useMemo(
+    () =>
+      new Map(
+        Object.entries(gamification.runsBySong ?? {}).map(([songId, runs]) => [
+          songId,
+          Math.max(
+            0,
+            ...runs
+              .map((run) => Date.parse(run.completedAt))
+              .filter(Number.isFinite),
+          ),
+        ]),
+      ),
+    [gamification.runsBySong],
+  );
   const activeGoal = useMemo<SongGoal | undefined>(
     () =>
       activeGoalRecord
@@ -414,12 +499,15 @@ export function SongListView() {
   const atomicStateReplay = useMemo(
     () =>
       replayAtomicSkillState(
-        practiceHistory.flatMap(
-          ({ summary }) => summary.atomicSkillEvidence ?? [],
-        ),
+        [
+          ...practiceHistory.flatMap(
+            ({ summary }) => summary.atomicSkillEvidence ?? [],
+          ),
+          ...Object.values(gamification.timingEvidenceBySong ?? {}).flat(),
+        ],
         { manifests: CURRICULUM_ITEM_MANIFESTS },
       ),
-    [practiceHistory],
+    [gamification.timingEvidenceBySong, practiceHistory],
   );
   const atomicStates = atomicStateReplay.states;
   const atomicReviews = useMemo(
@@ -604,7 +692,42 @@ export function SongListView() {
   // use-library-difficulty-charts.ts. Only requested while Songs is the
   // open tab; a song whose chart never resolves stays honestly unrated.
   const { charts: libraryDifficultyCharts, settled: libraryDifficultySettled } =
-    useLibraryDifficultyCharts(librarySongs, !songOpen && view === 'songs');
+    useLibraryDifficultyCharts(
+      librarySongs,
+      !songOpen && (view === 'insights' || (view === 'songs' && isLibraryWarm)),
+    );
+  const patternFamilies = useMemo(() => {
+    if (view !== 'insights') {
+      return [];
+    }
+
+    return cluster_pattern_figures(
+      [...libraryDifficultyCharts.entries()].flatMap(
+        ([itemId, chart]) =>
+          decompose_chart_patterns(chart, { item_id: itemId }).figures,
+      ),
+    );
+  }, [libraryDifficultyCharts, view]);
+  const patternProfile = useMemo(
+    () =>
+      view !== 'insights' || patternFamilies.length === 0
+        ? undefined
+        : build_pattern_player_profile({
+            families: patternFamilies,
+            history: {
+              runs: practiceHistory.map(({ summary }) => summary),
+              archived_events: Object.values(
+                gamification.atomicSkillEvidenceArchiveBySong ?? {},
+              ).flat(),
+            },
+          }),
+    [
+      gamification.atomicSkillEvidenceArchiveBySong,
+      patternFamilies,
+      practiceHistory,
+      view,
+    ],
+  );
   // Every song whose parse settled with no learner-relative score — a
   // ready song row says "Unrated" once instead of leaving the rated/
   // unrated boundary invisible. Never includes a song still parsing.
@@ -743,8 +866,16 @@ export function SongListView() {
         entries: browsableEntries,
         inZoneSongIds,
         favouriteSongIds,
+        sourceSeededSongIds: yandexTasteSeededSongIds,
+        recentPlayedAt,
       }),
-    [browsableEntries, favouriteSongIds, inZoneSongIds],
+    [
+      browsableEntries,
+      favouriteSongIds,
+      inZoneSongIds,
+      recentPlayedAt,
+      yandexTasteSeededSongIds,
+    ],
   );
   const isBrowsingLibrary =
     showEntireLibrary ||
@@ -1063,6 +1194,20 @@ export function SongListView() {
         gameMode: 'practice',
         practiceSpeed: practiceSpeed.toFixed(1),
       });
+      const adaptation =
+        recommendation.adaptation ?? recommendation.decisionReceipt?.adaptation;
+
+      if (adaptation) {
+        params.set('zpdRepeatBudget', String(adaptation.repeat_budget));
+        params.set(
+          'zpdQualityPasses',
+          String(adaptation.quality_passes_to_advance),
+        );
+        params.set(
+          'zpdLowQualityPasses',
+          String(adaptation.low_quality_passes_before_stop),
+        );
+      }
 
       if (!context?.audition) {
         params.set('autoStart', '1');
@@ -1100,6 +1245,42 @@ export function SongListView() {
       );
     }
   }, [launchPractice, nextPractice.recommendation]);
+  const drumFirstSurface: DrumGestureSurface = isStatsOpen
+    ? 'stats'
+    : 'insights';
+  const handleDrumFirstAction = useCallback(
+    (action: DrumGestureAction) => {
+      if (isStatsOpen) {
+        if (action === 'end') {
+          setIsStatsOpen(false);
+        }
+
+        return;
+      }
+
+      if (view !== 'insights') {
+        return;
+      }
+
+      if (action === 'continue') {
+        startTargetedPractice();
+      } else if (action === 'open-coach') {
+        loadAchievements();
+        setIsStatsOpen(true);
+      } else if (action === 'end') {
+        setView('home');
+      }
+    },
+    [isStatsOpen, loadAchievements, startTargetedPractice, view],
+  );
+
+  useDrumGestures({
+    enabled: kitConnected && !songOpen && (view === 'insights' || isStatsOpen),
+    surface: drumFirstSurface,
+    mapping: inputMapping,
+    onAction: handleDrumFirstAction,
+  });
+
   const startPracticeCard = useCallback(
     (option: PracticeCardOption) => {
       const recommendation = nextPractice.ranking.find(
@@ -1249,16 +1430,20 @@ export function SongListView() {
     <StemToolsProvider value={stemTools}>
       {gameModeSelector.element}
 
-      {!songOpen && !gameModeSelector.isOpen && view === 'songs' && (
-        <LibraryInputControls
-          mapping={libraryControls.mapping}
-          handlers={libraryInputHandlers}
-        />
-      )}
+      {!songOpen &&
+        !gameModeSelector.isOpen &&
+        !isStatsOpen &&
+        view === 'songs' && (
+          <LibraryInputControls
+            mapping={libraryControls.mapping}
+            handlers={libraryInputHandlers}
+          />
+        )}
 
       <AppShell
         view={view}
         onViewChange={setView}
+        runOpen={songOpen}
         statusSlot={
           <GamificationHeaderStrip
             isLoaded={gamification.isLoaded}
@@ -1270,6 +1455,7 @@ export function SongListView() {
             weekActivity={gamification.weekActivity}
             totalStars={gamification.totalStars}
             practiceRhythm={practiceRhythm}
+            kitConnected={kitConnected && view === 'insights' && !isStatsOpen}
             onOpenStats={() => {
               gamification.loadAchievements();
               setIsStatsOpen(true);
@@ -1334,6 +1520,7 @@ export function SongListView() {
             onSaveGoal={goals.saveGoal}
             onSetPrimaryGoal={goals.setPrimaryGoal}
             gamification={gamification}
+            kitConnected={kitConnected}
             insights={{
               recommendation: nextPractice.recommendation,
               atomicStates,
@@ -1342,6 +1529,7 @@ export function SongListView() {
               rejectedAtomicEvidenceCount:
                 atomicStateReplay.rejected_events.length,
               latestRun: gamification.latestRun?.summary,
+              patternProfile,
               practiceCards,
               weeklySet: weeklyPracticeSet,
               weeklyRhythm,
@@ -1361,6 +1549,15 @@ export function SongListView() {
             onPracticeRhythmChange={setPracticeRhythm}
             onRefreshPracticeSet={refreshPracticeSet}
             onStartAudition={startSectionAudition}
+            onOpenLesson={(lessonId) => {
+              const entry = lessonProgress.entries.find(
+                ({ lesson }) => lesson.id === lessonId,
+              );
+
+              if (entry) {
+                playLesson(entry);
+              }
+            }}
           />
         )}
 
@@ -1371,6 +1568,9 @@ export function SongListView() {
             scanPercent={scanPercent}
             onRescan={rescanLibrary}
             onBack={() => setView('home')}
+            initialUnit={journeyReturn?.unit}
+            initialFocusedLessonId={journeyReturn?.lessonId}
+            kitConnected={kitConnected}
           />
         )}
 
@@ -1636,7 +1836,12 @@ export function SongListView() {
                 <ActionableSongShelves
                   shelves={actionableLibrary.shelves}
                   sourceSeededSongIds={yandexTasteSeededSongIds}
-                  restCount={actionableLibrary.rest.length}
+                  allEntries={actionableLibrary.scrollingEntries}
+                  restCount={
+                    actionableLibrary.rest.filter(
+                      (entry) => entry.kind !== 'song',
+                    ).length
+                  }
                   difficulty={difficulty}
                   splittingIds={splittingIds}
                   onPlaySong={play}
@@ -1655,6 +1860,7 @@ export function SongListView() {
                   resolvingTrackIds={resolvingCandidateIds}
                   canUseLocalAudio={currentPath !== null}
                   onPlaySong={play}
+                  onLikeChange={handleLikeChange}
                   onResolveSource={resolveCandidate}
                   onUseLocalAudioForSource={autoChartCandidate}
                   onUseLocalAudioForSong={autoChartSong}
@@ -1755,6 +1961,7 @@ export function SongListView() {
           laneAccuracy={gamification.laneAccuracy ?? []}
           achievements={gamification.achievements}
           practiceRhythm={practiceRhythm}
+          kitConnected={kitConnected}
         />
       </Drawer>
 

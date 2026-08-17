@@ -84,7 +84,7 @@ export function StreakFlame({
           }}
         />
         <span
-          className="mt-0.5 text-xs font-semibold tabular-nums text-text"
+          className="mt-0.5 text-sm font-semibold tabular-nums text-text"
           data-testid="streak-count"
         >
           {streakDays}

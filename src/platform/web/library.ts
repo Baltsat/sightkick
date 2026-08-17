@@ -4,6 +4,7 @@ import { Song } from '../../types';
 export interface LessonManifestEntry {
   song: Song;
   chart: string;
+  sticking?: string;
   files: string[];
 }
 

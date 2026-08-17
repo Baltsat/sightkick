@@ -19,8 +19,15 @@ import {
   Flow,
 } from 'vexflow';
 import { ChartParser } from './parser';
-import { Measure, Note, RenderData, TempoMark } from './types';
+import { Measure, Note, RenderData, TempoMark, TimeAnchor } from './types';
 import { KEY_TO_ELEMENT } from './constants';
+import { ticksToSeconds } from './timing';
+import {
+  stickingNotesForMeasure,
+  type StickingData,
+  type StickingLimb,
+  type StickingNote,
+} from '../renderer/services/sticking';
 
 export interface SheetMusicColors {
   note: string;
@@ -47,13 +54,7 @@ const MIN_MEASURE_WIDTH = 300;
 // camera, rather than a compressed score, owns navigation.
 export const FLOW_MIN_MEASURE_WIDTH = 540;
 
-const FLOW_MEASURE_WIDTH_SCALE = 1.12;
 const MEASURE_TRAILING_PAD = 20;
-// Auto-charted songs carry a tempo map with per-measure micro-fluctuations
-// (83.03 / 83.71 / 83.5 ...), which would otherwise print a new label on
-// nearly every measure. Only the first tempo and any tempo that has drifted
-// at least this many BPM from the last one actually shown get a label.
-const TEMPO_LABEL_MIN_DELTA_BPM = 2;
 const UNCOLORED_NOTE_CLASS = 'vf-note-uncolored';
 const UNCOLORED_ACCENT_CLASS = 'vf-accent-uncolored';
 const REST_NOTE_CLASS = 'vf-note-rest';
@@ -61,6 +62,20 @@ const STEM_DIRECTION = -1;
 const REST_KEY = 'b/4';
 const ACCENT_SCALE = Flow.NOTATION_FONT_SCALE;
 const ACCENT_SCALE_RIGHT = Flow.NOTATION_FONT_SCALE * 0.8;
+const STICKING_FONT_SIZE = 18;
+const STICKING_FOOT_OFFSET = 20;
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+const STICKING_LANE_TO_ELEMENT: Record<StickingNote['lane'], string> = {
+  K: 'kick',
+  S: 'snare',
+  H: 'hihat',
+  O: 'hihat',
+  R: 'ride',
+  C: 'crash',
+  T1: 'tom1',
+  T2: 'tom2',
+  T3: 'tom3',
+};
 
 export function renderMusic(
   container: HTMLDivElement | undefined,
@@ -70,6 +85,7 @@ export function renderMusic(
   enableColors: boolean = false,
   showTempo: boolean = true,
   layout: SheetMusicLayout = 'classic',
+  sticking?: StickingData,
 ): RenderData[] {
   if (!container) {
     return [];
@@ -84,11 +100,23 @@ export function renderMusic(
   const requiredWidths = song.measures.map((measure, index) =>
     requiredMeasureWidth(measure, tempoLabels[index]),
   );
+  const headerOffsets = song.measures.map((measure, index) =>
+    measureHeaderOffset(measure, tempoLabels[index]),
+  );
+  const durations = song.measures.map((measure) =>
+    measureDurationSeconds(song, measure),
+  );
+  const minimumPixelsPerSecond = song.measures.reduce(
+    (pixelsPerSecond, measure, index) =>
+      Math.max(
+        pixelsPerSecond,
+        (requiredWidths[index] - headerOffsets[index]) / durations[index],
+      ),
+    0,
+  );
   const widths = isFlow
-    ? requiredWidths.map((width) =>
-        Math.max(FLOW_MIN_MEASURE_WIDTH, width * FLOW_MEASURE_WIDTH_SCALE),
-      )
-    : requiredWidths;
+    ? flowWidths(durations, headerOffsets, minimumPixelsPerSecond)
+    : durations.map((duration) => duration * minimumPixelsPerSecond);
   // Flow is intentionally a *single* system. Do not make this a visual
   // approximation with translated rows: GameRenderer receives the VexFlow
   // staves in this exact geometry, so hit/miss/wrong-hit and cursor math keep
@@ -99,9 +127,19 @@ export function renderMusic(
 
   rows.forEach((rowIndices, rowNum) => {
     const yOffset = rowNum * lineHeight;
-    const rowMin = rowIndices.reduce((sum, index) => sum + widths[index], 0);
-    const rowWidth = isFlow ? rowMin : Math.max(TARGET_ROW_WIDTH, rowMin);
-    const scale = !isFlow && rowMin > 0 ? rowWidth / rowMin : 1;
+    const pixelsPerSecond = isFlow
+      ? widths[0] / durations[0]
+      : rowPixelsPerSecond(
+          rowIndices,
+          durations,
+          requiredWidths,
+          headerOffsets,
+          minimumPixelsPerSecond,
+        );
+    const rowWidths = rowIndices.map(
+      (index) => headerOffsets[index] + durations[index] * pixelsPerSecond,
+    );
+    const rowWidth = rowWidths.reduce((sum, width) => sum + width, 0);
     const rowEl = document.createElement('div');
 
     rowEl.style.position = 'relative';
@@ -125,9 +163,15 @@ export function renderMusic(
 
     let x = 0;
 
-    rowIndices.forEach((index) => {
+    rowIndices.forEach((index, rowIndex) => {
       const measure = song.measures[index];
-      const measureWidth = widths[index] * scale;
+      const measureWidth = rowWidths[rowIndex];
+      const timeAnchors = measureTimeAnchors(
+        song,
+        measure,
+        x + headerOffsets[index],
+        pixelsPerSecond,
+      );
       const { stave, renderedNotes } = renderMeasure(
         context,
         measure,
@@ -140,10 +184,21 @@ export function renderMusic(
         enableColors,
         tempoLabels[index],
         colors,
+        timeAnchors,
+        sticking,
       );
 
-      renderData[index] = { measure, stave, renderedNotes, yOffset };
-      x += measureWidth;
+      renderData[index] = {
+        measure,
+        stave,
+        renderedNotes,
+        yOffset,
+        timeAnchors,
+      };
+
+      const nextHeaderOffset = headerOffsets[rowIndices[rowIndex + 1]] ?? 0;
+
+      x += measureWidth - nextHeaderOffset;
     });
   });
 
@@ -195,26 +250,127 @@ export function dedupedTempoLabels(
     return measures.map(() => undefined);
   }
 
-  let lastShownBpm: number | undefined;
+  return measures.map((measure) =>
+    measure.tempo
+      ? { ...measure.tempo, bpm: Math.round(measure.tempo.bpm) }
+      : undefined,
+  );
+}
 
-  return measures.map((measure) => {
-    const tempo = measure.tempo;
+function measureDurationSeconds(song: ChartParser, measure: Measure): number {
+  if (song.tempos?.length && song.resolution > 0) {
+    return Math.max(
+      Number.EPSILON,
+      ticksToSeconds(measure.endTick, song.resolution, song.tempos) -
+        ticksToSeconds(measure.startTick, song.resolution, song.tempos),
+    );
+  }
 
-    if (!tempo) {
-      return undefined;
+  const bpm = measure.tempo?.bpm ?? 120;
+  const beats = measure.timeSig[0] * (4 / measure.timeSig[1]);
+
+  return Math.max(Number.EPSILON, (beats * 60) / bpm);
+}
+
+function flowWidths(
+  durations: number[],
+  headerOffsets: number[],
+  minimumPixelsPerSecond: number,
+) {
+  const pixelsPerSecond = Math.max(
+    minimumPixelsPerSecond,
+    ...durations.map(
+      (duration, index) =>
+        (FLOW_MIN_MEASURE_WIDTH - headerOffsets[index]) / duration,
+    ),
+  );
+
+  return durations.map((duration) => duration * pixelsPerSecond);
+}
+
+function rowPixelsPerSecond(
+  rowIndices: number[],
+  durations: number[],
+  requiredWidths: number[],
+  headerOffsets: number[],
+  minimumPixelsPerSecond: number,
+) {
+  const rowDuration = rowIndices.reduce(
+    (sum, index) => sum + durations[index],
+    0,
+  );
+  const readablePixelsPerSecond = rowIndices.reduce(
+    (pixelsPerSecond, index) =>
+      Math.max(
+        pixelsPerSecond,
+        (requiredWidths[index] - headerOffsets[index]) / durations[index],
+      ),
+    minimumPixelsPerSecond,
+  );
+
+  return Math.max(
+    readablePixelsPerSecond,
+    (TARGET_ROW_WIDTH - headerOffsets[rowIndices[0]]) / rowDuration,
+  );
+}
+
+function measureTimeAnchors(
+  song: ChartParser,
+  measure: Measure,
+  startX: number,
+  pixelsPerSecond: number,
+): TimeAnchor[] {
+  const ticks = [measure.startTick];
+
+  (song.tempos ?? []).forEach((tempo) => {
+    if (tempo.tick > measure.startTick && tempo.tick < measure.endTick) {
+      ticks.push(tempo.tick);
     }
-
-    if (
-      lastShownBpm !== undefined &&
-      Math.abs(tempo.bpm - lastShownBpm) < TEMPO_LABEL_MIN_DELTA_BPM
-    ) {
-      return undefined;
-    }
-
-    lastShownBpm = tempo.bpm;
-
-    return { ...tempo, bpm: Math.round(tempo.bpm) };
   });
+
+  ticks.push(measure.endTick);
+
+  const startSeconds =
+    song.tempos?.length && song.resolution > 0
+      ? ticksToSeconds(measure.startTick, song.resolution, song.tempos)
+      : 0;
+  const duration = measureDurationSeconds(song, measure);
+
+  return ticks.map((tick) => {
+    const seconds =
+      song.tempos?.length && song.resolution > 0
+        ? ticksToSeconds(tick, song.resolution, song.tempos) - startSeconds
+        : ((tick - measure.startTick) / (measure.endTick - measure.startTick)) *
+          duration;
+
+    return { tick, x: startX + seconds * pixelsPerSecond };
+  });
+}
+
+function timeXForTick(tick: number, anchors: TimeAnchor[]): number {
+  const first = anchors[0];
+  const last = anchors.at(-1);
+
+  if (!first || !last) {
+    return 0;
+  }
+
+  if (tick <= first.tick) {
+    return first.x;
+  }
+
+  for (let index = 1; index < anchors.length; index += 1) {
+    const previous = anchors[index - 1];
+    const next = anchors[index];
+
+    if (tick <= next.tick) {
+      const progress = (tick - previous.tick) / (next.tick - previous.tick);
+
+      return previous.x + progress * (next.x - previous.x);
+    }
+  }
+
+  return last.x;
 }
 
 function staveHeaderOffset(
@@ -239,15 +395,22 @@ function staveHeaderOffset(
   return stave.getNoteStartX() - stave.getX();
 }
 
-function requiredMeasureWidth(
+function measureHeaderOffset(
   measure: Measure,
   tempoToShow: TempoMark | undefined,
 ): number {
-  const headerOffset = staveHeaderOffset(
+  return staveHeaderOffset(
     new Stave(0, 0, TARGET_ROW_WIDTH),
     measure,
     tempoToShow,
   );
+}
+
+function requiredMeasureWidth(
+  measure: Measure,
+  tempoToShow: TempoMark | undefined,
+): number {
+  const headerOffset = measureHeaderOffset(measure, tempoToShow);
   const { voice } = buildVoice(measure);
   const formatter = new Formatter().joinVoices([voice]);
   const minNoteWidth = formatter.preCalculateMinTotalWidth([voice]);
@@ -536,6 +699,124 @@ function drawAccents(
   context.restore();
 }
 
+function stickingGlyph(limb: StickingLimb): string {
+  switch (limb) {
+    case 'right-hand':
+      return 'R';
+
+    case 'left-hand':
+      return 'L';
+
+    case 'right-foot':
+      return 'RF';
+
+    case 'left-foot':
+      return 'LF';
+  }
+}
+
+function drawSticking(
+  stave: Stave,
+  measure: Measure,
+  measureIndex: number,
+  staveNotes: StaveNote[],
+  sticking: StickingData | undefined,
+  noteColor: string,
+) {
+  if (!sticking) {
+    return;
+  }
+
+  const positioned = stickingNotesForMeasure(
+    sticking,
+    measureIndex,
+    measure.startTick,
+    measure.endTick,
+    measure.timeSig,
+  );
+  const byTick = new Map<number, typeof positioned>();
+
+  positioned.forEach((note) => {
+    const notes = byTick.get(note.tick) ?? [];
+
+    notes.push(note);
+    byTick.set(note.tick, notes);
+  });
+
+  staveNotes.forEach((staveNote, noteIndex) => {
+    if (staveNote.isRest()) {
+      return;
+    }
+
+    const note = measure.notes[noteIndex];
+    const elements = new Set(
+      staveNote
+        .getKeys()
+        .map((key) => KEY_TO_ELEMENT[key])
+        .filter((element): element is string => Boolean(element)),
+    );
+    const stickingNotes = (byTick.get(note.tick) ?? []).filter((entry) =>
+      elements.has(STICKING_LANE_TO_ELEMENT[entry.lane]),
+    );
+    const glyphParent =
+      staveNote.getSVGElement() ??
+      staveNote.getStem()?.getSVGElement() ??
+      staveNote.noteHeads[0]?.getSVGElement();
+
+    if (!glyphParent || stickingNotes.length === 0) {
+      return;
+    }
+
+    const group = document.createElementNS(SVG_NAMESPACE, 'g');
+    const x = staveNote.getAbsoluteX();
+    const handGlyph = stickingNotes
+      .filter((entry) => entry.limb.endsWith('-hand'))
+      .sort((left) => (left.limb === 'right-hand' ? -1 : 1))
+      .map((entry) => stickingGlyph(entry.limb))
+      .join('');
+    const footGlyph = stickingNotes
+      .filter((entry) => entry.limb.endsWith('-foot'))
+      .map((entry) => stickingGlyph(entry.limb))
+      .join('');
+    const handY = stave.getYForBottomText(2);
+
+    group.classList.add('vf-sticking');
+    group.setAttribute('data-notation-kind', 'sticking');
+    group.setAttribute(
+      'data-sticking-limbs',
+      stickingNotes.map((entry) => entry.limb).join(' '),
+    );
+    group.setAttribute('aria-hidden', 'true');
+
+    [
+      { glyph: handGlyph, y: handY },
+      { glyph: footGlyph, y: handY + STICKING_FOOT_OFFSET },
+    ].forEach(({ glyph, y }) => {
+      if (!glyph) {
+        return;
+      }
+
+      const text = document.createElementNS(SVG_NAMESPACE, 'text');
+
+      text.classList.add('vf-sticking-glyph');
+      text.setAttribute('x', `${x}`);
+      text.setAttribute('y', `${y}`);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('font-family', 'Arial, sans-serif');
+      text.setAttribute('font-size', `${STICKING_FONT_SIZE}`);
+      text.setAttribute('font-weight', '800');
+      text.setAttribute('letter-spacing', '0.5');
+      text.setAttribute('fill', noteColor);
+      text.setAttribute('stroke', 'none');
+      text.setAttribute('pointer-events', 'none');
+      text.textContent = glyph;
+      group.appendChild(text);
+    });
+
+    glyphParent.appendChild(group);
+  });
+}
+
 function renderMeasure(
   context: RenderContext,
   measure: Measure,
@@ -548,6 +829,8 @@ function renderMeasure(
   enableColors: boolean,
   tempoToShow: TempoMark | undefined,
   colors: SheetMusicColors,
+  timeAnchors: TimeAnchor[],
+  sticking?: StickingData,
 ) {
   const stave = new Stave(xOffset, yOffset, width);
 
@@ -584,9 +867,20 @@ function renderMeasure(
   const { voice, beams, tuplets, staveNotes } = buildVoice(measure);
   const headerOffset = stave.getNoteStartX() - stave.getX();
 
+  voice.setStave(stave).preFormat();
+
   new Formatter()
     .joinVoices([voice])
     .format([voice], Math.max(1, width - headerOffset - MEASURE_TRAILING_PAD));
+
+  staveNotes.forEach((staveNote, noteIndex) => {
+    const tickContext = staveNote.getTickContext();
+    const absoluteOffset = staveNote.getAbsoluteX() - tickContext.getX();
+
+    tickContext.setX(
+      timeXForTick(measure.notes[noteIndex].tick, timeAnchors) - absoluteOffset,
+    );
+  });
   voice.draw(context, stave);
   beams.forEach((beam) => {
     beam.setContext(context).draw();
@@ -595,9 +889,14 @@ function renderMeasure(
     tuplet.setContext(context).draw();
   });
 
+  if (index > 0 && tempoToShow) {
+    drawTempoSeam(context, stave, colors.note);
+  }
+
   applyNoteClasses(staveNotes, enableColors);
   annotateNotation(staveNotes, measure);
   drawAccents(context, stave, measure, staveNotes, enableColors, colors.note);
+  drawSticking(stave, measure, index, staveNotes, sticking, colors.note);
 
   const renderedNotes = staveNotes.map((staveNote, i) => ({
     tick: measure.notes[i].tick,
@@ -607,4 +906,21 @@ function renderMeasure(
   }));
 
   return { stave, renderedNotes };
+}
+
+function drawTempoSeam(context: RenderContext, stave: Stave, color: string) {
+  const group = context.openGroup('tempo-seam') as SVGGElement;
+
+  group.classList.add('vf-tempo-seam');
+  group.setAttribute('data-notation-kind', 'tempo-seam');
+  context.save();
+  context.setStrokeStyle(color);
+  context.setLineWidth(2);
+  context.setLineDash([4, 4]);
+  context.beginPath();
+  context.moveTo(stave.getX(), stave.getY() - 10);
+  context.lineTo(stave.getX(), stave.getY() + stave.getHeight() + 10);
+  context.stroke();
+  context.restore();
+  context.closeGroup();
 }

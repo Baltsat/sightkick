@@ -108,7 +108,7 @@ export function useDownload(
           setDownloading(next);
           setFailedJob(songId, job.id);
           notification.error({
-            title: 'Could not add this recording',
+            title: 'Recording add failed',
             description: job.error ?? job.message,
             placement: 'bottomRight',
           });
@@ -130,7 +130,7 @@ export function useDownload(
 
       if (!candidate) {
         notification.error({
-          title: 'Could not add this recording',
+          title: 'Recording add failed',
           description: 'This result has no verified YouTube recording URL.',
           placement: 'bottomRight',
         });

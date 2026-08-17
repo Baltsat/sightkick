@@ -12,16 +12,17 @@ import { CoachSettings } from '../AICoach/CoachSettings';
 import { PracticePresenceSettings } from '../PracticePresence';
 
 interface Props {
+  performanceControls?: ReactNode;
+  /** The tutor only listens in Practice, so its controls hide in Perform. */
+  gameMode?: GameMode;
+  tutorControls?: ReactNode;
   volumeSliders?: ReactNode[];
   clickControls?: ReactNode;
   masterVolumeControl?: ReactNode;
   page: 'song-list' | 'song-view';
-  gameMode?: GameMode;
   scanPercent?: number;
   onExportPdf?: () => void;
   isExporting?: boolean;
-  tutorControls?: ReactNode;
-  performanceControls?: ReactNode;
   label?: string;
   hoverPreviewEnabled?: boolean;
   onHoverPreviewEnabledChange?: (enabled: boolean) => void;
@@ -29,16 +30,16 @@ interface Props {
 }
 
 export const SettingsButton = memo(function Settings({
+  performanceControls,
+  gameMode,
+  tutorControls,
   volumeSliders,
   clickControls,
   masterVolumeControl,
   page,
   scanPercent,
-  gameMode,
   onExportPdf,
   isExporting,
-  tutorControls,
-  performanceControls,
   label,
   hoverPreviewEnabled,
   onHoverPreviewEnabledChange,
@@ -71,7 +72,12 @@ export const SettingsButton = memo(function Settings({
         open={isOpen}
         onOpenChange={popoverOpenChange(setIsOpen)}
         trigger="click"
-        placement="bottomRight"
+        // The library trigger sits at the bottom of the shell rail; a
+        // bottom-anchored popover there lands past the window edge on a
+        // small screen, where a portal cannot be scrolled into view. Open
+        // rightward into the window instead; the run view keeps its
+        // toolbar anchor.
+        placement={page === 'song-list' ? 'rightBottom' : 'bottomRight'}
         rootClassName={label ? 'drumroll-performance-inspector' : undefined}
         destroyOnHidden={Boolean(label)}
         styles={popoverStyles}
@@ -92,30 +98,40 @@ export const SettingsButton = memo(function Settings({
                 onHoverPreviewEnabledChange={onHoverPreviewEnabledChange}
               />
             ) : (
-              <SongViewSettings
-                onExportPdf={onExportPdf}
-                isExporting={isExporting}
-                gameMode={gameMode}
-                onSetupInput={openInput}
-                currentInputName={currentInputName}
-                masterVolumeControl={masterVolumeControl}
-                volumeSliders={volumeSliders}
-                clickControls={clickControls}
-                tutorControls={tutorControls}
-                performanceControls={performanceControls}
-              />
+              <>
+                {performanceControls}
+                {gameMode === 'practice' ? tutorControls : null}
+                <Button
+                  type="text"
+                  data-testid="setup-input"
+                  onClick={openInput}
+                >
+                  Configure {currentInputName}
+                </Button>
+                <SongViewSettings
+                  onExportPdf={onExportPdf}
+                  isExporting={isExporting}
+                  masterVolumeControl={masterVolumeControl}
+                  volumeSliders={volumeSliders}
+                  clickControls={clickControls}
+                />
+              </>
             )}
-            <PracticePresenceSettings />
-            <Collapse
-              size="small"
-              items={[
-                {
-                  key: 'coach-provider',
-                  label: 'Advanced AI coach provider',
-                  children: <CoachSettings />,
-                },
-              ]}
-            />
+            {page === 'song-list' && (
+              <>
+                <PracticePresenceSettings />
+                <Collapse
+                  size="small"
+                  items={[
+                    {
+                      key: 'coach-provider',
+                      label: 'Advanced AI coach provider',
+                      children: <CoachSettings />,
+                    },
+                  ]}
+                />
+              </>
+            )}
           </div>
         }
       >

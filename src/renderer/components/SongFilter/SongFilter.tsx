@@ -62,7 +62,7 @@ export function SongFilter({
         visibleLabel: 'Favorites',
         count: 230,
         tooltipText:
-          '230 captured Yandex Music rows. Metadata only; no playback or downloads are available here.',
+          '230 captured Yandex Music rows. Metadata only. Playback and downloads are unavailable here.',
       },
       {
         icon: <FontAwesomeIcon icon={faGlobe} />,

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "dataset": {
+    "title": "Groove MIDI Dataset",
+    "licensor": "Google LLC",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceUrl": "https://magenta.tensorflow.org/datasets/groove",
+    "midiOnlyUrl": "https://storage.googleapis.com/magentadata/datasets/groove/groove-v1.0.0-midionly.zip",
+    "midiOnlySha256": "651cbc524ffb891be1a3e46d89dc82a1cecb09a57c748c7b45b844c4841dcc1e"
+  },
+  "selection": {
+    "sourceCount": 1150,
+    "timeSignature": "4-4",
+    "tempoBpm": [60, 180],
+    "practiceBars": 8,
+    "beats": { "count": 64, "minimumBars": 8 },
+    "fills": { "count": 32, "minimumSeconds": 1.5 },
+    "selectionOrder": "mapped hit ratio descending, then source id; round-robin by primary style"
+  }
+}

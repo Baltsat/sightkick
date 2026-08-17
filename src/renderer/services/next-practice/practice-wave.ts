@@ -254,18 +254,18 @@ function focusReason(candidate: WaveCandidate): string {
   if (candidate.directRemediationFindingCount > 0) {
     return `${candidate.directRemediationFindingCount} saved Coach finding${
       candidate.directRemediationFindingCount === 1 ? '' : 's'
-    } route directly to this lesson.`;
+    } match this lesson.`;
   }
 
   if (candidate.weakSkillSignal > 0) {
     return candidate.recommendation.candidate.kind === 'lesson'
       ? 'Start with the highest-ranked lesson tied to current weak-skill evidence.'
-      : 'Start with the highest-ranked playable task tied to current weak-skill evidence; no matching lesson is available.';
+      : 'Start with the highest-ranked playable task tied to current weak-skill evidence. No matching lesson is available.';
   }
 
   return candidate.recommendation.candidate.kind === 'lesson'
-    ? 'Start with the highest-ranked available lesson; no specific weak-skill link is proven yet.'
-    : 'Start with the highest-ranked distinct task; no playable lesson or specific weak-skill link is available.';
+    ? 'Start with the highest-ranked available lesson. No specific weak-skill link is proven.'
+    : 'Start with the highest-ranked distinct task. No playable lesson or specific weak-skill link is available.';
 }
 
 function applyReason(
@@ -273,7 +273,7 @@ function applyReason(
   linked: readonly string[],
 ): string {
   if (candidate.recommendation.candidate.kind !== 'song') {
-    return 'Apply the focus in the highest-ranked unused task; no playable song is available.';
+    return 'Apply the focus in the highest-ranked unused task. No playable song is available.';
   }
 
   if (candidate.recommendation.candidate.liked && linked.length > 0) {
@@ -285,16 +285,16 @@ function applyReason(
   }
 
   if (candidate.recommendation.candidate.liked) {
-    return 'Apply the session in a liked song; this choice is preference-based because no direct skill-tag link is available.';
+    return 'Apply the session in a liked song. This choice uses preference because no skill-tag link is available.';
   }
 
-  return 'Apply the session in the highest-ranked unused song; no stronger preference or skill link is available.';
+  return 'Apply the session in the highest-ranked unused song. No stronger preference or skill link is available.';
 }
 
 function consolidationReason(linked: readonly string[]): string {
   return linked.length > 0
     ? 'Consolidate the focused skill in one more distinct task to check transfer without repeating the same item.'
-    : 'Finish with the highest-ranked unused task to add variety; no stronger skill-tag link is available.';
+    : 'Finish with the highest-ranked unused task. No stronger skill-tag link is available.';
 }
 
 /**

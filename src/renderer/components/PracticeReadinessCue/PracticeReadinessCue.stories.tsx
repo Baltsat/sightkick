@@ -6,7 +6,13 @@ const meta: Meta<typeof PracticeReadinessCue> = {
   component: PracticeReadinessCue,
   decorators: [
     (Story) => (
-      <div className="relative h-screen overflow-hidden bg-surface-studio">
+      <div
+        className="relative h-screen overflow-hidden"
+        style={{
+          background:
+            'repeating-linear-gradient(#f4efe5 0 84px, #d9cebd 85px 86px)',
+        }}
+      >
         <Story />
       </div>
     ),
@@ -16,6 +22,10 @@ const meta: Meta<typeof PracticeReadinessCue> = {
 export default meta;
 
 type Story = StoryObj<typeof PracticeReadinessCue>;
+
+export const ReadyToStart: Story = {
+  args: { phase: 'ready' },
+};
 
 export const SectionAuditionReady: Story = {
   args: {

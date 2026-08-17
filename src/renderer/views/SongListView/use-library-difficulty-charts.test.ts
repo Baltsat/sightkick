@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ParsedChart } from '../../../chart-parser/types';
@@ -162,6 +163,36 @@ describe('useLibraryDifficultyCharts', () => {
     rerender({ list: [makeListSong('a')] });
 
     expect(ipc.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('keeps chart-map identity stable so unrelated renders do no chart decomposition', async () => {
+    const songs = [makeListSong('a')];
+    const decompose = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ renderSignal }: { renderSignal: number }) => {
+        const loaded = useLibraryDifficultyCharts(songs, true);
+
+        useMemo(() => {
+          loaded.charts.forEach((chart, id) => decompose(id, chart));
+        }, [loaded.charts]);
+
+        return { ...loaded, renderSignal };
+      },
+      { initialProps: { renderSignal: 0 } },
+    );
+
+    respondLoadSong('a');
+    await waitFor(() => expect(result.current.charts.size).toBe(1));
+
+    const settledCharts = result.current.charts;
+
+    expect(decompose).toHaveBeenCalledOnce();
+
+    rerender({ renderSignal: 1 });
+    rerender({ renderSignal: 2 });
+
+    expect(result.current.charts).toBe(settledCharts);
+    expect(decompose).toHaveBeenCalledOnce();
   });
 
   it('retries a request cancelled mid-flight instead of stranding it as unrated forever', () => {

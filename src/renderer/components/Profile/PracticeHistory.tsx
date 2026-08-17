@@ -395,9 +395,9 @@ export function PracticeHistory({
         data-testid="profile-practice-history-definition"
       >
         <p>
-          All history adds the evicted archive and currently retained recent
-          summaries once each. Accuracy is hit-weighted; timing is the signed,
-          sample-weighted mean (early is negative, late is positive).
+          All history counts each archived and recent run once. Accuracy uses
+          scored hits. Timing uses scored samples: early is negative, late is
+          positive.
         </p>
         {progress.aggregateOnlyArchivedRunCount > 0 && (
           <p

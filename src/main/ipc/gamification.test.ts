@@ -241,6 +241,7 @@ describe('loadAllPracticeRuns', () => {
       runsBySong: { 'song-1': [runA, runB], 'song-2': [runC] },
       archiveBySong: {},
       atomicSkillEvidenceArchiveBySong: {},
+      timingEvidenceBySong: {},
     });
   });
 
@@ -302,6 +303,60 @@ describe('loadAllPracticeRuns', () => {
     });
   });
 
+  it('replays a curriculum timing skill from stored hit evidence without rewriting history', () => {
+    const summary: RunSummary = {
+      ...fakeRun(0),
+      completedAt: '2026-08-17T04:20:56.660Z',
+      totalHits: 12,
+      timingBias: {
+        meanMs: 0,
+        medianMs: 0,
+        spreadMs: 0,
+        earlyCount: 0,
+        lateCount: 0,
+        onTimeCount: 12,
+        sampleCount: 12,
+      },
+      playbackSpeed: 1,
+      context: {
+        sessionId: 'timing-session',
+        schemaVersion: 3,
+        appVersion: 'test',
+        scoringPolicyVersion: 'test',
+        startedAt: '2026-08-17T04:20:00.000Z',
+        chartRevision: 'lesson:16.01:expert:fixture',
+        inputLatencyMs: 0,
+        inputMapping: {},
+      },
+    };
+    const records = Array.from({ length: 12 }, (_, index) => ({
+      tick: index * 120,
+      deltaMs: 0,
+      element: 'snare' as const,
+      verdict: 'hit' as const,
+    }));
+
+    storeHolder.current = makeStore({
+      practiceRuns: { 'lesson:16.01': [summary] },
+      practiceRunDetails: { 'lesson:16.01': [{ summary, records }] },
+    });
+
+    const event = makeEvent();
+
+    loadAllPracticeRuns(event as never);
+
+    expect(lastReply(event, 'load-all-practice-runs')!.args[0]).toMatchObject({
+      timingEvidenceBySong: {
+        'lesson:16.01': [
+          expect.objectContaining({
+            skill_id: 'timing.steadiness.sixteenth',
+            quality: 1,
+          }),
+        ],
+      },
+    });
+  });
+
   it('replies with an empty list when no runs exist yet', () => {
     storeHolder.current = makeStore({});
 
@@ -314,6 +369,7 @@ describe('loadAllPracticeRuns', () => {
       runsBySong: {},
       archiveBySong: {},
       atomicSkillEvidenceArchiveBySong: {},
+      timingEvidenceBySong: {},
     });
   });
 });

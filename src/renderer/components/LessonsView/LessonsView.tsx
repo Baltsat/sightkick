@@ -18,7 +18,9 @@ import { useInputControls } from '../../hooks/useInputControls';
 import journeyStudio from '../../assets/daybreak/journey-studio.png';
 import { makeLessonsOpen } from '../../services/lesson-progression';
 import { resolveJourneyControls } from './journey-controls';
+import { KitActionChip } from '../GamificationHeaderStrip/KitActionChip';
 import '../LessonsJourney/JourneyV2.css';
+import './LessonsView.css';
 
 export interface LessonsViewProps {
   progress: LessonProgress;
@@ -29,6 +31,9 @@ export interface LessonsViewProps {
   onRescan: () => void;
   /** Returns from Journey to the previous top-level surface. */
   onBack?: () => void;
+  initialUnit?: string;
+  initialFocusedLessonId?: string;
+  kitConnected?: boolean;
 }
 
 /**
@@ -43,6 +48,9 @@ export function LessonsView({
   scanPercent,
   onRescan,
   onBack,
+  initialUnit,
+  initialFocusedLessonId,
+  kitConnected = false,
 }: LessonsViewProps) {
   const { controlMapping, inputMapping } = useInput();
   const journeyControls = useMemo(
@@ -58,7 +66,11 @@ export function LessonsView({
   const currentUnit =
     currentSeasonInfo(openProgress)?.group.unit ??
     groups[groups.length - 1]?.unit;
-  const [selectedUnit, setSelectedUnit] = useState(currentUnit);
+  const [selectedUnit, setSelectedUnit] = useState(
+    groups.some((group) => group.unit === initialUnit)
+      ? initialUnit
+      : currentUnit,
+  );
   const visibleUnit = useMemo(
     () =>
       groups.some((group) => group.unit === selectedUnit)
@@ -80,7 +92,7 @@ export function LessonsView({
       (entry) => entry.song.id === openProgress.continueEntry?.song.id,
     )?.song.id ?? focusableEntries[0]?.song.id;
   const [focusedLessonId, setFocusedLessonId] = useState<string | undefined>(
-    preferredFocusedLessonId,
+    initialFocusedLessonId ?? preferredFocusedLessonId,
   );
   const [journeyControlsVisible, setJourneyControlsVisible] = useState(false);
   const resolvedFocusedLessonId = focusableEntries.some(
@@ -168,12 +180,16 @@ export function LessonsView({
 
     if (focused) {
       onPlay(focused);
+    } else if (totalLessons === 0) {
+      onRescan();
     }
   }, [
     focusableEntries,
     onPlay,
+    onRescan,
     resolvedFocusedLessonId,
     revealJourneyControls,
+    totalLessons,
   ]);
 
   // The lane-derived fallback exists only in this mounted Journey surface.
@@ -238,6 +254,7 @@ export function LessonsView({
           onClick={onRescan}
         >
           Rescan library
+          {kitConnected && <KitActionChip action="continue" compact />}
         </Button>
       </section>
     );
@@ -262,7 +279,19 @@ export function LessonsView({
         }
       `}</style>
       <div className="daybreak-journey-shell journey-route__shell">
-        <HeaderStrip progress={openProgress} onPlay={onPlay} />
+        <div className="journey-route__manifest-wrap">
+          <HeaderStrip progress={openProgress} onPlay={onPlay} />
+          {kitConnected && (
+            <div
+              className="journey-route__kit-actions"
+              data-testid="journey-primary-kit-actions"
+            >
+              <span>Kit controls</span>
+              <KitActionChip action="continue" />
+              {onBack && <KitActionChip action="end" />}
+            </div>
+          )}
+        </div>
 
         <nav
           className="daybreak-season-rail"

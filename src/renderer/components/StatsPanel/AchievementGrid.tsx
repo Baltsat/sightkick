@@ -33,7 +33,7 @@ export function AchievementGrid({ achievements }: Props) {
       </div>
       {archive.length > 0 && (
         <details data-testid="achievement-archive">
-          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.12em] text-text-faint">
+          <summary className="min-h-11 cursor-pointer py-2 text-base font-semibold text-text-muted">
             Archive records
           </summary>
           <div className="mt-2 grid grid-cols-3 gap-2">

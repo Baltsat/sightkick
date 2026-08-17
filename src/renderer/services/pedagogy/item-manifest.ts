@@ -4,6 +4,7 @@ import {
   skillNodeById,
 } from './skill-graph';
 import { GENERATED_CURRICULUM_ITEM_MANIFESTS } from './generated-curriculum-manifest';
+import { expandCurriculumManifests } from './curriculum-taxonomy';
 import { ItemManifestValidation, ItemSkillManifest, SkillNode } from './types';
 
 export const MIN_HARD_PREREQUISITE_CONFIDENCE = 0.8;
@@ -128,16 +129,22 @@ export function hardPrerequisitesForManifest(
     return [];
   }
 
+  const demanded = new Set(manifest.demands.map(({ skill_id }) => skill_id));
+
   return [
     ...new Set(
       manifest.demands.flatMap((demand) =>
         hardPrerequisitesFor(demand.skill_id, nodes),
       ),
     ),
-  ].sort();
+  ]
+    .filter((skill_id) => !demanded.has(skill_id))
+    .sort();
 }
 
-export const CURRICULUM_ITEM_MANIFESTS = GENERATED_CURRICULUM_ITEM_MANIFESTS;
+export const CURRICULUM_ITEM_MANIFESTS = expandCurriculumManifests(
+  GENERATED_CURRICULUM_ITEM_MANIFESTS,
+);
 
 export function curriculumItemManifest(
   item_id: string,

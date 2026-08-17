@@ -12,6 +12,29 @@ import { secondsToTicks } from '../../../chart-parser/timing';
  */
 export function getXForTick(tick: number, measureData: RenderData): number {
   const { measure, stave, renderedNotes } = measureData;
+  const timeAnchors = measureData.timeAnchors;
+
+  if (timeAnchors?.length) {
+    const first = timeAnchors[0];
+    const last = timeAnchors.at(-1)!;
+
+    if (tick <= first.tick) {
+      return first.x;
+    }
+
+    for (let index = 1; index < timeAnchors.length; index += 1) {
+      const previous = timeAnchors[index - 1];
+      const next = timeAnchors[index];
+
+      if (tick <= next.tick) {
+        const progress = (tick - previous.tick) / (next.tick - previous.tick);
+
+        return previous.x + progress * (next.x - previous.x);
+      }
+    }
+
+    return last.x;
+  }
 
   if (renderedNotes.every((note) => note.note.isRest())) {
     const normalizedTick =

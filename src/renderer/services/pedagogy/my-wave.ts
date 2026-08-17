@@ -1153,9 +1153,9 @@ function reason_for({
     candidate.profile.evidence_level === 'thin'
   ) {
     const continuation =
-      'playable continuation; chart and atomic-skill evidence are still thin.';
+      'Playable continuation. Chart and atomic-skill evidence remain thin.';
 
-    return affinity ? `${affinity}; ${continuation}` : continuation;
+    return affinity ? `${affinity}. ${continuation}` : continuation;
   }
 
   const phrase = shared_phrase(
@@ -1173,19 +1173,19 @@ function reason_for({
   if (step === 'consolidate') {
     const continuation = `${phrase}, one notch easier to consolidate the pattern.`;
 
-    return affinity ? `${affinity}; ${continuation}` : continuation;
+    return affinity ? `${affinity}. ${continuation}` : continuation;
   }
 
   if (step === 'stretch') {
     const continuation = `${phrase}, a short scaffolded stretch before the next clean pass.`;
 
-    return affinity ? `${affinity}; ${continuation}` : continuation;
+    return affinity ? `${affinity}. ${continuation}` : continuation;
   }
 
   if (step === 'diagnostic') {
     const continuation = `${phrase}, a short probe because the atomic evidence is still sparse.`;
 
-    return affinity ? `${affinity}; ${continuation}` : continuation;
+    return affinity ? `${affinity}. ${continuation}` : continuation;
   }
 
   const continuation =
@@ -1193,7 +1193,7 @@ function reason_for({
       ? `${phrase}, one notch faster.`
       : `${phrase}, one notch more demanding.`;
 
-  return affinity ? `${affinity}; ${continuation}` : continuation;
+  return affinity ? `${affinity}. ${continuation}` : continuation;
 }
 
 function prepared_sort(

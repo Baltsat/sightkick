@@ -34,32 +34,130 @@ function isKitElement(value: string): value is KitElement {
 }
 
 const KIT_ELEMENTS = Object.keys(KIT_ELEMENT_LABEL) as KitElement[];
-const NOTATION_KIT_KEY: ReadonlyArray<{
+
+type NotationKitKeyPosition =
+  | 'low'
+  | 'lower-middle'
+  | 'middle'
+  | 'upper-middle'
+  | 'high';
+
+interface NotationKitKeyItem {
+  id: string;
   element: KitElement;
-  head: 'round' | 'cross';
-  position: 'low' | 'lower-middle' | 'middle' | 'upper-middle' | 'high';
-}> = [
-  { element: 'kick', head: 'round', position: 'low' },
-  { element: 'snare', head: 'round', position: 'lower-middle' },
-  { element: 'hihat', head: 'cross', position: 'high' },
-  { element: 'tom1', head: 'round', position: 'upper-middle' },
-  { element: 'tom2', head: 'round', position: 'middle' },
-  { element: 'tom3', head: 'round', position: 'lower-middle' },
-  { element: 'ride', head: 'cross', position: 'high' },
-  { element: 'crash', head: 'cross', position: 'high' },
+  glyph: '●' | '×';
+  label: string;
+  position: NotationKitKeyPosition;
+}
+
+const NOTATION_KIT_KEY: ReadonlyArray<NotationKitKeyItem> = [
+  {
+    id: 'hihat',
+    element: 'hihat',
+    glyph: '×',
+    label: 'Hi-hat',
+    position: 'high',
+  },
+  { id: 'ride', element: 'ride', glyph: '×', label: 'Ride', position: 'high' },
+  {
+    id: 'crash',
+    element: 'crash',
+    glyph: '×',
+    label: 'Crash',
+    position: 'high',
+  },
+  {
+    id: 'snare',
+    element: 'snare',
+    glyph: '●',
+    label: 'Snare',
+    position: 'lower-middle',
+  },
+  {
+    id: 'cross-stick',
+    element: 'snare',
+    glyph: '×',
+    label: 'Cross-stick',
+    position: 'lower-middle',
+  },
+  {
+    id: 'tom1',
+    element: 'tom1',
+    glyph: '●',
+    label: 'High tom',
+    position: 'upper-middle',
+  },
+  {
+    id: 'tom2',
+    element: 'tom2',
+    glyph: '●',
+    label: 'Mid tom',
+    position: 'middle',
+  },
+  {
+    id: 'tom3',
+    element: 'tom3',
+    glyph: '●',
+    label: 'Floor tom',
+    position: 'lower-middle',
+  },
+  { id: 'kick', element: 'kick', glyph: '●', label: 'Kick', position: 'low' },
+  {
+    id: 'hihat-foot',
+    element: 'hihat',
+    glyph: '×',
+    label: 'Hi-hat foot',
+    position: 'low',
+  },
 ];
-const POSITION_MARK: Record<
-  (typeof NOTATION_KIT_KEY)[number]['position'],
-  string
-> = {
+const POSITION_MARK: Record<NotationKitKeyPosition, string> = {
   low: '↓',
   'lower-middle': '↙',
   middle: '↔',
   'upper-middle': '↗',
   high: '↑',
 };
+const STICKING_KEY = [
+  { glyph: 'R', label: 'Right hand' },
+  { glyph: 'L', label: 'Left hand' },
+  { glyph: 'RF', label: 'Right foot' },
+  { glyph: 'LF', label: 'Left foot' },
+] as const;
+
+export type NotationKitKeyPresentationPhase =
+  | 'ready'
+  | 'counting-in'
+  | 'playing'
+  | 'paused'
+  | 'inactivity-paused'
+  | 'recovery-explain'
+  | 'result';
+
+export function shouldShowNotationKitKey({
+  manualVisible,
+  interactionMode,
+  presentationPhase,
+}: {
+  manualVisible: boolean;
+  interactionMode: 'kit' | 'computer';
+  presentationPhase: NotationKitKeyPresentationPhase;
+}) {
+  return (
+    manualVisible ||
+    interactionMode === 'computer' ||
+    presentationPhase === 'paused' ||
+    presentationPhase === 'inactivity-paused'
+  );
+}
 
 export function NotationKitKey({ layout }: { layout: 'classic' | 'flow' }) {
+  const [activeItem, setActiveItem] = useState<
+    NotationKitKeyItem | (typeof STICKING_KEY)[number]
+  >();
+  const description = activeItem
+    ? `${activeItem.glyph} means ${activeItem.label}.`
+    : 'Hover or focus a mark to name it.';
+
   return (
     <aside
       id="notation-kit-key"
@@ -70,39 +168,73 @@ export function NotationKitKey({ layout }: { layout: 'classic' | 'flow' }) {
     >
       <div className="drumroll-notation-key__heading">
         <strong>kit key</strong>
-        <span>● drums · × cymbals · low → high</span>
+        <span>staff position · drum name</span>
       </div>
       <ul>
-        {NOTATION_KIT_KEY.map(({ element, head, position }) => (
-          <li
-            key={element}
-            data-kit-element={element}
-            aria-label={`${KIT_ELEMENT_LABEL[element]}: ${
-              head === 'round' ? 'round head' : 'cross head'
-            }, ${position} on the staff`}
-            style={
-              {
-                '--notation-key-color': KIT_ELEMENT_COLOR_VAR[element],
-              } as CSSProperties
-            }
-          >
-            <span
-              className="drumroll-notation-key__head"
-              data-head={head}
-              aria-hidden="true"
+        {NOTATION_KIT_KEY.map((item) => (
+          <li key={item.id} data-kit-element={item.id}>
+            <button
+              type="button"
+              className="drumroll-notation-key__item"
+              data-testid={`notation-kit-key-item-${item.id}`}
+              aria-describedby="notation-kit-key-detail"
+              aria-label={`${item.label}: ${
+                item.glyph === '●' ? 'round head' : 'cross head'
+              }, ${item.position} on the staff`}
+              title={`${item.label}: ${item.position} on the staff`}
+              style={
+                {
+                  '--notation-key-color': KIT_ELEMENT_COLOR_VAR[item.element],
+                } as CSSProperties
+              }
+              onFocus={() => setActiveItem(item)}
+              onBlur={() => setActiveItem(undefined)}
+              onPointerEnter={() => setActiveItem(item)}
+              onPointerLeave={() => setActiveItem(undefined)}
             >
-              {head === 'round' ? '●' : '×'}
-            </span>
-            <span>{KIT_ELEMENT_LABEL[element]}</span>
-            <span
-              className="drumroll-notation-key__position"
-              aria-hidden="true"
-            >
-              {POSITION_MARK[position]}
-            </span>
+              <span className="drumroll-notation-key__head" aria-hidden="true">
+                {item.glyph}
+              </span>
+              <span>{item.label}</span>
+              <span
+                className="drumroll-notation-key__position"
+                aria-hidden="true"
+              >
+                {POSITION_MARK[item.position]}
+              </span>
+            </button>
           </li>
         ))}
       </ul>
+      <div
+        className="drumroll-notation-key__sticking"
+        aria-label="Sticking key"
+      >
+        {STICKING_KEY.map((item) => (
+          <button
+            key={item.glyph}
+            type="button"
+            className="drumroll-notation-key__sticking-item"
+            data-testid={`notation-sticking-key-${item.glyph}`}
+            aria-describedby="notation-kit-key-detail"
+            aria-label={`${item.glyph}: ${item.label}`}
+            title={`${item.glyph}: ${item.label}`}
+            onFocus={() => setActiveItem(item)}
+            onBlur={() => setActiveItem(undefined)}
+            onPointerEnter={() => setActiveItem(item)}
+            onPointerLeave={() => setActiveItem(undefined)}
+          >
+            <strong aria-hidden="true">{item.glyph}</strong>
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </div>
+      <output
+        id="notation-kit-key-detail"
+        className="drumroll-notation-key__detail"
+      >
+        {description}
+      </output>
     </aside>
   );
 }

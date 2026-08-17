@@ -23,7 +23,7 @@ const FEATURING_TAG =
 // Splits a combined artist credit into its individual names. Mirrors
 // MyMusic/helpers.ts's ARTIST_SEPARATOR.
 const ARTIST_SEPARATOR =
-  /\s*(?:,|&|\bx\b|\bfeat\.?\b|\bft\.?\b|\bfeaturing\b)\s*/i;
+  /\s*(?:,|&|\/|\bx\b|\band\b|\bfeat\.?\b|\bft\.?\b|\bfeaturing\b)\s*/i;
 
 // NFKC folds compatibility variants and composes combining-mark sequences,
 // so the same accented name spelled two different ways still compares
@@ -201,17 +201,18 @@ export async function findItunesArtwork(
       continue;
     }
 
-    const score = titleSimilarity(
-      normalizeTitle(trackName),
-      normalizedQueryTitle,
-    );
+    const normalizedTrackTitle = normalizeTitle(trackName);
+    const score = titleSimilarity(normalizedTrackTitle, normalizedQueryTitle);
 
     if (score < MIN_TITLE_SIMILARITY) {
       continue;
     }
 
-    if (!best || score > best.score) {
-      best = { url: upgradeArtworkUrl(artwork), score };
+    const matchScore =
+      score + Number(normalizedTrackTitle === normalizedQueryTitle);
+
+    if (!best || matchScore > best.score) {
+      best = { url: upgradeArtworkUrl(artwork), score: matchScore };
     }
   }
 

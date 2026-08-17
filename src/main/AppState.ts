@@ -56,7 +56,12 @@ import { searchYoutube } from './ipc/searchYoutube';
 import { fetchMyMusic } from './ipc/myMusic';
 import { loadLibraryCandidates } from './ipc/loadLibraryCandidates';
 import { resolveLibraryCandidates } from './ipc/resolveLibraryCandidates';
-import { bootstrapLessonLibrary } from './lessonLibrary';
+import {
+  bootstrapLessonLibrary,
+  loadLocalLessonPacks,
+  LOCAL_LESSON_PACK_SONG_ARCHIVE_STORE_KEY,
+  reconcileLocalLessonPacks,
+} from './lessonLibrary';
 import { applyLessonProfileMigration } from './lessonIdentityMigration';
 import {
   finalizePracticeAttemptCheckpoint,
@@ -98,6 +103,7 @@ class AppState {
   });
   private libraryRoot = this.store.get('lastOpenedPath') as string | undefined;
   private lessonLibraryRoot: string | undefined;
+  private localLessonPackRoots: string[] = [];
 
   static getInstance(): AppState {
     if (!AppState.instance) {
@@ -113,7 +119,11 @@ class AppState {
   }
 
   getLibraryRoots(): string[] {
-    return [this.libraryRoot, this.lessonLibraryRoot].filter(
+    return [
+      this.libraryRoot,
+      this.lessonLibraryRoot,
+      ...this.localLessonPackRoots,
+    ].filter(
       (root, index, roots): root is string =>
         Boolean(root) && roots.indexOf(root) === index,
     );
@@ -325,6 +335,29 @@ class AppState {
       }
 
       applyLessonProfileMigration(this.store, result);
+
+      const localPacks = loadLocalLessonPacks(app.getPath('userData'));
+
+      this.localLessonPackRoots = localPacks.libraryRoots;
+
+      const songs =
+        (this.store.get('songs') as StorageSchema['songs'] | undefined) ??
+        existingSongs;
+      const localPackArchive =
+        (this.store.get(LOCAL_LESSON_PACK_SONG_ARCHIVE_STORE_KEY) as
+          | StorageSchema['songs']
+          | undefined) ?? {};
+      const reconciledLocalPacks = reconcileLocalLessonPacks(
+        songs,
+        localPacks.songs,
+        localPackArchive,
+      );
+
+      this.store.set('songs', reconciledLocalPacks.songs);
+      this.store.set(
+        LOCAL_LESSON_PACK_SONG_ARCHIVE_STORE_KEY,
+        reconciledLocalPacks.archivedSongs,
+      );
 
       if (!existingLibraryRoot && result.libraryRoot) {
         this.setLibraryRoot(result.libraryRoot);

@@ -4,6 +4,7 @@ import type { Song } from '../../../types';
 import type { UseGamificationResult } from '../../hooks/useGamification';
 import { InputProvider } from '../../context/InputContext';
 import type { RunSummary } from '../../services/practice-stats';
+import type { ZpdRankedCandidate } from '../../services/pedagogy';
 import type {
   HomeSessionReceipt,
   OneKickHomeSession,
@@ -18,6 +19,9 @@ import {
   HomeCockpit,
   liveDailyProgress,
   resolveShelfCopy,
+  resolveHomeEpisode,
+  resolveHomeSkillStory,
+  selectCuratedFindNew,
   selectHomeOffers,
 } from './HomeCockpit';
 import { HOME_KIT_ZONE_MAP, type KitZoneMap } from './kit-zone-map';
@@ -99,7 +103,7 @@ const lessonRecommendation = {
   predictedSuccess: 0.76,
   suggestedSpeed: 0.8,
   mastery: 20,
-  reason: '2 saved Coach findings route directly to this lesson.',
+  reason: '2 saved Coach findings match this lesson.',
   factors: [],
   confidence: {
     value: 0.7,
@@ -136,7 +140,7 @@ const practiceWave: PracticeWaveResult = {
     {
       role: 'focus',
       recommendation: lessonRecommendation,
-      reason: '2 saved Coach findings route directly to this lesson.',
+      reason: '2 saved Coach findings match this lesson.',
       linkedSkills: ['kick-independence'],
     },
     {
@@ -423,92 +427,85 @@ describe('HomeCockpit kit home', () => {
     expect(readiness).not.toHaveClass('sr-only');
   });
 
-  it('keeps a stray strike inert until confirm starts the selected My Wave door', () => {
-    window.localStorage.setItem(
-      'settings.selectedDevice',
-      JSON.stringify({
-        id: 'keyboard',
-        name: 'Keyboard',
-        sourceId: 'keyboard',
-      }),
-    );
-    window.localStorage.setItem(
-      'settings.inputMappings',
-      JSON.stringify({
-        keyboard: {
-          kick: ['keyboard:KeyA'],
-          snare: ['keyboard:KeyB'],
-          hihat: ['keyboard:KeyC'],
-          tom1: ['keyboard:KeyD'],
-          tom2: ['keyboard:KeyE'],
-          tom3: ['keyboard:KeyF'],
-          ride: ['keyboard:KeyG'],
-          crash: ['keyboard:KeyH'],
-        },
-      }),
-    );
+  it('opens the door a deliberate strike lands on and only arms the ones that follow it', () => {
+    // The kit's deliberateness gate is measured off performance.now(), so
+    // this test owns that clock rather than racing the real one.
+    let clock = 10_000;
+    const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => clock);
 
-    const onStartRecommended = vi.fn();
-    const onOpenSongs = vi.fn();
-    const onOpenJourney = vi.fn();
-    const onStartSession = vi.fn();
-
-    render(
-      <InputProvider>
-        <HomeCockpit
-          songList={[song]}
-          gamification={gamification}
-          recommendation={songRecommendation}
-          practiceRanking={[songRecommendation]}
-          onStartRecommended={onStartRecommended}
-          onStartSession={onStartSession}
-          onOpenSongs={onOpenSongs}
-          onOpenJourney={onOpenJourney}
-          onOpenProfile={vi.fn()}
-        />
-      </InputProvider>,
-    );
-
-    fireEvent.keyDown(window, { code: 'KeyA' });
-
-    expect(onStartRecommended).not.toHaveBeenCalled();
-    expect(screen.getByTestId('kit-hotspot-kick')).toHaveAttribute(
-      'data-struck',
-      'true',
-    );
-    expect(screen.getByTestId('kit-hotspot-kick')).toHaveAttribute(
-      'data-armed',
-      'true',
-    );
-
-    fireEvent.keyDown(window, { code: 'KeyC' });
-
-    expect(onStartSession).not.toHaveBeenCalled();
-    expect(screen.getByTestId('kit-hotspot-hihat')).toHaveAttribute(
-      'data-armed',
-      'true',
-    );
-
-    fireEvent.keyDown(window, { code: 'KeyB' });
-
-    expect(onStartRecommended).not.toHaveBeenCalled();
-    expect(onOpenSongs).not.toHaveBeenCalled();
-    expect(onStartSession).not.toHaveBeenCalled();
-    expect(onOpenJourney).toHaveBeenCalledOnce();
-
-    fireEvent.keyDown(window, { code: 'KeyB' });
-
-    expect(onStartRecommended).not.toHaveBeenCalled();
-    expect(onOpenSongs).not.toHaveBeenCalled();
-    expect(onOpenJourney).toHaveBeenCalledOnce();
-    expect(onStartSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        intent: 'songs',
-        launch: expect.objectContaining({
-          candidate: expect.objectContaining({ id: song.id }),
+    try {
+      window.localStorage.setItem(
+        'settings.selectedDevice',
+        JSON.stringify({
+          id: 'keyboard',
+          name: 'Keyboard',
+          sourceId: 'keyboard',
         }),
-      }),
-    );
+      );
+      window.localStorage.setItem(
+        'settings.inputMappings',
+        JSON.stringify({
+          keyboard: {
+            kick: ['keyboard:KeyA'],
+            snare: ['keyboard:KeyB'],
+            hihat: ['keyboard:KeyC'],
+            tom1: ['keyboard:KeyD'],
+            tom2: ['keyboard:KeyE'],
+            tom3: ['keyboard:KeyF'],
+            ride: ['keyboard:KeyG'],
+            crash: ['keyboard:KeyH'],
+          },
+        }),
+      );
+
+      const onStartRecommended = vi.fn();
+      const onOpenSongs = vi.fn();
+      const onOpenJourney = vi.fn();
+      const onStartSession = vi.fn();
+
+      render(
+        <InputProvider>
+          <HomeCockpit
+            songList={[song]}
+            gamification={gamification}
+            recommendation={songRecommendation}
+            practiceRanking={[songRecommendation]}
+            onStartRecommended={onStartRecommended}
+            onStartSession={onStartSession}
+            onOpenSongs={onOpenSongs}
+            onOpenJourney={onOpenJourney}
+            onOpenProfile={vi.fn()}
+          />
+        </InputProvider>,
+      );
+
+      // Hi-hat is the Journey door on the painted kit. One deliberate strike
+      // after a real pause is the whole command - nothing to confirm after.
+      clock += 1_000;
+      fireEvent.keyDown(window, { code: 'KeyC' });
+
+      expect(onOpenJourney).toHaveBeenCalledOnce();
+      expect(screen.getByTestId('kit-hotspot-hihat')).toHaveAttribute(
+        'data-struck',
+        'true',
+      );
+
+      // Anything struck inside the same warm-up window is not a second
+      // command: it arms its door and waits rather than navigating again.
+      clock += 100;
+      fireEvent.keyDown(window, { code: 'KeyG' });
+
+      expect(onOpenSongs).not.toHaveBeenCalled();
+      expect(onOpenJourney).toHaveBeenCalledOnce();
+      expect(screen.getByTestId('kit-hotspot-ride')).toHaveAttribute(
+        'data-armed',
+        'true',
+      );
+      expect(onStartRecommended).not.toHaveBeenCalled();
+      expect(onStartSession).not.toHaveBeenCalled();
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it('takes every kit surface to the single song chooser when no target is selected', () => {
@@ -634,6 +631,179 @@ describe('HomeCockpit kit home', () => {
       .querySelector('strong');
 
     expect(shelfHeadline).not.toHaveTextContent('Choose a song to begin');
+  });
+});
+
+describe('HomeCockpit today story', () => {
+  const adaptation = {
+    starting_speed: 0.72,
+    repeat_budget: 3,
+    quality_passes_to_advance: 2,
+    low_quality_passes_before_stop: 2,
+  };
+  const zpd = (
+    id: string,
+    kind: 'lesson' | 'song',
+    skill_id: string,
+  ): ZpdRankedCandidate => ({
+    candidate: {
+      item_id: id,
+      kind,
+      title: id,
+      available: true,
+      liked: kind === 'song',
+      manifest: {
+        item_id: id,
+        source: kind === 'song' ? 'chart_analysis' : 'curriculum',
+        source_revision: `${id}:v1`,
+        demands: [
+          {
+            skill_id,
+            weight: 1,
+            target_bpm: 90,
+            context:
+              'meter=4/4;subdivision=eighth;lanes=K,S,H;limbs=joint;transition=joint;phrase=groove',
+          },
+        ],
+        context_signature:
+          'meter=4/4;subdivision=eighth;lanes=K,S,H;limbs=joint;transition=joint;phrase=groove',
+        assessment_confidence: 0.9,
+      },
+    },
+    decision: {
+      policy_version: 'pedagogy-v2.0',
+      item_id: id,
+      source_revision: `${id}:v1`,
+      predicted_success: 0.76,
+      learning_value: 0.8,
+      state: 'productive_acquisition',
+      independent_eligible: true,
+      skill_fit: 0.72,
+      prereq_fit: 0.8,
+      tempo_fit: 0.8,
+      transfer_fit: 0.5,
+      uncertainty: 0.3,
+      hard_prerequisites: [],
+      scaffold: { speed: 0.72, steps: ['short_loop'] },
+      adaptation,
+      factors: [],
+      explanation: 'Current evidence puts this item in the practice zone.',
+    },
+  });
+
+  it('names the current atomic skill and turns its context into a notation snapshot', () => {
+    const story = resolveHomeSkillStory({
+      ranking: [zpd('lesson:today', 'lesson', 'coord.rock_three_way')],
+      states: [],
+      preferredItemId: 'lesson:today',
+    });
+
+    expect(story).toMatchObject({
+      skillId: 'coord.rock_three_way',
+      label: 'Rock three-way coordination',
+      adaptation: '0.72× · 3 passes',
+    });
+    expect(story?.exemplar.dsl).toContain('0 kick snare yellow');
+    expect(story?.exemplar.dsl).toContain('res=480 ts=4/4');
+  });
+
+  it('uses authored curriculum order for the episode label and skill snapshot', () => {
+    const lessons = [
+      ['01.01', 'Hand Blocks Warm-Up'],
+      ['01.02', 'Paired Doubles Warm-Up'],
+      ['01.03', 'Kick Drum Pulse'],
+      ['02.01', 'Whole and Half Note Reading'],
+    ].map(
+      ([id, title], index) =>
+        ({
+          id: `lesson:${id}`,
+          name: title,
+          lesson: {
+            id,
+            starsToUnlock: index,
+            unit: 'Foundations',
+            title,
+            skills: ['reading'],
+          },
+        }) as Song,
+    );
+    const nextLesson = {
+      ...lessonRecommendation,
+      candidate: {
+        ...lessonRecommendation.candidate,
+        id: 'lesson:02.01',
+        itemManifest: zpd('lesson:02.01', 'lesson', 'reading.rests').candidate
+          .manifest,
+      },
+    };
+
+    expect(resolveHomeEpisode({ nextLesson, songList: lessons })).toEqual({
+      label: 'Lesson 02.01',
+      detail: 'Episode 4 of Foundations · Reading rests',
+      ariaLabel:
+        'Hi-hat. Open Whole and Half Note Reading, Episode 4 of Foundations · Reading rests.',
+    });
+  });
+
+  it('prefers an unplayed Yandex-provenance song inside the productive ZPD', () => {
+    const liked = {
+      ...song,
+      id: 'song:liked',
+      name: 'Local favourite',
+    } as Song;
+    const yandex = {
+      ...song,
+      id: 'song:yandex',
+      name: 'Raging',
+      artist: 'Kygo feat. Kodaline',
+      sourceProvenance: {
+        provider: 'yandex-music',
+        collectionId: 'liked',
+        collectionName: 'Мне нравится',
+        trackId: 'raging',
+        title: 'Raging',
+        artists: ['Kygo', 'Kodaline'],
+      },
+    } as Song;
+    const ranked = [liked, yandex].map((candidate, index) => ({
+      ...songRecommendation,
+      candidate: {
+        ...songRecommendation.candidate,
+        id: candidate.id,
+        title: candidate.name,
+      },
+      predictedSuccess: index === 0 ? 0.76 : 0.74,
+      decisionReceipt: zpd(candidate.id, 'song', 'pulse.eighth').decision,
+    }));
+
+    expect(
+      selectCuratedFindNew({
+        songList: [liked, yandex],
+        ranking: ranked,
+        pedagogyRanking: [],
+        runsBySong: {},
+      }),
+    ).toBe(yandex);
+    expect(
+      selectCuratedFindNew({
+        songList: [yandex],
+        ranking: ranked.slice(1),
+        pedagogyRanking: [],
+        runsBySong: { [yandex.id]: [run(1)] },
+      }),
+    ).toBeUndefined();
+  });
+
+  it('keeps all three story surfaces honest when evidence is absent', () => {
+    expect(resolveHomeSkillStory({ ranking: [], states: [] })).toBeUndefined();
+    expect(resolveHomeEpisode({ songList: [] })).toBeUndefined();
+    expect(
+      selectCuratedFindNew({
+        songList: [],
+        ranking: [],
+        pedagogyRanking: [],
+      }),
+    ).toBeUndefined();
   });
 });
 
@@ -1124,7 +1294,7 @@ describe('resolveShelfCopy', () => {
 
     const payoff: HomeSessionReceipt = {
       title: 'Boulevard of Broken Dreams',
-      detail: 'Apply the session in your goal song.',
+      detail: 'Play the goal song.',
       candidateId: 'song-1',
     };
 
@@ -1144,7 +1314,7 @@ describe('resolveShelfCopy', () => {
       unavailable: true,
       title: 'No favourite-song payoff is ready',
       detail:
-        'Today’s work is Alternating Singles. My Wave has no playable saved favourite linked to this session.',
+        'Today’s work: Alternating Singles. My Wave has 0 playable saved favourites for this session.',
     };
 
     // Armed (the hero reads a specific lesson/song), but nothing was ranked
@@ -1172,7 +1342,7 @@ describe('resolveShelfCopy', () => {
     const payoff: HomeSessionReceipt = {
       title: 'Boulevard of Broken Dreams',
       detail:
-        'Apply the session in your goal song. A safe section probe will appear when chart evidence supports one.',
+        'Play the goal song. Drumroll adds 1 section probe when chart evidence supports it.',
       candidateId: 'song-1',
     };
 

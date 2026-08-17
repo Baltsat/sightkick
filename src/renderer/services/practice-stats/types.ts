@@ -7,6 +7,11 @@ import type {
   TutorSettings,
 } from '../tutor/types';
 import type { SkillEvidenceEvent } from '../pedagogy/types';
+import type {
+  TimingLadderAction,
+  TimingRunState,
+  TimingWindowStandard,
+} from '../adaptive-practice/types';
 
 export const PRACTICE_RUN_SCHEMA_VERSION = 3;
 
@@ -27,6 +32,8 @@ export const MAX_PRACTICE_ATTEMPT_CHECKPOINTS_PER_SONG = 3;
  * unusually long sessions, not a normal truncation policy.
  */
 export const MAX_PRACTICE_ATTEMPT_RECORDS = 20_000;
+
+export const MAX_PERSISTED_RUN_SECTIONS = 512;
 
 export const SCORING_POLICY_VERSION = 'judge-evidence-v3';
 
@@ -128,6 +135,19 @@ export interface PracticeRunContext {
   inputMapping: InputMapping;
 }
 
+export type PracticeAttemptTermination =
+  | 'natural-end'
+  | 'in-progress'
+  | 'abandoned';
+
+export interface PracticeAttemptOutcome {
+  completion: 'completed' | 'partial';
+  termination: PracticeAttemptTermination;
+  scope: 'full-chart' | 'loop-range';
+  rangeStartTick?: number;
+  rangeEndTick?: number;
+}
+
 export interface TutorRunEvidence {
   settings: TutorSettings;
   interventions: TutorIntervention[];
@@ -152,6 +172,22 @@ export interface RunLearningEvidence {
   skills?: Record<string, RunLearningEvidenceCount>;
   /** One-based chart bar numbers when the chart revision and bar mapping exist. */
   bars?: Record<string, RunLearningEvidenceCount>;
+}
+
+export interface RunSectionEvidence {
+  barStart: number;
+  barEnd: number;
+  startTick?: number;
+  endTick?: number;
+  startTimeSeconds: number;
+  endTimeSeconds: number;
+  expectedNotes: number;
+  hits: number;
+  misses: number;
+  wrongHits: number;
+  patternSignatures?: string[];
+  patternSignature?: string;
+  attempted?: boolean;
 }
 
 export interface PracticeCardRunEvidence {
@@ -241,6 +277,8 @@ export interface RunSummary {
   bestStreak?: number;
   /** Versioned, immutable context for reconstructing and migrating a run. */
   context?: PracticeRunContext;
+  /** Whether this is a finished run or deliberately excluded partial evidence. */
+  attemptOutcome?: PracticeAttemptOutcome;
   /** Practice-only intervention evidence captured before any rewind. */
   tutor?: TutorRunEvidence;
   /** Exact skill/bar evidence, only on runs where a chart-aware caller saved it. */
@@ -249,9 +287,31 @@ export interface RunSummary {
   coachEvidence?: PersistedCoachFindingEvidence[];
   /** Source symmetric scoring window used for this run, in milliseconds. */
   timingWindowMs?: number;
+  timingGapMs?: number;
+  timingStandard?: TimingWindowStandard;
+  timingLadderAction?: TimingLadderAction;
+  effectiveTempoBpm?: number;
+  timingNextRun?: TimingRunState;
+  opening?: {
+    playbackSpeed: number;
+    timingStandard: 'target';
+    timingWindowMs: number;
+    timingGapMs: number;
+    effectiveTempoBpm: number;
+    demand: {
+      tempoBpm: number;
+      subdivision: string;
+      gapMsAtOneX: number;
+      notesPerBeat: number;
+      maxSimultaneousNotes: number;
+    };
+    evidenceRunCount: number;
+    reason: string;
+  };
   /** Authored lesson skills stamped for longitudinal atomic-skill evidence. */
   authoredSkills?: string[];
   atomicSkillEvidence?: SkillEvidenceEvent[];
+  sectionEvidence?: RunSectionEvidence[];
   practiceCard?: PracticeCardRunEvidence;
   audition?: SongSectionAuditionEvidence;
 }
@@ -287,6 +347,11 @@ export interface PracticeAttemptCheckpoint {
   playbackSpeed: number;
   /** Authored chart position at the most recent durable checkpoint. */
   positionTick: number;
+  /** The part of the chart the learner was working on when this was captured. */
+  scope?: Pick<
+    PracticeAttemptOutcome,
+    'scope' | 'rangeStartTick' | 'rangeEndTick'
+  >;
   /** Compact scored evidence observed so far, never a synthesized result. */
   records: StoredHitRecord[];
   midiTelemetry?: MidiInputTelemetry;

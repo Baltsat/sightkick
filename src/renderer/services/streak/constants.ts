@@ -27,19 +27,19 @@ export const STREAK_RESET_ON_MISS = true;
  * the CSS escalation in `base.css` keys off of via `data-tier`.
  */
 export const STREAK_STAGES: readonly StreakStage[] = [
-  { id: 'warm-up', name: 'Warm-Up', threshold: 8, tier: 0 },
-  { id: 'in-the-pocket', name: 'In the Pocket', threshold: 16, tier: 1 },
-  { id: 'groove-machine', name: 'Groove Machine', threshold: 32, tier: 2 },
-  { id: 'backbeat-boss', name: 'Backbeat Boss', threshold: 50, tier: 3 },
-  { id: 'fill-wizard', name: 'Fill Wizard', threshold: 75, tier: 4 },
-  { id: 'drumroll', name: 'DRUMROLL!', threshold: 100, tier: 5 },
-  { id: 'thunderstruck', name: 'Thunderstruck', threshold: 150, tier: 6 },
-  { id: 'rhythm-deity', name: 'Rhythm Deity', threshold: 200, tier: 7 },
-  { id: 'possessed', name: 'POSSESSED', threshold: 300, tier: 8 },
+  { id: 'warm-up', name: 'Warm-Up', threshold: 16, tier: 0 },
+  { id: 'in-the-pocket', name: 'In the Pocket', threshold: 32, tier: 1 },
+  { id: 'groove-machine', name: 'Groove Machine', threshold: 64, tier: 2 },
+  { id: 'backbeat-boss', name: 'Backbeat Boss', threshold: 96, tier: 3 },
+  { id: 'fill-wizard', name: 'Fill Wizard', threshold: 128, tier: 4 },
+  { id: 'drumroll', name: 'DRUMROLL!', threshold: 192, tier: 5 },
+  { id: 'thunderstruck', name: 'Thunderstruck', threshold: 256, tier: 6 },
+  { id: 'rhythm-deity', name: 'Rhythm Deity', threshold: 384, tier: 7 },
+  { id: 'possessed', name: 'POSSESSED', threshold: 512, tier: 8 },
   {
     id: 'buzz-roll-berserker',
     name: 'Buzz Roll Berserker',
-    threshold: 500,
+    threshold: 768,
     tier: 9,
   },
 ] as const;

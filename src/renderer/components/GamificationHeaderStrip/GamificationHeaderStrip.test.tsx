@@ -120,4 +120,13 @@ describe('GamificationHeaderStrip', () => {
 
     expect(onChangeGoal).toHaveBeenCalledWith('intense');
   });
+
+  it('shows the hi-hat binding for insights when that kit control is active', () => {
+    render(<GamificationHeaderStrip {...baseProps} kitConnected />);
+
+    const chip = screen.getByTestId('kit-action-chip-open-coach');
+
+    expect(chip).toHaveAttribute('data-pad', 'hihat');
+    expect(chip).toHaveTextContent('Hi-hat');
+  });
 });

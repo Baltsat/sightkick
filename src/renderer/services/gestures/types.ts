@@ -5,6 +5,8 @@ export type DrumGestureSurface =
   | 'ready'
   | 'paused'
   | 'result'
+  | 'insights'
+  | 'stats'
   | 'playing';
 
 export type DrumGestureAction =
