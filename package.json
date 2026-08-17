@@ -1,7 +1,7 @@
 {
   "name": "sight-kick",
   "description": "An adaptive drum tutor and performance game for MIDI kits",
-  "version": "1.2.0-kb.16",
+  "version": "1.2.0-kb.17",
   "keywords": [
     "clonehero",
     "drums",
@@ -157,7 +157,7 @@
   "build": {
     "productName": "Drumroll",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
-    "buildVersion": "1.2.16",
+    "buildVersion": "1.2.17",
     "appId": "org.sk.SightKick",
     "asar": true,
     "asarUnpack": "**\\*.{node,dll}",
@@ -176,7 +176,7 @@
       },
       "type": "distribution",
       "bundleShortVersion": "1.2.0",
-      "bundleVersion": "1.2.16",
+      "bundleVersion": "1.2.17",
       "minimumSystemVersion": "12.0",
       "identity": "Konstantin Baltsat (3BGK34ZGS6)",
       "binaries": [
