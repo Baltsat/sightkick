@@ -80,14 +80,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function runToEnd(view: ReturnType<typeof setupSongView>) {
+async function runToEnd(
+  view: ReturnType<typeof setupSongView>,
+  probeBudget = 60,
+) {
   // The mocked stream still schedules through the real setInterval-driven
   // pump loop in speed/player.ts, which only produces (and only completes)
   // once the fake context's currentTime actually advances past each
   // chunk's scheduled end - so this has to step both the timers *and* the
   // fake clock together, the same way completeCountIn() does for the
   // count-in scheduler elsewhere in this test suite.
-  for (let i = 0; i < 60; i += 1) {
+  for (let i = 0; i < probeBudget; i += 1) {
     view.audio.currentTime += 1.5;
 
     await act(async () => {
@@ -573,6 +576,56 @@ describe('practice mode analytics', () => {
       // Perform-only side effects never fire for a Practice run, even
       // one that would have beaten the stored high score.
       expect(view.sentChannels()).not.toContain('update-song');
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 30000);
+
+  it('parks a sloppy Tutor run in the drill instead of playing on', async () => {
+    vi.useFakeTimers();
+
+    try {
+      // The Tutor is on, which is the shipped default, and this run misses
+      // nearly everything. It must stop at the failed bars and ask for them
+      // again rather than carry on to the end - and the transport must be
+      // parked while it waits, not silently looping past him.
+      const view = setupSongView({
+        route: '/song-1?gameMode=practice',
+        settings: { countIn: false, handsFreeControlsEnabled: false },
+        keyboard: { kit: { snare: ['keyboard:KeyJ'] } },
+      });
+
+      await view.loadSong(
+        makeSong({
+          scoreData: { expert: { hitNotes: 8, totalNotes: 8, falseHits: 0 } },
+        }),
+      );
+
+      view.clickPlay();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+
+      view.audio.currentTime = 0.5;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+
+      await act(async () => {
+        await view.pressKey('KeyJ');
+      });
+
+      for (let step = 0; step < 40; step += 1) {
+        view.audio.currentTime += 1.5;
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(150);
+        });
+      }
+
+      expect(screen.getByTestId('tutor-recovery-caption')).toBeInTheDocument();
+      expect(screen.queryByTestId('score-modal')).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

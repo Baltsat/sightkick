@@ -7,12 +7,18 @@ interface PracticeReadinessCueProps {
   phase: PracticeReadinessPhase;
   resumeMeasure?: number;
   audition?: SongSectionAuditionEvidence;
+  /**
+   * The run was started from the laptop with a kit connected, so it is held
+   * until the first strike. Say so, and name the way out.
+   */
+  armedForKitStart?: boolean;
 }
 
 export function PracticeReadinessCue({
   phase,
   resumeMeasure,
   audition,
+  armedForKitStart,
 }: PracticeReadinessCueProps) {
   if (phase === 'playing') {
     return null;
@@ -42,12 +48,14 @@ export function PracticeReadinessCue({
 
   return (
     <KitCommandVeil
-      kicker="Ready"
+      kicker={armedForKitStart ? 'Armed' : 'Ready'}
       title={instruction}
       titleAriaLabel="Hit the kick pad once to start the count-in"
       model={{ label: instruction, steps: ['kick'] }}
       detail={
-        audition
+        armedForKitStart
+          ? 'Take your seat. The song waits for your first hit. Press play again to start now.'
+          : audition
           ? `Tests ${audition.test_label} at ${audition.speed.toFixed(1)}×.`
           : 'The first beat is armed.'
       }

@@ -135,6 +135,12 @@ export interface SongViewOptions {
   route?: string;
   settings?: Record<string, unknown>;
   keyboard?: KeyboardSeed;
+  /**
+   * Seeds a real MIDI kit as the selected device. `loadSong` then answers the
+   * device list with it and sends the ready signal, so the view sees the kit
+   * as genuinely connected - the state that makes a start wait for a strike.
+   */
+  midiKit?: { name: string; port: number };
   onContinuePractice?: (completedRun?: PracticeHistoryEntry) => void;
   recommendationReason?: string;
 }
@@ -194,6 +200,7 @@ export function setupSongView({
   route = '/song-1',
   settings,
   keyboard,
+  midiKit,
   onContinuePractice,
   recommendationReason,
 }: SongViewOptions = {}): SongViewHarness {
@@ -211,6 +218,17 @@ export function setupSongView({
 
   if (keyboard) {
     seedKeyboardDevice(keyboard);
+  }
+
+  if (midiKit) {
+    seedSettings({
+      selectedDevice: {
+        id: `midi:${midiKit.name}`,
+        name: midiKit.name,
+        sourceId: 'midi',
+        port: midiKit.port,
+      },
+    });
   }
 
   let routeNavigate: NavigateFunction | undefined;
@@ -283,8 +301,27 @@ export function setupSongView({
         fileData: new TextEncoder().encode(chartText) as unknown as Buffer,
       };
 
+      if (midiKit) {
+        // A kit reaches "connected" in two hops: the device list, then the
+        // ready signal for the port it opened. They have to settle in their
+        // own passes, and before the song loads - he plugs the kit in first,
+        // then opens the song.
+        await act(async () => {
+          ipc.emit('midi-device-list', [midiKit]);
+          await new Promise((resolve) => {
+            setTimeout(resolve, 0);
+          });
+        });
+        await act(async () => {
+          ipc.emit('midi-ready', { port: midiKit.port });
+        });
+      }
+
       await act(async () => {
-        ipc.emit('midi-device-list', []);
+        if (!midiKit) {
+          ipc.emit('midi-device-list', []);
+        }
+
         ipc.emit('load-song', response);
       });
     },

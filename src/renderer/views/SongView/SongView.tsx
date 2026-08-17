@@ -378,6 +378,8 @@ export function SongView() {
   // first strike starts it. A second press starts anyway, for the times he
   // is not going to the stool.
   const [awaitingKitStart, setAwaitingKitStart] = useState(false);
+  /** The song whose recommended auto-start has already been acted on. */
+  const autoStartedSongRef = useRef<string | undefined>(undefined);
   const [practicePersistenceState, setPracticePersistenceState] = useState<
     'saving' | 'saved' | 'failed' | 'no-evidence'
   >('no-evidence');
@@ -2125,11 +2127,41 @@ export function SongView() {
       ? inactivityRecovery.pauseEpoch
       : undefined,
   );
+  // Every start that comes from the computer goes through here - the play
+  // button and the auto-started recommendation alike. Both must wait for the
+  // first strike when a kit is connected, or a My Wave card plays the song to
+  // an empty stool while he is still walking over.
+  const startRunFromComputer = useCallback(() => {
+    if (
+      shouldArmForKitStart({
+        kitConnected:
+          selectedDevice?.sourceId === 'midi' && inputReadiness === 'connected',
+        handsFreeControlsEnabled,
+        alreadyArmed: awaitingKitStart,
+        hasInterruptedAttempt: Boolean(interruptedAttempt),
+      })
+    ) {
+      setAwaitingKitStart(true);
+
+      return;
+    }
+
+    setAwaitingKitStart(false);
+    playRun();
+  }, [
+    awaitingKitStart,
+    handsFreeControlsEnabled,
+    inputReadiness,
+    interruptedAttempt,
+    playRun,
+    selectedDevice,
+  ]);
 
   useEffect(() => {
     if (
       gameMode !== 'practice' ||
       searchParams.get('autoStart') !== '1' ||
+      autoStartedSongRef.current === id ||
       !isReady ||
       isStarted ||
       isPlaying ||
@@ -2164,17 +2196,27 @@ export function SongView() {
 
     next.delete('autoStart');
     setSearchParams(next, { replace: true });
-    playRun();
+    // Claimed before the start, not after the URL settles. The parameter
+    // takes a render to disappear, and in that gap this effect used to run a
+    // second time - which armed the run and then instantly consumed the
+    // "press play again to start now" escape, playing to an empty stool.
+    autoStartedSongRef.current = id;
+    // The arming state this sets IS the point of the effect: a recommended
+    // launch has to become a visible "waiting for your first hit" before
+    // anything plays. It runs once per song, so there is no render cascade.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    startRunFromComputer();
   }, [
     engine,
     gameMode,
+    id,
     isCounting,
     isPlaying,
     isReady,
     isStarted,
     learnerPlaybackSpeed,
     playbackSpeed,
-    playRun,
+    startRunFromComputer,
     requestedPracticeSpeed,
     searchParams,
     setAutoPracticeSpeed,
@@ -3528,23 +3570,7 @@ export function SongView() {
               return;
             }
 
-            if (
-              shouldArmForKitStart({
-                kitConnected:
-                  selectedDevice?.sourceId === 'midi' &&
-                  inputReadiness === 'connected',
-                handsFreeControlsEnabled,
-                alreadyArmed: awaitingKitStart,
-                hasInterruptedAttempt: Boolean(interruptedAttempt),
-              })
-            ) {
-              setAwaitingKitStart(true);
-
-              return;
-            }
-
-            setAwaitingKitStart(false);
-            playRun();
+            startRunFromComputer();
           }}
           shape="circle"
           size="middle"
@@ -3812,6 +3838,7 @@ export function SongView() {
         {showReadinessCaption && (
           <PracticeReadinessCue
             phase={practiceReadinessPhase}
+            armedForKitStart={awaitingKitStart}
             resumeMeasure={
               practicePresentationPhase === 'ready'
                 ? interruptedResumeMeasure

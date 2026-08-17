@@ -311,6 +311,42 @@ describe('safe hands-free run intent', () => {
     );
   });
 
+  it('holds an auto-started run until he strikes the connected kit', async () => {
+    const view = setupSongView({
+      route: '/song-1?gameMode=practice&autoStart=1&practiceSpeed=0.7',
+      settings: { countIn: false },
+      midiKit: { name: 'Yamaha DTX402', port: 4 },
+    });
+
+    await view.loadSong();
+
+    // The recommendation launched the song while he is still walking to the
+    // stool, so the music must wait rather than play to an empty seat.
+    await waitFor(() =>
+      expect(screen.getByTestId('practice-readiness-cue')).toHaveTextContent(
+        'Armed',
+      ),
+    );
+    expect(screen.getByTestId('practice-readiness-cue')).toHaveTextContent(
+      'Take your seat',
+    );
+    expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+      'aria-label',
+      'Play',
+    );
+    expect(view.startedSources()).toHaveLength(0);
+
+    // Pressing play again starts anyway, for the times he is not going.
+    view.clickPlay();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('play-toggle')).toHaveAttribute(
+        'aria-label',
+        'Pause',
+      ),
+    );
+  });
+
   it('stamps the run start at first playback rather than component mount', async () => {
     vi.useFakeTimers();
 
