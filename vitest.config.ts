@@ -18,10 +18,11 @@ export default defineConfig({
     // (every one of these files passes quickly run alone) but because
     // they're waiting on their share of CPU. 20s matches what a busy full
     // run actually needs to finish rather than being aborted mid-flight.
-    // SongView integration tests render the whole practice surface. The
-    // adaptive-practice wave made that render markedly heavier - see
-    // docs/perf-songview-render.md - so these need headroom until that
-    // regression is fixed. Raise the ceiling, do not hide the cost.
+    // 60s, not 20s, because SongView integration tests render the whole
+    // practice surface and a starved worker can sit past 20s while healthy.
+    // This was first raised for a render regression that turned out to be a
+    // timing taken on a busy machine - see docs/perf-songview-render.md. The
+    // headroom stays for starvation, which is real.
     testTimeout: 60000,
     hookTimeout: 60000,
     moduleNameMapper: {

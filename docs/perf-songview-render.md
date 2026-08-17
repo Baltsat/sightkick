@@ -1,47 +1,47 @@
-# SongView render cost regression (2026-08-17)
+# SongView render cost — retracted regression (2026-08-17)
 
-## What happened
+## What this file used to claim
 
-The adaptive-practice wave made the practice surface much more expensive to
-render. Measured on this machine, single-worker:
+That the adaptive-practice wave made the practice surface five to ten times
+more expensive to render, measured as `SongView.test.tsx` taking 209 s against
+a 15-20 s baseline and `SongListView.test.tsx` taking 117 s against about 20 s.
 
-| suite | before the wave | after |
-| --- | ---: | ---: |
-| `SongView.test.tsx` (84 tests) | about 15-20 s | **209 s** |
-| `SongListView.test.tsx` (91 tests) | about 20 s | **117 s** |
+## What is actually true
 
-Individual integration tests that drive many interactions now take 13-49 s
-each. Every test passes; the suite only fails when workers are starved and the
-20 s timeout fires. The timeout is raised to 60 s so the gate reports real
-failures rather than starvation, and this file records the debt.
+Both numbers were taken while about fifteen lanes were writing files and
+competing for the same cores. Re-measured on a settled tree, single worker,
+same machine, same commit range:
 
-## Why it matters beyond CI
+| suite                              | claimed |     actual |
+| ---------------------------------- | ------: | ---------: |
+| `SongView.test.tsx` (84 tests)     |   209 s | **15.6 s** |
+| `SongListView.test.tsx` (91 tests) |   117 s | **12.0 s** |
 
-The player reported the app "lagging" during practice. A five-to-tenfold
-increase in render cost on the practice surface is the same defect seen from
-the other side. Fixing this is a player-facing performance fix, not test
-housekeeping.
+Both sit inside the original baseline. There is no render regression. The
+"individual tests take 13-49 s" figure came from the same poisoned run.
 
-## Ruled out so far
+## What was real
 
-- The interaction-mode arbiter notifies subscribers only on a real mode change
-  (`setMode` early-returns when the mode is unchanged), so mouse movement does
-  not re-render the tree.
-- The fragment-map and pattern-profile analyses are gated behind
-  `isScoreModalOpen`, so they do not run during play.
-- The score render effect does not depend on playback speed, so speed changes
-  do not re-lay-out the score.
+The per-render derivations that this file told the next reader to suspect were
+already memoised when it was written: `deriveTimingGrid`,
+`deriveAdaptiveTimingWindow`, `selectPracticeOpening`, `filterRunsForSpeedBand`
+and `buildTutorChartPlan` all sit behind `useMemo` on stable inputs.
+`resolvePracticeSpeed` runs per render and is a small policy function.
 
-## Where to look next
+The player-facing lag he reported belongs to the earlier freeze - settings that
+would not close and a stalled interaction surface - and was fixed there. It was
+never evidence for this.
 
-1. Profile one slow test (`practice mode > adjusts and clamps the practice
-   speed`, about 49 s) with a React profiler or `--inspect` to find the hot
-   component; that test only presses arrow keys, so the cost is per-keystroke
-   re-render, not layout.
-2. Suspect the new toolbar controls and the per-render derivations added around
-   them (`selectPracticeOpening`, `deriveTimingGrid`, `resolvePracticeSpeed`) —
-   confirm each is memoised on stable inputs rather than recomputed per render.
-3. Check the time-proportional score layout for per-render work that could be
-   computed once per chart.
-4. Add a render-count assertion to a test so this cannot regress silently
-   again.
+## The lesson, which is the point of keeping this file
+
+A timing taken on a busy machine is not a measurement. This wave produced the
+same class of error twice: a 45-failure test reading taken mid-write that
+settled at 14, and this. Measure on a settled tree or do not measure.
+
+## The timeout
+
+`vitest.config.ts` raises testTimeout and hookTimeout from 20 s to 60 s. That
+change was made for this phantom regression, and it stays - not for render
+cost, but because parallel workers on a shared CI runner can starve a test long
+enough to trip a 20 s limit, and a starvation timeout reads as a real failure.
+The comment there says so.
