@@ -279,6 +279,27 @@ for (const lesson of lessonManifest.lessons) {
 assert(lessonIds.size === 170, 'Did not verify 170 unique lesson IDs');
 assert(lessonDirectories.size === 170, 'Did not verify 170 unique lesson directories');
 
+// The main process requires @julusian/midi before it evaluates a single line
+// of our own code. If its native binding is missing from the package, the app
+// throws at startup, Electron puts up a modal error box, and the window never
+// appears - a build that signs, notarizes and passes Gatekeeper while being
+// completely dead. That happened on 2026-08-17, from a stray
+// node_modules/node_modules symlink that made electron-builder pack the dev
+// tree instead of the real dependency layout. Fail here instead.
+const unpackedRoot = path.join(resourcesPath, 'app.asar.unpacked');
+const midiBindingPath = path.join(
+  unpackedRoot,
+  'node_modules/@julusian/midi/build/Release/midi.node',
+);
+assert(
+  fs.existsSync(midiBindingPath),
+  'The packaged app has no @julusian/midi native binding, so it cannot start',
+);
+assert(
+  !fs.existsSync(path.join(unpackedRoot, 'node_modules/node_modules')),
+  'The package contains a nested node_modules/node_modules - the dependency layout is wrong',
+);
+
 const sourceSpecs = {
   'yandex-drums-2026-08-09.json': 13,
   'yandex-favorites-2026-08-10.json': 230,
