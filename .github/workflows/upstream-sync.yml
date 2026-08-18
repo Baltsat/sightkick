@@ -51,7 +51,7 @@ jobs:
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `${output}\n`);
           NODE
 
-      - name: Open upstream update issue
+      - name: Report upstream update
         if: steps.compare.outputs.update_available == 'true'
         uses: actions/github-script@v7
         env:
@@ -63,6 +63,16 @@ jobs:
           script: |
             const marker = '<!-- sightkick-upstream-sync -->';
             const title = `Upstream sync available: ${process.env.LATEST_TAG || process.env.LATEST_SHA}`;
+            const summary = `## ${title}\n\nUpstream \`tonygoldcrest/sightkick\` has ${process.env.AHEAD} commit(s) beyond this fork's default branch.\n\n- latest upstream tag: \`${process.env.LATEST_TAG || 'none'}\`\n- upstream main: \`${process.env.LATEST_SHA}\`\n- latest tag missing locally: \`${process.env.TAG_MISSING}\``;
+            await core.summary.addRaw(summary).write();
+            const { data: repository } = await github.rest.repos.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            if (!repository.has_issues) {
+              core.notice('Issues are disabled on this repository; the upstream status is in the job summary only.');
+              return;
+            }
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
